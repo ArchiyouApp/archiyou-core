@@ -1,6 +1,6 @@
 # Archiyou-core
 
-![Archiyou](assets/archiyou_logo_header_white.png)
+![Archiyou](assets/archiyou_logo_header_white_bg.png)
 
 ## 🌐 What is Archiyou?
 
