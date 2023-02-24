@@ -13,7 +13,6 @@ This is the core library of the Archiyou platform. It consists of the following 
 - 🛠️ **Geom** - The module to create geometry and topology shapes. Wraps a custom build of [OpenCascade.js](https://github.com/donalffons/opencascade.js). 
 - 📦 **Exporter** - Module to export data 
 - ⭐ **Annotator** - A module for generating annotations like dimension lines and labels
-- 🖩 **Calc** - Module to turn models into tables of data and do calculations
 - 📚 **Doc** - The module to define documents, pages and add content (shapes, text, images) to them
 - 🌈 **Misc utils** - A way to parse scripts in different scopes (like Webworkers)
 
