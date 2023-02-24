@@ -1,0 +1,13 @@
+node_modules/
+*.log
+pids
+logs
+results
+tmp
+.env
+.idea
+*.iml
+.DS_Store
+Thumbs.db
+dist/**/*
+yarn.lock

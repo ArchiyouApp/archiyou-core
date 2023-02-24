@@ -1,0 +1,27 @@
+{
+  "name": "archiyou-docs",
+  "version": "0.0.1",
+  "description": "Archiyou documentation and API reference",
+  "main": "index.js",
+  "authors": {
+    "name": "Mark van der Net",
+    "email": "mark@archiyou.com"
+  },
+  "repository": "",
+  "scripts": {
+    "dev": "vuepress dev src",
+    "build": "vuepress build src"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "vuepress": "^1.5.3"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.1",
+    "eslint": "^8.6.0",
+    "typedoc": "^0.23.7",
+    "typedoc-plugin-markdown": "^3.13.3",
+    "typescript": "^4.5.4",
+    "vuepress-plugin-typedoc": "^0.10.3"
+  }
+}

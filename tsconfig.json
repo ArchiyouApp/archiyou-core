@@ -1,0 +1,54 @@
+// tsconfig.json
+// See reference: https://www.typescriptlang.org/tsconfig
+{
+    "compilerOptions": 
+    {
+      "target": "es2017", 
+      "module": "esnext",
+      "moduleResolution": "node", // Needed to import libs                   
+      "lib": ["es6","dom"],        
+      "declaration" : true,
+      "allowJs": true,
+      "outDir": "dist",
+      "strict": false,
+      //"noPropertyAccessFromIndexSignature" : false,
+      "noImplicitAny": false,
+      "emitDecoratorMetadata": true,
+      "experimentalDecorators" : true,
+      //"useDefineForClassFields": false,
+      //"esModuleInterop": true,
+      "allowSyntheticDefaultImports" : true, // fix: This module is declared with using 'export =', and can only be used with a default import when using the 'esModuleInterop' flag.
+      "sourceMap": true,
+      "noEmit": true,
+      "baseUrl": ".",
+      "paths": {
+        "~/*": ["./*"],
+        "@/*": ["./*"]
+      },
+      "skipLibCheck": true
+    },
+    "include" : ["src"], // not working
+    "exclude": [
+      "node_modules",
+      "**/archiyou-opencascade/*.ts", // not working when imported
+      "typings",
+      "tests",
+      "**/*.spec.ts"
+    ],
+    "ts-node": {
+      "moduleTypes": {
+        "jest.config.ts": "cjs"
+      }
+    },
+    // TypeDoc settings: https://typedoc.org/guides/options/
+    // For standalone API docs only
+    "typedocOptions": 
+    {
+      "entryPoints": [
+        "src/internal.ts",
+      ],
+      "out": "apidocs",
+      "name" : "Archiyou Geom API",
+      "includeVersion" : true
+    }
+  }
