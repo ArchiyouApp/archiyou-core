@@ -13,7 +13,6 @@
     "chroma-js": "^2.4.2",
     "dotenv": "^16.0.0",
     "meshoptimizer": "^0.17.0",
-    "opencascade.js": "2.0.0-beta.dd8ce1a",
     "spark-md5": "^3.0.2",
     "typedoc": "^0.23.7",
     "uuid": "^8.3.2"

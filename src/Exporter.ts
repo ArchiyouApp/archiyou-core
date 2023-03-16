@@ -37,9 +37,9 @@ export class Exporter
 
     _parent = null; 
 
-    constructor(parent:any) // Either reference to WebWorker or Main.vue
+    constructor(parent:any) 
     {
-        this._parent = parent;
+        this._parent = parent; // Either reference to WebWorker or Main.vue
     }
 
     exportToStep():string
@@ -86,7 +86,7 @@ export class Exporter
         }
     }
 
-    async exportToStepWindow(content)
+    async exportToStepWindow(content:string)
     {
         let stepContent = content || this.exportToStep();
         const fileHandle = await this.getNewFileHandle("STEP files", "text/plain", "step");
@@ -136,39 +136,58 @@ export class Exporter
         });
     }
 
-    exportToGLTF(quality?:MeshingQualitySettings):ArrayBuffer
+    /** Export Scene to GLTF 
+        TODO: Open Cascade is not exporting geometry buffers in text-based GLTF (probably because it assumes a external .bin file) - check how we can include it
+        OC docs: https://dev.opencascade.org/doc/refman/html/class_r_w_gltf___caf_writer.htm
+    */
+    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true):ArrayBuffer|string
     {
-        // !!!! TODO: is seperate triangulation needed? !!!!
-        // Export GLTF with seperate meshes for each Shape
         const oc = this._parent.geom._oc;
         
-        const filename = this._getFileName() + '.glb';
         const meshingQuality = quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
+        const filename = `file.${(binary) ? 'glb' : 'gltf'}`
 
         let sceneCompoundShape = this._parent.geom.all().filter(s => s.visible()).toOcCompound();
         
         // Taken from: https://github.com/donalffons/opencascade.js/blob/master/starter-templates/ocjs-create-nuxt-app/components/shapeToUrl.js
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
         
+        // TODO: We want to export all shapes (at least on root level) as seperate nodes in GLTF
         const shapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get();
         shapeTool.SetShape(shapeTool.NewShape(), sceneCompoundShape);
 
+        // Triangulate as one mesh (TODO: export as seperate Shapes)
         new oc.BRepMesh_IncrementalMesh_2(sceneCompoundShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
 
-        // Export a GLB file (this will also perform the meshing)
-        const cafWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2("./file.glb"), true);
-        cafWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
+        // TODO: transform to GLTF coord system
 
-        // Read the GLB file from the virtual file system
-        const glbFile = oc.FS.readFile("./file.glb", { encoding: "binary" });
-        // TODO: unlink
+        // Export a GLTF file (this will also perform the meshing)
+        // IMPORTANT: currently OC does not export embedded geometry buffer with text/json based GLTF - TODO: add manually
+        const cafWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), binary);
+        cafWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
+        // TODO: We might need to pick up the seperate bin file for text-based GLTF
+
+        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (binary) ? 'binary' : 'utf8' });
+        oc.FS.unlink("./" + filename);
         
-        return glbFile.buffer;
+        let gltfContent =  (binary) ? gltfFile.buffer : gltfFile;
+        
+        if(archiyouFormat)
+        {
+            // add special Archiyou data to GLTF
+            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay); 
+        }
+        
+        return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
     }
 
-    async exportToGLTFWindow(content:ArrayBuffer)
+    /** Export GLTF (binary or text) to the browser window */
+    async exportToGLTFWindow(content:ArrayBuffer|string)
     {
-        const fileHandle = await this.getNewFileHandle("GLTF files", "application/octet-stream", "glb");
+        const fileHandle = (typeof content === 'string') ? 
+                    await this.getNewFileHandle("GLTF files", "text/plain", "gltf") :
+                    await this.getNewFileHandle("GLTF files", "application/octet-stream", "glb");
+
         this.writeFile(fileHandle, content).then(() => 
         {
           console.info("Saved GLTF to " + fileHandle.name);

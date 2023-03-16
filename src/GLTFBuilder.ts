@@ -1,8 +1,8 @@
-import { Vector } from './internal'
-import { MeshShape } from './internal' // ExportModels
+import { Geom, Vector, SceneGraphNode, Gizmo, DimensionLineData, DocData, ArchiyouState, StatementError, ConsoleMessage} from './internal'
 import { toRad } from './internal'
-import { Document, Accessor, Scene, WebIO, Node } from '@gltf-transform/core';
+import { Document, Accessor, Scene, WebIO, Node, BufferUtils } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
+import * as base64js from 'base64-js'
 
 /* Docs:
     - animation sequence: https://gltf-transform.donmccurdy.com/functions.html 
@@ -10,6 +10,20 @@ import { sequence } from '@gltf-transform/functions';
     - animation sequence options: https://github.com/donmccurdy/glTF-Transform/blob/8d1eba3de55b93e1f3a656f1701c37dea48b3af1/packages/functions/src/sequence.ts#L6
 
 */
+
+/** Special Archiyou data inserted into asset.archiyou
+    TODO: We use ComputeResult internally - which has a lot of overlap with this
+    When we start using GLB format internally these types will merge
+*/
+export interface ArchiyouData
+{
+    scenegraph: SceneGraphNode
+    gizmos: Array<Gizmo>,
+    annotations: Array<DimensionLineData>, 
+    docs: {[key:string]:DocData} // all documents in data and serialized content
+    errors?: Array<StatementError>, // only needed for internal use in the future
+    messages?: Array<ConsoleMessage>, // only needed for internal use in the future
+}
 
 export class GLTFBuilder
 {
@@ -86,4 +100,34 @@ export class GLTFBuilder
         let arrayBuffer = await io.writeBinary(this.doc); 
         return arrayBuffer as any; // avoid TS errors
     }
+
+    //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
+
+    /** Apply Archiyou GLTF format data to raw GLTF content buffer */
+    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouState):ArrayBuffer
+    {
+        const io = new WebIO({credentials: 'include'});
+        if (typeof gltfContent === 'string')
+        {
+            // TODO
+        }
+        else {
+            // Open ArrayBuffer and write extra data
+            this.doc = io.readBinary(gltfContent);
+            let asset = this.doc.getRoot().getAsset();
+
+            asset.generator = 'Archiyou';
+            asset.extras = {};
+            asset.extras.archiyou = {
+                scenegraph: ay.geom.scene.toGraph(),
+                gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
+                annotations: ay.geom._annotator.getAnnotations(),
+                // Dont do: messages, errors
+            } as ArchiyouData
+            
+            let buffer = io.writeBinary(this.doc); 
+            return buffer; 
+        }
+    }
+
 }

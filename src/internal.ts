@@ -39,6 +39,9 @@ export * from './decorators'
 export * from './utils'
 export * from './Selector'
 
+export * from './Console'
+export * from './CodeParser'
+
 export * from './Doc'
 export * from './DocPageContainer'
 export * from './DocPageContainerView'

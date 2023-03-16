@@ -1,4 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
+import { Geom, Doc, CodeParser, Exporter} from './internal'
 
 //// SETTINGS ////
 
@@ -68,6 +69,18 @@ export type MakeSolidInput = Array<Shell>|ShapeCollection
 
 //// INTERFACES ////
 
+/** A group of all modules of Archiyou for easy access  */
+export interface ArchiyouState
+{
+    geom: Geom,
+    doc: Doc,
+    console: Console,
+    executor: CodeParser,
+    exporter: Exporter, 
+    // TODO: importer?
+    gizmos: Array<Gizmo>, // TODO: move this to Geom?
+}
+
 /** All possible attributes for Shapes */
 // TODO: Can we allow user attributes??
 export interface ShapeAttributes
@@ -116,6 +129,14 @@ export interface SceneGraphNodeDetails {
     numVertices?:number,
     numEdges?:number,
     numWires?:number,
+}
+
+export interface StatementError 
+{
+    lineStart: number, // NOTE: lineIndex versus this!
+    lineEnd: number,
+    code: string,
+    message : string,
 }
 
 export interface BaseStyle 
