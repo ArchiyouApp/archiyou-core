@@ -1302,7 +1302,9 @@ export class Wire extends Shape
         return newShape;
     }
 
-    /** Offset Wire to create a new parallel Wire at given distance (private) */
+    /** Offset Wire to create a new parallel Wire at given distance (private) 
+     *  IMPORTANT: -amount means the Wire becomes smaller. We will check for that!
+    */
     // TODO: @protectOC
     @checkInput([[Number,WIRE_OFFSET_AMOUNT],[String, WIRE_OFFSET_TYPE], ['PointLike', null]], ['auto', 'auto', 'Vector'])
     _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Wire
@@ -1324,42 +1326,58 @@ export class Wire extends Shape
        
         let ocOffsetType = OFFSET_2D_TYPE[type] || OFFSET_2D_TYPE[WIRE_OFFSET_TYPE];
         let ocMakeOffset;
+        let isOpen = false;
 
         if(this.closed())
         {
+            // Closed Wire
             if(this.selfIntersecting())
             {
                 console.error(`Wire::offset: Cannot offset a self-intersecting Wire or Face!`);
                 return null;
             }
-            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_2(this._toFace()._ocShape, 
-                                ocOffsetType, 
-                                false); // isOpenResult
+
+            // Fix case if Wire has only one single (probably a Circle)
+            const downgradedShape = this.checkDowngrade();
+            if(downgradedShape.type() == 'Edge')
+            {
+                return (downgradedShape._offsetted(amount, type, onPlaneNormal) as Edge)._toWire();
+            }
+
+            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_2(this._toFace()._ocShape, ocOffsetType, false); // isOpenResult
         }
         else 
         {
             // offset open Wire
-            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_3(this._ocShape, 
-                ocOffsetType, 
-                true); // isOpenResult
+            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_3(this._ocShape, ocOffsetType, true); // isOpenResult
+            isOpen = true;
         }
         
-        ocMakeOffset.Perform(amount, 0)
-
-        let newOcShape = ocMakeOffset.Shape();
-        if(!newOcShape)
+        ocMakeOffset.Perform(amount, 0); // Alt
+        let offsetWire = (new Shape()._fromOcShape(ocMakeOffset.Shape())) as Wire;
+        
+        if (!offsetWire)
         {
-            console.error(`Wire::offset: Failed. Check geometry!`)
-            return null;
+            throw new Error('Wire::_offsetted: Offsetting failed. Check if the offset amount does not lead to self-intersection!')
         }
 
-        let newWire = (new Shape()._fromOcShape(newOcShape)) as Wire;
-        newWire._unifyDomain();
+        // Test if -amount results in smaller Wire (only when its a open Wire)
+        if(isOpen)
+        {
+            const growth = offsetWire.bbox().area() - this.bbox().area();
+            if( (amount > 0 && growth < 0) || (amount < 0 && growth > 0) )
+            { 
+                ocMakeOffset.Perform(-amount, 0); // switch amount
+                offsetWire = (new Shape()._fromOcShape(ocMakeOffset.Shape())) as Wire;
+            }
+        }
 
-        return newWire;
+        offsetWire._unifyDomain();
+
+        return offsetWire;
     }
 
-    /** Offset Wire to create a new parallel Wire at given distance*/
+    /** Offset Wire to create a new parallel Wire at given distance */
     @addResultShapesToScene
     @checkInput([[Number,WIRE_OFFSET_AMOUNT],[String, WIRE_OFFSET_TYPE], ['PointLike', null]], ['auto', 'auto', 'Vector'])
     offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Wire

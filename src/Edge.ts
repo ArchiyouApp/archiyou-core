@@ -322,7 +322,9 @@ export class Edge extends Shape
         return new Vertex()._fromOcVertex((new this._oc.ShapeAnalysis_Edge()).LastVertex(this._ocShape));
     }
 
-    /** Get Edge Type: Line, Circle, Ellipse, Hyperbola, Parabola, BezierCurve, BSplineCurve, OffsetCurve, OtherCurve */
+    /** Get Edge Type: Line, Circle, Ellipse, Hyperbola, Parabola, BezierCurve, BSplineCurve, OffsetCurve, OtherCurve 
+     *  IMPORTANT: Because it generates a lot of confusion we add here the distinction Circle/Arc that is not in OpenCascade
+    */
     edgeType():string
     {
         const LOOKUP_INT_TO_TYPE = {
@@ -338,6 +340,15 @@ export class Edge extends Shape
         }
         
         let edgeType = LOOKUP_INT_TO_TYPE[String(this._toOcCurve().GetType().value)];
+
+        if(edgeType === 'Circle')
+        {
+            if (!this.start().equals(this.end()))
+            {
+                edgeType = 'Arc'
+            }
+        }
+
         return edgeType;
     }
 
@@ -608,12 +619,26 @@ export class Edge extends Shape
         if (this.edgeType() != 'Line')
         {
             let wire = this._toWire();
-            let ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_3(wire._ocShape, this._oc.GeomAbs_JoinType.GeomAbs_Tangent, true); // isOpenResult
-            ocMakeOffset.Perform(amount, 0);
+            let ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_3(wire._ocShape, this._oc.GeomAbs_JoinType.GeomAbs_Tangent, true); // isOpenResult (false actually thickens the Edge into a closed Wire)
+            ocMakeOffset.Perform(amount,0); // Alt altitude
             let newOcShape = ocMakeOffset.Shape();
-            let newWire = (new Shape()._fromOcShape(newOcShape)) as Wire; // always a Wire
             
-            return newWire.checkDowngrade() as Edge|Wire;
+            let offsetShape = new Shape()._fromOcShape(newOcShape) as Edge|Wire;
+
+            if(!offsetShape){
+                throw new Error('Edge::_offsetted: Offsetting failed. Check if the offset amount does not lead to self-intersection!')
+            }
+
+            // Sometimes the offsetted Shape becomes a Wire (like in Spline), check if we can downcast to Edge
+            offsetShape = (offsetShape.type() === 'Wire') ? offsetShape.checkDowngrade() as Edge|Wire : offsetShape;
+            // OC always offsets from origin - correct to offset from center of Edge
+            if(offsetShape.type() === 'Edge')
+            {
+                ((offsetShape as Edge).edgeType() === 'Circle') ? offsetShape.move(this.center().toVector().reversed())
+                    : offsetShape.move(0,0,-this.start().z)
+            }            
+            
+            return offsetShape as Edge
         }
         else {
             // Line offset
@@ -630,17 +655,34 @@ export class Edge extends Shape
     @checkInput([ [Number,EDGE_DEFAULT_OFFSET], [String, null],['PointLike', null]], [Number, 'auto','Vector'])
     offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Edge|Wire
     {
-        return this._offsetted(amount,type,onPlaneNormal)
+        let offsetShape = this._offsetted(amount,type,onPlaneNormal);
+        // Open Shapes sometimes become bigger (after -amount): Check and corrent
+        const growth = offsetShape.bbox().area() - this.bbox().area();
+        if( (amount > 0 && growth < 0) || (amount < 0 && growth > 0) ){ offsetShape = this._offsetted(-amount, type, onPlaneNormal);}
+        return offsetShape;
     }
 
     /** Offset Edge a given amount into normal direction or reversed with '-amount' */
     @checkInput([ [Number,EDGE_DEFAULT_OFFSET], [String, null], ['PointLike', null]], [Number, 'auto','Vector'])
     offset(amount?:number, type?:string, onPlaneNormal?:PointLike):Edge|Wire
     {
-        let newEdge = this._offsetted(amount, type, onPlaneNormal);
-        this._fromOcEdge(newEdge._ocShape); // replace old OC Edge with new
+        let offsetShape = this._offsetted(amount, type, onPlaneNormal); 
+        // Open Shapes sometimes become bigger (after -amount): Check and corrent
+        const growth = offsetShape.bbox().area() - this.bbox().area();
+        if( (amount > 0 && growth < 0) || (amount < 0 && growth > 0) ){ offsetShape = this._offsetted(-amount, type, onPlaneNormal);}
+
+        if (offsetShape.type() === 'Edge')
+        {
+            this._fromOcEdge(offsetShape._ocShape); // replace old OC Edge with new
+            return this;
+        }
+        else {
+            // IMPORTANT: Splines can turn into Wires after offsetted - so we can't update 
+            console.warn('Edge::offset: A Spline Edge turned into a Wire after offset!')
+            this.replaceShape(offsetShape)
+            return offsetShape;
+        }
         
-        return this;
     }
 
     /** 
