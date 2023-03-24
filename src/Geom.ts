@@ -95,16 +95,16 @@ export class Geom
   //// CREATION METHODS ////
 
   /** Creates a 2D/3D Point */
-  @checkInput('PointLike', 'Point')
+  @checkInput([['PointLike', [0,0,0]]], 'Point')
   Point(p:PointLike, ...args):Point
   {
     let pnt = p as Point; // auto converted
-    if (!pnt){ pnt = new Vector().fromPointLike(p,...args)}
+    if (!pnt){ pnt = new Point().fromPointLike(p,...args)}
     return pnt;
   }
 
   /** Creates a 2D/3D Vector */
-  @checkInput([['PointLike',null]], 'Vector') // allow null and fix later
+  @checkInput([['PointLike',[1,0,0]]], 'Vector') // allow null and fix later
   Vector(p:PointLike, ...args):Vector
   {
     let v = p as Vector; // auto converted
@@ -114,10 +114,10 @@ export class Geom
   }
 
   /** Creates a 2D/3D Point */
-  @checkInput('PointLike', 'Vertex')
+  @checkInput([['PointLike', [0,0,0]]], 'Vertex')
   Vertex(p:PointLike, ...args):Vertex
   {
-    let v = p as Vertex; // auto converted
+    const v = p as Vertex; // auto converted
     v.addToScene();
     v.name(this.getNextObjName('Vertex')); // auto name
     console.geom(`Geom::Vertex: Created a Vertex at ${v.x},${v.y},${v.z}`);

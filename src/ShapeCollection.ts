@@ -939,7 +939,7 @@
       select(selectString:string=null):ShapeCollection
       {
          let selectedShapes = new ShapeCollection();
-         this.all().forEach( shape => selectedShapes.concat(shape.select(selectString)) )
+         this.all().forEach( shape => selectedShapes.concat(new ShapeCollection(shape.select(selectString))))
          return selectedShapes.distinct();
       }
 

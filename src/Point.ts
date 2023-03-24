@@ -48,7 +48,6 @@ export class Point
     // IMPORTANT: we need to use private properties _x here, otherwise the setter is invoked on Vector before ocVector is set
     fromPointLike( p?:PointLike, ...args): Point | Vector
     {
-
         if (p === null || p === undefined)
         {
             // new Point() or new Vector() is handy to have default to [0,0,0]

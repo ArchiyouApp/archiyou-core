@@ -332,7 +332,7 @@ export class Solid extends Shape
         {
             let selectionString = edges as SelectionString;
 
-            let selectedShapes = this.select(selectionString);
+            let selectedShapes = new ShapeCollection(this.select(selectionString)); // select might return Shape or ShapeCollection
             if (selectedShapes == null)
             {
                 throw new Error(`Solid::fillet: ERROR\n Could not get any Shapes with selection string: ${selectionString}!`)
@@ -449,7 +449,7 @@ export class Solid extends Shape
          {
              let selectionString = edges as SelectionString;
  
-             let selectedShapes = this.select(selectionString);
+             let selectedShapes = new ShapeCollection(this.select(selectionString));
              if (selectedShapes == null)
              {
                  throw new Error(`Solid::chamfer: ERROR\n Could not get any Shapes with selection string: ${selectionString}!`)

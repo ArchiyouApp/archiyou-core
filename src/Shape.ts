@@ -792,6 +792,30 @@ export class Shape
         return this;
     }
 
+    /** Aliass for move along x-direction */
+    @checkInput(Number, 'auto')
+    moveX(distance:number):this
+    {
+        this.move(distance)
+        return this;
+    }
+
+    /** Aliass for move along x-direction */
+    @checkInput(Number, 'auto')
+    moveY(distance:number):this
+    {
+        this.move(0,distance,0)
+        return this;
+    }
+
+    /** Aliass for move along x-direction */
+    @checkInput(Number, 'auto')
+    moveZ(distance:number):this
+    {
+        this.move(0,0,distance)
+        return this;
+    }
+
     /** Move a copy of the Shape */
     @addResultShapesToScene
     @checkInput('PointLike','Vector')
@@ -1022,8 +1046,9 @@ export class Shape
             return this._copy();
         }
 
-        let bottomFace = this.select('F||bottom').first();
-
+        const selected = this.select('F||bottom');
+        let bottomFace = ShapeCollection.isShapeCollection(selected) ? (selected as AnyShapeCollection).first() : selected as AnyShape;
+        
         if(bottomFace && bottomFace.type() === 'Face')
         {
             return bottomFace._copy() as Face; // auto added to Scene
@@ -1438,14 +1463,14 @@ export class Shape
 
         if(isSelectionString(excludeFaces))
         {
-            let selectedShapes = this.select(excludeFaces as SelectionString);
-            if (selectedShapes == null)
+            let selected = this.select(excludeFaces as SelectionString); // Can be Shape or ShapeCollection
+            if (selected == null)
             {
                 console.warn(`Shape::_shelled: No Faces found for exclusion with selection string: "${excludeFaces}. Fell back to none!`);
                 excludeFacesCollection = new ShapeCollection();
             }
             else {
-                excludeFacesCollection = selectedShapes.getSubShapes('Face');
+                excludeFacesCollection = new ShapeCollection(selected.getSubShapes('Face'));
                 if (excludeFacesCollection.length == 0)
                 {
                     console.warn(`Shape::_shelled: No Faces found for exclusion with selection string: "${excludeFaces}. Check if you supplied Faces in your SelectionString!`);
@@ -2694,11 +2719,32 @@ export class Shape
         shapes.add(this) // Don't include original Shape (start at index 1), but do add to array
         for(let i = 1; i < size; i++) 
         {
-            let newShape = this.copy().move( (offset as Vector).scaled(i)); // offset is auto converted
+            let newShape = this.moved( (offset as Vector).scaled(i)); // offset is auto converted
             shapes.add(newShape);
         }
 
         return shapes;
+    }
+
+    /** Alias for array along x-axis */
+    @checkInput([[Number, 5],[Number, 100]], [Number, Number])
+    arrayX(size?:number, offset?:number)
+    {
+        return this._array1D(size, new Vector(1,0,0).scale(offset))
+    }
+
+    /** Alias for array along y-axis */
+    @checkInput([[Number, 5],[Number, 100]], [Number, Number])
+    arrayY(size?:number, offset?:number)
+    {
+        return this._array1D(size, new Vector(0,1,0).scale(offset))
+    }
+
+    /** Alias for array along z-axis */
+    @checkInput([[Number, 5],[Number, 100]], [Number, Number])
+    arrayZ(size?:number, offset?:number)
+    {
+        return this._array1D(size, new Vector(0,0,1).scale(offset))
     }
 
     /** Copies a Shape along a linear path */
@@ -3081,12 +3127,12 @@ export class Shape
      *   
      */
     @checkInput(String,'auto')
-    select(selectString:string=null):AnyShapeCollection // NOTE: always return ShapeCollection for clarity
+    select(selectString:string=null):AnyShape|AnyShapeCollection // NOTE: always return ShapeCollection for clarity
     {
         let selectedShapes:AnyShapeCollection = new Selector(this).select(selectString);
         selectedShapes.forEach( shape => shape._parent = this ); // keep reference to parent Shape
 
-        return selectedShapes;
+        return selectedShapes.checkSingle(); // return either ShapeCollection or single Shape
     }
 
     _axisAndPlanesToVector(axis:string):Vector
@@ -3453,6 +3499,7 @@ export class Shape
 
         // We are looking for the same of as bboxSide type 
         let bboxSideShape = this.bbox().getSidesShape(sidesString); // can be Vertex, Edge or Face
+        
         if(!bboxSideShape)
         {
             console.error(`Shape::_getSide: Failed to get a bbox for this Shape.`)
@@ -3489,7 +3536,7 @@ export class Shape
 
         // optimize search by ordering on distance to bbox side shape
         testShapes.sort(SEARCH_SORT_FUNC);
-        
+
         while(true)
         {
             

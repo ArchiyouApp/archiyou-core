@@ -332,7 +332,7 @@ export class Bbox
     {
         // IMPORTANT: Bbox can be pretty inaccurate! Sometimes 1 unit on each axis for flat Shapes.
         // We introduce this TOLERANCE_2D
-        const TOLERANCE_2D = 2.0;
+        const TOLERANCE_2D = 0.4;
         
         return (this.height() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE 
                     || this.width() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE 

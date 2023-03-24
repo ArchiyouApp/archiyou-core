@@ -19,7 +19,7 @@ test("ModelingTopologyEdges", () =>
     expect(l.type()).toEqual('Edge'); // Output: Edge
     expect(l.edgeType()).toEqual('Line'); // Output: Line
     const a = geom.Arc([0,0,0],[100,200,0],[200,0,0]); // an arc ~ half a circle 
-    expect(a.edgeType()).toEqual('Circle'); // Output: Circle (because arcs are pieces of a circle!)
+    expect(a.edgeType()).toEqual('Arc'); // Output: OC returns this as Circle, but Archiyou overrides to more intuitive Arc
     const s = geom.Spline([[0,0,0],[100,100,0],[200,0,0],[300,0,0]]); 
     expect(s.edgeType()).toEqual('BSplineCurve');
 })
@@ -145,7 +145,7 @@ test("ModelingTopologySelectors", () =>
     const box = geom.Box(100);
     expect(box.select('E|Z').length).toEqual(4); // 4 Edges parallel to Z-axis
     expect(box.select('E||front').length).toEqual(4); // 4 Edges that are part of the front Face
-    expect(box.select('F||top')[0].type()).toEqual('Face'); // top Face
+    expect(box.select('F||top').type()).toEqual('Face'); // top Face
     expect(box.select('V@X=-50').length).toEqual(4); // 4 Vertices with x coordinate of -50
     expect(box.select('E::line').length).toEqual(12); // all 12 line Edges of the Box
     expect(box.select('V<<->[-100,0,0]').length).toEqual(4); // 4 Vertices closest to point [-100,0,0]
