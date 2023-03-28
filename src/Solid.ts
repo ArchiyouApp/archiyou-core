@@ -183,7 +183,7 @@ export class Solid extends Shape
             return null;
         }
         
-        let ocBox = new this._oc.BRepPrimAPI_MakeBox_4( fromP._toOcPoint(), toP._toOcPoint() ).Shape();
+        const ocBox = new this._oc.BRepPrimAPI_MakeBox_4( fromP._toOcPoint(), toP._toOcPoint() ).Shape();
         this._fromOcSolid(ocBox);
 
         return this;

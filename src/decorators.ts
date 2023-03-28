@@ -555,11 +555,11 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
 
         if (cacheResult)
         {
-            return cacheResult.copy(); // return copy of cached version to avoid changing cache version
+            return cacheResult._copy(); // return copy of cached version to avoid changing cache version
         }
         else {
             let calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
-            _setCache(cache,hash,calculatedOutput.copy()); // place a copy of the output in the cache
+            _setCache(cache,hash,calculatedOutput._copy()); // place a copy of the output in the cache
             return calculatedOutput; // return real output - no cached version!
         }
         

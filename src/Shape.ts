@@ -1463,14 +1463,14 @@ export class Shape
 
         if(isSelectionString(excludeFaces))
         {
-            let selected = this.select(excludeFaces as SelectionString); // Can be Shape or ShapeCollection
-            if (selected == null)
+            const selected = this.select(excludeFaces as SelectionString); // Can be Shape or ShapeCollection
+            if (selected === null)
             {
                 console.warn(`Shape::_shelled: No Faces found for exclusion with selection string: "${excludeFaces}. Fell back to none!`);
                 excludeFacesCollection = new ShapeCollection();
             }
             else {
-                excludeFacesCollection = new ShapeCollection(selected.getSubShapes('Face'));
+                excludeFacesCollection = new ShapeCollection(selected.faces());
                 if (excludeFacesCollection.length == 0)
                 {
                     console.warn(`Shape::_shelled: No Faces found for exclusion with selection string: "${excludeFaces}. Check if you supplied Faces in your SelectionString!`);
