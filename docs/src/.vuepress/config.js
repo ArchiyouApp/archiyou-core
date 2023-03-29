@@ -72,6 +72,7 @@ module.exports = {
             sidebarDepth: 1,
             children: [
               '/guide/quickstart/tablex',
+              '/guide/quickstart/cabinetx',
             ]
           },
           {

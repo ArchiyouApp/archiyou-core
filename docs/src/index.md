@@ -1,6 +1,6 @@
 ---
 home: true
-heroImage: ./ay_logo_pwa.png
+heroImage: ./ay_logo.png
 tagline: Archiyou documentation and API reference
 actionText: Quick Start →
 actionLink: /guide/
