@@ -1,4 +1,4 @@
-import { MeshingQualitySettings, MeshShape } from './internal'
+import { MeshingQualitySettings, Shape, AnyShape} from './internal'
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
 import { GLTFBuilder } from './GLTFBuilder';
 
@@ -138,7 +138,14 @@ export class Exporter
 
     /** Export Scene to GLTF 
         TODO: Open Cascade is not exporting geometry buffers in text-based GLTF (probably because it assumes a external .bin file) - check how we can include it
-        OC docs: https://dev.opencascade.org/doc/refman/html/class_r_w_gltf___caf_writer.htm
+        OC docs: 
+        - https://dev.opencascade.org/doc/refman/html/class_r_w_gltf___caf_writer.htm
+        - ShapeTool: https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___shape_tool.html
+        - TDF_Label: https://dev.opencascade.org/doc/refman/html/class_t_d_f___label.html
+        - TDataStd_Name: https://dev.opencascade.org/doc/refman/html/class_t_data_std___name.html
+        - VisMaterialTool: https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___vis_material_tool.html#aaa1fb4d64b9eb24ed86bbe6d368010ab
+        - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
+
     */
     exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true):ArrayBuffer|string
     {
@@ -146,27 +153,37 @@ export class Exporter
         
         const meshingQuality = quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
         const filename = `file.${(binary) ? 'glb' : 'gltf'}`
-
-        let sceneCompoundShape = this._parent.geom.all().filter(s => s.visible()).toOcCompound();
-        
-        // Taken from: https://github.com/donalffons/opencascade.js/blob/master/starter-templates/ocjs-create-nuxt-app/components/shapeToUrl.js
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
+        const ocShapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get(); // autonaming is on by default
         
-        // TODO: We want to export all shapes (at least on root level) as seperate nodes in GLTF
-        const shapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get();
-        shapeTool.SetShape(shapeTool.NewShape(), sceneCompoundShape);
+        /* For now we export all visible shapes in a flattened scene (without nested scenegraph) 
+            and export as much properties (id, color) as possible 
+            NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
+        */
+        this._parent.geom.all().filter(s => s.visible()).forEach(entity => {
+            if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
+            {
+                const shape = entity as AnyShape;
+                const ocShape = shape._ocShape;
+                const ocShapeLabel = ocShapeTool.AddShape(ocShape,false,false); // Shape, makeAssembly, makePrepare
 
-        // Triangulate as one mesh (TODO: export as seperate Shapes)
-        new oc.BRepMesh_IncrementalMesh_2(sceneCompoundShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
+                const shapeName = `${shape.getId()}__${shape.getName()}`; // save obj_id and name into GLTF node
+                
+                oc.TDataStd_Name.Set_2(ocShapeLabel, 
+                                oc.TDataStd_Name.GetID(), 
+                                new oc.TCollection_ExtendedString_2(shapeName, false)); // Set_2 not according to docs (no Set_3)
 
-        // TODO: transform to GLTF coord system
+                // triangulate BREP to mesh
+                new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
+            }
+        })
 
-        // Export a GLTF file (this will also perform the meshing)
-        // IMPORTANT: currently OC does not export embedded geometry buffer with text/json based GLTF - TODO: add manually
-        const cafWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), binary);
-        cafWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
+        const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), binary);
+        ocGLFTWriter.SetCoordinateSystemConverter(ocGLFTWriter.CoordinateSystemConverter());
+        ocGLFTWriter.SetForcedUVExport(true); // to output UV coords
+        ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
+        
         // TODO: We might need to pick up the seperate bin file for text-based GLTF
-
         const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (binary) ? 'binary' : 'utf8' });
         oc.FS.unlink("./" + filename);
         
@@ -177,6 +194,11 @@ export class Exporter
             // add special Archiyou data to GLTF
             gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay); 
         }
+
+        // clean up OC classes
+        ocShapeTool.delete();
+        ocGLFTWriter.delete();
+
         
         return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
     }

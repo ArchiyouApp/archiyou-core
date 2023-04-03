@@ -3784,9 +3784,15 @@ export class Shape
     }
 
     /** Get name of container Obj */
-    getName()
+    getId():string
     {
-        return this?._obj?.name();
+        return this?._obj?._id;
+    }
+
+    /** Get name of container Obj */
+    getName():string
+    {
+        return this?._obj?.name() as string;
     }
 
     hide():Shape

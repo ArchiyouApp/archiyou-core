@@ -260,6 +260,17 @@ mainBuild:
   - symbol: HLRAlgo_Projector
   - symbol: HLRBRep_HLRToShape
   - symbol: GCPnts_QuasiUniformDeflection
+  - symbol: TDataStd_Name
+  - symbol: Handle_TDataStd_Name
+  - symbol: TDataStd_NamedData
+  - symbol: Handle_TDataStd_NamedData
+  - symbol: TDataStd_GenericExtString
+  - symbol: Handle_TDataStd_GenericExtString
+  - symbol: Handle_TDF_Attribute
+  - symbol: Standard_GUID
+  - symbol: XCAFDoc_VisMaterialTool
+  - symbol: XCAFDoc_VisMaterialPBR
+  - symbol: RWMesh_CoordinateSystemConverter
   - symbol: OCJS
   emccFlags:
     - -sEXPORT_ES6=1

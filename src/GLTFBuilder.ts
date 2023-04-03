@@ -38,6 +38,28 @@ export class GLTFBuilder
         //this.buffer = this.doc.createBuffer('buffer'); //.setURI('buffer.bin');
     }
 
+    /** To binary GLTF buffer */
+    async toGLTFBuffer():Promise<Uint8Array>
+    {
+        const io = new WebIO({credentials: 'include'});
+        let arrayBuffer = await io.writeBinary(this.doc); 
+        return arrayBuffer as any; // avoid TS errors
+    }
+
+    //// GLTF ANIMATION EXPORT ////
+
+    /** build Animated GLTF */
+    createAnimation(frameGLBs:Array<Uint8Array>):boolean
+    {
+        this.loadFramesIntoScene(frameGLBs) // load GLB buffers into scene
+
+        // now we got all frames into seperate nodes - we can use the special function sequence to build a animation out of it
+        // NOTE: Blender has default FPS on animation of 24 - we want to place one Shape frame into exactly one frame in Blender
+        let sequenceOptions = { fps: 24, pattern: /FrameShapes[0-9]+/, animation: 'ParamAnimation', sort: false }; // see: https://github.com/donmccurdy/glTF-Transform/blob/8d1eba3de55b93e1f3a656f1701c37dea48b3af1/packages/functions/src/sequence.ts#L6
+        this.doc.transform(sequence(sequenceOptions));
+        return true;
+    }
+
     /** Load GLB of frame into scene */
     async frameGLBToNode(GLBBuffer:Uint8Array, nodeName:string)
     {   
@@ -69,18 +91,6 @@ export class GLTFBuilder
         this.doc.getRoot().listBuffers().forEach((b, index) => index > 0 ? b.dispose() : null);
     }
 
-    /** build Animated GLTF */
-    createAnimation(frameGLBs:Array<Uint8Array>):boolean
-    {
-        this.loadFramesIntoScene(frameGLBs) // load GLB buffers into scene
-
-        // now we got all frames into seperate nodes - we can use the special function sequence to build a animation out of it
-        // NOTE: Blender has default FPS on animation of 24 - we want to place one Shape frame into exactly one frame in Blender
-        let sequenceOptions = { fps: 24, pattern: /FrameShapes[0-9]+/, animation: 'ParamAnimation', sort: false }; // see: https://github.com/donmccurdy/glTF-Transform/blob/8d1eba3de55b93e1f3a656f1701c37dea48b3af1/packages/functions/src/sequence.ts#L6
-        this.doc.transform(sequence(sequenceOptions));
-        return true;
-    }
-
     _quaternionFromAxisAngle(axis:Vector, angleDeg:number):Array<number> // TODO: TS type 
     {
         // see: https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
@@ -91,14 +101,6 @@ export class GLTFBuilder
         let rotationQuaternion = [ axis.x*s, axis.y*s, axis.z*s, c ]; // [X, Y, Z, W] in GLTF
 
         return rotationQuaternion;
-    }
-
-    /** To binary GLTF buffer */
-    async toGLTFBuffer():Promise<Uint8Array>
-    {
-        const io = new WebIO({credentials: 'include'});
-        let arrayBuffer = await io.writeBinary(this.doc); 
-        return arrayBuffer as any; // avoid TS errors
     }
 
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////

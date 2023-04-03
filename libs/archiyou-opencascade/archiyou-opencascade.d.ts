@@ -1,4 +1,3 @@
-// @ts-nocheck
 export declare class BRepAdaptor_CompCurve extends Adaptor3d_Curve {
   static get_type_name(): Standard_Character;
   static get_type_descriptor(): Handle_Standard_Type;
@@ -953,6 +952,29 @@ export declare type ChFiDS_ChamfMode = {
   ChFiDS_ClassicChamfer: {};
   ChFiDS_ConstThroatChamfer: {};
   ChFiDS_ConstThroatWithPenetrationChamfer: {};
+}
+
+export declare class RWMesh_CoordinateSystemConverter {
+  constructor()
+  static StandardCoordinateSystem(theSys: RWMesh_CoordinateSystem): gp_Ax3;
+  IsEmpty(): Standard_Boolean;
+  InputLengthUnit(): Standard_Real;
+  SetInputLengthUnit(theInputScale: Standard_Real): void;
+  OutputLengthUnit(): Standard_Real;
+  SetOutputLengthUnit(theOutputScale: Standard_Real): void;
+  HasInputCoordinateSystem(): Standard_Boolean;
+  InputCoordinateSystem(): gp_Ax3;
+  SetInputCoordinateSystem_1(theSysFrom: gp_Ax3): void;
+  SetInputCoordinateSystem_2(theSysFrom: RWMesh_CoordinateSystem): void;
+  HasOutputCoordinateSystem(): Standard_Boolean;
+  OutputCoordinateSystem(): gp_Ax3;
+  SetOutputCoordinateSystem_1(theSysTo: gp_Ax3): void;
+  SetOutputCoordinateSystem_2(theSysTo: RWMesh_CoordinateSystem): void;
+  Init(theInputSystem: gp_Ax3, theInputLengthUnit: Standard_Real, theOutputSystem: gp_Ax3, theOutputLengthUnit: Standard_Real): void;
+  TransformTransformation(theTrsf: gp_Trsf): void;
+  TransformPosition(thePos: gp_XYZ): void;
+  TransformNormal(theNorm: OpenGl_Vec3): void;
+  delete(): void;
 }
 
 export declare type ChFi3d_FilletShape = {
@@ -3585,6 +3607,46 @@ export declare class Standard_Failure extends Standard_Transient {
     constructor(theDesc: Standard_CString, theStackTrace: Standard_CString);
   }
 
+export declare class Standard_GUID {
+  ToUUID(): Standard_UUID;
+  ToCString(aStrGuid: Standard_PCharacter): void;
+  ToExtString(aStrGuid: Standard_PExtCharacter): void;
+  IsSame(uid: Standard_GUID): Standard_Boolean;
+  IsNotSame(uid: Standard_GUID): Standard_Boolean;
+  Assign_1(uid: Standard_GUID): void;
+  Assign_2(uid: Standard_UUID): void;
+  ShallowDump(aStream: Standard_OStream): void;
+  static CheckGUIDFormat(aGuid: Standard_CString): Standard_Boolean;
+  Hash(Upper: Graphic3d_ZLayerId): Graphic3d_ZLayerId;
+  static HashCode(theGUID: Standard_GUID, theUpperBound: Graphic3d_ZLayerId): Graphic3d_ZLayerId;
+  static IsEqual(string1: Standard_GUID, string2: Standard_GUID): Standard_Boolean;
+  delete(): void;
+}
+
+  export declare class Standard_GUID_1 extends Standard_GUID {
+    constructor();
+  }
+
+  export declare class Standard_GUID_2 extends Standard_GUID {
+    constructor(aGuid: Standard_CString);
+  }
+
+  export declare class Standard_GUID_3 extends Standard_GUID {
+    constructor(aGuid: Standard_ExtString);
+  }
+
+  export declare class Standard_GUID_4 extends Standard_GUID {
+    constructor(a32b: Graphic3d_ZLayerId, a16b1: Standard_ExtCharacter, a16b2: Standard_ExtCharacter, a16b3: Standard_ExtCharacter, a8b1: Standard_Byte, a8b2: Standard_Byte, a8b3: Standard_Byte, a8b4: Standard_Byte, a8b5: Standard_Byte, a8b6: Standard_Byte);
+  }
+
+  export declare class Standard_GUID_5 extends Standard_GUID {
+    constructor(aGuid: Standard_UUID);
+  }
+
+  export declare class Standard_GUID_6 extends Standard_GUID {
+    constructor(aGuid: Standard_GUID);
+  }
+
 export declare class Standard_Transient {
   Delete(): void;
   static get_type_name(): Standard_Character;
@@ -3975,9 +4037,172 @@ export declare class Message_ProgressRange {
     constructor(theOther: Message_ProgressRange);
   }
 
+export declare class Handle_TDataStd_GenericExtString {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: TDataStd_GenericExtString): void;
+  get(): TDataStd_GenericExtString;
+  delete(): void;
+}
+
+  export declare class Handle_TDataStd_GenericExtString_1 extends Handle_TDataStd_GenericExtString {
+    constructor();
+  }
+
+  export declare class Handle_TDataStd_GenericExtString_2 extends Handle_TDataStd_GenericExtString {
+    constructor(thePtr: TDataStd_GenericExtString);
+  }
+
+  export declare class Handle_TDataStd_GenericExtString_3 extends Handle_TDataStd_GenericExtString {
+    constructor(theHandle: Handle_TDataStd_GenericExtString);
+  }
+
+  export declare class Handle_TDataStd_GenericExtString_4 extends Handle_TDataStd_GenericExtString {
+    constructor(theHandle: Handle_TDataStd_GenericExtString);
+  }
+
+export declare class TDataStd_GenericExtString extends TDF_Attribute {
+  Set(S: TCollection_ExtendedString): void;
+  SetID(guid: Standard_GUID): void;
+  Get(): TCollection_ExtendedString;
+  ID(): Standard_GUID;
+  Restore(with_: Handle_TDF_Attribute): void;
+  Paste(into: Handle_TDF_Attribute, RT: Handle_TDF_RelocationTable): void;
+  DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
+  static get_type_name(): Standard_Character;
+  static get_type_descriptor(): Handle_Standard_Type;
+  DynamicType(): Handle_Standard_Type;
+  delete(): void;
+}
+
+export declare class TDataStd_Name extends TDataStd_GenericExtString {
+  constructor()
+  static GetID(): Standard_GUID;
+  static Set_1(label: TDF_Label, string: TCollection_ExtendedString): Handle_TDataStd_Name;
+  static Set_2(label: TDF_Label, guid: Standard_GUID, string: TCollection_ExtendedString): Handle_TDataStd_Name;
+  Set_3(S: TCollection_ExtendedString): void;
+  SetID_1(guid: Standard_GUID): void;
+  SetID_2(): void;
+  static get_type_name(): Standard_Character;
+  static get_type_descriptor(): Handle_Standard_Type;
+  DynamicType(): Handle_Standard_Type;
+  NewEmpty(): Handle_TDF_Attribute;
+  delete(): void;
+}
+
+export declare class Handle_TDataStd_Name {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: TDataStd_Name): void;
+  get(): TDataStd_Name;
+  delete(): void;
+}
+
+  export declare class Handle_TDataStd_Name_1 extends Handle_TDataStd_Name {
+    constructor();
+  }
+
+  export declare class Handle_TDataStd_Name_2 extends Handle_TDataStd_Name {
+    constructor(thePtr: TDataStd_Name);
+  }
+
+  export declare class Handle_TDataStd_Name_3 extends Handle_TDataStd_Name {
+    constructor(theHandle: Handle_TDataStd_Name);
+  }
+
+  export declare class Handle_TDataStd_Name_4 extends Handle_TDataStd_Name {
+    constructor(theHandle: Handle_TDataStd_Name);
+  }
+
 export declare class TDataStd_GenericEmpty extends TDF_Attribute {
   Restore(a0: Handle_TDF_Attribute): void;
   Paste(a0: Handle_TDF_Attribute, a1: Handle_TDF_RelocationTable): void;
+  DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
+  static get_type_name(): Standard_Character;
+  static get_type_descriptor(): Handle_Standard_Type;
+  DynamicType(): Handle_Standard_Type;
+  delete(): void;
+}
+
+export declare class Handle_TDataStd_NamedData {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: TDataStd_NamedData): void;
+  get(): TDataStd_NamedData;
+  delete(): void;
+}
+
+  export declare class Handle_TDataStd_NamedData_1 extends Handle_TDataStd_NamedData {
+    constructor();
+  }
+
+  export declare class Handle_TDataStd_NamedData_2 extends Handle_TDataStd_NamedData {
+    constructor(thePtr: TDataStd_NamedData);
+  }
+
+  export declare class Handle_TDataStd_NamedData_3 extends Handle_TDataStd_NamedData {
+    constructor(theHandle: Handle_TDataStd_NamedData);
+  }
+
+  export declare class Handle_TDataStd_NamedData_4 extends Handle_TDataStd_NamedData {
+    constructor(theHandle: Handle_TDataStd_NamedData);
+  }
+
+export declare class TDataStd_NamedData extends TDF_Attribute {
+  constructor()
+  static GetID(): Standard_GUID;
+  static Set(label: TDF_Label): Handle_TDataStd_NamedData;
+  HasIntegers(): Standard_Boolean;
+  HasInteger(theName: TCollection_ExtendedString): Standard_Boolean;
+  GetInteger(theName: TCollection_ExtendedString): Graphic3d_ZLayerId;
+  SetInteger(theName: TCollection_ExtendedString, theInteger: Graphic3d_ZLayerId): void;
+  GetIntegersContainer(): CDM_NamesDirectory;
+  ChangeIntegers(theIntegers: CDM_NamesDirectory): void;
+  HasReals(): Standard_Boolean;
+  HasReal(theName: TCollection_ExtendedString): Standard_Boolean;
+  GetReal(theName: TCollection_ExtendedString): Standard_Real;
+  SetReal(theName: TCollection_ExtendedString, theReal: Standard_Real): void;
+  GetRealsContainer(): TDataStd_DataMapOfStringReal;
+  ChangeReals(theReals: TDataStd_DataMapOfStringReal): void;
+  HasStrings(): Standard_Boolean;
+  HasString(theName: TCollection_ExtendedString): Standard_Boolean;
+  GetString(theName: TCollection_ExtendedString): TCollection_ExtendedString;
+  SetString(theName: TCollection_ExtendedString, theString: TCollection_ExtendedString): void;
+  GetStringsContainer(): TDataStd_DataMapOfStringString;
+  ChangeStrings(theStrings: TDataStd_DataMapOfStringString): void;
+  HasBytes(): Standard_Boolean;
+  HasByte(theName: TCollection_ExtendedString): Standard_Boolean;
+  GetByte(theName: TCollection_ExtendedString): Standard_Byte;
+  SetByte(theName: TCollection_ExtendedString, theByte: Standard_Byte): void;
+  GetBytesContainer(): TDataStd_DataMapOfStringByte;
+  ChangeBytes(theBytes: TDataStd_DataMapOfStringByte): void;
+  HasArraysOfIntegers(): Standard_Boolean;
+  HasArrayOfIntegers(theName: TCollection_ExtendedString): Standard_Boolean;
+  GetArrayOfIntegers(theName: TCollection_ExtendedString): Handle_TColStd_HArray1OfInteger;
+  SetArrayOfIntegers(theName: TCollection_ExtendedString, theArrayOfIntegers: Handle_TColStd_HArray1OfInteger): void;
+  GetArraysOfIntegersContainer(): TDataStd_DataMapOfStringHArray1OfInteger;
+  ChangeArraysOfIntegers(theArraysOfIntegers: TDataStd_DataMapOfStringHArray1OfInteger): void;
+  HasArraysOfReals(): Standard_Boolean;
+  HasArrayOfReals(theName: TCollection_ExtendedString): Standard_Boolean;
+  GetArrayOfReals(theName: TCollection_ExtendedString): Handle_TColStd_HArray1OfReal;
+  SetArrayOfReals(theName: TCollection_ExtendedString, theArrayOfReals: Handle_TColStd_HArray1OfReal): void;
+  GetArraysOfRealsContainer(): TDataStd_DataMapOfStringHArray1OfReal;
+  ChangeArraysOfReals(theArraysOfReals: TDataStd_DataMapOfStringHArray1OfReal): void;
+  Clear(): void;
+  HasDeferredData(): Standard_Boolean;
+  LoadDeferredData(theToKeepDeferred: Standard_Boolean): Standard_Boolean;
+  UnloadDeferredData(): Standard_Boolean;
+  clear(): void;
+  setInteger(theName: TCollection_ExtendedString, theInteger: Graphic3d_ZLayerId): void;
+  setReal(theName: TCollection_ExtendedString, theReal: Standard_Real): void;
+  setString(theName: TCollection_ExtendedString, theString: TCollection_ExtendedString): void;
+  setByte(theName: TCollection_ExtendedString, theByte: Standard_Byte): void;
+  setArrayOfIntegers(theName: TCollection_ExtendedString, theArrayOfIntegers: Handle_TColStd_HArray1OfInteger): void;
+  setArrayOfReals(theName: TCollection_ExtendedString, theArrayOfReals: Handle_TColStd_HArray1OfReal): void;
+  ID(): Standard_GUID;
+  Restore(With: Handle_TDF_Attribute): void;
+  NewEmpty(): Handle_TDF_Attribute;
+  Paste(Into: Handle_TDF_Attribute, RT: Handle_TDF_RelocationTable): void;
   DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
   static get_type_name(): Standard_Character;
   static get_type_descriptor(): Handle_Standard_Type;
@@ -5118,6 +5343,30 @@ export declare class TDF_Attribute extends Standard_Transient {
   delete(): void;
 }
 
+export declare class Handle_TDF_Attribute {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: TDF_Attribute): void;
+  get(): TDF_Attribute;
+  delete(): void;
+}
+
+  export declare class Handle_TDF_Attribute_1 extends Handle_TDF_Attribute {
+    constructor();
+  }
+
+  export declare class Handle_TDF_Attribute_2 extends Handle_TDF_Attribute {
+    constructor(thePtr: TDF_Attribute);
+  }
+
+  export declare class Handle_TDF_Attribute_3 extends Handle_TDF_Attribute {
+    constructor(theHandle: Handle_TDF_Attribute);
+  }
+
+  export declare class Handle_TDF_Attribute_4 extends Handle_TDF_Attribute {
+    constructor(theHandle: Handle_TDF_Attribute);
+  }
+
 export declare class TDF_Label {
   constructor()
   Nullify(): void;
@@ -6169,6 +6418,45 @@ export declare class XCAFDoc_ShapeTool extends TDataStd_GenericEmpty {
   static get_type_descriptor(): Handle_Standard_Type;
   DynamicType(): Handle_Standard_Type;
   NewEmpty(): Handle_TDF_Attribute;
+  delete(): void;
+}
+
+export declare class XCAFDoc_VisMaterialPBR {
+  constructor()
+  IsEqual(theOther: XCAFDoc_VisMaterialPBR): Standard_Boolean;
+  DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
+  delete(): void;
+}
+
+export declare class XCAFDoc_VisMaterialTool extends TDF_Attribute {
+  constructor()
+  static get_type_name(): Standard_Character;
+  static get_type_descriptor(): Handle_Standard_Type;
+  DynamicType(): Handle_Standard_Type;
+  static Set(L: TDF_Label): Handle_XCAFDoc_VisMaterialTool;
+  static GetID(): Standard_GUID;
+  BaseLabel(): TDF_Label;
+  ShapeTool(): Handle_XCAFDoc_ShapeTool;
+  IsMaterial(theLabel: TDF_Label): Standard_Boolean;
+  GetMaterial(theMatLabel: TDF_Label): Handle_XCAFDoc_VisMaterial;
+  AddMaterial_1(theMat: Handle_XCAFDoc_VisMaterial, theName: XCAFDoc_PartId): TDF_Label;
+  AddMaterial_2(theName: XCAFDoc_PartId): TDF_Label;
+  RemoveMaterial(theLabel: TDF_Label): void;
+  GetMaterials(Labels: TDF_LabelSequence): void;
+  SetShapeMaterial_1(theShapeLabel: TDF_Label, theMaterialLabel: TDF_Label): void;
+  UnSetShapeMaterial_1(theShapeLabel: TDF_Label): void;
+  IsSetShapeMaterial_1(theLabel: TDF_Label): Standard_Boolean;
+  static GetShapeMaterial_1(theShapeLabel: TDF_Label, theMaterialLabel: TDF_Label): Standard_Boolean;
+  GetShapeMaterial_2(theShapeLabel: TDF_Label): Handle_XCAFDoc_VisMaterial;
+  SetShapeMaterial_2(theShape: TopoDS_Shape, theMaterialLabel: TDF_Label): Standard_Boolean;
+  UnSetShapeMaterial_2(theShape: TopoDS_Shape): Standard_Boolean;
+  IsSetShapeMaterial_2(theShape: TopoDS_Shape): Standard_Boolean;
+  GetShapeMaterial_3(theShape: TopoDS_Shape, theMaterialLabel: TDF_Label): Standard_Boolean;
+  GetShapeMaterial_4(theShape: TopoDS_Shape): Handle_XCAFDoc_VisMaterial;
+  ID(): Standard_GUID;
+  Restore(a0: Handle_TDF_Attribute): void;
+  NewEmpty(): Handle_TDF_Attribute;
+  Paste(a0: Handle_TDF_Attribute, a1: Handle_TDF_RelocationTable): void;
   delete(): void;
 }
 
@@ -8216,6 +8504,7 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   GeomAbs_Shape: GeomAbs_Shape;
   GeomAbs_SurfaceType: GeomAbs_SurfaceType;
   ChFiDS_ChamfMode: ChFiDS_ChamfMode;
+  RWMesh_CoordinateSystemConverter: typeof RWMesh_CoordinateSystemConverter;
   ChFi3d_FilletShape: ChFi3d_FilletShape;
   BndLib_Add2dCurve: typeof BndLib_Add2dCurve;
   gp_Ax3: typeof gp_Ax3;
@@ -8482,6 +8771,13 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   Standard_Failure_2: typeof Standard_Failure_2;
   Standard_Failure_3: typeof Standard_Failure_3;
   Standard_Failure_4: typeof Standard_Failure_4;
+  Standard_GUID: typeof Standard_GUID;
+  Standard_GUID_1: typeof Standard_GUID_1;
+  Standard_GUID_2: typeof Standard_GUID_2;
+  Standard_GUID_3: typeof Standard_GUID_3;
+  Standard_GUID_4: typeof Standard_GUID_4;
+  Standard_GUID_5: typeof Standard_GUID_5;
+  Standard_GUID_6: typeof Standard_GUID_6;
   Standard_Transient: typeof Standard_Transient;
   Standard_Transient_1: typeof Standard_Transient_1;
   Standard_Transient_2: typeof Standard_Transient_2;
@@ -8521,7 +8817,25 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   Message_ProgressRange: typeof Message_ProgressRange;
   Message_ProgressRange_1: typeof Message_ProgressRange_1;
   Message_ProgressRange_2: typeof Message_ProgressRange_2;
+  Handle_TDataStd_GenericExtString: typeof Handle_TDataStd_GenericExtString;
+  Handle_TDataStd_GenericExtString_1: typeof Handle_TDataStd_GenericExtString_1;
+  Handle_TDataStd_GenericExtString_2: typeof Handle_TDataStd_GenericExtString_2;
+  Handle_TDataStd_GenericExtString_3: typeof Handle_TDataStd_GenericExtString_3;
+  Handle_TDataStd_GenericExtString_4: typeof Handle_TDataStd_GenericExtString_4;
+  TDataStd_GenericExtString: typeof TDataStd_GenericExtString;
+  TDataStd_Name: typeof TDataStd_Name;
+  Handle_TDataStd_Name: typeof Handle_TDataStd_Name;
+  Handle_TDataStd_Name_1: typeof Handle_TDataStd_Name_1;
+  Handle_TDataStd_Name_2: typeof Handle_TDataStd_Name_2;
+  Handle_TDataStd_Name_3: typeof Handle_TDataStd_Name_3;
+  Handle_TDataStd_Name_4: typeof Handle_TDataStd_Name_4;
   TDataStd_GenericEmpty: typeof TDataStd_GenericEmpty;
+  Handle_TDataStd_NamedData: typeof Handle_TDataStd_NamedData;
+  Handle_TDataStd_NamedData_1: typeof Handle_TDataStd_NamedData_1;
+  Handle_TDataStd_NamedData_2: typeof Handle_TDataStd_NamedData_2;
+  Handle_TDataStd_NamedData_3: typeof Handle_TDataStd_NamedData_3;
+  Handle_TDataStd_NamedData_4: typeof Handle_TDataStd_NamedData_4;
+  TDataStd_NamedData: typeof TDataStd_NamedData;
   Geom2dAPI_InterCurveCurve: typeof Geom2dAPI_InterCurveCurve;
   Geom2dAPI_InterCurveCurve_1: typeof Geom2dAPI_InterCurveCurve_1;
   Geom2dAPI_InterCurveCurve_2: typeof Geom2dAPI_InterCurveCurve_2;
@@ -8655,6 +8969,11 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   TColgp_Array1OfPnt2d_5: typeof TColgp_Array1OfPnt2d_5;
   GeomLib: typeof GeomLib;
   TDF_Attribute: typeof TDF_Attribute;
+  Handle_TDF_Attribute: typeof Handle_TDF_Attribute;
+  Handle_TDF_Attribute_1: typeof Handle_TDF_Attribute_1;
+  Handle_TDF_Attribute_2: typeof Handle_TDF_Attribute_2;
+  Handle_TDF_Attribute_3: typeof Handle_TDF_Attribute_3;
+  Handle_TDF_Attribute_4: typeof Handle_TDF_Attribute_4;
   TDF_Label: typeof TDF_Label;
   RWGltf_CafWriter: typeof RWGltf_CafWriter;
   GeomAdaptor_Curve: typeof GeomAdaptor_Curve;
@@ -8771,6 +9090,8 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   Handle_XCAFDoc_ShapeTool_3: typeof Handle_XCAFDoc_ShapeTool_3;
   Handle_XCAFDoc_ShapeTool_4: typeof Handle_XCAFDoc_ShapeTool_4;
   XCAFDoc_ShapeTool: typeof XCAFDoc_ShapeTool;
+  XCAFDoc_VisMaterialPBR: typeof XCAFDoc_VisMaterialPBR;
+  XCAFDoc_VisMaterialTool: typeof XCAFDoc_VisMaterialTool;
   GeomAPI_ProjectPointOnSurf: typeof GeomAPI_ProjectPointOnSurf;
   GeomAPI_ProjectPointOnSurf_1: typeof GeomAPI_ProjectPointOnSurf_1;
   GeomAPI_ProjectPointOnSurf_2: typeof GeomAPI_ProjectPointOnSurf_2;
