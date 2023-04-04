@@ -2352,6 +2352,114 @@ export declare class ShapeAnalysis_Wire extends Standard_Transient {
     constructor(sbwd: Handle_ShapeExtend_WireData, face: TopoDS_Face, precision: Standard_Real);
   }
 
+export declare class Quantity_ColorRGBA {
+  SetValues(theRed: Standard_ShortReal, theGreen: Standard_ShortReal, theBlue: Standard_ShortReal, theAlpha: Standard_ShortReal): void;
+  GetRGB(): Quantity_Color;
+  ChangeRGB(): Quantity_Color;
+  SetRGB(theRgb: Quantity_Color): void;
+  Alpha(): Standard_ShortReal;
+  SetAlpha(theAlpha: Standard_ShortReal): void;
+  IsDifferent(theOther: Quantity_ColorRGBA): Standard_Boolean;
+  IsEqual(theOther: Quantity_ColorRGBA): Standard_Boolean;
+  static ColorFromName(theColorNameString: Standard_CString, theColor: Quantity_ColorRGBA): Standard_Boolean;
+  static ColorFromHex(theHexColorString: Standard_Character, theColor: Quantity_ColorRGBA, theAlphaComponentIsOff: Standard_Boolean): Standard_Boolean;
+  static ColorToHex(theColor: Quantity_ColorRGBA, theToPrefixHash: Standard_Boolean): XCAFDoc_PartId;
+  static Convert_LinearRGB_To_sRGB(theRGB: NCollection_Vec4<float>): any;
+  static Convert_sRGB_To_LinearRGB(theRGB: NCollection_Vec4<float>): any;
+  DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
+  InitFromJson(theSStream: Standard_SStream, theStreamPos: Graphic3d_ZLayerId): Standard_Boolean;
+  delete(): void;
+}
+
+  export declare class Quantity_ColorRGBA_1 extends Quantity_ColorRGBA {
+    constructor();
+  }
+
+  export declare class Quantity_ColorRGBA_2 extends Quantity_ColorRGBA {
+    constructor(theRgb: Quantity_Color);
+  }
+
+  export declare class Quantity_ColorRGBA_3 extends Quantity_ColorRGBA {
+    constructor(theRgb: Quantity_Color, theAlpha: Standard_ShortReal);
+  }
+
+  export declare class Quantity_ColorRGBA_4 extends Quantity_ColorRGBA {
+    constructor(theRgba: NCollection_Vec4<float>);
+  }
+
+  export declare class Quantity_ColorRGBA_5 extends Quantity_ColorRGBA {
+    constructor(theRed: Standard_ShortReal, theGreen: Standard_ShortReal, theBlue: Standard_ShortReal, theAlpha: Standard_ShortReal);
+  }
+
+export declare class Quantity_Color {
+  Name_1(): Quantity_NameOfColor;
+  SetValues_1(theName: Quantity_NameOfColor): void;
+  Rgb(): any;
+  Values(theC1: Standard_Real, theC2: Standard_Real, theC3: Standard_Real, theType: Quantity_TypeOfColor): void;
+  SetValues_2(theC1: Standard_Real, theC2: Standard_Real, theC3: Standard_Real, theType: Quantity_TypeOfColor): void;
+  Red(): Standard_Real;
+  Green(): Standard_Real;
+  Blue(): Standard_Real;
+  Hue(): Standard_Real;
+  Light(): Standard_Real;
+  ChangeIntensity(theDelta: Standard_Real): void;
+  Saturation(): Standard_Real;
+  ChangeContrast(theDelta: Standard_Real): void;
+  IsDifferent(theOther: Quantity_Color): Standard_Boolean;
+  IsEqual(theOther: Quantity_Color): Standard_Boolean;
+  Distance(theColor: Quantity_Color): Standard_Real;
+  SquareDistance(theColor: Quantity_Color): Standard_Real;
+  Delta(theColor: Quantity_Color, DC: Standard_Real, DI: Standard_Real): void;
+  DeltaE2000(theOther: Quantity_Color): Standard_Real;
+  static Name_2(theR: Standard_Real, theG: Standard_Real, theB: Standard_Real): Quantity_NameOfColor;
+  static StringName(theColor: Quantity_NameOfColor): Standard_CString;
+  static ColorFromName_1(theName: Standard_CString, theColor: Quantity_NameOfColor): Standard_Boolean;
+  static ColorFromName_2(theColorNameString: Standard_CString, theColor: Quantity_Color): Standard_Boolean;
+  static ColorFromHex(theHexColorString: Standard_CString, theColor: Quantity_Color): Standard_Boolean;
+  static ColorToHex(theColor: Quantity_Color, theToPrefixHash: Standard_Boolean): XCAFDoc_PartId;
+  static Convert_sRGB_To_HLS(theRgb: NCollection_Vec3<float>): any;
+  static Convert_HLS_To_sRGB(theHls: NCollection_Vec3<float>): any;
+  static Convert_LinearRGB_To_HLS(theRgb: NCollection_Vec3<float>): any;
+  static Convert_HLS_To_LinearRGB(theHls: NCollection_Vec3<float>): any;
+  static Convert_LinearRGB_To_Lab(theRgb: NCollection_Vec3<float>): any;
+  static Convert_Lab_To_Lch(theLab: NCollection_Vec3<float>): any;
+  static Convert_Lab_To_LinearRGB(theLab: NCollection_Vec3<float>): any;
+  static Convert_Lch_To_Lab(theLch: NCollection_Vec3<float>): any;
+  static Color2argb(theColor: Quantity_Color, theARGB: Graphic3d_ZLayerId): void;
+  static Argb2color(theARGB: Graphic3d_ZLayerId, theColor: Quantity_Color): void;
+  static Convert_LinearRGB_To_sRGB_1(theLinearValue: Standard_Real): Standard_Real;
+  static Convert_LinearRGB_To_sRGB_2(theLinearValue: Standard_ShortReal): Standard_ShortReal;
+  static Convert_sRGB_To_LinearRGB_1(thesRGBValue: Standard_Real): Standard_Real;
+  static Convert_sRGB_To_LinearRGB_2(thesRGBValue: Standard_ShortReal): Standard_ShortReal;
+  static Convert_LinearRGB_To_sRGB_approx22_1(theLinearValue: Standard_ShortReal): Standard_ShortReal;
+  static Convert_sRGB_To_LinearRGB_approx22_1(thesRGBValue: Standard_ShortReal): Standard_ShortReal;
+  static Convert_LinearRGB_To_sRGB_approx22_2(theRGB: NCollection_Vec3<float>): any;
+  static Convert_sRGB_To_LinearRGB_approx22_2(theRGB: NCollection_Vec3<float>): any;
+  static HlsRgb(theH: Standard_Real, theL: Standard_Real, theS: Standard_Real, theR: Standard_Real, theG: Standard_Real, theB: Standard_Real): void;
+  static RgbHls(theR: Standard_Real, theG: Standard_Real, theB: Standard_Real, theH: Standard_Real, theL: Standard_Real, theS: Standard_Real): void;
+  static Epsilon(): Standard_Real;
+  static SetEpsilon(theEpsilon: Standard_Real): void;
+  DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
+  InitFromJson(theSStream: Standard_SStream, theStreamPos: Graphic3d_ZLayerId): Standard_Boolean;
+  delete(): void;
+}
+
+  export declare class Quantity_Color_1 extends Quantity_Color {
+    constructor();
+  }
+
+  export declare class Quantity_Color_2 extends Quantity_Color {
+    constructor(theName: Quantity_NameOfColor);
+  }
+
+  export declare class Quantity_Color_3 extends Quantity_Color {
+    constructor(theC1: Standard_Real, theC2: Standard_Real, theC3: Standard_Real, theType: Quantity_TypeOfColor);
+  }
+
+  export declare class Quantity_Color_4 extends Quantity_Color {
+    constructor(theRgb: NCollection_Vec3<float>);
+  }
+
 export declare class Bnd_Box2d {
   constructor()
   SetWhole(): void;
@@ -6322,6 +6430,68 @@ export declare class XCAFDoc_DocumentTool extends TDataStd_GenericEmpty {
   delete(): void;
 }
 
+export declare class XCAFDoc_VisMaterial extends TDF_Attribute {
+  constructor()
+  static get_type_name(): Standard_Character;
+  static get_type_descriptor(): Handle_Standard_Type;
+  DynamicType(): Handle_Standard_Type;
+  static GetID(): Standard_GUID;
+  IsEmpty(): Standard_Boolean;
+  FillMaterialAspect(theAspect: Graphic3d_MaterialAspect): void;
+  FillAspect(theAspect: Handle_Graphic3d_Aspects): void;
+  HasPbrMaterial(): Standard_Boolean;
+  PbrMaterial(): XCAFDoc_VisMaterialPBR;
+  SetPbrMaterial(theMaterial: XCAFDoc_VisMaterialPBR): void;
+  UnsetPbrMaterial(): void;
+  HasCommonMaterial(): Standard_Boolean;
+  CommonMaterial(): XCAFDoc_VisMaterialCommon;
+  SetCommonMaterial(theMaterial: XCAFDoc_VisMaterialCommon): void;
+  UnsetCommonMaterial(): void;
+  BaseColor(): Quantity_ColorRGBA;
+  AlphaMode(): Graphic3d_AlphaMode;
+  AlphaCutOff(): Standard_ShortReal;
+  SetAlphaMode(theMode: Graphic3d_AlphaMode, theCutOff: Standard_ShortReal): void;
+  FaceCulling(): V3d_TypeOfBackfacingModel;
+  SetFaceCulling(theFaceCulling: V3d_TypeOfBackfacingModel): void;
+  IsDoubleSided(): Standard_Boolean;
+  SetDoubleSided(theIsDoubleSided: Standard_Boolean): void;
+  RawName(): Handle_TCollection_HAsciiString;
+  SetRawName(theName: Handle_TCollection_HAsciiString): void;
+  IsEqual(theOther: Handle_XCAFDoc_VisMaterial): Standard_Boolean;
+  ConvertToCommonMaterial(): XCAFDoc_VisMaterialCommon;
+  ConvertToPbrMaterial(): XCAFDoc_VisMaterialPBR;
+  ID(): Standard_GUID;
+  Restore(theWith: Handle_TDF_Attribute): void;
+  NewEmpty(): Handle_TDF_Attribute;
+  Paste(theInto: Handle_TDF_Attribute, theRelTable: Handle_TDF_RelocationTable): void;
+  DumpJson(theOStream: Standard_OStream, theDepth: Graphic3d_ZLayerId): void;
+  delete(): void;
+}
+
+export declare class Handle_XCAFDoc_VisMaterial {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: XCAFDoc_VisMaterial): void;
+  get(): XCAFDoc_VisMaterial;
+  delete(): void;
+}
+
+  export declare class Handle_XCAFDoc_VisMaterial_1 extends Handle_XCAFDoc_VisMaterial {
+    constructor();
+  }
+
+  export declare class Handle_XCAFDoc_VisMaterial_2 extends Handle_XCAFDoc_VisMaterial {
+    constructor(thePtr: XCAFDoc_VisMaterial);
+  }
+
+  export declare class Handle_XCAFDoc_VisMaterial_3 extends Handle_XCAFDoc_VisMaterial {
+    constructor(theHandle: Handle_XCAFDoc_VisMaterial);
+  }
+
+  export declare class Handle_XCAFDoc_VisMaterial_4 extends Handle_XCAFDoc_VisMaterial {
+    constructor(theHandle: Handle_XCAFDoc_VisMaterial);
+  }
+
 export declare class Handle_XCAFDoc_ShapeTool {
   Nullify(): void;
   IsNull(): boolean;
@@ -6459,6 +6629,30 @@ export declare class XCAFDoc_VisMaterialTool extends TDF_Attribute {
   Paste(a0: Handle_TDF_Attribute, a1: Handle_TDF_RelocationTable): void;
   delete(): void;
 }
+
+export declare class Handle_XCAFDoc_VisMaterialTool {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: XCAFDoc_VisMaterialTool): void;
+  get(): XCAFDoc_VisMaterialTool;
+  delete(): void;
+}
+
+  export declare class Handle_XCAFDoc_VisMaterialTool_1 extends Handle_XCAFDoc_VisMaterialTool {
+    constructor();
+  }
+
+  export declare class Handle_XCAFDoc_VisMaterialTool_2 extends Handle_XCAFDoc_VisMaterialTool {
+    constructor(thePtr: XCAFDoc_VisMaterialTool);
+  }
+
+  export declare class Handle_XCAFDoc_VisMaterialTool_3 extends Handle_XCAFDoc_VisMaterialTool {
+    constructor(theHandle: Handle_XCAFDoc_VisMaterialTool);
+  }
+
+  export declare class Handle_XCAFDoc_VisMaterialTool_4 extends Handle_XCAFDoc_VisMaterialTool {
+    constructor(theHandle: Handle_XCAFDoc_VisMaterialTool);
+  }
 
 export declare class GeomAPI_ProjectPointOnSurf {
   Init_1(P: gp_Pnt, Surface: Handle_Geom_Surface, Tolerance: Standard_Real, Algo: Extrema_ExtAlgo): void;
@@ -8612,6 +8806,17 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   ShapeAnalysis_Wire_1: typeof ShapeAnalysis_Wire_1;
   ShapeAnalysis_Wire_2: typeof ShapeAnalysis_Wire_2;
   ShapeAnalysis_Wire_3: typeof ShapeAnalysis_Wire_3;
+  Quantity_ColorRGBA: typeof Quantity_ColorRGBA;
+  Quantity_ColorRGBA_1: typeof Quantity_ColorRGBA_1;
+  Quantity_ColorRGBA_2: typeof Quantity_ColorRGBA_2;
+  Quantity_ColorRGBA_3: typeof Quantity_ColorRGBA_3;
+  Quantity_ColorRGBA_4: typeof Quantity_ColorRGBA_4;
+  Quantity_ColorRGBA_5: typeof Quantity_ColorRGBA_5;
+  Quantity_Color: typeof Quantity_Color;
+  Quantity_Color_1: typeof Quantity_Color_1;
+  Quantity_Color_2: typeof Quantity_Color_2;
+  Quantity_Color_3: typeof Quantity_Color_3;
+  Quantity_Color_4: typeof Quantity_Color_4;
   Bnd_Box2d: typeof Bnd_Box2d;
   Bnd_OBB: typeof Bnd_OBB;
   Bnd_OBB_1: typeof Bnd_OBB_1;
@@ -9084,6 +9289,12 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   BRepFeat_MakeDPrism_2: typeof BRepFeat_MakeDPrism_2;
   BRepFeat_Form: typeof BRepFeat_Form;
   XCAFDoc_DocumentTool: typeof XCAFDoc_DocumentTool;
+  XCAFDoc_VisMaterial: typeof XCAFDoc_VisMaterial;
+  Handle_XCAFDoc_VisMaterial: typeof Handle_XCAFDoc_VisMaterial;
+  Handle_XCAFDoc_VisMaterial_1: typeof Handle_XCAFDoc_VisMaterial_1;
+  Handle_XCAFDoc_VisMaterial_2: typeof Handle_XCAFDoc_VisMaterial_2;
+  Handle_XCAFDoc_VisMaterial_3: typeof Handle_XCAFDoc_VisMaterial_3;
+  Handle_XCAFDoc_VisMaterial_4: typeof Handle_XCAFDoc_VisMaterial_4;
   Handle_XCAFDoc_ShapeTool: typeof Handle_XCAFDoc_ShapeTool;
   Handle_XCAFDoc_ShapeTool_1: typeof Handle_XCAFDoc_ShapeTool_1;
   Handle_XCAFDoc_ShapeTool_2: typeof Handle_XCAFDoc_ShapeTool_2;
@@ -9092,6 +9303,11 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   XCAFDoc_ShapeTool: typeof XCAFDoc_ShapeTool;
   XCAFDoc_VisMaterialPBR: typeof XCAFDoc_VisMaterialPBR;
   XCAFDoc_VisMaterialTool: typeof XCAFDoc_VisMaterialTool;
+  Handle_XCAFDoc_VisMaterialTool: typeof Handle_XCAFDoc_VisMaterialTool;
+  Handle_XCAFDoc_VisMaterialTool_1: typeof Handle_XCAFDoc_VisMaterialTool_1;
+  Handle_XCAFDoc_VisMaterialTool_2: typeof Handle_XCAFDoc_VisMaterialTool_2;
+  Handle_XCAFDoc_VisMaterialTool_3: typeof Handle_XCAFDoc_VisMaterialTool_3;
+  Handle_XCAFDoc_VisMaterialTool_4: typeof Handle_XCAFDoc_VisMaterialTool_4;
   GeomAPI_ProjectPointOnSurf: typeof GeomAPI_ProjectPointOnSurf;
   GeomAPI_ProjectPointOnSurf_1: typeof GeomAPI_ProjectPointOnSurf_1;
   GeomAPI_ProjectPointOnSurf_2: typeof GeomAPI_ProjectPointOnSurf_2;

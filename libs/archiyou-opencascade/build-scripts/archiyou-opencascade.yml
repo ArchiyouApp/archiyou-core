@@ -269,7 +269,12 @@ mainBuild:
   - symbol: Handle_TDF_Attribute
   - symbol: Standard_GUID
   - symbol: XCAFDoc_VisMaterialTool
+  - symbol: Handle_XCAFDoc_VisMaterialTool
+  - symbol: XCAFDoc_VisMaterial
+  - symbol: Handle_XCAFDoc_VisMaterial
   - symbol: XCAFDoc_VisMaterialPBR
+  - symbol: Quantity_ColorRGBA
+  - symbol: Quantity_Color
   - symbol: RWMesh_CoordinateSystemConverter
   - symbol: OCJS
   emccFlags:

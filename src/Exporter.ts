@@ -139,11 +139,13 @@ export class Exporter
     /** Export Scene to GLTF 
         TODO: Open Cascade is not exporting geometry buffers in text-based GLTF (probably because it assumes a external .bin file) - check how we can include it
         OC docs: 
-        - https://dev.opencascade.org/doc/refman/html/class_r_w_gltf___caf_writer.htm
+        - RWGltf_CafWriter: https://dev.opencascade.org/doc/refman/html/class_r_w_gltf___caf_writer.html
+        - XCAFDoc_DocumentTool: - https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___document_tool.html
         - ShapeTool: https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___shape_tool.html
         - TDF_Label: https://dev.opencascade.org/doc/refman/html/class_t_d_f___label.html
         - TDataStd_Name: https://dev.opencascade.org/doc/refman/html/class_t_data_std___name.html
         - VisMaterialTool: https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___vis_material_tool.html#aaa1fb4d64b9eb24ed86bbe6d368010ab
+        - XCAFDoc_VisMaterial - https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___vis_material.html
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
@@ -173,13 +175,25 @@ export class Exporter
                                 oc.TDataStd_Name.GetID(), 
                                 new oc.TCollection_ExtendedString_2(shapeName, false)); // Set_2 not according to docs (no Set_3)
 
+                // Export basic material to GLTF
+                if (shape._getColorRGBA() !== null)
+                {
+                    const ocMaterialTool = oc.XCAFDoc_DocumentTool.prototype.constructor.VisMaterialTool(ocShapeLabel).get(); // returns Handle< XCAFDoc_VisMaterialTool >
+                    const ocMaterial = new oc.XCAFDoc_VisMaterial();
+                    const ocPBRMaterial = new oc.XCAFDoc_VisMaterialPBR(); // this is a struct
+                    ocPBRMaterial.BaseColor = new oc.Quantity_ColorRGBA_5(...shape._getColorRGBA()); // [ r,g,b,a]
+                    ocMaterial.SetPbrMaterial(ocPBRMaterial);
+                    const ocMaterialLabel = ocMaterialTool.AddMaterial_1( new oc.Handle_XCAFDoc_VisMaterial_2(ocMaterial), new oc.TCollection_AsciiString_2(shapeName)); // returns TDF_Label
+                    ocMaterialTool.SetShapeMaterial_1(ocShapeLabel, ocMaterialLabel);
+                }
+                
                 // triangulate BREP to mesh
                 new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
             }
         })
 
         const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), binary);
-        ocGLFTWriter.SetCoordinateSystemConverter(ocGLFTWriter.CoordinateSystemConverter());
+        ocGLFTWriter.SetCoordinateSystemConverter(ocGLFTWriter.CoordinateSystemConverter()); // convert from Z-up to Y-up coordinate system of GLTF
         ocGLFTWriter.SetForcedUVExport(true); // to output UV coords
         ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
         

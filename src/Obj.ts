@@ -115,6 +115,15 @@ export class Obj
         
     }
 
+    /** Internal: get RGBA values of current color in  range [0-1] for RGB and A*/
+    _getColorRGBA():[number,number,number,number]
+    {
+        const c = this.getColor();
+        return (c !== null)  ?
+            chroma(c).rgba(true).map((v,i) => (i < 3) ? v/255 : v ) as [number,number,number,number]
+            : null
+    }
+
     /** set Lines dashed */
     dashed()
     {

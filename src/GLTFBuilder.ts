@@ -121,6 +121,7 @@ export class GLTFBuilder
             asset.generator = 'Archiyou';
             asset.extras = {};
             asset.extras.archiyou = {
+                // TODO: basic information like author?
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                 annotations: ay.geom._annotator.getAnnotations(),

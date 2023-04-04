@@ -280,6 +280,17 @@ export class Shape
         return this;
     }
 
+    /** Get the color of this Shape as defined in its Obj container */
+    getColor():number
+    {
+        return this?._obj?.getColor();
+    }
+
+    _getColorRGBA():[number,number,number,number]
+    {
+        return this?._obj?._getColorRGBA()
+    }
+
     /** Set dashed lines on the Object of this Shape */
     dashed()
     {
