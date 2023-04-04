@@ -1,4 +1,4 @@
-import { MeshingQualitySettings, Shape, AnyShape} from './internal'
+import { MeshingQualitySettings, Shape, AnyShape, ShapeCollection} from './internal'
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
 import { GLTFBuilder } from './GLTFBuilder';
 
@@ -149,7 +149,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true):ArrayBuffer|string
+    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true):ArrayBuffer|string
     {
         const oc = this._parent.geom._oc;
         
@@ -162,7 +162,7 @@ export class Exporter
             and export as much properties (id, color) as possible 
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
-        this._parent.geom.all().filter(s => s.visible()).forEach(entity => {
+        this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())).forEach(entity => {
             if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
             {
                 const shape = entity as AnyShape;
@@ -185,6 +185,8 @@ export class Exporter
                     ocMaterial.SetPbrMaterial(ocPBRMaterial);
                     const ocMaterialLabel = ocMaterialTool.AddMaterial_1( new oc.Handle_XCAFDoc_VisMaterial_2(ocMaterial), new oc.TCollection_AsciiString_2(shapeName)); // returns TDF_Label
                     ocMaterialTool.SetShapeMaterial_1(ocShapeLabel, ocMaterialLabel);
+
+                    // NOTE: do we need to delete these OC classes (not here because we need them still). Save the references?
                 }
                 
                 // triangulate BREP to mesh
@@ -202,16 +204,23 @@ export class Exporter
         oc.FS.unlink("./" + filename);
         
         let gltfContent =  (binary) ? gltfFile.buffer : gltfFile;
-        
+
+        // clean up OC classes
+        ocShapeTool.delete();
+        ocGLFTWriter.delete();
+
+        // Force inclusion of points and lines to export
+        if (includePointsAndLines)
+        {
+            const pointAndLineShapes:ShapeCollection = this._parent.geom.all().filter(s => s.visible() && ['Vertex','Edge','Wire'].includes(s.type()));
+            if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes ); 
+        }
+
         if(archiyouFormat)
         {
             // add special Archiyou data to GLTF
             gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay); 
         }
-
-        // clean up OC classes
-        ocShapeTool.delete();
-        ocGLFTWriter.delete();
 
         
         return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)

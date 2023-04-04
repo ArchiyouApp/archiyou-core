@@ -283,7 +283,7 @@ export class Geom
 
   /** Create the basic planes along the main axis */
   @checkInput([['Axis', FACE_BASEPLANE_AXIS], [Number, FACE_BASEPLANE_SIZE]], ['Axis','auto'] )
-  BasePlane(axis?:string, size?:number)
+  BasePlane(axis?:string, size?:number):Face
   {
     let plane = new Face().makeBasePlane(axis as Axis,size);
     plane.addToScene(); // new API (TODO: update others)
@@ -294,7 +294,7 @@ export class Geom
 
   /** Create circular Face */
   @checkInput([[Number, CIRCLE_RADIUS]], ['auto'])
-  Circle(radius?:number)
+  Circle(radius?:number):Face|Shell
   {
     let circleFace = new Face().fromWire(new Edge().makeCircle(radius)._toWire());
     circleFace.addToScene();

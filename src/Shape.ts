@@ -3992,6 +3992,66 @@ export class Shape
 
     //// OUTPUTS ////
 
+    /** Output all Vertices of this Shape into an Array for further processing */
+    toMeshVertices():Array<VertexMesh>
+    {
+        let meshVertices:Array<VertexMesh> = []
+        this.vertices().forEach( (curVertex, curVertexIndex) =>
+        {
+            meshVertices.push({ vertices : curVertex.toArray(), objId: this._obj.id, ocId: curVertex._hashcode(), indexInShape: curVertexIndex });
+        });
+
+        return meshVertices;
+    }
+
+    toMeshEdges(quality:MeshingQualitySettings):Array<EdgeMesh>
+    {
+        let meshEdges:Array<EdgeMesh> = [];
+
+        this.edges().forEach( (curEdge, curEdgeIndex) => 
+        {   
+            let vertexCoords = [];
+            let ocLocation = new this._oc.TopLoc_Location_1(); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_top_loc___location.html
+
+            if(curEdge._ocShape == null)
+            {
+                console.warn(`Shape::toMeshShape: null Edge detected!`);
+            }
+            else if (!curEdge.valid())
+            {
+                console.warn(`Shape::toMeshShape: Invalid Edge detected!`);
+            }
+            else 
+            {   
+                let ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
+                let ocTangDef = new this._oc.GCPnts_TangentialDeflection_2(ocAdaptorCurve, 
+                    quality?.linearDeflection || MESHING_MAX_DEVIATION, 
+                    quality?.angularDeflection || MESHING_ANGULAR_DEFLECTION, 
+                    quality?.edgeMinimalPoints || MESHING_MINIMUM_POINTS, 
+                    quality?.tolerance || MESHING_TOLERANCE, 
+                    quality?.edgeMinimalLength || MESHING_EDGE_MIN_LENGTH ); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_g_c_pnts___tangential_deflection.html
+
+                vertexCoords = new Array(ocTangDef.NbPoints() * 3);
+                for(let j = 0; j < ocTangDef.NbPoints(); j++) 
+                {
+                    let ocVertex = ocTangDef.Value(j+1).Transformed(ocLocation.Transformation()); // world coords
+                    vertexCoords[(j * 3) + 0] = ocVertex.X();
+                    vertexCoords[(j * 3) + 1] = ocVertex.Y();
+                    vertexCoords[(j * 3) + 2] = ocVertex.Z();
+                    ocVertex.delete();
+                }
+                // Output all Edges data as sequential vertices
+                meshEdges.push({ vertices : vertexCoords, objId: this._obj.id, ocId: curEdge._hashcode(), indexInShape: curEdgeIndex });
+
+                // clean up
+                ocAdaptorCurve.delete();
+                ocTangDef.delete();
+            }
+        });
+
+        return meshEdges;
+    }
+
     /** Output triangulated Mesh of Faces of this Shape */
     toMeshFaces(quality:MeshingQualitySettings): Array<FaceMesh>
     {
@@ -4185,62 +4245,11 @@ export class Shape
             console.error(`Shape::toMeshShape: null wrapped ocShape! Aborted mesh output`);
             return null;
         }
-
-        // ==== OC vertices to mesh vertices
-        let meshVertices:Array<VertexMesh> = [];
-        this.vertices().forEach( (curVertex, curVertexIndex) =>
-        {
-            meshVertices.push({ vertices : curVertex.toArray(), objId: this._obj.id, ocId: curVertex._hashcode(), indexInShape: curVertexIndex });
-        });
-            
-        // ==== OC edges to mesh edges
-        let meshEdges:Array<EdgeMesh> = [];
-
-        this.edges().forEach( (curEdge, curEdgeIndex) => 
-        {   
-            let vertexCoords = [];
-            let ocLocation = new this._oc.TopLoc_Location_1(); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_top_loc___location.html
-
-            if(curEdge._ocShape == null)
-            {
-                console.warn(`Shape::toMeshShape: null Edge detected!`);
-            }
-            else if (!curEdge.valid())
-            {
-                console.warn(`Shape::toMeshShape: Invalid Edge detected!`);
-            }
-            else 
-            {   
-                let ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
-                let ocTangDef = new this._oc.GCPnts_TangentialDeflection_2(ocAdaptorCurve, 
-                    quality?.linearDeflection || MESHING_MAX_DEVIATION, 
-                    quality?.angularDeflection || MESHING_ANGULAR_DEFLECTION, 
-                    quality?.edgeMinimalPoints || MESHING_MINIMUM_POINTS, 
-                    quality?.tolerance || MESHING_TOLERANCE, 
-                    quality?.edgeMinimalLength || MESHING_EDGE_MIN_LENGTH ); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_g_c_pnts___tangential_deflection.html
-
-                vertexCoords = new Array(ocTangDef.NbPoints() * 3);
-                for(let j = 0; j < ocTangDef.NbPoints(); j++) 
-                {
-                    let ocVertex = ocTangDef.Value(j+1).Transformed(ocLocation.Transformation()); // world coords
-                    vertexCoords[(j * 3) + 0] = ocVertex.X();
-                    vertexCoords[(j * 3) + 1] = ocVertex.Y();
-                    vertexCoords[(j * 3) + 2] = ocVertex.Z();
-                    ocVertex.delete();
-                }
-                // Output all Edges data as sequential vertices
-                meshEdges.push({ vertices : vertexCoords, objId: this._obj.id, ocId: curEdge._hashcode(), indexInShape: curEdgeIndex });
-
-                // clean up
-                ocAdaptorCurve.delete();
-                ocTangDef.delete();
-            }
-        });
-
+    
         let shapeMesh:MeshShape = { 
             objId: this._obj.id,
-            vertices: meshVertices, 
-            edges: meshEdges, 
+            vertices: this.toMeshVertices(),
+            edges: this.toMeshEdges(quality),
             faces: this.toMeshFaces(quality),
             style : this._getObjStyle(),
          };
