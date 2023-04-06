@@ -334,7 +334,8 @@ export class Obj
     }
 
     /** Return Obj ShapeCollection: NOTE: use allShapes() to also get the Shapes of children. 
-        For example layers don't have Shapes of their own! */
+        For example layers don't have Shapes of their own! 
+        !!!! IMPORTANT: returns reference. So don't change the return value !!!!*/
     shapes():ShapeCollection 
     {
         return this._shapes; // all children of ShapeCollection _shapes
@@ -343,21 +344,22 @@ export class Obj
     /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection */
     allShapesCollection():ShapeCollection
     {
-         let collection = this.shapes();
+        let collection = this.shapes().shallowCopy(); // IMPORTANT: don't change reference this._shapes
 
-         this.children().forEach((child,i) => 
-         {
+        this.children().forEach((child,i) => 
+        {
             // add as layers
             if(child.isLayer())
             {
-                collection.addGroup( child?.name() as string || `obj${i}`, new ShapeCollection(child.allShapes()));
+                const groupShapes = new ShapeCollection(child.allShapes());
+                collection.addGroup( child?.name() as string || `obj${i}`, groupShapes);
             }
             else {
                 collection.add(child.shapes())
             }
-         });
+        });
  
-         return collection;
+        return collection;
     }
 
     /** Get all Shapes within this Obj and its children Objs */

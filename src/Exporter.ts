@@ -137,7 +137,9 @@ export class Exporter
     }
 
     /** Export Scene to GLTF 
-        TODO: Open Cascade is not exporting geometry buffers in text-based GLTF (probably because it assumes a external .bin file) - check how we can include it
+        
+        Export high-resolution GLTF with added loose Points and Lines. And optionally export seperate Vertices and Edges per Shape
+
         OC docs: 
         - RWGltf_CafWriter: https://dev.opencascade.org/doc/refman/html/class_r_w_gltf___caf_writer.html
         - XCAFDoc_DocumentTool: - https://dev.opencascade.org/doc/refman/html/class_x_c_a_f_doc___document_tool.html
@@ -149,7 +151,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true):ArrayBuffer|string
+    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=true):ArrayBuffer|string
     {
         const oc = this._parent.geom._oc;
         
@@ -195,7 +197,10 @@ export class Exporter
         })
 
         const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), binary);
-        ocGLFTWriter.SetCoordinateSystemConverter(ocGLFTWriter.CoordinateSystemConverter()); // convert from Z-up to Y-up coordinate system of GLTF
+        
+        const ocCoordSystemConverter = ocGLFTWriter.CoordinateSystemConverter();
+        ocCoordSystemConverter.SetInputCoordinateSystem_2(oc.RWMesh_CoordinateSystem.RWMesh_CoordinateSystem_Zup);
+        ocGLFTWriter.SetCoordinateSystemConverter(ocCoordSystemConverter);
         ocGLFTWriter.SetForcedUVExport(true); // to output UV coords
         ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
         
@@ -208,20 +213,29 @@ export class Exporter
         // clean up OC classes
         ocShapeTool.delete();
         ocGLFTWriter.delete();
+        ocCoordSystemConverter.delete();
 
         // Force inclusion of points and lines to export
         if (includePointsAndLines)
         {
-            const pointAndLineShapes:ShapeCollection = this._parent.geom.all().filter(s => s.visible() && ['Vertex','Edge','Wire'].includes(s.type()));
-            if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes ); 
+            const pointAndLineShapes:ShapeCollection = this._parent.geom.all().filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type())));
+            if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, quality); 
         }
 
+        // Add special archiyou data in GLTF asset.extras section
         if(archiyouFormat)
         {
             // add special Archiyou data to GLTF
             gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay); 
         }
 
+        // extra vertices and lines for specific visualization styles
+        if (extraShapesAsPointLines)
+        {
+            const extraOutputShapes = this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type())));
+            gltfContent = new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, quality); 
+        }
+        
         
         return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
     }

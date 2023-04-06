@@ -276,6 +276,7 @@ mainBuild:
   - symbol: Quantity_ColorRGBA
   - symbol: Quantity_Color
   - symbol: RWMesh_CoordinateSystemConverter
+  - symbol: RWMesh_CoordinateSystem
   - symbol: OCJS
   emccFlags:
     - -sEXPORT_ES6=1

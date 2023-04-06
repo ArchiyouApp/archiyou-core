@@ -954,6 +954,16 @@ export declare type ChFiDS_ChamfMode = {
   ChFiDS_ConstThroatWithPenetrationChamfer: {};
 }
 
+export declare type RWMesh_CoordinateSystem = {
+  RWMesh_CoordinateSystem_Undefined: {};
+  RWMesh_CoordinateSystem_posYfwd_posZup: {};
+  RWMesh_CoordinateSystem_negZfwd_posYup: {};
+  RWMesh_CoordinateSystem_Blender: {};
+  RWMesh_CoordinateSystem_glTF: {};
+  RWMesh_CoordinateSystem_Zup: {};
+  RWMesh_CoordinateSystem_Yup: {};
+}
+
 export declare class RWMesh_CoordinateSystemConverter {
   constructor()
   static StandardCoordinateSystem(theSys: RWMesh_CoordinateSystem): gp_Ax3;
@@ -8698,6 +8708,7 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   GeomAbs_Shape: GeomAbs_Shape;
   GeomAbs_SurfaceType: GeomAbs_SurfaceType;
   ChFiDS_ChamfMode: ChFiDS_ChamfMode;
+  RWMesh_CoordinateSystem: RWMesh_CoordinateSystem;
   RWMesh_CoordinateSystemConverter: typeof RWMesh_CoordinateSystemConverter;
   ChFi3d_FilletShape: ChFi3d_FilletShape;
   BndLib_Add2dCurve: typeof BndLib_Add2dCurve;

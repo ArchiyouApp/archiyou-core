@@ -1,5 +1,5 @@
-import { Geom, Vector, Vertex, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, ArchiyouState, StatementError, ConsoleMessage} from './internal'
-import { toRad } from './internal'
+import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, ArchiyouState, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
+import { toRad, MeshingQualitySettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
 import * as base64js from 'base64-js'
@@ -133,69 +133,134 @@ export class GLTFBuilder
         }
     }
 
+   
+
     /** Add all loose point and line Shapes (Vertex,Edge,Wire) to the GLTF buffer */
-    addPointsAndLines(gltfContent:ArrayBuffer, shapes:ShapeCollection):ArrayBuffer
+    addPointsAndLines(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):ArrayBuffer
     {
         const io = new WebIO({credentials: 'include'});
         this.doc = io.readBinary(gltfContent);
         let buffer = this.doc.getRoot().listBuffers()[0];
+
+        // Create a node for every loose Vertex (TODO: check performace implications?)
+        shapes.getShapesByType('Vertex').forEach(v => this._addPoints(v, buffer));
+       
+        // For every Edge and Wire make a seperate node
+        const lines = shapes.filter(s => ['Edge', 'Wire'].includes(s.type()))
+        lines.forEach( l => 
+        {
+            this._addShapeLines(l, buffer, quality);
+        })
+                
+        // export new GLTF binary content
+        return io.writeBinary(this.doc); 
+
+    }
+
+    /** Add Vertices of Shape (including just one Vertex) as node to GLTF */
+    _addPoints(shape:AnyShape, gltfBuffer:any)
+    {
+        let vArr:Array<number> = [];
+
+        shape.vertices().forEach(v => {
+            let va = v.toArray()
+            vArr = vArr.concat([va[0],va[2], -va[1]]) // just switch z and y coordinate to fix different coordinate system
+        })
         
-        // combine all Vertices into one buffer
-        let vertexArr:Array<number> = []
-        shapes.getShapesByType('Vertex').forEach(v => 
-            { 
-                let vArr = (v as Vertex).toArray();
-                // just switch z and y coordinate to fix different coordinate system
-                vertexArr = vertexArr.concat([vArr[0],vArr[2], -vArr[1]]) 
-            });
         const gltfVertexBuffer = this.doc
-                            .createAccessor()
-                            .setArray(new Float32Array(vertexArr))
-                            .setType('VEC3')
-                            .setBuffer(buffer)
+            .createAccessor()
+            .setArray(new Float32Array(vArr))
+            .setType('VEC3')
+            .setBuffer(gltfBuffer) // this automatically augments to existing buffer
         
         const gltfVertexPrimitive = this.doc
             .createPrimitive()
             .setAttribute('POSITION', gltfVertexBuffer)
             .setMode(0) // Point mode see: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive_mode
 
+        // color (TODO: check if this property is saved correctly)
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj' }::Points`;
+        const rgba = shape._getColorRGBA();
+        if (rgba)
+        {
+            const material = this.doc.createMaterial(shapeName)
+                            .setBaseColorFactor(rgba) // RGBA
+            gltfVertexPrimitive.setMaterial(material)
+        }
+        
         const vertMesh = this.doc.createMesh();
-        this.doc.createNode().setMesh(vertMesh).setName('vertices');
+        this.doc.createNode().setMesh(vertMesh).setName(shapeName);
         vertMesh.addPrimitive(gltfVertexPrimitive);
+    }
 
-
-        // combine all lines into one buffer 
-        // TODO: do we need to seperate into GLFT nodes for later internal use and seperate materials per line Shape?
-        const lines = shapes.filter(s => ['Edge', 'Wire'].includes(s.type()))
+    _addShapeLines(shape:AnyShape, gltfBuffer:any, quality:MeshingQualitySettings)
+    {
         let lineArr:Array<number> = [];
-        lines.forEach( l => {
-            let edgesOfShape = l.toMeshEdges(); // as EdgeMesh objects
-            let lineCoords = [];
-            edgesOfShape.forEach(e => {
-                let edgeVerts = e.vertices;
-                lineCoords = lineCoords.concat([edgeVerts[0], edgeVerts[2], -edgeVerts[1],edgeVerts[3], edgeVerts[5], -edgeVerts[4]]) // again switch Z and Y axis
-            })
-            lineArr = lineArr.concat(lineCoords)
-        })
+        let edgesOfShape = shape.toMeshEdges(quality); // as EdgeMesh objects
+        let lineCoords = [];
+        
+        edgesOfShape.forEach(e => {
+            let edgeCoords = e.vertices; // these can have more than 6 for non-line edges!
+            
+            for (let i = 0; i < edgeCoords.length; i +=3  ) // coordinate index
+            {
+                const lineEdgeVert = [edgeCoords[i], edgeCoords[i+2], -edgeCoords[i+1]] // again switch Z and Y axis
+                lineCoords = lineCoords.concat(lineEdgeVert)
 
+                if ( i !== 0 && i !== edgeCoords.length - 3)
+                {
+                    // every GLTF edge is made of two vertex pairs (no line string like GL_LINE_STRIP) so add a extra vertex at every end vertex of new line edge
+                    // except for the first and last vertex - if AY Edge is a Line (only two vertices) no GLTF vertices are added
+                    lineCoords = lineCoords.concat(lineEdgeVert);
+                }
+                
+            }
+        })
+        lineArr = lineArr.concat(lineCoords)
+        
         const gltfLineBuffer = this.doc
             .createAccessor()
             .setArray(new Float32Array(lineArr))
             .setType('VEC3')
-            .setBuffer(buffer)
+            .setBuffer(gltfBuffer)
 
         const gltfLinePrimitive = this.doc
             .createPrimitive()
             .setAttribute('POSITION', gltfLineBuffer)
             .setMode(1); // line mode
 
+        // color
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}::Lines`; // default is 'Line' is name is undefined
+        const rgba = shape._getColorRGBA();
+        if (rgba)
+        {
+            const material = this.doc.createMaterial(shapeName)
+                            .setBaseColorFactor(rgba) // RGBA
+            gltfLinePrimitive.setMaterial(material)
+        }
+
         const lineMesh = this.doc.createMesh();
-        this.doc.createNode().setMesh(lineMesh).setName('lines');
-        lineMesh.addPrimitive(gltfLinePrimitive);
+            this.doc.createNode().setMesh(lineMesh).setName(shapeName);
+            lineMesh.addPrimitive(gltfLinePrimitive);
+    }
+
+    /** For visualization purposes it's handy output seperate point- and line buffer into the GLTF
+     *  So these can be seperately styled in a GLTF viewer
+     */
+    addSeperatePointsAndLinesForShapes(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):ArrayBuffer
+    {
+        const io = new WebIO({credentials: 'include'});
+        this.doc = io.readBinary(gltfContent);
+        let buffer = this.doc.getRoot().listBuffers()[0];
+        
+        shapes.forEach(shape =>
+        {
+            this._addPoints(shape, buffer); // Add Vertices of Shape
+            this._addShapeLines(shape, buffer,quality); // Add Edges of Shape to GLTF 
+        })
 
         // export new GLTF binary content
         return io.writeBinary(this.doc); 
-
     }
 
 }
