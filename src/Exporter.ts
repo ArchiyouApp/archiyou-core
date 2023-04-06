@@ -151,7 +151,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=true):ArrayBuffer|string
+    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=false):ArrayBuffer|string
     {
         const oc = this._parent.geom._oc;
         
