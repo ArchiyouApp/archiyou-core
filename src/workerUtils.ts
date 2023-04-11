@@ -49,9 +49,9 @@ export function setParamVariables(scope:any, params:{[key:string]:any}) // param
     
     if (typeof params === 'object')
     {
-        for (const [name, param] of Object.entries(params) )
+        for (const [name, value] of Object.entries(params) )
         {
-            scope[PARAM_SIGNIFIER + name] = param?.value;
+            scope[PARAM_SIGNIFIER + name] = value;
         }
     }
 }

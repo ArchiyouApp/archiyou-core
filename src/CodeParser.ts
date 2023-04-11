@@ -199,7 +199,7 @@ export class CodeParser
             componentCode = componentCode.substring(0,mutation.start+charIndexInc) + mutation.content + componentCode.substring(mutation.end+charIndexInc);
             charIndexInc = componentCode.length - origComponentCode.length;
         });
-        
+
         return componentCode;
     }
 
@@ -464,11 +464,11 @@ export class CodeParser
             ${codeParamsStr}
             ${code}
             geom.endLayerGroup();
-            let importedShapes = layerGroup.allShapesCollection();
+            // TODO: Fix objects that stay in scenegraph in layerGroup (even if they are hidden)
+            let importedShapes = layerGroup.allShapesCollection(); 
             return importedShapes;
         }
         ${importStatement.code} // we can actually keep original import statement`
-
 
         return componentCode;
     }

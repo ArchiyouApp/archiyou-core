@@ -863,8 +863,8 @@ export class Shape
     /** Resize Shape with a given factor 
         TODO: different scaling factors per axis? scale(0.5,1,2)
     */
-    @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['Point', null]],Number)
-    scale(factor?:number, pivot?:Point):AnyShape
+    @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number, 'Point'])
+    scale(factor?:number, pivot?:PointLike):AnyShape
     {
         /* OC docs: 
             - gp_Trsf https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___trsf.html
@@ -879,10 +879,10 @@ export class Shape
     }
 
     /** Same as scale but returning a copy of Shape */
-    @checkInput(Number,Number)
-    scaled(factor?:number):AnyShape
+    @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number, 'Point'])
+    scaled(factor?:number, pivot?:PointLike):AnyShape
     {
-        return (this.copy() as AnyShape).scale(factor);
+        return (this.copy() as AnyShape).scale(factor,pivot);
     }
 
     /** 

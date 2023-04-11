@@ -20,7 +20,7 @@
  import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
  import { Layout, LayoutOrderType, LayoutOptions } from './internal'
 
- import { SHAPE_EXTRUDE_DEFAULT_AMOUNT } from './internal';
+ import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
 
  // special libraries
@@ -477,18 +477,18 @@
       }
 
       /** Scale entire ShapeCollection */
-      @checkInput([[Number, 1.0]], ['auto'])
-      scale(factor?:number):AnyShapeCollection
+      @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number,'Point'])
+      scale(factor?:number, pivot?:PointLike):AnyShapeCollection
       {
-         const pivot = this.center();
+         pivot = pivot || this.center();
          this.shapes.forEach( shape => shape.scale(factor,pivot));
          return this;
       }
 
       /** Scale entire ShapeCollection and return copy */
       @addResultShapesToScene
-      @checkInput([[Number, 1.0]], ['auto'])
-      scaled(factor?:number):AnyShapeCollection
+      @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number,'Point'])
+      scaled(factor?:number, pivot?:PointLike):AnyShapeCollection
       {
          let newCollection = this._copy();
          newCollection.scale(factor);
