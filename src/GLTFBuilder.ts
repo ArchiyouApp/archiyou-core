@@ -188,8 +188,9 @@ export class GLTFBuilder
         }
         
         const vertMesh = this.doc.createMesh();
-        this.doc.createNode().setMesh(vertMesh).setName(shapeName);
         vertMesh.addPrimitive(gltfVertexPrimitive);
+        const vertNode = this.doc.createNode().setMesh(vertMesh).setName(shapeName);
+        this.doc.getRoot().listScenes()[0].addChild(vertNode); // add node to scene
     }
 
     _addShapeLines(shape:AnyShape, gltfBuffer:any, quality:MeshingQualitySettings)
@@ -239,8 +240,10 @@ export class GLTFBuilder
         }
 
         const lineMesh = this.doc.createMesh();
-            this.doc.createNode().setMesh(lineMesh).setName(shapeName);
-            lineMesh.addPrimitive(gltfLinePrimitive);
+        lineMesh.addPrimitive(gltfLinePrimitive);
+        const lineNode = this.doc.createNode().setMesh(lineMesh).setName(shapeName);
+        this.doc.getRoot().listScenes()[0].addChild(lineNode) // add node to scene
+        
     }
 
     /** For visualization purposes it's handy output seperate point- and line buffer into the GLTF
