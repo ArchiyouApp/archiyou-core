@@ -871,7 +871,7 @@ export class Shape
             - BRepBuilderAPI_Transform: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_builder_a_p_i___transform.html
         */
         let ocTransform = new this._oc.gp_Trsf_1();
-        pivot = pivot || this.center();
+        pivot = pivot as Point || this.center();
         ocTransform.SetScale(pivot._toOcPoint(), factor);
         let ocBuilder = new this._oc.BRepBuilderAPI_Transform_2(this._ocShape, ocTransform, true);
         this._ocShape = ocBuilder.Shape(); // 

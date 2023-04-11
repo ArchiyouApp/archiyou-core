@@ -62,7 +62,7 @@ export function clearParamVariables(scope:any, params?:{[key:string]:any})
 
     if (typeof params === 'object')
     {
-        for (const [name, param] of Object.entries(params) )
+        for (const [name, value] of Object.entries(params) )
         {
             if(scope[PARAM_SIGNIFIER + name])
             {
