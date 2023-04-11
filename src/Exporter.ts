@@ -158,12 +158,14 @@ export class Exporter
         const meshingQuality = quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
         const filename = `file.${(binary) ? 'glb' : 'gltf'}`
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
+
         const ocShapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get(); // autonaming is on by default
         
         /* For now we export all visible shapes in a flattened scene (without nested scenegraph) 
             and export as much properties (id, color) as possible 
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
+        
         this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())).forEach(entity => {
             if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
             {

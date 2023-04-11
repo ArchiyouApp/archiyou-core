@@ -2,7 +2,6 @@ import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, Scen
 import { toRad, MeshingQualitySettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
-import * as base64js from 'base64-js'
 
 /* Docs:
     - animation sequence: https://gltf-transform.donmccurdy.com/functions.html 

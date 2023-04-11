@@ -1,5 +1,6 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
-import { Geom, Doc, CodeParser, Exporter} from './internal'
+import { Geom, Doc, CodeParser, Exporter } from './internal'
+import Console from './Console'
 
 //// SETTINGS ////
 
