@@ -30,6 +30,9 @@ export class GLTFBuilder
     scene:any;
     buffer:any;
 
+    //// SETTINGS ////
+    SUBSHAPE_OUTPUT_NAME_SEPERATOR:string = '___';
+
     constructor()
     {
         this.doc = new Document(); // Start new GLTF document
@@ -178,7 +181,7 @@ export class GLTFBuilder
             .setMode(0) // Point mode see: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive_mode
 
         // color (TODO: check if this property is saved correctly)
-        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj' }::Points`;
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj' }${this.SUBSHAPE_OUTPUT_NAME_SEPERATOR}Points`;
         const rgba = shape._getColorRGBA();
         if (rgba)
         {
@@ -230,7 +233,7 @@ export class GLTFBuilder
             .setMode(1); // line mode
 
         // color
-        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}::Lines`; // default is 'Line' is name is undefined
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}${this.SUBSHAPE_OUTPUT_NAME_SEPERATOR}Lines`; // default is 'Line' is name is undefined
         const rgba = shape._getColorRGBA();
         if (rgba)
         {
