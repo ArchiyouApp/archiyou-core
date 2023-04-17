@@ -141,7 +141,7 @@ export class GLTFBuilder
         this.doc = io.readBinary(gltfContent);
         let buffer = this.doc.getRoot().listBuffers()[0];
 
-        // Create a node for every loose Vertex (TODO: check performace implications?)
+        // Create a node for every loose Vertex (TODO: check performance implications?)
         shapes.getShapesByType('Vertex').forEach(v => this._addPoints(v, buffer));
        
         // For every Edge and Wire make a seperate node
@@ -177,8 +177,8 @@ export class GLTFBuilder
             .setAttribute('POSITION', gltfVertexBuffer)
             .setMode(0) // Point mode see: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive_mode
 
-        // color (TODO: check if this property is saved correctly)
-        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj' }::Points`;
+        // name - if Shape is a Vertex just use its name, if higher order use subshape addition '::Points'
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}${(shape.type() !== 'Vertex') ? '::Points' : ''}`;
         const rgba = shape._getColorRGBA();
         if (rgba)
         {
@@ -229,8 +229,9 @@ export class GLTFBuilder
             .setAttribute('POSITION', gltfLineBuffer)
             .setMode(1); // line mode
 
+        // name - if Shape is linear just use its name, if higher order use subshape addition '::Lines'
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}${(!['Edge','Wire'].includes(shape.type())) ? '::Lines' : ''}`; // default is 'Line' is name is undefined
         // color
-        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}::Lines`; // default is 'Line' is name is undefined
         const rgba = shape._getColorRGBA();
         if (rgba)
         {
@@ -258,7 +259,11 @@ export class GLTFBuilder
         shapes.forEach(shape =>
         {
             this._addPoints(shape, buffer); // Add Vertices of Shape
-            this._addShapeLines(shape, buffer,quality); // Add Edges of Shape to GLTF 
+            // Only output lines if Shape is higher order than Edge/Wire (mostly because these are already outputted in GLTFBuilder().addPointsAndLines())
+            if(!['Edge', 'Wire'].includes(shape.type()))
+            {
+                this._addShapeLines(shape, buffer,quality); // Add Edges of Shape to GLTF 
+            }
         })
 
         // export new GLTF binary content

@@ -151,7 +151,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=false):ArrayBuffer|string
+    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=true):ArrayBuffer|string
     {
         const oc = this._parent.geom._oc;
         
@@ -231,10 +231,12 @@ export class Exporter
             gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay); 
         }
 
-        // extra vertices and lines for specific visualization styles
+        // extra base vertices and lines for every Shape used for specific visualization styles
         if (extraShapesAsPointLines)
         {
-            const extraOutputShapes = this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type())));
+            const EXCLUDE_SHAPES_FOR_EXPORT = ['Vertex']; // We want to output vertices of edges/wires too! 
+            // GLTFBuilder.addSeperatePointsAndLinesForShapes() skips the lines for these, but includes the points
+            const extraOutputShapes = this._parent.geom.all().filter(s => (s.visible() && !EXCLUDE_SHAPES_FOR_EXPORT.includes(s.type())));
             gltfContent = new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, quality); 
         }
         
