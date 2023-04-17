@@ -645,13 +645,24 @@ export class Geom
     return this.scene.allShapesCollection();
   }
 
+  /** Return all shapes on the active layer */
+  layerShapes():ShapeCollection
+  {
+    return this.activeLayer.allShapesCollection()
+  }
+
   //// SCENE MANAGEMENT ////
 
   /** Create and/or activate a layer as sibling to active layer (or Scene) 
    *  IMPORTANT: a layer is always a direct child of the Scene root
   */
-  layer(name:string):Obj
+  layer(name?:string):Obj
   {
+      if(!name)
+      {
+        return this.activeLayer;  
+      }
+
       if(name === 'scene' || !name)
       {
         return this.resetLayers();

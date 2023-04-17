@@ -21,7 +21,7 @@ import { roundToTolerance } from './internal'
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
 import { WIRE_LOFTED_SOLID } from './internal'
 import { toRad } from './internal';
-import { DimensionLine } from './internal' // from Annotator through internal.ts
+import { DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
 
 // this can disable TS errors when subclasses are not initialized yet
 type IWire = Wire
@@ -1015,11 +1015,11 @@ export class Edge extends Shape
 
     //// SHAPE ANNOTATIONS API ////
 
-    @checkInput([['String', null]], ['auto'])
-    dimension(units?:string):IDimensionLine
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dimension(dim?:DimensionOptions):IDimensionLine
     {
         // TODO: Find out a good way to formulate offset vector of dimension line
-        units = (!units) ? this._geom.units() : units;
+        const units = (!dim) ? this._geom.units() : dim.units;
         let dimLine = this._geom._annotator.dimensionLine(this.start(), this.end(), units);
         dimLine.link(this);
         return dimLine

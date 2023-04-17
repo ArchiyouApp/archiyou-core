@@ -71,7 +71,7 @@ export type MakeSolidInput = Array<Shell>|ShapeCollection
 //// INTERFACES ////
 
 /** A group of all modules of Archiyou for easy access  */
-export interface ArchiyouState
+export interface ArchiyouApp
 {
     geom: Geom,
     doc: Doc,
@@ -80,6 +80,21 @@ export interface ArchiyouState
     exporter: Exporter, 
     // TODO: importer?
     gizmos: Array<Gizmo>, // TODO: move this to Geom?
+}
+
+export interface ArchiyouAppInfoBbox
+{
+    min:Array<number|number|number> // leftfrontbottom 
+    max:Array<number|number|number> // rightbacktop
+    width: number
+    height: number
+}
+
+/** Data structure on the current state of the Archiyou App (mostly inside a worker) */
+export interface ArchiyouAppInfo
+{
+    units?:ModelUnits // units of Geom._units
+    bbox?:ArchiyouAppInfoBbox // bbox of all shapes in scene
 }
 
 /** All possible attributes for Shapes */

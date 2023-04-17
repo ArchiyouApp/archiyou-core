@@ -25,7 +25,8 @@ import { MeshShape, FaceMesh, EdgeMesh, VertexMesh } from './internal' // see: E
 import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
-import { Alignment, isAlignment, isShapeType, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings} from './internal'
+import { Alignment, isAlignment, isShapeType, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
+import { DimensionOptions, DimensionLine } from './internal'
 import { Obbox } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -33,6 +34,7 @@ type IVertex = Vertex
 type IEdge = Edge
 type ISolid = Solid
 type IWire = Wire
+type IDimensionLine = DimensionLine
  
 export class Shape
 {
@@ -3744,10 +3746,10 @@ export class Shape
 
     //// SHAPE ANNOTATIONS API ////
 
-    @checkInput(['DimensionLineData'], ['auto'])
-    dimension(units:string) // TODO: unit typing
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dimension(dim?:DimensionOptions):IDimensionLine // TODO: unit typing
     {
-        console.warn(`Shape::dimension(): No implementation of dimension method in Shape of type ${this.type()}!`);
+        throw new Error(`Shape::dimension(): No implementation of dimension method in Shape of type ${this.type()}!`);
     }
 
     //// API to forward to _Obj ////

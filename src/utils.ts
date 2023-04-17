@@ -5,7 +5,9 @@
  */
 
 
-import {isCoordArray, isAnyShape, isPointLike, PolarCoord, DocUnits, isDocUnits} from './internal'
+import {isCoordArray, isAnyShape, isPointLike, PolarCoord, DocUnits, isDocUnits, ModelUnits} from './internal'
+
+type Units = DocUnits | ModelUnits
 
 //// Working with types ////
 
@@ -194,7 +196,7 @@ export function intRange(start:string|number,end:string|number)
 }
 
 /** Convert a value between units of measure */
-export function convertValueFromToUnit(v:number, from:DocUnits, to:DocUnits):number
+export function convertValueFromToUnit(v:number, from:Units, to:Units):number
 {
     const INCH_TO_MM = 25.4;
     const MM_TO_INCH = 0.0393700787;

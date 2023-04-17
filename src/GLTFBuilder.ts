@@ -1,4 +1,4 @@
-import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, ArchiyouState, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
+import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, ArchiyouApp, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
 import { toRad, MeshingQualitySettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
@@ -108,7 +108,7 @@ export class GLTFBuilder
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouState):ArrayBuffer
+    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp):ArrayBuffer
     {
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')

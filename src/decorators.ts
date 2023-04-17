@@ -13,7 +13,7 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
-            isLayoutOptions, isDimensionLineData, ModelUnits, isModelUnits } from './internal'
+            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions } from './internal'
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
 
@@ -411,12 +411,12 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             errorMessage: { possible: ['LayoutOptions: { margin: number, flatten: boolean, stock: string, groupSame: boolean }'] }, // TODO
             transformInput: null,
         },
-        'isDimensionLineData':
+        'isDimensionOptions':
         {
-            name: 'DimensionLineData',
-            obj: isDimensionLineData,
-            check: isDimensionLineData,
-            errorMessage: { possible: ['DimensionLineData: { unit:string, offset:number, scale:number }'] },
+            name: 'DimensionOptions',
+            obj: isDimensionOptions,
+            check: isDimensionOptions,
+            errorMessage: { possible: ['DimensionOptions: { units:string }'] }, // TODO: more options
             transformInput: null,
         },
         'isModelUnits':

@@ -5,7 +5,7 @@
  *      Only on output they might be turned into real Shapes like text Faces etc.
  */ 
 
-import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom } from './internal'
+import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, ModelUnits } from './internal'
 import { AnyShape,  AnyShapeOrCollection, Layout, roundToTolerance } from './internal'
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
@@ -18,15 +18,21 @@ export interface DimensionLineData
     start:Array<number|number|number>
     end:Array<number|number|number>
     value:number
-    static:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
-    units:string
-    offset:Array<number|number|number>
-    scale:number
+    static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
+    units?:string
+    offset?:Array<number|number|number>
+    scale?:number
     interactive:boolean
     round?:boolean 
     param:string // name param binded to this dimension line
     _labelPosition?:Array<number|number|number> // for internal use
-    showUnits:boolean
+    showUnits?:boolean
+}
+
+/** Used with Shape.dimension() as options */
+export interface DimensionOptions 
+{
+    units:ModelUnits
 }
 
 /** Dimension Line Style */

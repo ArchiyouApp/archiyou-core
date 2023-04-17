@@ -265,9 +265,9 @@ export function isMakeSolidInput(o:any): o is MakeSolidInput
 
 }
 
-export function isDimensionLineData(o:any): o is DimensionLineData
+export function isDimensionOptions(o:any): o is DimensionLineData
 {
-    return (typeof o === 'object') && (o?.type)
+    return (typeof o === 'object') && (isModelUnits(o?.units))
 }
 
 //// SELECTIONS ////
