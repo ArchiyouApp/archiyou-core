@@ -30,6 +30,9 @@ export class GLTFBuilder
     scene:any;
     buffer:any;
 
+    //// SETTINGS ////
+    SUBSHAPE_OUTPUT_NAME_SEPERATOR:string = '___';
+
     constructor()
     {
         this.doc = new Document(); // Start new GLTF document
