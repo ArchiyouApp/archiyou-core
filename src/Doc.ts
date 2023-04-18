@@ -544,9 +544,6 @@ export class Doc
     /** Check if page name exists for active document */
     _pageExists(name:string):boolean
     {
-        console.log('==== PAGE EXISTS ====');
-        console.log(this._pagesByDoc);
-        console.log(name);
         return this._pagesByDoc[this._activeDoc].some( page => page.name === name);
     }
 
