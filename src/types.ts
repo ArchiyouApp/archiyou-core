@@ -73,6 +73,7 @@ export type MakeSolidInput = Array<Shell>|ShapeCollection
 /** A group of all modules of Archiyou for easy access  */
 export interface ArchiyouApp
 {
+    worker: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
     geom: Geom,
     doc: Doc,
     console: Console,

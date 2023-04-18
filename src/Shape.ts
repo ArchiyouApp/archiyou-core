@@ -3992,6 +3992,13 @@ export class Shape
         return this._isometry(viewpoint, showHidden)
     }
 
+    /** Alias for isometry() */
+    iso(viewpoint:string|PointLike, showHidden:boolean=false):AnyShapeCollection
+    {
+        return this.isometry(viewpoint, showHidden)
+    }
+
+
     //// OUTPUTS ////
 
     /** Output all Vertices of this Shape into an Array for further processing */

@@ -26,7 +26,7 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, Page, PageSize, Container, AnyContainer, View, TableOptions } from './internal' // classes
+import { Geom, ModelUnits, ShapeCollection, Page, PageSize, Container, AnyContainer, View, TableOptions, ArchiyouApp } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             Position, isPosition, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, Table } from './internal' // types and type guards
 
@@ -89,27 +89,41 @@ export class Doc
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
 
     //// END SETTINGS ////
+    _ay:ArchiyouApp; // all archiyou modules together
     _geom:Geom;
     _calc:any; // Cannot use reference to Calc here, because we don't allow references outside core
     
-    _docs:Array<string> = []; // multiple documents
-    _activeDoc:string;
+    _docs:Array<string> = []; // multiple documents names (see them as 'files')
+    _activeDoc:string; // name of active document
 
     _pageSizeByDoc:{[key:string]:PageSize} = {};
     _pageOrientationByDoc:{[key:string]:PageOrientation} = {}; // default orientation
     _pagesByDoc:{[key:string]:Array<Page>} = {};
     _unitsByDoc:{[key:string]:DocUnits} = {};
+    _pipelinesByDoc:{[key:string]:() => void} = {}; 
 
     _activePage:Page
     _activeContainer:AnyContainer
     
 
-    constructor(geom:Geom) // null is allowed
+    constructor(ay?:ArchiyouApp) // null is allowed
     {
-        this._geom = geom;
+        this.setArchiyou(ay)
 
         //// DEFAULTS
         this._setDefaults();
+    }
+
+    //// MAIN FUNCTIONS ////
+
+    setArchiyou(ay:ArchiyouApp)
+    {
+        if(ay)
+        {
+            this._ay = ay;
+            this._geom = ay?.geom;
+            // TODO: calc
+        }
     }
 
     /** Set reference to Calc module */
@@ -126,8 +140,29 @@ export class Doc
         return this;
     }
 
+    /** Execute pipeline for docs 
+     *  @param include list of docs to include (if empty all)
+     *  @param exclude list of docs to include (if empty exclude none)
+    */
+    executePipelines(include:Array<string> = [], exclude:Array<string> = [])
+    {
+        for (const [docName,pipelineFn] of Object.entries(this._pipelinesByDoc))
+        {
+            if (
+                    typeof pipelineFn === 'function' && 
+                    (include.length === 0 || include.includes(docName)) &&
+                    (exclude.length === 0 || !exclude.includes(docName))
+            )
+            {
+                this._ay.worker.funcs.executeFunc(pipelineFn)
+            }
+        }
+    }
+
+    //// DOC API ////
+
     /** Make a new document with optionally a name */
-    new(name?:string):Doc
+    create(name?:string):Doc
     {
         this._activeDoc = `${this.DOC_DEFAULT_NAME}${this._docs.length+1}` // start a unnamed doc
         this._docs.push(this._activeDoc);
@@ -179,12 +214,26 @@ export class Doc
         this._pageOrientationByDoc = {};
         this._pagesByDoc = {};
         this._unitsByDoc = {};
-        this.new(); // make sure we have a default document
+        this._activeDoc = null;
     }
+
+    /** Check if there is an active document, otherwise create a default one */
+    checkAndMakeDefaultDoc()
+    {
+        if(!this._activeDoc)
+        {
+            this.create();
+        }
+
+        return this._activeDoc;
+    }
+
+    //// DOC API ////
 
     /** Set Unit for active document: 'mm','cm' or 'inch' */
     units(units:DocUnits):Doc
     {
+        this.checkAndMakeDefaultDoc();
         if(!isDocUnits(units)){ throw new Error(`doc::pageSize: Invalid units. Use 'mm', 'cm' or 'inch'`);}
         this._unitsByDoc[this._activeDoc] = units;
 
@@ -194,6 +243,7 @@ export class Doc
     /** Set general page ISO size (A0,A4 etc) for current doc */
     pageSize(size:PageSize):Doc
     {
+        this.checkAndMakeDefaultDoc();
         if(!isPageSize(size)){ throw new Error(`doc::pageSize: Invalid ISO page size. Use: A0, A4 etc!`);}
         this._pageSizeByDoc[this._activeDoc] = size;
 
@@ -203,6 +253,7 @@ export class Doc
     /** Set general page ISO size (A0,A4 etc) for current doc */
     pageOrientation(o:PageOrientation):Doc
     {
+        this.checkAndMakeDefaultDoc();
         if(!isPageOrientation(o)){ throw new Error(`doc::pageSize: Invalid page orientation. Use 'landscape' or 'portrait'`);}
         this._pageOrientationByDoc[this._activeDoc] = o;
 
@@ -212,6 +263,7 @@ export class Doc
     /** Add a new page to the doc with given name */
     page(name:string):Doc
     {
+        this.checkAndMakeDefaultDoc();
         if(!name){ throw new Error(`Doc::page: Please supply a name to a page!`)}
         if(this._pageExists(name)){ throw new Error(`Doc::page: Page name "${name}" is already taken. Please use unique names!`)}
         
@@ -222,6 +274,20 @@ export class Doc
 
         return this;
     }
+
+    /** Define script that is executed before active document is generated */
+    pipeline(fn: () => any):Doc
+    {
+        this.checkAndMakeDefaultDoc();
+
+        if(typeof fn !== 'function'){ throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active document!`); }
+
+        this._pipelinesByDoc[this._activeDoc] = fn;
+
+        return this;
+    }
+
+    //// PAGE API ////
 
     /** Set size of active Page */
     size(size:PageSize):Doc
@@ -263,7 +329,10 @@ export class Doc
         
         const newViewContainer = new View(name).on(this._activePage);
         this._activeContainer = newViewContainer;
-        if(ShapeCollection.isShapeCollection(shapes)) this.shapes(shapes);
+        if(ShapeCollection.isShapeCollection(shapes))
+        {
+            this.shapes(shapes);
+        }
 
         return this;
     }
@@ -407,8 +476,8 @@ export class Doc
 
     //// Forward to active View Container ////
 
-    /** Bind ShapeCollection to View */
-    shapes(shapes:ShapeCollection):Doc
+    /** Bind ShapeCollection to View: either a real reference or the name of a ShapeCollection after running the doc pipeline */
+    shapes(shapes:ShapeCollection|string):Doc
     {
         if(!this._activeContainer){ throw new Error(`Doc::shapes(): Cannot add Shapes because no View Container is active! Make a View first with view("myView")!`)};
         if(this._activeContainer._type !== 'view'){ { throw new Error(`Doc::shapes(): Cannot add Shapes because no active container is a not a View. Check the order of your statements!`)};}
@@ -441,6 +510,8 @@ export class Doc
 
     toData():{[key:string]:DocData}
     {
+        this.executePipelines();
+
         let docs = {};
         this._docs.forEach( doc => {
             docs[doc] = {
