@@ -1730,8 +1730,6 @@ export class Shape
 
                 if (!vertexIsPresent)
                 {
-                    console.log('==== EQUAS NOT FOUND ====');
-                    console.log(v1); 
                     return false;
                 }
             }

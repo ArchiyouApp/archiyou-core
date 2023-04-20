@@ -570,7 +570,7 @@ export class Vector extends Point
         @param position position of mirror axis
         @param direction direction of mirror axis - default is the Y axis
     */
-    @checkInput( [ [isPointLike,[0,0,0]] , [isPointLike,[0,1,0]] ], [Vector, Vector]) // default values in checkInput
+    @checkInput( [ ['PointLike',[0,0,0]] , ['PointLike',[0,1,0]] ], [Vector, Vector]) // default values in checkInput
     mirror(position?:PointLike, direction?:PointLike):Vector
     {
         let positionPoint = (position as Vector).toPoint(); // auto converted to Vector

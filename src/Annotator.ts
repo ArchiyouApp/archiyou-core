@@ -146,9 +146,11 @@ export class DimensionLine extends BaseAnnotation
         }
     }
 
-    getRotation():number
+    /** Get rotation in SVG coordinate system (so mirror y!) */
+    getSVGRotation():number
     {
-        return this.end.toVector().subtracted(this.start).angle2D();
+        return this.end.toVector().mirror([0,0,0],[1,0,0])
+            .subtracted(this.start.toVector().mirror([0,0,0],[1,0,0])).angle2D();
     }
 
     _calculateOffsetVec()
@@ -164,8 +166,7 @@ export class DimensionLine extends BaseAnnotation
             {
                 this.offsetVec.reverse();
             }
-        }
-        
+        }        
     }
 
     //// OPERATIONS ////
@@ -292,7 +293,7 @@ export class DimensionLine extends BaseAnnotation
 
        const atPoint = at as Point;
         
-       const rotation = (flip) ? this.getRotation() + 90 : this.getRotation() + 180 + 90;
+       const rotation = (flip) ? this.getSVGRotation() - 90 + 180: this.getSVGRotation() - 90;
     
        return `
           <g transform="translate(${atPoint.x} ${atPoint.y}) 

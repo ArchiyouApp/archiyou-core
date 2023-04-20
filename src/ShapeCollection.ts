@@ -1923,7 +1923,7 @@
          if (shapeEdges.length == 0){ return null;}
 
          // to deal with flipped y-axis: mirror collection for now 
-         const flippedEdgeCollection = shapeEdges._mirroredX(); // NOTE: mirroring in x-axis
+         const flippedEdgeCollection = shapeEdges._mirroredX(0); // NOTE: mirroring in x-axis
 
          let svgPaths:Array<string> = [];
 
