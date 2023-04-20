@@ -276,9 +276,8 @@ export class Exporter
 
     exportToSVG():string
     {
-        // For now only export 2D edges on XY plane
-        let edges2DCollection = this._parent.geom.all().filter(s => s.visible() && s.type() === 'Edge' && s.is2DXY());
-        return edges2DCollection.toSvg();
+        // For now only export 2D Shapes on XY plane
+        return this._parent.geom.all().toSvg();
     }
 
     async exportToSVGWindow(content:string)

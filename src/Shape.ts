@@ -26,7 +26,7 @@ import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
 import { Alignment, isAlignment, isShapeType, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
-import { DimensionOptions, DimensionLine } from './internal'
+import { Annotation, DimensionOptions, DimensionLine } from './internal'
 import { Obbox } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -45,7 +45,9 @@ export class Shape
     _ocShape:any = null; // instance of OC Shape subclass: Vertex, Edge, Wire etc. - NOTE: we have to set a value here: otherwise it will not be set 
     _ocId:string = null;
     _isTmp:boolean = false; // Flag to signify if a Shape is temporary (for example for construction)
+    
     attributes:ShapeAttributes = {}; // data attributes that can be added to Shapes 
+    annotations:Array<Annotation> = []; // array of annotations associated with this Shape
 
     //// SETTINGS ////
     CLASSNAME_TO_SHAPE_ENUM_STATIC: {[key:string]:string} =  {
@@ -801,6 +803,9 @@ export class Shape
             // !!!! checking takes a lot time (10-15ms), don't use it for simple operations like move
             this.checkAndFix(); 
         }
+
+        // bring annotation along
+        this._updateAnnotations();
         
         return this;
     }
@@ -981,6 +986,8 @@ export class Shape
 
         this._ocShape.Move(ocRotation, true);
         this._updateFromOcShape(); // needed for certain classes like Vertex to update class properties
+        
+        this._updateAnnotations(); // bring annotation along
 
         return this;
     }
@@ -1688,7 +1695,9 @@ export class Shape
         return (this._hashcode() === other._hashcode())
     }
 
-    /** Is exactly the same Shape based on its topology/geometry */
+    /** Is exactly the same Shape based on its topology/geometry 
+     *  IMPORTANT: this will not always work!
+    */
     @checkInput('PointLikeOrAnyShape', 'auto')
     equals(other:PointLikeOrAnyShape):boolean
     {
@@ -1701,15 +1710,13 @@ export class Shape
         else {
             otherShape = other as AnyShape; 
         }
-
-        let vertices = this.vertices().all(); 
-        let otherVertices = otherShape.vertices().all();
         
-        if(this.type() != otherShape.type())
-        {
-            return false;
-        }
-        else if (vertices.length != otherVertices.length)
+        if(this.type() != otherShape.type()){ return false;}
+
+        const vertices = this.vertices().all(); 
+        const otherVertices = otherShape.vertices().all();
+        
+        if (vertices.length != otherVertices.length)
         {
             return false;
         }
@@ -1723,6 +1730,8 @@ export class Shape
 
                 if (!vertexIsPresent)
                 {
+                    console.log('==== EQUAS NOT FOUND ====');
+                    console.log(v1); 
                     return false;
                 }
             }
@@ -3743,13 +3752,25 @@ export class Shape
         }
     }
 
-
     //// SHAPE ANNOTATIONS API ////
 
     @checkInput([['DimensionOptions',null]], ['auto'])
     dimension(dim?:DimensionOptions):IDimensionLine // TODO: unit typing
     {
         throw new Error(`Shape::dimension(): No implementation of dimension method in Shape of type ${this.type()}!`);
+    }
+
+    _addAnnotation(a:Annotation):boolean
+    {
+        // add dimension to annotations of this shape
+        // TODO: check for doubles etc
+        this.annotations.push(a)
+        return true;
+    }
+
+    _updateAnnotations()
+    {
+        this.annotations.forEach(a => a.update());
     }
 
     //// API to forward to _Obj ////
@@ -3825,6 +3846,8 @@ export class Shape
     /** Project this 3D Shape onto the XY Plane given by a normal Vector (up is the z-axis)
      *  It groups the different Edge types in the returning Collection for easy extractions
      *  Include flag all=true to include hidden Edges
+     * 
+     *  IMPORTANT: Projection of a Solid that contains a certain Edge results in different alignment when projecting that Edge individually
      *  
      *  TODO: find a way to identify edges/vertices from before and after projection
      *          for example to preserve dimensions
@@ -3946,13 +3969,16 @@ export class Shape
     /** Generate isometric view from Side or corner of ViewCube ('frontlefttop') or PointLike coordinate
      *      Use showHidden=true to output with hidden lines
      */
-    _isometry(viewpoint:string|PointLike, showHidden:boolean=false):AnyShapeCollection
+    _isometry(viewpoint:string|PointLike, showHidden:boolean=false, transferDimensions:boolean=true):AnyShapeCollection
     {
         const DEFAULT_VIEWPOINT = [-1,-1,1]; 
         
         if(!viewpoint){ viewpoint = DEFAULT_VIEWPOINT as PointLike };
 
-        if (typeof viewpoint ===  'string')
+        let projShapes:ShapeCollection;
+        let rotateProjShapes:number = 0;
+
+        if (typeof viewpoint === 'string')
         {
             const b = new Solid().makeBox(100,100,100);
             let viewpointShape = b._getSide(viewpoint as string);
@@ -3963,8 +3989,8 @@ export class Shape
                 // We use some heuristics to transform limited values so that UP (prev Z) is aligned to 2D Y
                 let rotation = (viewpoint.includes('front')) ? 60 : 120;
                 if (viewpoint.includes('right')){ rotation *= -1; }
-                r.rotateZ(rotation);
-                return r.moveToOrigin(); // center resulting isometry on origin
+                rotateProjShapes = rotation;
+                projShapes = r
             }
             else {
                 console.warn(`Shape:_isometry: Invalid side string "${viewpoint}". Make sure you signify a point on the ViewCube! Defaulted to "frontleftop". `)
@@ -3977,10 +4003,29 @@ export class Shape
         if(isPointLike(viewpoint))
         {
             const p = new Point(viewpoint).toVector().normalize();
-            return this._project(p, showHidden).moveToOrigin();
+            projShapes = this._project(p, showHidden);
+            rotateProjShapes = 60; // NOTE: we simply rotate 60 degrees now
         }
         
-        throw new Error(`Shape._isometry(): Invalid input: Use a string of sides ('topleftfront') or PointLike ([-1,-1,1])!`)
+        // Handle results
+        if (projShapes)
+        {
+            // we have the projected Shape now check if the original 
+            // had dimensions associated with it and transfer them to the 2D projected Shape
+            let newDimLines = [];
+            if(transferDimensions)
+            { 
+                newDimLines = this._addDimensionsToProj(viewpoint, projShapes); 
+            }
+            projShapes.rotateZ(rotateProjShapes); // rotate 
+            projShapes.moveToOrigin(); // center resulting isometry on origin
+            newDimLines.forEach( dim => dim.updatePosition()); // after translate/rotate update position of dim line (but not value!)
+
+            return projShapes;
+        }
+        else {
+            throw new Error(`Shape._isometry(): Invalid input: Use a string of sides ('topleftfront') or PointLike ([-1,-1,1])!`)
+        }
     }
 
     /** Generate isometric view from Side or corner of ViewCube ('frontlefttop') or PointLike coordinate
@@ -3997,7 +4042,36 @@ export class Shape
     {
         return this.isometry(viewpoint, showHidden)
     }
+    
+    /** Take Dimensions associated with current Shape to the projected 2D shape
+     *  NOTE: We can not yet associate dimensions with ShapeCollections, 
+     *  so we link it to the specific Shape within this collection
+     */
+    _addDimensionsToProj(viewpoint:string|PointLike, projShapes:AnyShapeCollection):Array<DimensionLine>
+    {
+        const dimLines = this.annotations.filter(a => a.type() === 'dimensionLine');
+        const newDimLines = [];
 
+        dimLines.forEach( dimLine => {
+            const dimEdge = dimLine.toEdge();
+            const projDimEdge = dimEdge._project(viewpoint, false).first();
+            // IMPORTANT: results of projection can be translated anywhere (there is no consistency in world-position => projected-position)
+            // This means that getEqualsTranslated() can return multiple if there are same Edges around ( for example in box geometries)
+            const projEdge = projShapes.getEqualsTranslated(new ShapeCollection(projDimEdge)).first();
+
+            if (projEdge)
+            {
+                const newProjDimLine = projEdge.dimension();
+                newProjDimLine.setValue(dimLine.value); // get value from old to new dimension line
+                newDimLines.push(newProjDimLine);
+            }
+            else {
+                console.warn('Shape._addDimensionsToProj(): Failed to map dimension line to project Edge')
+            }
+        })
+
+        return newDimLines;
+    }
 
     //// OUTPUTS ////
 

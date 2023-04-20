@@ -25,7 +25,8 @@ export class View extends Container
                 main: (ShapeCollection.isShapeCollection(this._shapes)) ? 
                                 (this._shapes as ShapeCollection)?.toSvg() : 
                                 this.resolveShapeNameToSVG(this._shapes as string), 
-                settings: {} } as ContainerContent,
+                settings: {} 
+            } as ContainerContent,
         }
     }
 

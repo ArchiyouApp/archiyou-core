@@ -1257,6 +1257,29 @@
 
          return new ShapeCollection(equals);
       }
+
+      /** Get the Shapes that the same, but might be translated 
+       *    NOTE: this might not be enough to establish 
+       * 
+      */
+      @checkInput('AnyShapeOrCollection', 'auto')
+      getEqualsTranslated(others:AnyShapeOrCollection):ShapeCollection
+      {
+         let equals = [];
+
+         let othersCollection = (isAnyShape(others)) ? new ShapeCollection(others as Shape) :  others as ShapeCollection;
+
+         this.shapes.forEach( curShape => 
+         {
+            let equalShape = othersCollection.shapes.find(otherShape => curShape._copy().moveTo(0,0,0).equals(otherShape._copy().moveTo(0,0,0) as any));
+            if (equalShape)
+            {
+                  equals.push(curShape)
+            }
+         });
+
+         return new ShapeCollection(equals);
+      }
       
       /** Combine two ShapeCollections and also try to upgrade Shapes that might be combined into higher order Shapes */
       // TODO: performance looks very slow. Can we improve this?
@@ -1874,18 +1897,33 @@
          return `ShapeCollection<${this.shapes.map(s => s.toString())}>`;
       }
 
-      /** Export (for now only Edges) to SVG */
+      /** Get all edges of 2D XY Shapes in this collection */
+      _get2DXYShapeEdges():ShapeCollection
+      {
+         const shapeEdges = new ShapeCollection();
+
+         this.forEach(shape => 
+         {
+            if (shape.is2DXY())
+            {
+               shapeEdges.add(shape.edges())
+            }
+         })
+
+         return shapeEdges;
+      }
+
+      /** Export Shapes that are 2D and on XY plane to SVG 
+       *    All shapes will be converted to Edges
+      */
       toSvg(withAnnotations:boolean=true):string
       {
-         const edgeCollection = this.getShapesByType('Edge');
+         const shapeEdges = this._get2DXYShapeEdges();
          
-         if (edgeCollection.length == 0)
-         {
-            return null;
-         }
+         if (shapeEdges.length == 0){ return null;}
 
          // to deal with flipped y-axis: mirror collection for now 
-         const flippedEdgeCollection = edgeCollection._mirroredX(); // NOTE: mirroring in x-axis
+         const flippedEdgeCollection = shapeEdges._mirroredX(); // NOTE: mirroring in x-axis
 
          let svgPaths:Array<string> = [];
 
@@ -1910,22 +1948,23 @@
       /** Add dimension lines that are tied to shapes in this Collection */
       _getDimensionLinesSvgElems():string
       {
-         // TODO: have these arrow in editable files on disk
          const dimensionLines = this._geom._annotator.dimensionLines;
 
          let svgElems:Array<string> = [];
-         let bboxHeight = this.bbox().depth(); // needed for flipping (maybe we should do something smarter here!)
 
-         const edgeCollection = this.getShapesByType('Edge');
-         edgeCollection.forEach( e => 
+         const flatXYShapes = this.filter(s => s.is2DXY());
+
+         flatXYShapes.forEach( s => 
          {
-            // dimension line that is linked to Edge we are about to export to SVG
-            const linkedDimensionLines = dimensionLines.filter( dl => dl.shape && dl.shape.same(e) )
+            // get the DimensionLine that is linked to current shape
+            const linkedDimensionLines = dimensionLines.filter( dl => dl.shape && dl.shape.same(s) )
             linkedDimensionLines.forEach( d => 
             {
-               svgElems.push(d.toSvg(bboxHeight));
+               svgElems.push(d.toSvg());
             })
          });
+
+         console.info(`ShapeCollection::_getDimensionLinesSvgElems(): Exported ${svgElems.length} dimension lines to SVG`)
 
          let dimSvg = svgElems.join('\n');
          return dimSvg;

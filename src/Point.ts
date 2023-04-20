@@ -329,7 +329,7 @@ export class Point
     equals(other:PointLike, ...args):boolean
     {
         other = other as Point;
-        let tolerance = this._oc.SHAPE_TOLERANCE; // TODO: use methods on OC?
+        const tolerance = this._oc.SHAPE_TOLERANCE; // TODO: use methods on OC?
         return Math.abs(this._x - other._x) < tolerance && 
                Math.abs(this._y - other._y) < tolerance && 
                Math.abs(this._z - other._z) < tolerance;

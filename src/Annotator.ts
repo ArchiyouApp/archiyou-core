@@ -5,10 +5,15 @@
  *      Only on output they might be turned into real Shapes like text Faces etc.
  */ 
 
+import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
+
 import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, ModelUnits } from './internal'
 import { AnyShape,  AnyShapeOrCollection, Layout, roundToTolerance } from './internal'
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
+/** Bring all annotations in one type */
+export type AnnotationType = 'base'|'dimensionLine' | 'label' // TODO MORE
+export type Annotation = DimensionLine  // TODO: more: label
 
 /** Exporting DimensionLine instances as data */
 export interface DimensionLineData
@@ -17,11 +22,11 @@ export interface DimensionLineData
     type:'dimensionLine'|'label', // TODO: more annotation types
     start:Array<number|number|number>
     end:Array<number|number|number>
+    dir:Array<number|number|number>
     value:number
     static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
     units?:string
     offset?:Array<number|number|number>
-    scale?:number
     interactive:boolean
     round?:boolean 
     param:string // name param binded to this dimension line
@@ -33,67 +38,112 @@ export interface DimensionLineData
 export interface DimensionOptions 
 {
     units:ModelUnits
+    offset?:number   
 }
 
-/** Dimension Line Style */
-export interface DimensionLineStyle
+export class BaseAnnotation
 {
-    color:any
-    scale:number // general scale
-    offset:number   
+    uuid:string;
+
+    constructor()
+    {
+        this.uuid = uuidv4();
+    }
+
+    /** Type of Annotation, reimplemented in extended classes */
+    type():AnnotationType
+    {
+        return 'base'
+    }
 }
 
-/** Dimension Class */
-export class DimensionLine
+/** DimensionLine Class 
+ * 
+ *  NOTES:
+ *      - offset length can be set by user in world coordinates
+ * 
+*/
+export class DimensionLine extends BaseAnnotation
 {
     //// SETTINGS
-    DIMENSION_OFFSET_DEFAULT = 5;
+    DIMENSION_OFFSET_DEFAULT = 10;
     DIMENSION_TEXTSIZE_DEFAULT = 10;
-    DIMENSION_ARROWLENGTH_DEFAULT = 10;
-    DIMENSION_ARROWRADIUS_DEFAULT = 5;
     DIMENSION_ROUND_DEFAULT = true;
 
-    start:Point;
-    end:Point;
+    start:Point; // on Shape
+    end:Point; // on Shape
     shape:AnyShape = null; // the Shape the dimension is linked to - needed to know if we need to export dimension lines in toSvg()
-    value:number;
-    units:string = null; // not needed?
-    offsetVec:Vector; 
-    scale:number = 1.0; // scale textSize and arrows uniformly
+    value:number; // the value of the dimension line, can be static
+    static:boolean = false;
+    units:ModelUnits = null;
+    offsetVec:Vector; // Normalized Vector offset from Shape 
 
-    offsetLength:number;
-    textSize:number = this.DIMENSION_TEXTSIZE_DEFAULT;
-    arrowLength:number = this.DIMENSION_ARROWLENGTH_DEFAULT;
-    arrowRadius:number = this.DIMENSION_ARROWRADIUS_DEFAULT;
+    offsetLength:Number; // distance of DimensionLine to Shape along offsetVec in world units: most of the time this is calculated based on view context
+    textSize:number;
 
     interactive:boolean = false;
     showUnits:boolean = false;
     round:boolean = true;
     param:string = null; // name of bound parameter
 
-    constructor(start:Point, end:Point, units?:string)
+    constructor(start:Point, end:Point)
     {
+        super();
         this.start = start as Point;
         this.end = end as Point;
-        this.value = roundToTolerance(this.start._toVertex().distance(this.end._toVertex()));
-
-        this.units = units || null; 
-        // styling settings. Use setStyle seperately
-        this.scale = 1.0;
-        this.offsetLength = this.DIMENSION_OFFSET_DEFAULT;
+        this.value = this._getDynamicValue();
     
         this._calculateOffsetVec();
     }
 
-    /** Link to Shape */
+    _getDynamicValue():number
+    {
+        return roundToTolerance(this.start._toVertex().distance(this.end._toVertex()));
+    }
+
+    type():AnnotationType
+    {
+        return 'dimensionLine';
+    }
+
+    dir():Vector
+    {
+        return this.toEdge().direction();
+    }
+
+    /** Middle Point of this DimensionLine */
+    middle():Point
+    {
+        return new Edge(this.start, this.end).middle()
+    }
+
+    /** Link to Shape so we can export DimensionLine with the shapes */
     link(shape:AnyShape):DimensionLine
     {
-        if(Shape.isShape(shape))
-        {
-            this.shape = shape;
-        }
+        if(Shape.isShape(shape)){ this.shape = shape; }
 
         return this;
+    }
+
+    /** Update when linked Shape is updated */
+    update()
+    {
+        if(!this.static){ this.value = this._getDynamicValue() }
+        this.updatePosition();
+    }
+
+    /** Update position after linked Shape has moved 
+     *  !!!! IMPORTANT !!!! Improve this method
+    */
+    updatePosition()
+    {
+        if(this.shape && this.shape.type() === 'Edge')
+        {
+            const linkedEdge = (this.shape as Edge);
+            this.start = linkedEdge.start().toPoint();
+            this.end = linkedEdge.end().toPoint();
+            this._calculateOffsetVec();
+        }
     }
 
     getRotation():number
@@ -105,27 +155,44 @@ export class DimensionLine
     {
         if ( (this.end.x === this.start.x) && (this.end.y === this.start.y))
         {
-            this.offsetVec = new Vector(1,0,0).scale(this.offsetLength); // along x-axis is dimension line is parallel to z-axis
+            this.offsetVec = new Vector(1,0,0); // along x-axis is dimension line is parallel to z-axis
         }
         else {
-            this.offsetVec = this.end.toVector().subtracted(this.start.toVector()).crossed([0,0,1]).normalized().scale(this.offsetLength);
+            this.offsetVec = this.end.toVector().subtracted(this.start.toVector()).crossed([0,0,1]).normalized();
+            // as a quick-solution align the offsetVector at the DimensionLine away from the origin
+            if (new Vertex(0,0,0).move(this.offsetVec).distance(this.middle()) > new Vertex(0,0,0).move(this.offsetVec.reversed()).distance(this.middle()) ) 
+            {
+                this.offsetVec.reverse();
+            }
         }
         
     }
 
-    // TODO: input checking and sane error message
-    setStyle(dimStyle:DimensionLineStyle)
+    //// OPERATIONS ////
+
+    /** Set static value  */
+    setValue(v:number|string):this
     {
-        this.scale = dimStyle?.scale || this.scale;
-        this.offsetLength = dimStyle?.offset || this.offsetLength; 
-        this._calculateOffsetVec();
+        this.value = (typeof v === 'number') ? v : Number(v);
+        this.static = true; // set this flag so we know if we need to update it in update()
+
+        return this;
+    }
+
+    // TODO: input checking and sane error message
+    setOptions(o:DimensionOptions):this
+    {
+        this.offsetLength = o?.offset || this.offsetLength; // only updates when not null 
+        this.units = o?.units || this.units;
         // TODO: more: color, linethickness etc.
+        return this;
     }
 
     @checkInput(['PointLike'],['Vector'])
-    setOffset(v:PointLike)
+    setOffsetVec(v:PointLike):this
     {
         this.offsetVec = v as Vector; // auto converted
+        return this;
     }
 
     /** bind parameter to this dimension line and make it interactive */
@@ -136,6 +203,12 @@ export class DimensionLine
         this.interactive = true;
     }
 
+    /** Make a Line Edge out this DimensionLine */
+    toEdge():Edge
+    {
+        return new Edge(this.start, this.end);
+    }
+
     /** Output to data (to be send from Webworker to main app) */
     toData():DimensionLineData
     {
@@ -144,10 +217,10 @@ export class DimensionLine
             start: this.start.toArray(),
             end: this.end.toArray(),
             value: this.value,
-            static: false,
+            static: this.static,
             units: this.units,
+            dir: this.dir().toArray(),
             offset: this.offsetVec.toArray(),
-            scale: this.scale,
             interactive: this.interactive,
             param: this.param,
             round: this.round,
@@ -155,41 +228,51 @@ export class DimensionLine
         } as DimensionLineData
     }
 
-    /** Generate SVG (in world coordinates) for this dimension line
-     *     if 3D the Dimension Line is projected to XY plane
-     */
-    toSvg(bboxHeight:number)
+    /** Calculate a offset length */
+    _calculateAutoOffsetLength():number
     {
-        let lineStart = this.start.add(this.offsetVec).toArray();
-        lineStart[1] = bboxHeight - lineStart[1]; // flip to svg y-axis
-        
-        let lineEnd = this.end.add(this.offsetVec).toArray();
-        lineEnd[1] = bboxHeight - lineEnd[1];
+        // For now keep it static
+        return this.DIMENSION_OFFSET_DEFAULT;
+    }
 
-        let dir = this.start.toVector().subtracted(this.end);
-        let lineMid = this.end.moved(dir.scaled(0.5)).add(this.offsetVec).toArray();
-        lineMid[1] = bboxHeight - lineMid[1];
+    /** Generate SVG for this dimension line
+     *     if 3D the Dimension Line is projected to XY plane
+     *     NOTE: we need to transform from Archiyou coordinate system to the SVG one (flip y)
+     */
+    toSvg()
+    {   
+        const offsetLength = this.offsetLength || this._calculateAutoOffsetLength();
+        const offsetVec = this.offsetVec.scaled(offsetLength as PointLike);
+
+        let lineStart = this.start.add(offsetVec).toArray();
+        lineStart[1] = -lineStart[1]; // flip to svg y-axis
+        
+        let lineEnd = this.end.add(offsetVec).toArray();
+        console.log(lineEnd);
+        lineEnd[1] = -lineEnd[1];
+
+        let lineMid = this.middle().toArray();
+        lineMid[1] = -lineMid[1];
 
         let dimText = ((this.round) ? Math.round(this.value) : this.value).toString();
         if (this.showUnits ) dimText += this.units;
 
         return `<g class="dimensionline">
-            ${this._makeSvgLinePath(lineStart,lineEnd)}
-            ${this._makeSvgArrow(lineStart)}
-            ${this._makeSvgArrow(lineEnd, true)}
-            ${this._makeSvgTextLabel(lineMid,dimText)}
+                ${this._makeSvgLinePath(lineStart,lineEnd)}
+                ${this._makeSvgArrow(lineStart)}
+                ${this._makeSvgArrow(lineEnd, true)}
+                ${this._makeSvgTextLabel(lineMid,dimText)}
             </g>
         `
     }
 
+    /** Generate a line segment in SVG (with SVG coords) */
     @checkInput(['PointLike','PointLike'], ['Point','Point'])
     _makeSvgLinePath(start:PointLike, end:PointLike)
     {  
-       // NOTE: auto converted to Point 
-       // In SVG coords
-       let startPoint = start as Point;
+       let startPoint = start as Point; // NOTE: auto converted to Point 
        let endPoint = end as Point;
-       return `<line x1="${startPoint.x}" y1="${startPoint.y}" x2="${endPoint.x}" y2="${endPoint.y}"/>`
+       return `<line class="annotation line" style="stroke-width:0.5" x1="${startPoint.x}" y1="${startPoint.y}" x2="${endPoint.x}" y2="${endPoint.y}"/>`
     }
 
     /** Place SVG arrow on position and rotation. Tip of the arrow is pivot */
@@ -197,17 +280,26 @@ export class DimensionLine
     @checkInput(['PointLike', ['Boolean',false]], ['Point','auto'])
     _makeSvgArrow(at:PointLike, flip?:boolean)
     {
-       // Pivot of error is [0,0]
+       /*   Arrows in raw SVG
+            - Pivot of arrow is at [0,0] pointing upwards (in SVG coordinate system of course)
+            - use style for fill/stroke, so we can override it later (not tags fill="..")
+            - TODO: different arrow styles
+        */
+       const ARROWS_SVG  = {
+            default: '<path class="annotation arrow" style="fill:none;stroke-width:0.5" d="M-5 5 L 0 0 L 5 5" />'
+       }
+       const DEFAULT_ARROW_SVG = 'default'
+
        const atPoint = at as Point;
         
-       const rotation = (flip) ? this.getRotation() : this.getRotation() + 180;
+       const rotation = (flip) ? this.getRotation() + 90 : this.getRotation() + 180 + 90;
     
        return `
           <g transform="translate(${atPoint.x} ${atPoint.y}) 
                             rotate(${rotation})
                             scale(1 1)
                             ">
-                            <path style="fill:#000000" d="M0 0 L -2 6 L 2 6 Z" />
+                            ${ARROWS_SVG[DEFAULT_ARROW_SVG]}
           </g>`
         
     }
@@ -228,22 +320,23 @@ export class DimensionLine
         const atPoint = at as Point;
         const rectWidth = text.length*RECT_WIDTH_PER_CHAR;
 
-        return `<rect class="dimension-text-background"
+        return `<rect class="annotation text-background"
                         x="${atPoint.x}" 
                         y="${atPoint.y}" 
                         width="${rectWidth}" 
                         height="${RECT_HEIGHT}"
-                        fill="#FFFFFF"
-                        stroke-width="0" 
+                        style="fill:white;stroke-opacity:0;"
                         transform="translate(${-rectWidth/2} ${-RECT_HEIGHT/2})" />
                 <text 
-                    class="dimension-text" 
+                    class="annotation text" 
                     x="${atPoint.x}"
                     y="${atPoint.y}"
                     text-anchor="middle"
                     font-size="${FONT_SIZE}"
+                    style="fill:black;stroke-opacity:0;stroke-width:0"
                     dominant-baseline="central">${text}</text>`
     }
+    // NOTE: do very little styling here to be able to easily style with CSS. Only stroke-width is good to set (default is 1, 0.5 sets it apart from Shapes)
 }
 
 
@@ -267,9 +360,9 @@ export class Annotator
 
     /** Make dimension line */
     @checkInput(['PointLike','PointLike',['String',null],[Number, 1.0], [Number, null]],['Point','Point', 'auto', 'auto', 'auto'])
-    dimensionLine(start:PointLike, end:PointLike, units?:string)
+    dimensionLine(start:PointLike, end:PointLike)
     {
-        let newDimension = new DimensionLine(start as Point,end as Point, units);
+        let newDimension = new DimensionLine(start as Point,end as Point);
         this.dimensionLines.push(newDimension);
         return newDimension;
     }
@@ -310,7 +403,7 @@ export class Annotator
                     // now we can safely normalize
                     let offsetVec = offsetVecDiag.normalize().scaled(this.DIMENSION_BOX_OFFSET_DEFAULT);
                     
-                    dim.setOffset(offsetVec);
+                    dim.setOffsetVec(offsetVec);
                     this.dimensionLines.push(dim);
                 }
             }

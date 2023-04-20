@@ -269,6 +269,13 @@ export class Solid extends Shape
         
     }
 
+    /** Is 2D and on XY plane */
+    is2DXY(): boolean 
+    {
+        // NOTE: Solids can not be 2D by definition
+        return false
+    }
+
     //// OPERATIONS ON SHAPE ////
 
     _fix():Solid
