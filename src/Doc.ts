@@ -37,7 +37,7 @@ export type DocUnits = 'mm'|'cm'|'inch';
 export type PercentageString = string // 100%, 0.5%, -10%
 export type ValueWithUnitsString = string
 export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
-export type TableInput = string|Array<{[key:string]:any}>
+export type TableInput = string
 
 export interface DocData {
     name:string
@@ -75,7 +75,6 @@ export function isWidthHeightInput(o:any): o is WidthHeightInput
 export function isTableInput(o:any): o is TableInput
 {
     return (typeof o === 'string') 
-        || (Array.isArray(o) && o.every(r => typeof r === 'object'))
 }
 
 //// MAIN CLASS ////
@@ -267,7 +266,7 @@ export class Doc
         if(!name){ throw new Error(`Doc::page: Please supply a name to a page!`)}
         if(this._pageExists(name)){ throw new Error(`Doc::page: Page name "${name}" is already taken. Please use unique names!`)}
         
-        const newPage = new Page(this, this._units() , name);
+        const newPage = new Page(this, this._activeDoc , name);
         this._pagesByDoc[this._activeDoc].push(newPage);
         this._setPageDefaults(newPage);
         this._activePage = newPage;
@@ -372,19 +371,20 @@ export class Doc
     }
 
     /** Add table to active Page 
-     *  @param input name of Calc table or raw data rows in format [{c1:v1,c2:v2},{...}]
+     *  @param input name of Calc table
      * 
     */
-    table(input:TableInput, options?:TableOptions):Doc
+    table(name:TableInput, options?:TableOptions):Doc
     {
         if(!isTableInput){ throw new Error(`Doc::table: Please enter a name of existing Calc Table or data rows in format [{ col1:val1, col2:val2},{...}]`); }
-        if(typeof input === 'string' && !this._calc){ throw new Error(`Doc::table: Cannot get table data from Calc module. Calc is not initialized. Use calc.init()`); }
-        if(typeof input === 'string' && !this._calc.tables().includes(input as string)){ { throw new Error(`Doc::table: Cannot get table data from Calc module. No such table: '${input}'. Available tables: ${this._calc.tables().join(',')}`); } }
+        if(typeof name === 'string' && !this._calc){ throw new Error(`Doc::table: Cannot get table data from Calc module. Calc is not initialized. Use calc.init()`); }
+        if(typeof name === 'string' && !this._calc.tables().includes(name as string)){ { throw new Error(`Doc::table: Cannot get table data from Calc module. No such table: '${name}'. Available tables: ${this._calc.tables().join(',')}`); } }
 
         // either get data from Calc or use raw data input
-        const dataRows = (typeof input === 'string') ? this._calc.db.table(input as string).toDataRows() : input;
+        const dataRows = this._calc.db.table(name as string).toDataRows();
 
         const newTableContainer = new Table(dataRows, options).on(this._activePage);
+        newTableContainer.name = name;
         this._activeContainer = newTableContainer;
         
         return this;
@@ -521,6 +521,10 @@ export class Doc
                 modelUnits: this._geom._units, // set model units to calculate scale later
             }
         })
+
+        console.log(' ==== DOCS ====')
+        console.log(docs);
+
         return docs;
     }
 

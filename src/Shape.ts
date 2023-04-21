@@ -1026,7 +1026,16 @@ export class Shape
         // now get bbox and find the largest face and lay it on the given plane
         let biggestFace;
         let biggestFaceArea = 0;
-        this.bbox().box().faces().forEach(f =>
+
+        const shapeBbox = this.bbox().box() || this.bbox().rect(); // Shape can already be 2D (bbox().box() return null )
+
+        if(!shapeBbox)
+        {
+            console.error('Shape::rotateToLayFlat(): Failed. Returned original Shape.')
+            return this;
+        }
+
+        shapeBbox.faces().forEach(f =>
         {
             let area = f.area();
             if(area > biggestFaceArea)
@@ -3809,8 +3818,9 @@ export class Shape
     }
 
     /** Set name of container Obj */
-    name(newName:string):Shape
+    name(newName?:string):Shape
     {
+        
         this.checkObj().name(newName);
         return this;   
     }

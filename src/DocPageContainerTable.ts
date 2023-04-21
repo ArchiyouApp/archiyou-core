@@ -51,8 +51,8 @@ export class Table extends Container
     /** Set options and defaults */
     setOptions(options:TableOptions = {})
     {
-        this._setFontSize(this.DEFAULT_FONT_SIZE);
-        this._setFontColor(this.DEFAULT_FONT_COLOR);
+        this._setFontSize(options?.fontsize || this.DEFAULT_FONT_SIZE);
+        this._setFontColor(options?.fontcolor || this.DEFAULT_FONT_COLOR);
     }
 
     /** Set size of text in traditional 'points'. Real doc units (mm,cm,inch) are converted to points */

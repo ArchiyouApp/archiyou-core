@@ -12,6 +12,7 @@
     "@types/uuid": "^8.3.4",
     "chroma-js": "^2.4.2",
     "dotenv": "^16.0.0",
+    "guillotine-packer": "^1.0.2",
     "meshoptimizer": "^0.17.0",
     "spark-md5": "^3.0.2",
     "typedoc": "^0.23.7",

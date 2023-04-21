@@ -155,14 +155,29 @@ export class DimensionLine extends BaseAnnotation
 
     _calculateOffsetVec()
     {
+        // along x-axis is dimension line is parallel to z-axis
         if ( (this.end.x === this.start.x) && (this.end.y === this.start.y))
         {
-            this.offsetVec = new Vector(1,0,0); // along x-axis is dimension line is parallel to z-axis
+            this.offsetVec = new Vector(1,0,0); 
         }
         else {
+            // TODO: find a better strategy based on bbox of shape
             this.offsetVec = this.end.toVector().subtracted(this.start.toVector()).crossed([0,0,1]).normalized();
             // as a quick-solution align the offsetVector at the DimensionLine away from the origin
-            if (new Vertex(0,0,0).move(this.offsetVec).distance(this.middle()) > new Vertex(0,0,0).move(this.offsetVec.reversed()).distance(this.middle()) ) 
+            const d1 = new Vertex(0,0,0).move(this.offsetVec).distance(this.middle());
+            const d2 = new Vertex(0,0,0).move(this.offsetVec.reversed()).distance(this.middle());
+
+            console.log('CALC OFFSET');
+            console.log(d1)
+            console.log(d2)
+            // the same (with tolerance)
+            const DISTANCE_TOLERANCE = 2;
+            if (Math.abs(d1 - d2) < DISTANCE_TOLERANCE)
+            {
+                // TEMP HACK: preference for -y
+                if (this.offsetVec.y > 0){ this.offsetVec.reverse(); }
+            }
+            else if (d1 > d2) 
             {
                 this.offsetVec.reverse();
             }

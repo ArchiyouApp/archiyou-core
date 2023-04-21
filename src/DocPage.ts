@@ -71,11 +71,11 @@ export class Page
     _containers:Array<AnyContainer> = [];
     _variables: {[key:string]:any} = {}; // template variables
 
-    constructor(doc:Doc, document:string, name:string)
+    constructor(doc:Doc, documentName:string, name:string)
     {
         this.name = name;
         this._doc = doc;
-        this._document = document;
+        this._document = documentName;
         this._units = this._doc._unitsByDoc[this._document];
         this.setDefaults();
     }

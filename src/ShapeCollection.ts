@@ -25,6 +25,21 @@
 
  // special libraries
  import chroma from 'chroma-js';
+ import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+ interface PackerItem {
+   name:string
+   width:number
+   height:number
+   shapeIndex:number
+ }
+ interface PackerResultItem {
+   bin:number
+   width:number
+   height:number
+   x:number
+   y:number
+   item:PackerItem
+ }
 
 
  export class ShapeCollection
@@ -176,8 +191,10 @@
          return c;
       }
 
-      _defineGroup(name:string, shapes:ShapeCollection)
+      _defineGroup(name:string, shapes?:ShapeCollection)
       {
+         if(!shapes){ shapes = this }
+
          if(!name)
          {
             return null;
@@ -201,13 +218,19 @@
       }
 
       /** Get shapes in group as ShapeCollection */
-      getGroup(name:string)
+      getGroup(name:string):ShapeCollection
       {
          if(name)
          {
             return (this._groups[name]) ? new ShapeCollection(this._groups[name]) : null;
          }
          return null;
+      }
+
+      /** Alias for getGroup */
+      group(name:string):ShapeCollection
+      {
+         return this.getGroup(name);
       }
 
       /* EXPERIMENTAL: try to be compatible with Arrays by setting index keys on this instance */
@@ -406,6 +429,30 @@
       moveToOrigin():AnyShapeCollection
       {
          this.moveTo(0,0,0);
+         return this;
+      }
+
+      /** Aliass for move along x-direction */
+      @checkInput(Number, 'auto')
+      moveX(distance:number):this
+      {
+         this.move(distance)
+         return this;
+      }
+
+      /** Aliass for move along x-direction */
+      @checkInput(Number, 'auto')
+      moveY(distance:number):this
+      {
+         this.move(0,distance,0)
+         return this;
+      }
+
+      /** Aliass for move along x-direction */
+      @checkInput(Number, 'auto')
+      moveZ(distance:number):this
+      {
+         this.move(0,0,distance)
          return this;
       }
 
@@ -1043,6 +1090,11 @@
       isometry(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
          return this._isometry(viewpoint, showHidden)
+      }
+
+      iso(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
+      {
+         return this.isometry(viewpoint, showHidden)
       }
 
       //// ARRAY LIKE API ////
@@ -1702,13 +1754,50 @@
       //// LAYOUTING ALGORITHMS ////
 
       /** Layout Shapes on XY plane within a given Layout order */
-      @checkInput([ ['String','sequence'], ['PointLike',[0,0,0]], ['Boolean', true], ['LayoutOptions', null]], ['String','Point','auto','auto'])
-      layout(order:LayoutOrderType, position:PointLike, copy:boolean, options:LayoutOptions):ShapeCollection
+      @checkInput([ ['String','binpack'], ['Boolean', true], ['LayoutOptions', null]], ['String','auto','auto'])
+      layout(order:LayoutOrderType, copy:boolean, options:LayoutOptions):ShapeCollection
       {
-         // removed for now. See commit 9f7125202075db29d4ce1412e4b3be26d85dfdbd (GitLab) for last test version
-         console.warn('To be implemented');
-         return null;
+         let lastItemPosition:Point = new Point(0,0,0);
+         let layoutCollection = new ShapeCollection();
+
+         this.forEach( (shape,index) => 
+         {
+            let workShape = (copy) ? shape._copy() : shape;
+            // autoRotate (default)
+            workShape = (options?.autoRotate == undefined || options?.autoRotate) ? workShape.rotateToLayFlat() : workShape;
+            // flatten if given as option
+            workShape = (options?.flatten) ? workShape._flattened() : workShape;
+
+            switch (order)
+            {
+               case 'line':
+                  lastItemPosition = this._placeLine(workShape, lastItemPosition, options?.margin, index);
+                  break
+               case 'binpack':
+                     // do when ShapeCollection is done: see underneath
+                     break;
+               default:
+                  throw new Error(`layout:: Unknown layout order "${order}". Please use: 'line','grid','binpack' or 'nest'`)
+            }
+            
+            workShape.addToScene();
+            layoutCollection.add(workShape);
+         })
+
+         // actions after ShapeCollection is made
+         switch(order)
+         {
+            case 'line':
+               // nothing
+               break;
+            case 'binpack':
+               layoutCollection = layoutCollection._packBinShapes(options); // add bin Shapes to layouted collection
+               break;
+         }
+
+         return layoutCollection;
       }
+
 
       _placeLine(shape:AnyShape, prevPosition:Point, margin:number=10, index:number):Point // returns last position
       {
@@ -1719,18 +1808,89 @@
          return prevPosition.moved(workShapeBbox.width() + margin)
       }
 
-      _packBinShapes(layoutCollection:ShapeCollection, position:Point, options:LayoutOptions)
+      _packBinShapes(options:LayoutOptions):ShapeCollection
       {
-         // removed for now. See commit 9f7125202075db29d4ce1412e4b3be26d85dfdbd (GitLab) for last test version
-         console.warn('To be implemented');
-         return null;
+         const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
+         const DEFAULT_BIN_HEIGHT = 1000;
+         const BOX_MARGIN_DEFAULT = 5;
+         const BIN_MARGIN = 50; 
+         
+         const position = new Vertex(0,0,0);
+         const binWidth = options?.stockWidth || DEFAULT_BIN_WIDTH;
+         const binHeight = options?.stockHeight || DEFAULT_BIN_HEIGHT
+
+         let boxMargin = options?.margin || BOX_MARGIN_DEFAULT;
+         let boxes = this.toArray().map( (shape,i) => this._makeBinPackBox(shape, boxMargin, i));
+         // place boxes with skewest width-height ratio first
+         boxes.sort((a,b) => this._calculateSizeSkewness(b) - this._calculateSizeSkewness(a)); // order boxes from big to small for better fitting
+         
+         const packResult = packer({ 
+            binHeight: binHeight,
+            binWidth: binWidth,
+            items: boxes,
+            },
+            { kerfSize: boxMargin, allowRotation: true }
+         ); // returns Array<Array<PackerResultItem>>
+
+         // now align shapes to all bins
+         let numPackedBins = packResult.length;
+
+         packResult.every((bin,binIndex) => 
+         {  
+            // start placing Shapes according to resultItem
+            (bin as Array<PackerResultItem>).forEach(resultItem => 
+            {
+               // NOTE: resultItems xy are left top
+               const box = resultItem as PackerResultItem;
+               let boxCenter = [box.x + box.width/2 + (binIndex*(binWidth+BIN_MARGIN)+position.x), 
+                                 box.y + box.height/2 + position.y];
+               
+               let workShape = this.at(box.item.shapeIndex);
+               // check if we need to rotate 90 degrees (NOTE: Shape bbox are original size while Box are with margin!)
+               if((Math.round(workShape.bbox().width())) != Math.round(box.width))
+               {
+                  workShape.rotateZ(90);
+               }
+               
+               workShape.moveTo(boxCenter);
+               
+            })
+            return true; // continue every loop
+            
+         })
+
+         // draw bins on seperate layer and assign group
+         const binShapes = new ShapeCollection();
+         if(options?.drawStock === undefined || options.drawStock === true)
+         {
+            this._geom.layer('bins').color('blue');
+            new Array(numPackedBins).fill(null).forEach( (n, bi) => 
+            {
+               let binStartX = bi*(binWidth+BIN_MARGIN)+position.x;
+               let binStartY = position.y;
+               let outline = new Face().makePlaneBetween([binStartX, binStartY],[binStartX+binWidth, binStartY+binHeight]).toWire();
+               outline.addToScene();
+               binShapes.add(outline);
+            })
+            this._geom.resetLayers();
+         }
+
+         // return binpacked Shapes and optionally stock outlines in ShapeCollection
+         return (binShapes) ? this.addGroup('bins', binShapes) : this;
+
       }
 
       _makeBinPackBox(shape:AnyShape, margin:number=10, index:number):any // TODO: typing
       {
-         // removed for now. See commit 9f7125202075db29d4ce1412e4b3be26d85dfdbd (GitLab) for last test version
-         console.warn('To be implemented');
-         return null;
+         // IMPORTANT: The shape needs to be on XY plane!
+         let workShapeBbox = shape.bbox() // DISABLED: .enlarged(margin) - use packer.kerfSize
+         const box = { 
+            name: shape.getName(), 
+            width: workShapeBbox.width(), 
+            height: workShapeBbox.depth(),
+         } as PackerItem; 
+         box.shapeIndex = index; // IMPORTANT: to keep track of box-Shape link
+         return box;
       }
 
       _calculateSizeSkewness(box:any)
