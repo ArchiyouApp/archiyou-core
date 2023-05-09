@@ -135,6 +135,36 @@ export class Bbox
         return new Point(this.bounds[1], this.bounds[3], this.bounds[5]);
     }
 
+    minX():number
+    {
+        return this.min().x;
+    }
+
+    maxX():number
+    {
+        return this.max().x;
+    }
+
+    minY():number
+    {
+        return this.min().y;
+    }
+
+    maxY():number
+    {
+        return this.max().y;
+    }
+
+    minZ():number
+    {
+        return this.min().z;
+    }
+
+    maxZ():number
+    {
+        return this.max().z;
+    }
+
     /** Get center of Bounding Box */
     center():Point
     {

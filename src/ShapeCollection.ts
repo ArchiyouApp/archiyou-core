@@ -2064,7 +2064,7 @@
 
          this.forEach(shape => 
          {
-            if (shape.is2DXY())
+            if (shape.is2DXY() && shape.visible())
             {
                shapeEdges.add(shape.edges())
             }

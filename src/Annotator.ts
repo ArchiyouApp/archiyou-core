@@ -8,7 +8,7 @@
 import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
 
 import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, ModelUnits } from './internal'
-import { AnyShape,  AnyShapeOrCollection, Layout, roundToTolerance } from './internal'
+import { AnyShape,  AnyShapeOrCollection, Layout, roundToTolerance, roundTo } from './internal'
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
 /** Bring all annotations in one type */
@@ -29,6 +29,7 @@ export interface DimensionLineData
     offset?:Array<number|number|number>
     interactive:boolean
     round?:boolean 
+    roundDecimals?:number
     param:string // name param binded to this dimension line
     _labelPosition?:Array<number|number|number> // for internal use
     showUnits?:boolean
@@ -38,7 +39,8 @@ export interface DimensionLineData
 export interface DimensionOptions 
 {
     units:ModelUnits
-    offset?:number   
+    offset?:number 
+    roundDecimals?:number // round to number decimals. Default is 0
 }
 
 export class BaseAnnotation
@@ -78,12 +80,13 @@ export class DimensionLine extends BaseAnnotation
     units:ModelUnits = null;
     offsetVec:Vector; // Normalized Vector offset from Shape 
 
+    round:boolean = true;
+    roundDecimals:number = 0;
     offsetLength:Number; // distance of DimensionLine to Shape along offsetVec in world units: most of the time this is calculated based on view context
     textSize:number;
 
     interactive:boolean = false;
     showUnits:boolean = false;
-    round:boolean = true;
     param:string = null; // name of bound parameter
 
     constructor(start:Point, end:Point)
@@ -167,9 +170,6 @@ export class DimensionLine extends BaseAnnotation
             const d1 = new Vertex(0,0,0).move(this.offsetVec).distance(this.middle());
             const d2 = new Vertex(0,0,0).move(this.offsetVec.reversed()).distance(this.middle());
 
-            console.log('CALC OFFSET');
-            console.log(d1)
-            console.log(d2)
             // the same (with tolerance)
             const DISTANCE_TOLERANCE = 2;
             if (Math.abs(d1 - d2) < DISTANCE_TOLERANCE)
@@ -200,6 +200,7 @@ export class DimensionLine extends BaseAnnotation
     {
         this.offsetLength = o?.offset || this.offsetLength; // only updates when not null 
         this.units = o?.units || this.units;
+        this.roundDecimals = o?.roundDecimals || this.roundDecimals;
         // TODO: more: color, linethickness etc.
         return this;
     }
@@ -238,8 +239,9 @@ export class DimensionLine extends BaseAnnotation
             dir: this.dir().toArray(),
             offset: this.offsetVec.toArray(),
             interactive: this.interactive,
-            param: this.param,
             round: this.round,
+            roundDecimals: this.roundDecimals,
+            param: this.param,
             showUnits: this.showUnits,
         } as DimensionLineData
     }
@@ -264,13 +266,12 @@ export class DimensionLine extends BaseAnnotation
         lineStart[1] = -lineStart[1]; // flip to svg y-axis
         
         let lineEnd = this.end.add(offsetVec).toArray();
-        console.log(lineEnd);
         lineEnd[1] = -lineEnd[1];
 
         let lineMid = this.middle().toArray();
         lineMid[1] = -lineMid[1];
 
-        let dimText = ((this.round) ? Math.round(this.value) : this.value).toString();
+        let dimText = ((this.round) ? roundTo(this.value, this.roundDecimals) : this.value).toString();
         if (this.showUnits ) dimText += this.units;
 
         return `<g class="dimensionline">

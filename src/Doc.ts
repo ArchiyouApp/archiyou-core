@@ -113,6 +113,11 @@ export class Doc
         this._setDefaults();
     }
 
+    hasDocs():boolean
+    {
+        return this._docs.length > 0
+    }
+
     //// MAIN FUNCTIONS ////
 
     setArchiyou(ay:ArchiyouApp)
@@ -157,6 +162,7 @@ export class Doc
             }
         }
     }
+
 
     //// DOC API ////
 
@@ -521,9 +527,6 @@ export class Doc
                 modelUnits: this._geom._units, // set model units to calculate scale later
             }
         })
-
-        console.log(' ==== DOCS ====')
-        console.log(docs);
 
         return docs;
     }

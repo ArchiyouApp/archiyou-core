@@ -1019,12 +1019,12 @@ export class Edge extends Shape
     dimension(dim?:DimensionOptions):IDimensionLine
     {
         // For Edges it is always unclear where to offset dimension to
-        //  For now we set offset away from origin. See Annotator
+        // For now we set offset away from origin. See Annotator
         if(!dim){ dim = { units: null }}
         dim.units = dim?.units || this._geom.units(); // make sure we have units
 
         let dimLine = this._geom._annotator.dimensionLine(this.start(), this.end());
-        dimLine.setOptions(dim); // set offset, units
+        dimLine.setOptions(dim); // set offset, units, roundDecimals
         
         const mainShape = this._parent || this;
         dimLine.link(mainShape); // if its a subshape select the main shape
