@@ -267,7 +267,10 @@ export function isMakeSolidInput(o:any): o is MakeSolidInput
 
 export function isDimensionOptions(o:any): o is DimensionLineData
 {
-    return (typeof o === 'object') && (isModelUnits(o?.units))
+    return (typeof o === 'object') 
+        && (o?.units && isModelUnits(o?.units))
+        && (o?.offset && typeof o?.offset === 'number')
+        && (o?.roundDecimals && typeof o?.roundDecimals === 'number')
 }
 
 //// SELECTIONS ////

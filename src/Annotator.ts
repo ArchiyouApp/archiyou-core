@@ -35,10 +35,12 @@ export interface DimensionLineData
     showUnits?:boolean
 }
 
-/** Used with Shape.dimension() as options */
+/** Used with Shape.dimension() as options 
+ *  NOTE: update typeguards when adding fields to this
+*/
 export interface DimensionOptions 
 {
-    units:ModelUnits
+    units?:ModelUnits
     offset?:number 
     roundDecimals?:number // round to number decimals. Default is 0
 }
@@ -80,7 +82,7 @@ export class DimensionLine extends BaseAnnotation
     units:ModelUnits = null;
     offsetVec:Vector; // Normalized Vector offset from Shape 
 
-    round:boolean = true;
+    round:boolean = this.DIMENSION_ROUND_DEFAULT; 
     roundDecimals:number = 0;
     offsetLength:Number; // distance of DimensionLine to Shape along offsetVec in world units: most of the time this is calculated based on view context
     textSize:number;
