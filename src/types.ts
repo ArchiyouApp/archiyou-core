@@ -1,5 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
-import { Geom, Doc, CodeParser, Exporter } from './internal'
+import { Geom, Doc, CodeParser, Exporter, Make } from './internal'
 import Console from './Console'
 
 //// SETTINGS ////
@@ -76,9 +76,10 @@ export interface ArchiyouApp
     worker: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
     geom: Geom,
     doc: Doc,
-    console: Console,
+    console?: Console,
     executor: CodeParser,
     exporter: Exporter, 
+    make?: Make,
     // TODO: importer?
     gizmos: Array<Gizmo>, // TODO: move this to Geom?
 }

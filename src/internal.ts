@@ -52,6 +52,8 @@ export * from './DocPageContainerTable'
 export * from './DocPage'
 export * from './DocUtils'
 
+export * from './Make'
+
 
  
  

@@ -574,13 +574,14 @@ export class Doc
          }
          else if(isValueWithUnitsString(n))
          {
+             // position like '10mm' is absolute to page (not to content)
              return [this._resolveValueWithUnitsString(n, page, side), 'page' as ContainerSizeRelativeTo]; // absolute units are relative to page (because padding might change and thus size of content area)
          }
          
          return null;
      }
      
-     /** Percentage of page space, page minus padding (not entire padding) */
+     /** Percentage of page space, page minus page-padding (not entire padding) */
      _resolvePercentageString(s:PercentageString):number
      {
         // TODO: take padding into account !

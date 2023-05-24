@@ -32,7 +32,10 @@ export class View extends Container
 
     resolveShapeNameToSVG(shapes:string):string
     {
-        if(typeof shapes !== 'string'){ throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapes}" is not a string!`) } 
+        if(typeof shapes !== 'string')
+        { 
+            throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapes}" is not a string!`) 
+        } 
 
         const workerScope = this._page._doc._ay.worker.self;
         const realShapes = workerScope[shapes];
@@ -50,9 +53,9 @@ export class View extends Container
     shapes(shapes:AnyShapeOrCollection|string)
     {
         // a reference to a ShapeCollection from main script
-        if (ShapeCollection.isShapeCollection(shapes))
+        if (ShapeCollection.isShapeCollection(shapes) || Shape.isShape(shapes))
         {
-            this._shapes = shapes as ShapeCollection; // auto converted
+            this._shapes = new ShapeCollection(shapes) as ShapeCollection; // auto converted
         }
         else if(typeof shapes === 'string')
         {

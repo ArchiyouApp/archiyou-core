@@ -7,7 +7,7 @@
 
 import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
 
-import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, ModelUnits } from './internal'
+import { Coord, Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, ModelUnits } from './internal'
 import { AnyShape,  AnyShapeOrCollection, Layout, roundToTolerance, roundTo } from './internal'
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
@@ -26,7 +26,7 @@ export interface DimensionLineData
     value:number
     static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
     units?:string
-    offset?:Array<number|number|number>
+    offset?:Array<number|number|number> // offset vector with length in model units
     interactive:boolean
     round?:boolean 
     roundDecimals?:number
@@ -41,7 +41,7 @@ export interface DimensionLineData
 export interface DimensionOptions 
 {
     units?:ModelUnits
-    offset?:number 
+    offset?:number // offsetLength (minus for other direction)
     roundDecimals?:number // round to number decimals. Default is 0
 }
 
@@ -70,7 +70,7 @@ export class BaseAnnotation
 export class DimensionLine extends BaseAnnotation
 {
     //// SETTINGS
-    DIMENSION_OFFSET_DEFAULT = 10;
+    DIMENSION_OFFSET_DEFAULT = 20; // in model units
     DIMENSION_TEXTSIZE_DEFAULT = 10;
     DIMENSION_ROUND_DEFAULT = true;
 
@@ -239,7 +239,7 @@ export class DimensionLine extends BaseAnnotation
             static: this.static,
             units: this.units,
             dir: this.dir().toArray(),
-            offset: this.offsetVec.toArray(),
+            offset: this.offsetVec.scaled(this.offsetLength as Coord).toArray(), // with length
             interactive: this.interactive,
             round: this.round,
             roundDecimals: this.roundDecimals,
@@ -251,7 +251,7 @@ export class DimensionLine extends BaseAnnotation
     /** Calculate a offset length */
     _calculateAutoOffsetLength():number
     {
-        // For now keep it static
+        // Now it is static. TODO: something dynamic based on model units?
         return this.DIMENSION_OFFSET_DEFAULT;
     }
 
@@ -326,31 +326,20 @@ export class DimensionLine extends BaseAnnotation
     @checkInput(['PointLike', 'String'], ['Point', 'auto'])
     _makeSvgTextLabel(at:PointLike, text:string): string
     {
-        const RECT_WIDTH_PER_CHAR = 6; // heuristic - TODO: better?
-        const RECT_HEIGHT = 10;
         /* IMPORTANT: 
             This font-size is temporary: 
             We need to make the text (and background rect) scale according to page size and view scale 
              so they are almost the same
         */
-        const FONT_SIZE = '50%'; 
-        
-
+        const FONT_SIZE = '10'; 
         const atPoint = at as Point;
-        const rectWidth = text.length*RECT_WIDTH_PER_CHAR;
 
-        return `<rect class="annotation text-background"
-                        x="${atPoint.x}" 
-                        y="${atPoint.y}" 
-                        width="${rectWidth}" 
-                        height="${RECT_HEIGHT}"
-                        style="fill:white;stroke-opacity:0;"
-                        transform="translate(${-rectWidth/2} ${-RECT_HEIGHT/2})" />
-                <text 
+        return `<text 
                     class="annotation text" 
                     x="${atPoint.x}"
                     y="${atPoint.y}"
                     text-anchor="middle"
+                    alignment-baseline="hanging"
                     font-size="${FONT_SIZE}"
                     style="fill:black;stroke-opacity:0;stroke-width:0"
                     dominant-baseline="central">${text}</text>`

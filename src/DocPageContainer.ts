@@ -15,12 +15,12 @@ export type ContainerData = { // Combine all Container types for convenience
     name:string
     parent:string
     type:ContainerType
-    width:number
+    width:number // relative to (see: widthRelativeTo)
     widthRelativeTo:ContainerSizeRelativeTo
-    absWidth?:number // in real world doc units (added on place)
-    height:number
+    widthAbs?:number // in doc units (added on place)
+    height:number // relative to (see: widthRelativeTo)
     heightRelativeTo:ContainerSizeRelativeTo
-    absHeight?:number // in real world doc units (added on place)
+    heightAbs?:number // in doc units (added on place)
     position:Array<number|number> // relative to page-content-area
     pivot:Array<number|number>
     frame?:any // TODO
@@ -30,7 +30,7 @@ export type ContainerData = { // Combine all Container types for convenience
     content:any; // TODO: raw content
     zoomLevel:ScaleInput, // number or 'auto
     zoomRelativeTo:ZoomRelativeTo,
-    docUnits:DocUnits,
+    docUnits:DocUnits, 
     modelUnits:ModelUnits,
     _domElem?:HTMLDivElement, // added on placement
 }
@@ -94,7 +94,7 @@ export class Container
     _type:ContainerType;
     _width:number; // in relative coordinates [0-1] of page content area width or page width (when _widthRelativeTo = 'page')
     _height:number; // in relative coordinates [0-1] of page content area height or page height (when _heightRelativeTo = 'page')
-    _widthRelativeTo:ContainerSizeRelativeTo = 'page-content-area';
+    _widthRelativeTo:ContainerSizeRelativeTo = 'page-content-area'; // NOTE: 'page-content-area is the area that remains after page padding [DEFAULT]
     _heightRelativeTo:ContainerSizeRelativeTo = 'page-content-area';
     _position:Array<number|number>; // x,y in relative coords [0-1] of page-content-area
     _pivot:Array<number|number>; // x,y in percentage [0-1] of [containerWidth,containerHeight] - leftbottom = [0,0]
@@ -128,7 +128,7 @@ export class Container
         return this;
     }
 
-    /** Set width of this Container. Either in percentage ([0-1]) of width or in % or units */
+    /** Set width of this Container. Either in percentage ([0-1]) of (page or content) width or in % or units */
     width(n:WidthHeightInput)
     {
         if(!isWidthHeightInput(n)){ throw new Error(`Container::height: Invalid input "${n}": Use a number, number with units ("30mm") or string like "40%"!`)};
@@ -194,6 +194,22 @@ export class Container
 
     //// OUTPUT ////
 
+    /** Transform from relative width (to page or page-content-area) to absolute (in DocUnits) */
+    _calculateAbsWidth():number
+    {
+        const relToSize =  (this._widthRelativeTo === 'page-content-area') ?
+            this._page._width - 2*this._page._width*this._page._padding[0] : this._page._width
+        return this._width * relToSize;
+    }
+
+    /** Transform from relative height (to page or page-content-area) to absolute (in DocUnits) */
+    _calculateAbsHeight():number
+    {
+        const relToSize = (this._heightRelativeTo === 'page-content-area') ?
+            this._page._height - 2*this._page._height*this._page._padding[1] : this._page._height
+        return this._height * relToSize;
+    }
+
     /** Output raw Container data */
     // NOTE: We use toData from the subclasses of Container (they use this function)
     _toContainerData():ContainerData
@@ -203,10 +219,12 @@ export class Container
             name: this.name,
             parent: this._parent?.name,
             type: this._type,
-            width: this._width,
+            width: this._width, // relative to page-content-area or page
             widthRelativeTo: this._widthRelativeTo,
-            height: this._height,
+            widthAbs: this._calculateAbsWidth(),
+            height: this._height, // relative to page-content-area or page
             heightRelativeTo: this._widthRelativeTo,
+            heightAbs: this._calculateAbsHeight(), // in doc units
             position: this._position,
             pivot: this._pivot,
             frame: this._frame,
