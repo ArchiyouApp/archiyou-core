@@ -13,7 +13,7 @@ export interface ConsoleMessage
     message: string,
 }
 
-export default class Console
+export class Console
 {
     output = null; // Vuex store, console, webworker instance or a local array [ null ]
     buffer:Array<ConsoleMessage> = []; // If we cannot output somewhere put in buffer
@@ -89,7 +89,13 @@ export default class Console
 
             case 'console':
                 let origConsoleFunc = MESSAGE_TO_CONSOLE_TYPE[message.type] || 'log';
-                this._originalConsole[MESSAGE_TO_CONSOLE_TYPE[message.type]](message.message); // NOTE: important: don't use output here, because it can lead to unending loops
+                try {
+                    this._originalConsole[origConsoleFunc](message.message); // IMPORTANT: don't use output here, because it can lead to unending loops
+                }
+                catch(e) 
+                {
+                    console.error(`Console::sendMessage: Could not output data: ${message.message}: ${e}`);
+                }
                 break;
 
             case 'webworker':

@@ -373,6 +373,26 @@
          return new ShapeCollection([shape].concat(this.shapes));
       }
 
+      /** Add Shape to right of current ShapeCollection */
+      @checkInput('AnyShape', 'auto')
+      addAligned(shape:AnyShape):this
+      {
+         const NEXT_MARGIN = 10;
+
+         if(this.isEmpty())
+         {
+            // just add new Shape in center
+            this.add(shape.moveToOrigin());
+         }
+         else {
+            // add new Shape next other shapes
+            let shapePosition = this.center().add(this.bbox().width() + NEXT_MARGIN + shape.bbox().width());
+            this.add(shape.moveTo(shapePosition));
+         }
+
+         return this;
+      }
+
       @checkInput(['AnyShapeOrCollection','AnyShapeOrCollection'],['ShapeCollection','ShapeCollection'])
       replace(shapes:AnyShapeOrCollection, newShapes:AnyShapeOrCollection):ShapeCollection
       {
@@ -1155,12 +1175,10 @@
          return this;
       }
 
-      /** Remove everything */
-      isEmpty():ShapeCollection
+      /** Check if ShapeCollection is empty */
+      isEmpty():boolean
       {
-         this.shapes = [];
-
-         return this;
+         return this.length === 0;
       }
 
       /** Alias for length */
@@ -1791,7 +1809,7 @@
                // nothing
                break;
             case 'binpack':
-               layoutCollection = layoutCollection._packBinShapes(options); // add bin Shapes to layouted collection
+               layoutCollection = layoutCollection.pack(options); // add bin Shapes to layouted collection
                break;
          }
 
@@ -1808,18 +1826,18 @@
          return prevPosition.moved(workShapeBbox.width() + margin)
       }
 
-      _packBinShapes(options:LayoutOptions):ShapeCollection
+      pack(options:LayoutOptions, copy:boolean = true):ShapeCollection
       {
          const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
          const DEFAULT_BIN_HEIGHT = 1000;
          const BOX_MARGIN_DEFAULT = 5;
-         const BIN_MARGIN = 50; 
+         const BIN_MARGIN = 10; 
          
          const position = new Vertex(0,0,0);
          const binWidth = options?.stockWidth || DEFAULT_BIN_WIDTH;
          const binHeight = options?.stockHeight || DEFAULT_BIN_HEIGHT
 
-         let boxMargin = options?.margin || BOX_MARGIN_DEFAULT;
+         let boxMargin = (options?.margin !== undefined) ? options.margin : BOX_MARGIN_DEFAULT;
          let boxes = this.toArray().map( (shape,i) => this._makeBinPackBox(shape, boxMargin, i));
          // place boxes with skewest width-height ratio first
          boxes.sort((a,b) => this._calculateSizeSkewness(b) - this._calculateSizeSkewness(a)); // order boxes from big to small for better fitting
@@ -1834,6 +1852,7 @@
 
          // now align shapes to all bins
          let numPackedBins = packResult.length;
+         let toShapeCollection = (!copy) ? this : new ShapeCollection();
 
          packResult.every((bin,binIndex) => 
          {  
@@ -1846,6 +1865,11 @@
                                  box.y + box.height/2 + position.y];
                
                let workShape = this.at(box.item.shapeIndex);
+               if(copy)
+               { 
+                  workShape = workShape.copy()
+                  toShapeCollection.addGroup('cut', workShape);
+               } // copy shape or move in place
                // check if we need to rotate 90 degrees (NOTE: Shape bbox are original size while Box are with margin!)
                if((Math.round(workShape.bbox().width())) != Math.round(box.width))
                {
@@ -1876,8 +1900,7 @@
          }
 
          // return binpacked Shapes and optionally stock outlines in ShapeCollection
-         return (binShapes) ? this.addGroup('bins', binShapes) : this;
-
+         return (binShapes) ? toShapeCollection.addGroup('bins', binShapes) : toShapeCollection;
       }
 
       _makeBinPackBox(shape:AnyShape, margin:number=10, index:number):any // TODO: typing

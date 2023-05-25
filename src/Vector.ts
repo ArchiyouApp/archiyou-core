@@ -618,6 +618,12 @@ export class Vector extends Point
         return v;
     }
 
+    /** Swap x,y coordinates for some 2D applications */
+    swappedXY():Vector
+    {
+        return new Vector(this._y, this._x, this._z);
+    }
+
     //// RELATIONS WITH OTHER VECTORS ////
 
     /** Check if this Vector is the opposite of another Vector */

@@ -1,6 +1,6 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
 import { Geom, Doc, CodeParser, Exporter, Make } from './internal'
-import Console from './Console'
+import { Console } from './Console'
 
 //// SETTINGS ////
 
@@ -358,12 +358,8 @@ export interface LayoutOptions
     groupSame?: boolean
     margin?: number
     center?: boolean // center shape
-    algo?:'AREA'|'LONGSIDE'|'SHORTSIDE'|'BOTTOMLEFT' // TODO MORE for other order types
+    algo?:any
     drawStock?:boolean;
-    // for line
-    // TODO
-    // for grid
-    // TODO
 }
 
 export interface Layout
