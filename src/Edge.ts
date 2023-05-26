@@ -10,12 +10,14 @@
  *      - Circle 
  */
 
+import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
+
 import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_DEFAULT_OFFSET, EDGE_DEFAULT_THICKEN,
     EDGE_DEFAULT_POPULATE_NUM, EDGE_DEFAULT_EXTEND_AMOUNT, EDGE_DEFAULT_EXTEND_DIRECTION, EDGE_DEFAULT_ALIGNTO_FROM,
     EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_SIZE
 } from './internal'
 import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
-import { ThickenDirection, PointLike, isPointLike,Cursor,AnyShapeOrCollection,
+import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShapeOrCollection,
         LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
 import { roundToTolerance } from './internal'
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
@@ -43,6 +45,9 @@ export class Edge extends Shape
         _ocShape
         _ocId
     */
+
+    //// SETTINGS ////
+    TO_SVG_DASH_SIZE = 10
 
     /** Creates a simple Line Edge, use new Edge().makeCicle etc for others */
     constructor(start?:any, end?:any) // NOTE: decorators cannot be applied to constructors
@@ -1091,23 +1096,72 @@ export class Edge extends Shape
         }
         
         // Based on attributes we assign some classes for later styling
-        const svgNodeStr = `<path d="${svgPathD}" class="${this._getSvgClasses()}"/>`; 
+        const svgNodeStr = `<path d="${svgPathD}" ${this._getSvgPathAttributes()} class="${this._getSvgClasses()}"/>`; 
 
         // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSvg() method
 
         return svgNodeStr; // return as string for now
     }
 
-    /** Based on attributes add classes to Svg that help us select and style these SVG elements */
+    /** get SVG attributes from style properties of Shape */
+    _getSvgPathAttributes():string
+    {
+        const STYLE_TO_ATTR = [
+            { geom: 'line', prop: 'color', attr: 'stroke', transform : (val) => chroma(val).hex() },
+            { geom: 'line', prop: 'dashed', attr: 'stroke-dasharray', transform : (val) => this.TO_SVG_DASH_SIZE },
+            { geom: 'line', prop: 'width', attr: 'stroke-width' , transform : (val) => val },
+            { geom: 'line', prop: 'opacity', attr: 'stroke-opacity' , transform : (val) => val },
+        ]
+
+        let svgAttrs = {};
+
+        const style = this?._obj?._style || this?._parent?._obj?._style as ObjStyle;
+
+        if(!style)
+        {
+            console.warn(`Edge::_getSvgPathAttributes(): This Edge (or it's _parent main Shape) is not in the Scene. There is no style available!`);
+        }
+        else {
+            STYLE_TO_ATTR.forEach( t => 
+            {
+                const geom = style[t.geom];
+                if(geom)
+                {
+                    const val = geom[t.prop] || null;
+                    if (val !== null)
+                    {
+                        svgAttrs[t.attr] = t.transform(val)
+                    }
+                }
+            })
+        }
+        let svgAttrArr = [];
+        for(const [a,v] of Object.entries(svgAttrs))
+        {
+            svgAttrArr.push(`${a}="${v}"`)
+        }
+
+        const svgAttrStr = svgAttrArr.join(' ');
+
+        return svgAttrStr;
+    }
+
+    /** Based on attributes or tests add classes to Svg that help us select and style these SVG elements later */
     _getSvgClasses():string
     {
         const ATTRIBUTE_TRUE_TO_CLASS = {
             hidden : 'hidden',
-            outline : 'outline'
+            outline : 'outline',
+        }
+        
+        const CLASSES_AFTER_TESTS = {
+            'line' : (edge) => true, // add for basic geom type styling
+            'dashed' : (edge) => edge._getObjStyle()?.line?.dashed === true,
         }
 
         let classes:Array<string> = [];
 
+        // Add style classes based on attributes
         for (const [attr,value] of Object.entries(this.attributes))
         {
             const toClass = ATTRIBUTE_TRUE_TO_CLASS[attr];
@@ -1116,6 +1170,13 @@ export class Edge extends Shape
                 classes.push(toClass)
             }
         }
+        // Add style classes based on tests
+        Object.keys(CLASSES_AFTER_TESTS).forEach( className => {
+           if ( CLASSES_AFTER_TESTS[className](this))
+           {
+                classes.push(className);
+            }
+        })
         return classes.join(' ');
     }
     

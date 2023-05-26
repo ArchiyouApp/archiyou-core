@@ -107,6 +107,7 @@ export interface ShapeAttributes
     hidden?:boolean // lines that are hidden behind other shapes in projection
     outline?:boolean // outlines after projection
     visible?:boolean
+    dashed?:boolean
 }
 
 /** A cursor in a coordinate system. Used in Sketcher and others in the future */
@@ -163,6 +164,7 @@ export interface BaseStyle
     color?: number, 
     opacity? : number,
     size?: number,
+    dashed?: boolean
 }
 
 export interface ObjStyle 

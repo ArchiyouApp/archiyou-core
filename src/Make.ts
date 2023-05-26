@@ -159,12 +159,6 @@ export class Make
     {
         this.resetStats();
         o = this._checkLayoutOptions(o);
-        
-        // some checks
-        if(o.stockWidth > o.width || o.stockHeight > o.height )
-        {
-            throw new Error(`Make::_layout2DBoxes: Boxes are too big for layout! Check stockWidth and stockHeight`)    
-        }
 
         if (o.seams && ((o.direction === 'horizontal') && o.seams > o.width) || ((o.direction === 'vertical') && o.seams > o.height))
         {
@@ -229,12 +223,12 @@ export class Make
 
         if (this.stats.cut.length > 0)
         {
-            this.stats.fitted = this.stats.cut.pack({ stockWidth: o.stockWidth, stockHeight: o.stockHeight, margin: o.cutMargin }, true);
-            this.stats.fitted.removeFromScene();
+            this.stats.fitted = this.stats.cut.pack({ stockWidth: o.stockWidth, stockHeight: o.stockHeight, margin: o.cutMargin }, true)
+            this.stats.fitted?.removeFromScene(); // don't add automatically to Scene
             this.stats.numStock += this.stats.fitted.getGroup('bins').length;
-            const stockUsedArea = this.stats.numStock * this.stats.full.first().area();
+            const stockUsedArea = this.stats.numStock * o.stockWidth * o.stockHeight;
             const cutPartsArea = this.stats.fitted.getGroup('cut').reduce( (sum,shape) => sum + shape.area(), 0)
-            const fullPartsArea = this.stats.full.length * this.stats.full.first().area()
+            const fullPartsArea = this.stats.full.length * (this.stats.full?.first()?.area() || 0)
             this.stats.efficiency = Math.round((fullPartsArea + cutPartsArea) / stockUsedArea * 100);
         }
         

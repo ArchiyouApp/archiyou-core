@@ -211,12 +211,16 @@ export function isPivot(o: any): o is Pivot
 
 export function isBaseStyle(o:any):  o is BaseStyle
 {
-    return o.color != null || o.opacity != null || o.size  != null;
+    return typeof(o) === 'object' && (o.color !== null || o.opacity !== null || o.size !== null || o.dashed !== null)
 }
 
 export function isObjStyle(o:any):  o is ObjStyle
 {
-    return typeof(o) === 'object' && Object.keys(o).some(key => isBaseStyle(o[key]))
+    // works on fragments too: { line : { dashed: true }}
+    return typeof(o) === 'object' 
+        && (o.point || o.line || o.fill)
+        && Object.keys(o).some(geomType => isBaseStyle(o[geomType]))
+
 }
 
 //// Test Shape Constructor Inputs ////

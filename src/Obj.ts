@@ -9,7 +9,7 @@
 
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Geom} from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Geom, isObjStyle, isBaseStyle} from './internal'
 import { AnyShape, isAnyShape } from './internal' // types
 import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
 import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
@@ -21,6 +21,15 @@ import { PointLike, isPointLike, AnyShapeOrCollection, MeshingQualitySettings } 
 
 export class Obj
 {
+    //// SETTINGS ////
+    DEFAULT_OBJ_STYLE:ObjStyle = { point : {}, line: {}, fill: {} }
+    DEFAULT_BASE_STYLE:BaseStyle = { 
+        color: null, // null: let viewer decide
+        opacity: null, 
+        size: null,
+        dashed: null, 
+    }
+
     _oc:any; // holds a reference to loaded opencascade.js: needs to be public
     _geom:Geom; // reference to Geom API instance
     
@@ -85,6 +94,18 @@ export class Obj
         return this.style( { color: newColor });
     }
 
+    /** set Lines dashed */
+    dashed():Obj
+    {
+        return this.style({ line: { dashed: true }});
+    }
+
+    /** set strokeWidth */
+    strokeWidth(n:number):Obj
+    {
+        return this.style({ line: { width: n }});
+    }
+
     /** Get current Obj color or the one that is defined by one of the parents up the hierarchy */
     getColor():number
     {
@@ -124,72 +145,42 @@ export class Obj
             : null
     }
 
-    /** set Lines dashed */
-    dashed()
-    {
-        this.style({ line: { dashed: true }});
-    }
 
-    /** Compile different parameters into a ObjStyle instance 
-     *  we can have different levels of detail:
-     *  - baseStyle: { color, opacity, size } which translates to all geometries (point, line, fill)
-     *  - objStyle: { point: BaseStyle, fill: BaseStyle, line: BaseStyle } which we just copy directly over after checking
-     *  NOTE: baseStyle params can also be directly set on the Obj: box.color = 'red'
-    */
-    _compileStyle(style:any):ObjStyle // NOTE: needs be to be any, not Object
+    /** Compile different parameters into a ObjStyle instance */
+    _compileStyle(newStyle:ObjStyle|BaseStyle):ObjStyle // NOTE: needs be to be any, not Object
     {
-        // target ObjStyle
-        let objStyle:ObjStyle = { 'point' : null, 'line' : null, 'fill' : null }; // set these to avoid TS warnings
+        let newObjStyle = { ...this.DEFAULT_OBJ_STYLE, ...(this._style || {}) };
      
-        // given style Obj is a ObjStyle ( full config )
-        if( style.hasOwnProperty('point') || style.hasOwnProperty('line') || style.hasOwnProperty('fill') )
+        // given newStyle is a full/fragmented config ObjStyle in format { line: { BaseStyle }, point : ..., fill: ... }
+        if( isObjStyle(newStyle))
         {
-            objStyle = this._checkObjStyle(style)
+            // newStyle can have fragmented form: { line : dashed }: Make sure we keep original structure
+             Object.keys(newStyle).forEach(k => {
+                newObjStyle[k] = { ...newObjStyle[k], ...newStyle[k] }
+            })
         }
-        // BaseStyle ( simplified config )
-        else if( style.hasOwnProperty('color') || style.hasOwnProperty('opacity') || style.hasOwnProperty('size') )
+        // or a simplified BaseStyle
+        else if( isBaseStyle(newStyle))
         {
             // base style over all geometries
-            objStyle.point = { ...style };
-            objStyle.line = { ...style };
-            objStyle.fill = { ...style };
-            // then check
-            objStyle = this._checkObjStyle(objStyle);
+            newObjStyle.point = { ...newObjStyle.point, ...newStyle };
+            newObjStyle.line = { ...newObjStyle.line, ...newStyle };
+            newObjStyle.fill = { ...newObjStyle.fill, ...newStyle };
         }
-
-        return objStyle as ObjStyle;
+        
+        const s = this._checkObjStyle(newObjStyle as ObjStyle);
+        
+        return s;
     }
 
-
-    _checkObjStyle(style:any):ObjStyle
+    /** Check and normalize ObjStyle values (mostly colors) in place */
+    _checkObjStyle(style:ObjStyle):ObjStyle
     {
-        /** !!!! IMPORTANT !!!! Typescript typing with Object.entries and Object.keys :
-            - https://stackoverflow.com/questions/55012174/why-doesnt-object-keys-return-a-keyof-type-in-typescript
-            - https://www.typescriptlang.org/docs/handbook/2/generics.html
-            - We can avoid the complex generic typing by substituting of (const [k,v] of Object.entries(obj)) for  Object.entries(obj).forEach(([k, v]) => {..}
-
-         */
-        const OBJ_STYLE_TYPE_PARAMS:Array<string> = [ 'point', 'line', 'fill']; // basic structure of an ObjStyle
-        const BASE_STYLE_PARAMS:Array<string> = ['color', 'opacity', 'size', 'dashed']; // allowed properites per Object type
-
-        let objStyle:ObjStyle = { point: style.point, 
-                                  line: style.line, 
-                                  fill: style.fill };
-        
-        // check base styles
-        Object.entries(objStyle).forEach(([geomType, geomStyle]) =>
+        // check base styles per geomType in place
+        Object.entries(style).forEach(([geomType, geomStyle]) =>
         {
-            // copy over the style params
-            let baseStyle:BaseStyle = { color: null, opacity: null, size: null };
-            let geomStyleObj = (geomStyle || {});
-            let inputStyle:BaseStyle = { color: geomStyleObj.color, 
-                                            opacity: geomStyleObj.opacity, 
-                                            size: geomStyleObj.size };
-            let objStyle = { ...baseStyle, ...inputStyle };
-            
-            // important: handle a variety of color inputs with Chroma
-
-            if (geomStyle.color)
+            // Normalize colors with Chroma
+            if (geomStyle?.color)
             {
                 if( chroma.valid(geomStyle.color) )
                 {   
@@ -206,9 +197,7 @@ export class Obj
             }
             
         });
-
-        return objStyle as ObjStyle;
-
+        return style
     }
 
 
@@ -275,7 +264,6 @@ export class Obj
             this._children.push(o);
             o._parent = this;
             this._setProps(); // changed structure so recalculate 
-            console.log(`Obj::add: Added object of type "${o.shapeType()}" to Obj container "${this.name()}"`);
         }
 
         return this;

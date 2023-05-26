@@ -46,7 +46,7 @@ export class Shape
     _ocId:string = null;
     _isTmp:boolean = false; // Flag to signify if a Shape is temporary (for example for construction)
     
-    attributes:ShapeAttributes = {}; // data attributes that can be added to Shapes 
+    attributes:ShapeAttributes = {}; // data attributes that can be added to Shapes (NOT STYLING)
     annotations:Array<Annotation> = []; // array of annotations associated with this Shape
 
     //// SETTINGS ////
@@ -140,6 +140,19 @@ export class Shape
         this.attributes[key] = value;
 
         return this;
+    }
+
+    /** Get attributes of Shape */
+    attrs():ShapeAttributes
+    {
+        return this.attributes;
+    }
+
+    /** Copy attributes from other Shape */
+    @checkInput('AnyShape', 'auto')
+    _copyAttributes(from:Shape)
+    {
+        this.attributes = { ...from.attrs() }
     }
 
     //// CURSOR ////
@@ -275,12 +288,24 @@ export class Shape
 
     /** Set color on the Object of this Shape */
     @checkInput('ColorInput', 'auto')
-    color(value:string|number):AnyShape
+    color(value:string|number):this
     {
-        if(this._obj)
-        {
-            this._obj.color(value);
-        }
+        this.object().color(value);
+        return this;
+    }
+
+    /** Set dashed lines on the Object of this Shape */
+    dashed():this
+    {
+        this.object().dashed();
+        return this;
+    }
+
+    /** Set stroke width of lines of Shape */
+    @checkInput(Number, 'auto')
+    strokeWidth(n:number):this
+    {
+        this.object().strokeWidth(n);
         return this;
     }
 
@@ -293,16 +318,6 @@ export class Shape
     _getColorRGBA():[number,number,number,number]
     {
         return this?._obj?._getColorRGBA()
-    }
-
-    /** Set dashed lines on the Object of this Shape */
-    dashed()
-    {
-        if(this._obj)
-        {
-            this._obj.dashed();
-        }
-        return this;
     }
 
     /** check if Shape is co-planar and return the normal of the workingplane if so! */
@@ -763,7 +778,8 @@ export class Shape
     /** Copy the Shape and add it to the Scene (private) */
     _copy()
     {
-        return this.copy(false);
+        const newShape = this.copy(false);
+        return newShape;
     }
 
     /** Copy the Shape and add it to the Scene */
@@ -775,6 +791,9 @@ export class Shape
         let ocBuilderCopy = new this._oc.BRepBuilderAPI_Copy_1();
         ocBuilderCopy.Perform(this._ocShape, true, false); // TopoDS_Shape &S, copyGeom=Standard_True, copyMesh=Standard_False
         let newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as AnyShape;
+        
+        newShape._copyAttributes(this); 
+        newShape._parent = this._parent; // also take over _parent
 
         if(addToScene)
         {
@@ -1215,6 +1234,9 @@ export class Shape
         ocMirrorTransform.SetMirror_3( new this._oc.gp_Ax2_3(ocMirrorOrigin, ocMirrorPlaneNormal));
 
         let newShape = new Shape()._fromOcShape(new this._oc.BRepBuilderAPI_Transform_2(this._ocShape, ocMirrorTransform, true).Shape()) as AnyShape; // cast needed
+        
+        newShape._copyAttributes(this); // copy attributes over
+        newShape._parent = this._parent; // also take over _parent
 
         return newShape;
 
@@ -2333,6 +2355,13 @@ export class Shape
 
     //// ALIGNMENTS WITH OTHER SHAPES ////
 
+    _alignPerc(a:Alignment='center'):Array<number>
+    {
+        return (!Array.isArray(a)) ? 
+                this._alignStringToAlignPerc(a as string) : 
+                a as Array<number>;
+    }
+
     /** 
      *  Align a given Shape to another by supplying a pivot for current Shape, another Shape and the alignment
      *  For the pivot and alignment you can supply either a string with the combinations of sides (left,right,front,back,bottom,top)
@@ -2342,14 +2371,8 @@ export class Shape
     @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
     align(other:AnyShape, pivot?:Pivot, alignment?:Alignment):AnyShape
     {
-        let pivotAlignPerc:Array<number> = (!Array.isArray(pivot)) ? 
-                                this._alignStringToAlignPerc(pivot as string) : 
-                                pivot as Array<number>;
-
-        // alignment inside other Shape
-        let alignmentPerc:Array<number> = (!Array.isArray(alignment)) ? 
-                this._alignStringToAlignPerc(alignment as string) :
-                alignment as Array<number>;
+        const pivotAlignPerc:Array<number> = this._alignPerc(pivot);
+        const alignmentPerc:Array<number> = this._alignPerc(alignment); // alignment inside other Shape
 
         let fromPosition = this.bbox().getPositionAtPerc(pivotAlignPerc).toVector();
         let toPosition = other.bbox().getPositionAtPerc(alignmentPerc).toVector();
@@ -2826,6 +2849,8 @@ export class Shape
 
         ocShapes.forEach( ocShape => {
             let specifiedShape = this._fromOcShape(ocShape) as any;  // NOTE: avoid TS errors
+            // NOTE: we keep track of main Shape in _parent
+            specifiedShape._parent = this;
             shapes.push(specifiedShape as Shape);
         });
 
@@ -3804,8 +3829,8 @@ export class Shape
     _getObjStyle():ObjStyle
     {
         // TODO: we can avoid copying the style by refering to another Obj that is its parent layer
-        let objStyle = (this._obj._style) ? (( Object.keys(this._obj._style).length > 0) ? this._obj._style : null) : null; 
-        let parentObjStyle = (this._obj._parent) ? this._obj._parent._style : null;
+        let objStyle = this?._obj?._style;
+        let parentObjStyle = this?._parent?._obj?._style;
         // TODO: recurse to above layers?
         return (objStyle || parentObjStyle) as ObjStyle;
     }

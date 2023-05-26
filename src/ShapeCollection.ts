@@ -9,16 +9,15 @@
  *   - TODO: The Scene is also a ShapeCollection => clear and advanced Object trees for navigation
  */
 
- import { isCoordArray, PointLike, isPointLike,PointLikeSequence, isPointLikeSequence, isCoord,Coord,isShapeTypes, PointLikeOrAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
-         ShapeType, isShapeType, AnyShape, isAnyShape, AnyShapeOrCollection,isAnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
-         ColorInput,isColorInput,Pivot,isPivot,AnyShapeSequence, isAnyShapeSequence, AnyShapeOrSequence,
-         isAnyShapeOrSequence, isObjStyle, Bbox, Side} from './internal' // see types
+ import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
+         ShapeType, AnyShape, isAnyShape, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
+         Pivot,AnyShapeSequence, Alignment, Bbox, Side} from './internal' // see types
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
  import type { ObjStyle } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
- import { Layout, LayoutOrderType, LayoutOptions } from './internal'
+ import { LayoutOrderType, LayoutOptions } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
@@ -171,7 +170,7 @@
          {
             if(this._groups[group])
             {
-               this._groups[group].concat(addedShapes)
+               this._groups[group] = this._groups[group].concat(addedShapes)
             }
             else {
                this._groups[group] = addedShapes;
@@ -560,6 +559,24 @@
          let newCollection = this._copy();
          newCollection.scale(factor);
          return newCollection;
+      }
+
+      /** Shape API - Align Shapecollection to other Shape or ShapeCollection */
+      @checkInput(['AnyShapeOrCollection',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
+      align(other:AnyShapeOrCollection, pivot?:Pivot, alignment?:Alignment):AnyShapeOrCollection
+      {
+         // pivot using bbox() of ShapeCollection
+         const pivotAlignPerc:Array<number> = (this.bbox().box() || this.bbox().rect())._alignPerc(pivot)
+         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(other)) ? 
+                                             (other.bbox().box() || other.bbox().rect())._alignPerc(alignment) :
+                                             (other as Shape)._alignPerc(alignment)
+         
+         const fromPosition = this.bbox().getPositionAtPerc(pivotAlignPerc).toVector();
+         const toPosition = other.bbox().getPositionAtPerc(alignmentPerc).toVector();
+
+         this.move(toPosition.subtracted(fromPosition)); //.move(pivotOffsetVec);
+
+         return this;
       }
 
       /** Shape API - */
@@ -1826,7 +1843,7 @@
          return prevPosition.moved(workShapeBbox.width() + margin)
       }
 
-      pack(options:LayoutOptions, copy:boolean = true):ShapeCollection
+      pack(options:LayoutOptions, copy:boolean=true):ShapeCollection
       {
          const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
          const DEFAULT_BIN_HEIGHT = 1000;
@@ -1883,11 +1900,10 @@
             
          })
 
-         // draw bins on seperate layer and assign group
+         // Add bins in seperate gorup
          const binShapes = new ShapeCollection();
          if(options?.drawStock === undefined || options.drawStock === true)
          {
-            this._geom.layer('bins').color('blue');
             new Array(numPackedBins).fill(null).forEach( (n, bi) => 
             {
                let binStartX = bi*(binWidth+BIN_MARGIN)+position.x;
@@ -1896,7 +1912,7 @@
                outline.addToScene();
                binShapes.add(outline);
             })
-            this._geom.resetLayers();
+            
          }
 
          // return binpacked Shapes and optionally stock outlines in ShapeCollection
@@ -2089,7 +2105,7 @@
          {
             if (shape.is2DXY() && shape.visible())
             {
-               shapeEdges.add(shape.edges())
+               shapeEdges.add(shape.edges()); // NOTE: this._parent refers to main Shape of subshapes
             }
          })
 
@@ -2120,7 +2136,7 @@
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
          // TODO: bbox is not including dimension lines
 
-         const svg = `<svg _bbox="${svgRectBbox}" _worldUnits="${this._geom._units}" stroke="black">
+         const svg = `<svg _bbox="${svgRectBbox}" _worldUnits="${this._geom._units}">
                         ${svgPaths.join('\n\t')}
                         ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`

@@ -97,8 +97,10 @@ export class DimensionLine extends BaseAnnotation
         this.start = start as Point;
         this.end = end as Point;
         this.value = this._getDynamicValue();
-    
+
+        this.offsetLength = this._calculateAutoOffsetLength();
         this._calculateOffsetVec();
+        
     }
 
     _getDynamicValue():number
@@ -200,7 +202,7 @@ export class DimensionLine extends BaseAnnotation
     // TODO: input checking and sane error message
     setOptions(o:DimensionOptions):this
     {
-        this.offsetLength = o?.offset || this.offsetLength; // only updates when not null 
+        this.offsetLength = o?.offset || this.offsetLength || this._calculateAutoOffsetLength();
         this.units = o?.units || this.units;
         this.roundDecimals = o?.roundDecimals || this.roundDecimals;
         // TODO: more: color, linethickness etc.
@@ -261,7 +263,7 @@ export class DimensionLine extends BaseAnnotation
      */
     toSvg()
     {   
-        const offsetLength = this.offsetLength || this._calculateAutoOffsetLength();
+        const offsetLength = this.offsetLength;
         const offsetVec = this.offsetVec.scaled(offsetLength as PointLike);
 
         let lineStart = this.start.add(offsetVec).toArray();
