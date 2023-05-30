@@ -357,6 +357,33 @@
          return this;
       }
 
+      /** Remove Shapes from ShapeCollection */
+      @checkInput('AnyShapeOrCollection', 'ShapeCollection')
+      remove(shapes:AnyShapeOrCollection, ...args): ShapeCollection
+      {
+         let removeShapes = shapes as ShapeCollection;
+
+         this.shapes = this.shapes.filter( s => !removeShapes.has(s));
+
+         // check groups and remove if needed
+         Object.values(this._groups).forEach( groupColl => 
+         {
+            removeShapes.forEach((removeShape) => {
+               const indexOf = groupColl.indexOf(removeShape)
+               if( indexOf !== -1)
+               {
+                  groupColl.splice(indexOf, 1)
+               }
+            })
+         })
+
+         this._setFakeArrayKeys();
+         this._setFakeGroupKeys();
+
+         return this;
+      }
+
+
       /** Add Shape at beginning of collection */
       @checkInput('AnyShape', 'auto')
       prepend(shape:AnyShape):ShapeCollection
@@ -1035,7 +1062,7 @@
          return this;
       }
 
-      /**  Array API - Add Shape to ShapeCollection*/
+      /**  Array API - Pop last Shape from ShapeCollection*/
       pop():ShapeCollection
       {
          this.shapes.pop();
@@ -1179,17 +1206,6 @@
       not(shape:AnyShape):ShapeCollection
       {
          return this.filter(s => !s.same(shape))
-      }
-
-      /** Remove Shapes from ShapeCollection */
-      @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-      remove(shapes:AnyShapeOrCollection, ...args): ShapeCollection
-      {
-         let removeShapes = shapes as ShapeCollection;
-
-         this.shapes = this.shapes.filter( s => !removeShapes.has(s) );
-
-         return this;
       }
 
       /** Check if ShapeCollection is empty */
@@ -1727,9 +1743,17 @@
          return this;
       }
 
-      color(color:any):ShapeCollection
+      color(color:any):this
       {
          this.forEach( shape => shape.color(color));
+
+         return this;
+      }
+
+      /** Make all Shapes in this ShapeCollection dashed lines */
+      dashed():this
+      {
+         this.forEach( shape => shape.dashed());
 
          return this;
       }
@@ -1848,14 +1872,24 @@
          const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
          const DEFAULT_BIN_HEIGHT = 1000;
          const BOX_MARGIN_DEFAULT = 5;
-         const BIN_MARGIN = 10; 
+         const BIN_MARGIN = 100; 
          
          const position = new Vertex(0,0,0);
          const binWidth = options?.stockWidth || DEFAULT_BIN_WIDTH;
-         const binHeight = options?.stockHeight || DEFAULT_BIN_HEIGHT
+         const binHeight = options?.stockHeight || DEFAULT_BIN_HEIGHT;
+
+         const autoRotate = (options?.autoRotate == undefined || options?.autoRotate);
+         const flatten = (options?.flatten);
+         if(autoRotate || flatten){ copy = true };
 
          let boxMargin = (options?.margin !== undefined) ? options.margin : BOX_MARGIN_DEFAULT;
-         let boxes = this.toArray().map( (shape,i) => this._makeBinPackBox(shape, boxMargin, i));
+         let boxes = this.toArray().map( (shape,i) => 
+         {
+            let s = (autoRotate) ? shape._copy().rotateToLayFlat() : shape;
+            s = (flatten) ? s._flattened() : s;
+            s.color('red');
+            return this._makeBinPackBox(s, boxMargin, i)
+         });
          // place boxes with skewest width-height ratio first
          boxes.sort((a,b) => this._calculateSizeSkewness(b) - this._calculateSizeSkewness(a)); // order boxes from big to small for better fitting
          
@@ -1884,8 +1918,13 @@
                let workShape = this.at(box.item.shapeIndex);
                if(copy)
                { 
-                  workShape = workShape.copy()
-                  toShapeCollection.addGroup('cut', workShape);
+                  let newWorkShape = workShape._copy(); // IMPORTANT: don't add to scene - flattened leaves this copy around
+                  newWorkShape = (autoRotate) ? newWorkShape.rotateToLayFlat() : newWorkShape;
+                  newWorkShape = (flatten) ? newWorkShape._flattened() : newWorkShape;
+                  newWorkShape.color('red');
+                  newWorkShape.addToScene();
+                  toShapeCollection.addGroup('cut', newWorkShape);
+                  workShape = newWorkShape;
                } // copy shape or move in place
                // check if we need to rotate 90 degrees (NOTE: Shape bbox are original size while Box are with margin!)
                if((Math.round(workShape.bbox().width())) != Math.round(box.width))
@@ -2136,10 +2175,11 @@
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
          // TODO: bbox is not including dimension lines
 
-         const svg = `<svg _bbox="${svgRectBbox}" _worldUnits="${this._geom._units}">
+         const svg = `<svg _bbox="${svgRectBbox}" _worldUnits="${this._geom._units}" stroke="black">
                         ${svgPaths.join('\n\t')}
                         ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`
+         // TODO: remove block so we can enable subshape styling
 
          return svg;
       }

@@ -28,12 +28,14 @@ export interface MakeStats
 export interface Layout2DOptions
 {
     start:Alignment2D
-    direction:'horizontal'|'vertical' // direction of sequential elements
+    direction:'horizontal'|'vertical' // direction of sequential elements (stacking direction)
     width:number, // total width of layout in model units
     height:number, // total height of layout in model units
     stockWidth?:number // the boxes that need to fit
     stockHeight?:number
     seams?:number // make sure the boxes are the right size to have their seams on given grid lines
+    // !!!! TODO: seamsDirection - NOW only vertical
+    seamsStartOffset?: number // let seams start later then start of layout
     leftover?:boolean
     cutMargin?:number
 }
@@ -160,10 +162,6 @@ export class Make
         this.resetStats();
         o = this._checkLayoutOptions(o);
 
-        if (o.seams && ((o.direction === 'horizontal') && o.seams > o.width) || ((o.direction === 'vertical') && o.seams > o.height))
-        {
-            throw new Error(`Make::_layout2DBoxes: 'seams' is more than dimensions of boxes! This can not work!`)    
-        }
 
         let createdElems = new ShapeCollection().name('boards'); 
         let cursor = this._alignment2DToPoint(o.start, o.width, o.height);

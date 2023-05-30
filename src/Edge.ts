@@ -47,7 +47,7 @@ export class Edge extends Shape
     */
 
     //// SETTINGS ////
-    TO_SVG_DASH_SIZE = 10
+    TO_SVG_DASH_SIZE = 5
 
     /** Creates a simple Line Edge, use new Edge().makeCicle etc for others */
     constructor(start?:any, end?:any) // NOTE: decorators cannot be applied to constructors
