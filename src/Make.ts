@@ -238,4 +238,24 @@ export class Make
     {
         return this._layout2DBoxes(o);
     }
+
+    //// SPECIALS WITH STRUTS AND FRAMEWORKS ////
+    // work in progress
+
+    /** Find a 2D strut length and angle that exactly fits diagonally in given space 
+     *   NOTE: It's easy to see how it works if you consider the special circumstances 
+     *   of width=spaceWidth, width=spaceHeight and angle(spaceWidth,spaceHeight) = 45 deg
+    */
+    fitRectStrut(width:number, space:Array<number|number>, withSpace:boolean=false):Face|ShapeCollection
+    {
+        const spaceAngle = Math.atan((space[1]-width)/(space[0]-width));
+        const diagAlignHeight = Math.cos(spaceAngle) * width;
+        const diagAlignWidth = Math.sin(spaceAngle) * width;
+        
+        const strut = new Edge().makeLine([diagAlignWidth,0], [space[0], space[1]-diagAlignHeight]).extrude(width) as Face;
+        
+        return (!withSpace) ? 
+                    strut : 
+                    new ShapeCollection(strut, new Face().makeRectBetween([0,0],space).toWire().addToScene().color('blue'));
+    }
 }

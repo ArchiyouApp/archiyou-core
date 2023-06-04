@@ -1046,6 +1046,12 @@
          return allSolids;
       }
 
+      /** Return new ShapeCollection with only the visible Shapes */
+      onlyVisible():ShapeCollection
+      {
+         return this.filter(s => s.visible());
+      }
+
       /** Shape API */
       select(selectString:string=null):ShapeCollection
       {
