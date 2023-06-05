@@ -1,26 +1,26 @@
 # Modeling with topology primitives
 
-In the [introduction](/guide/introduction/language-basics) we mentioned that all the models in Archiyou are build with the BREP primitives: *vertices*, *edges*, *wires*, *faces*, *shells* and *solids* that are tightly hierarchically connected to each other: An *edge* is a (specific) sequence of vertices, a wire of *edges* and so on. 
+In the [introduction](/guide/introduction/language-basics) we mentioned that all the models in Archiyou are build with the BREP primitives: *vertices*, *edges*, *wires*, *faces*, *shells* and *solids* that are tightly hierarchically connected to each other: An *edge* is a (specific) sequence of vertices, a wire of *edges* and so on.
 
 ::: warning
 If this section is a bit too theoretic for you. Just skip ahead to [Constructive Solid Geometry Modeling](./csg.md) which is more hands-on. You can always learn about topology primitives later! ☕
 :::
 
-## Starting (inifinite) small: Points, Vectors and Vertices
+## Starting (infinite) small: Points, Vectors and Vertices
 
 There are no models without points. Most of the time you see them defined as an array [x,y,z] (3D) or [x,y] (2D) but Sketch for example also offers polar coordinates and relative coordinates. At that moment they are just series of coordinates that you can use to make Points, Vectors or Vertices:
 
 ``` js
 vert = vertex(100,0,0);
 vec = vector(100,0,0);
-pnt = point(100,0,0); 
+pnt = point(100,0,0);
 ```
 
 So given that an array like [100,0,0] can be turned into a point, vector and vertex; what is the difference between these three?
 
 * Point: is just that - a 2D/3D point in space - it has very little properties or actions. It's basically a mathematical construct
 * Vector: A Vector can be seen as a point with an extra property: magnitude. So where a point is just [100,0,0] a Vector [100,0,0] s seen as the entity between [0,0,0] and [100,0,0], so with a *magnitude* or length of 100 units. It has also a direction: it *points* somewhere. Vectors can also be *added* together, *subtracted* or *normalized*. See [Wikipedia](https://en.wikipedia.org/wiki/Vector_(mathematics_and_physics)) for a general introduction or [Here for a fun one](https://www.mathsisfun.com/algebra/vectors.html)
-* Vertex: A Vertex is a point Shape and is thus visible where a Point is not in Archiyou. Vertices (and not Points or Vectors) are the building blocks of a model by combining into Edges, Edges into Wires, Wires into Faces and so on. 
+* Vertex: A Vertex is a point Shape and is thus visible where a Point is not in Archiyou. Vertices (and not Points or Vectors) are the building blocks of a model by combining into Edges, Edges into Wires, Wires into Faces and so on.
 
 Have a look at all the API reference manual for all the properties and methods of Points, Vectors and Vertices.
 
@@ -38,9 +38,9 @@ Edges are sequences of Vertices. Most of the time they have 2 Vertices but can h
 l = line([0,0,0],[100,0,0]); // a straight line edge
 print(l.type()); // Output: Edge
 print(l.edgeType()); // Output: Line
-a = arc([0,0,0],[100,200,0],[200,0,0]); // an arc ~ half a circle 
+a = arc([0,0,0],[100,200,0],[200,0,0]); // an arc ~ half a circle
 print(a.edgeType()); // Output: Circle (because arcs are pieces of a circle!)
-spl = spline([[0,0,0],[100,100,0],[200,0,0],[300,0,0]]); 
+spl = spline([[0,0,0],[100,100,0],[200,0,0],[300,0,0]]);
 print(spl.edgeType()); // Output: BSplineCurve
 // ==> an elegant curved line spline through 4 points
 ```
@@ -50,31 +50,31 @@ This doesn't look like much but there is a lot that you can already to with just
 ![Edges experiment](/modeling-edges-example.png)
 
 ``` js
-s = spline([[0,0,0],[100,100,100],[200,0,0],[300,100,0]]); 
+s = spline([[0,0,0],[100,100,100],[200,0,0],[300,100,0]]);
 l = line([0,0,0],[300,100,0]);
 startPoints = s.populated(50); // generate 50 points on the spline
 endPoints = l.populated(50); // generate 50 points on the line
 
-startPoints.forEach( (curPoint,i) => { 
+startPoints.forEach( (curPoint,i) => {
         otherPoint = endPoints[i];
         if (!curPoint.equals(otherPoint)) // to avoid zero length Edges at start and end
         {
-            line(curPoint, otherPoint); // make a Line between curPoint and otherPoint 
+            line(curPoint, otherPoint); // make a Line between curPoint and otherPoint
         }
     }
-); 
+);
 ```
 
 ## Wires
 
-Wires are connecting sequences of Edges. It doesn't matter what type of Edges (*Lines*, *Arcs*, *Splines* etc ); all can be joined into a Wire as long as their start or end Vertices touch each other.  
+Wires are connecting sequences of Edges. It doesn't matter what type of Edges (*Lines*, *Arcs*, *Splines* etc ); all can be joined into a Wire as long as their start or end Vertices touch each other.
 
 ![Make Wire from Edges](/modeling-wires-example.png)
 
 ``` js
 a = arc([0,0,0],[100,50,0],[200,0,0]);
 l = line([200,0,0],[100,-50,0]);
-w = wire(a,l); 
+w = wire(a,l);
 w.close(); // closing the Wire by adding a closing Line Edge to it
 ```
 
@@ -109,16 +109,16 @@ All those Vertices, Edges and Wires are nice, but if you need something more sub
 
 ``` js
 // create a closed Wire
-triangle = wire([0,0,0],[100,100,0],[200,0,0]).close(); 
+triangle = wire([0,0,0],[100,100,0],[200,0,0]).close();
 triangleFace = triangle.toFace(); // convert that Wire to a Face without any work
 triangleFace.move(0,0,100); // move Face a bit up to see it better
 ```
 
-As in the image above you can see the difference between a closed Wire and a Face by the fill and of course also in the Scene Navigator [reference to User Guide]. 
+As in the image above you can see the difference between a closed Wire and a Face by the fill and of course also in the Scene Navigator [reference to User Guide].
 
 ### non planar faces!
 
-Faces in a BREP system can be non-planar (unlike in mesh modeling). This is actually a very powerful feature that we can use in [Advanced Surface Modeling](./surface.md). 
+Faces in a BREP system can be non-planar (unlike in mesh modeling). This is actually a very powerful feature that we can use in [Advanced Surface Modeling](./surface.md).
 
 ![Extruding](/modeling_nonplanar_faces.png)
 
@@ -141,23 +141,23 @@ Continuing on in the hierarchy of topology. A Shell is a connected sequence of F
 
 ### Extruding
 
-With extrude you can create surfaces or solids by 'pushing' *profile* Shapes (Vertices, Edges, Wires, Faces) along a straight line with a given length. Extruding generates a higher order Shape (*Vertex => Edge*, *Edge => Face*, *Face => Solid*). 
+With extrude you can create surfaces or solids by 'pushing' *profile* Shapes (Vertices, Edges, Wires, Faces) along a straight line with a given length. Extruding generates a higher order Shape (*Vertex => Edge*, *Edge => Face*, *Face => Solid*).
 
 ![Extruding](/modeling-extrude.png)
 
 ``` js
 // extruding a Vertex gives an Edge
-vertex(0,0,0).extrude(100).color('blue'); 
+vertex(0,0,0).extrude(100).color('blue');
 
 // open Edge or Wire result in Face(s)
 line([100,0,0],[100,200,0])
-    .extrude(100).color('red'); 
+    .extrude(100).color('red');
 
 // close Wires will result in Solid:
 wire([300,0,0],[400,100,0],[200,100,0])
-    .close().extrude(100).color('green'); 
+    .close().extrude(100).color('green');
 arc([500,0,0],[500,100,-20],[600,0,50])
-    .close().extrude(100).color('purple'); 
+    .close().extrude(100).color('purple');
 
 ```
 
@@ -166,8 +166,8 @@ The direction used for extrusion is usually automatically chosen ( based on orde
 ![Extrude along normals](/modeling-extrude-normal.png)
 
 ``` js
-vertex(0,0,0).extrude(100,[-1,1,1]); // extrude in direction [-1,1,1] 
-edge([100,0,0],[100,200,0]).extrude(-100, [0,-1,-1]); 
+vertex(0,0,0).extrude(100,[-1,1,1]); // extrude in direction [-1,1,1]
+edge([100,0,0],[100,200,0]).extrude(-100, [0,-1,-1]);
 // extrude in direction [0,-1,-1] and the other way (-100)
 wire([300,0,0],[400,100,0],[200,100,0])
     .close().extrude(100, [-0.5,0,1]);
@@ -197,9 +197,9 @@ Sweeping is extruding along a given Edge or Wire called a *spine*. An example:
 
 ![Sweeping](/modeling-sweep.png)
 ``` js
-profile = circle(50); // a simple circle 
+profile = circle(50); // a simple circle
 // a spline as the sweep spine
-spine = spline([0,0,0],[200,-50,300],[100,150,450],[100,100,600]); 
+spine = spline([0,0,0],[200,-50,300],[100,150,450],[100,100,600]);
 pipe = profile.sweeped(spine);
 ```
 
@@ -227,15 +227,15 @@ Lofting can be done with all Wires and Faces, even the non-planar ones!
 :::
 
 ::: tip
-If given multiple profiles to loft it creates a smooth curved Shape with interpolation. When lofting sequentially with each profile you can get a lineary interpolated Shape.
+If given multiple profiles to loft it creates a smooth curved Shape with interpolation. When lofting sequentially with each profile you can get a linearly interpolated Shape.
 ![Linear Loft or smooth Lofts](/modeling_topology_loft_smooth_or_linear.png)
 :::
 
 
 ## Revolving
 
-With revolve you can be create a Solid Shape by rotating a linear Shape (Edge, Wire) along a axis like with a lathe machine. 
-An example: 
+With revolve you can be create a Solid Shape by rotating a linear Shape (Edge, Wire) along a axis like with a lathe machine.
+An example:
 
 ![Lofts](/modeling_topology_revolve.png)
 
@@ -247,7 +247,7 @@ s = spline([0,0,0],
             [150,0,300],
             [150,0,400],
             [0,0,500]);
-            
+
 s.revolved(360,[0,0,0],[0,0,300]).color('red'); // 360 degrees for a closed Solid Shape
 s.revolved(120,[0,0,0],[0,0,300]).color('blue').move(400); // less for a segment of it
 ```
@@ -259,7 +259,7 @@ Every Shape except the rudimentary Vertex consists of its topological subshapes.
 ``` js
     box = geom.Box();
     box.vertices(); // 8 vertices
-    print(box.vertices()) // console: ShapeCollection< shapes=[...] > 
+    print(box.vertices()) // console: ShapeCollection< shapes=[...] >
     // A ShapeCollection behaves a lot like an array too!
     box.edges(); // the 12 line edges of the box
     print (box.edges()[0].subType()); // console: Line
@@ -268,7 +268,7 @@ Every Shape except the rudimentary Vertex consists of its topological subshapes.
     print(box.wires()[0].subType()) // console: CoplanarClosed
     box.faces(); // the 6 faces enclosing the box
     box.shells(); // 1 enclosing shell
-    
+
     // extract a face from the box as a own Shape and move around
     box.faces()[0].copy().move([0,0,100]);
 ```
@@ -276,10 +276,10 @@ Every Shape except the rudimentary Vertex consists of its topological subshapes.
 ::: warning
 Subshape accessors like vertices() return a ShapeCollection of references to the subshapes; they remain part of the Shape. When you want to extract them and use them to build something else use Shape.copy()
 :::
- 
+
 ## Selectors
 
-If you need to select specific parts of a Shape with a bit more finesse than *subschape accessors* Archiyou offers *Selectors* [TODO: TO REFERENCE]. Especially in combination with advanced operations like *fillet* and *chamfer/bevel* they are very powerful. Some examples:
+If you need to select specific parts of a Shape with a bit more finesse than *subshape accessors* Archiyou offers *Selectors* [TODO: TO REFERENCE]. Especially in combination with advanced operations like *fillet* and *chamfer/bevel* they are very powerful. Some examples:
 
 ``` js
     // Overview of selectors:
@@ -298,7 +298,7 @@ See [Access parts of your model](./model-org.md) for more information on subshap
 
 ## Transforming Shapes
 
-In conventional CAD software it's sometimes a task to find the right *way* to create something based on something else and you might need to find a certain conversion hid away in some menu. This will break the intuitive design flow although that intuition might be underdefined.
+In conventional CAD software it's sometimes a task to find the right *way* to create something based on something else and you might need to find a certain conversion hid away in some menu. This will break the intuitive design flow although that intuition might be under-defined.
 Archiyou tries to go along with it and create something anyway that can be iterated upon. Transforming between (collections of) topologies (while maintaining topology validity) is an important part of that:
 
 |        | Vertex     | Edge    | Wire                               | Face                      | Shell                         | Solid                      |
@@ -306,7 +306,7 @@ Archiyou tries to go along with it and create something anyway that can be itera
 | Vertex |            | -       | -                                  | -                         | -                             | -                          |
 | Edge   | vertices() populated() |         | toWire()                           | -                         | -                             | -                          |
 | Wire   | vertices() populated() | edges() segmentized() |                                    | toFace() will try close() | toShell() [single Wire Shell] |                            |
-| Face   | vertices() populated() | edges() segmentized()| wires() outherWires() innerWires() |                           | toShell() [single Face Shell] | -                          |
+| Face   | vertices() populated() | edges() segmentized()| wires() outerWires() innerWires() |                           | toShell() [single Face Shell] | -                          |
 | Shell  | vertices() populated()| edges() segmentized() | wires() outerWires() innerWires()  | faces()                   |                               | toSolid() will try close() |
 | Solid  | vertices() populated()| edges() segmentized() | wires() outerWires() innerWires()  | faces()                   | shells()                      |                            |
 
