@@ -111,6 +111,7 @@ module.exports = {
   plugins: [
     '@vuepress/plugin-back-to-top',
     '@vuepress/plugin-medium-zoom',
+    /*
     ['vuepress-plugin-typedoc', {
         // see: https://www.npmjs.com/package/vuepress-plugin-typedoc
         // Plugin options
@@ -124,5 +125,6 @@ module.exports = {
         },
       }
     ]
+    */
   ]
 }
