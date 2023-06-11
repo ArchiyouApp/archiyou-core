@@ -1,4 +1,4 @@
-![Archiyou](/ay_logo.png.png)
+![Archiyou](/ay_logo.png)
 
 # Archiyou Documentation
 
