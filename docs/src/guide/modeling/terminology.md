@@ -2,15 +2,15 @@
 
 Let's start by defining what we mean by things:
 
-## Axis 
+## Axis
 
-There are 3 main axis of the cartesian coordinate system namely x,y,z. 
+There are 3 main axis of the cartesian coordinate system namely x,y,z.
 A position in space is defined by a x, y and z coordinate. Archiyou will always use lowercase letters for Axis!
 
 ## Sides
 
 Connected to the main axis of the coordinate system are the 6 sides: *top*,*bottom*,*front*,*back*,*left*,*right*.
-There are important to orientate yourself and the model in 3D. 
+There are important to orientate yourself and the model in 3D.
 
 ## Points
 
@@ -39,34 +39,34 @@ These are rudimentary mathematical entities, basically points in space and a mag
 ::: warning
 Because vertex(..) exists as a function you have to avoid creating variables with that exact name:
 ```js
-    // !! Don't do this: 
+    // !! Don't do this:
     vertex = vertex(0,0,0);
-    // will give error because vertex() method has been overwriten:
-    vert = vertex(100,0,0); 
+    // will give error because vertex() method has been overwritten:
+    vert = vertex(100,0,0);
     // !! Avoid vertex() as a variable name and keep it simple:
     v1 = vertex(0,0,0);
     v2 = vertex(100,0,0);
 ```
 :::
 
-Because points/vectors are so essential in modeling you see these 3-coordinate arrays a lot in Archiyou code! ⚠️ Note that a vector or point is not yet a shape (Vertex), so you can't see them. Convert to a Vertex: 
+Because points/vectors are so essential in modeling you see these 3-coordinate arrays a lot in Archiyou code! ⚠️ Note that a vector or point is not yet a shape (Vertex), so you can't see them. Convert to a Vertex:
 
-``` js 
+``` js
     v = vector(100,0,0); // now you see a point in the scene!
     vertex.toVertex().addToScene();  // convert Vector to Vertex and add to Scene
 ```
 ::: tip
-    
-Since points are so essential in modeling, Archiyou makes a big effort to interpretate any inputs if it expects a point-like 
 
-``` js 
-        p0 = point(); 
+Since points are so essential in modeling, Archiyou makes a big effort to interpret any inputs if it expects a point-like
+
+``` js
+        p0 = point();
         p1 = point(0); // [0,0,0]
         p2 = point(10,10); // z=0 by default
         v = vector(p); // auto converted to Vector
         v.move(100,100,100); // Vector<[100,100,100]>
         // convert Vector to Vertex (which can be added to scene)
-        vertex = v.toVertex().addToScene(); 
+        vertex = v.toVertex().addToScene();
         p = point(vertex); // and back again to Point
 ```
 :::
@@ -83,7 +83,7 @@ print(myVertex.type()); // output: 'Vertex'
 myEdge = edge([0,0,0],[100,0,0]); // a horizontal line edge
 myFace = face([0,0,0],[100,0,0],[100,100,0]); // a triangle face
 // some auto conversions and shorthands for coords
-myOtherFace = face(myVertex,[100],[100,100]); 
+myOtherFace = face(myVertex,[100],[100,100]);
 print(myOtherFace.type()); // output: 'Face'
 ```
 
@@ -96,7 +96,7 @@ cylinder();
 cone(200,10,300);
 ```
 
-See more about these primitive Shapes in the section [Constructive Solids Modeling](./csg.md). 
+See more about these primitive Shapes in the section [Constructive Solids Modeling](./csg.md).
 
 
 ## ShapeCollection
@@ -104,14 +104,14 @@ See more about these primitive Shapes in the section [Constructive Solids Modeli
 A collection of multiple shapes. Archiyou makes it easy to work with collections to treat them a lot like individual Shapes. So you can move a collection the same as a Shape:
 
 ``` js
-vertex1 = vertex(0,0,0); 
-vertex2 = vertex(10,10,10); 
+vertex1 = vertex(0,0,0);
+vertex2 = vertex(10,10,10);
 myCollection = collection(vertex1,vertex2);
 // move them all together
 myCollection.move(100,0,0); // move the collection of two vertices to 100 units to the right
 ```
 
-All basic operations like *move*, *rotate*, *extrude* etc work equally for individual shapes as a collection. Of course the operation needs to make sense for a specific Shape. 
+All basic operations like *move*, *rotate*, *extrude* etc work equally for individual shapes as a collection. Of course the operation needs to make sense for a specific Shape.
 
 ## Scene
 
@@ -130,13 +130,13 @@ Within the *Obj* container Shapes (or a ShapeCollection) are added to the scene 
 
 ```js
 // a Vertex instance is automatically created, wrapped in Obj and added to Scene
-v1 = vertex(0,0,10); 
+v1 = vertex(0,0,10);
 // Initiate a vertex by using class. It's not added to Scene
-v2 = new Vertex(10,10,10); 
+v2 = new Vertex(10,10,10);
 v2.addToScene().color('purple'); // Wrap in Obj, add to Scene and color
 v2.hide(); // hide Vertex #2
 // a blue box (by actually styling the Obj container):
-box().color('blue'); 
+box().color('blue');
 ```
 
 When you are modeling you probably forget the distinction between a Obj and the Shape and that's totally fine!
@@ -159,7 +159,7 @@ In Archiyou Shapes are all javascript instances. If you want to know properties 
 
 ## Shape Operations
 
-If you want to change a Shape you use an operations. Most operations are methods of that Shape instance. Use code hints (CTRL-SPACE) to see the possibilities in the *Code Editor*. 
+If you want to change a Shape you use an operations. Most operations are methods of that Shape instance. Use code hints (CTRL-SPACE) to see the possibilities in the *Code Editor*.
 
 Also notice that every method in a Shape returns that same Shape so you can chain operations.
 
@@ -167,7 +167,7 @@ Also notice that every method in a Shape returns that same Shape so you can chai
     p = plane(10,20);
     b = p.extrude(100); // that plane is now a box
     // or more elegantly chained:
-    myBox = plane(10,20).extrude(100).move(100,0,0); 
+    myBox = plane(10,20).extrude(100).move(100,0,0);
 
 ```
 
@@ -178,8 +178,8 @@ Doing operations might change the current Shape. Archiyou makes it very simple t
 ``` js
     p = plane();
     // There is now only a box in the scene, because it replaced the circle
-    p.extrude(100); 
-    myBox = p.extruded(100); 
+    p.extrude(100);
+    myBox = p.extruded(100);
     // ==> a box is created but the plane object/shape remains in the scene
 
 ```
@@ -195,21 +195,21 @@ Doing operations might change the current Shape. Archiyou makes it very simple t
 
 Every Shape (apart from a Vertex) consists of rudimentary Shapes. So a Edge contains Vertices. A Wire contains Edges (and thus Vertices). It's easy to get them:
 
-```js 
+```js
     l = line([0,0,0],[100,0,0]);
-    vertices = l.vertices(); 
+    vertices = l.vertices();
     print(vertices); // console ==> ShapeCollection<<Vertex[0,0,0]>,<Vertex[100,0,0]>>
     // these are still references to the vertices in the line edge
     vertices[0].move([0,0,100]); // so this does not work to alter the edge
     // you can extract the vertex
     vertices[0].moved(0,0,100); // make a copy and move
-    
+
     myBox = box();
     print(myBox.vertices().count()); // console: 8
     print(myBox.edges().count()); // console: 12
     print(myBox.faces().count()); // console: 6
     print(myBox.wires().count()); // console: 6 => the closed wires of the faces
-    
+
 ```
 
 ::: warning
@@ -221,11 +221,11 @@ Every Shape (apart from a Vertex) consists of rudimentary Shapes. So a Edge cont
 
 These terms are less important for now or have their own reference page.
 
-* Bounding Box - every Shape has a bounding box. Acces it by *Shape*.box() or add to the Scene: *Shape*.bbox().box().addToScene();
+* Bounding Box - every Shape has a bounding box. Access it by *Shape*.box() or add to the Scene: *Shape*.bbox().box().addToScene();
 * Selectors [TODO] - These are short strings to select specific parts of a Shape
 * Parameters [TODO] - To make your models customizable use parameters
 
-That's it for the basics. Let's start with modeling. 
+That's it for the basics. Let's start with modeling.
 
 
 

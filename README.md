@@ -4,14 +4,14 @@
 
 ## 🌐 What is Archiyou?
 
-Archiyou is an online platform to codify design and making know-how. It is currently in alpha phase and freely available to try. See [Archiyou.com](https://archiyou.com). 
+Archiyou is an online platform to codify design and making know-how. It is currently in alpha phase and freely available to try. See [Archiyou.com](https://archiyou.com).
 
 ## 🚩 What is Archiyou-core?
 
-This is the core library of the Archiyou platform. It consists of the following parts: 
+This is the core library of the Archiyou platform. It consists of the following parts:
 
-- 🛠️ **Geom** - The module to create geometry and topology shapes. Wraps a custom build of [OpenCascade.js](https://github.com/donalffons/opencascade.js). 
-- 📦 **Exporter** - Module to export data 
+- 🛠️ **Geom** - The module to create geometry and topology shapes. Wraps a custom build of [OpenCascade.js](https://github.com/donalffons/opencascade.js).
+- 📦 **Exporter** - Module to export data
 - ☝ **Importer (IO)** - Module in-progress to import data from different sources like SVG's, geodata etc.
 - ⭐ **Annotator** - A module for generating annotations like dimension lines and labels
 - 📚 **Doc** - The module to define documents, pages and add content (shapes, text, images) to them
@@ -31,7 +31,7 @@ That's why we want to keep the core of Archiyou open. This has some advantages:
 * CAD content created on the Archiyou platform is always portable and can be used without Archiyou. Never a vendor lock-in!
 * Open source CAD based on OpenCascade kernel like FreeCAD, CadQuery, ZenCAD, RepliCAD and now Archiyou can work together to challenge the proprietary CAD systems. For maximum adoption and compatibility with CadQuery we chose the Apache2 License
 
-Currently the source code of the platform itself (the frontend app and server infrastructure) remains closed but parts of it become open source in collaborations like [OCCI](https://github.com/occi-cad). 
+Currently the source code of the platform itself (the frontend app and server infrastructure) remains closed but parts of it become open source in collaborations like [OCCI](https://github.com/occi-cad).
 
 ## 🏗 What is the state of Archiyou-core?
 
@@ -43,9 +43,9 @@ We are building the Archiyou platform, its content and the core at the same time
 We are working on starter templates for developers:
 - [ ] Basic: run your Archiyou script without Archiyou
 - [ ] Use Archiyou-core in a modern app
-- [ ] Use Archiyou-core in a server Node enviroment
+- [ ] Use Archiyou-core in a server Node environment
 
-Let us know if you like more usage scenerios!
+Let us know if you like more usage scenarios!
 
 ## 🙋 Contributions
 
@@ -64,7 +64,7 @@ Other great projects that might suit your needs:
 
 * [CadQuery](https://github.com/CadQuery/cadquery) - Python based Script CAD and inspiration for Archiyou
 * [OpenCascade.js](https://github.com/donalffons/opencascade.js) - Run a CAD kernel directly in your browser. Without the great work by Sebastian on porting the OpenCascade kernel to WASM Archiyou would not exist
-* [Replicad](https://github.com/sgenoud/replicad) - Great script CAD library by Steve based on the same technology as Archiyou. Generally more focussed on developers. 
+* [Replicad](https://github.com/sgenoud/replicad) - Great script CAD library by Steve based on the same technology as Archiyou. Generally more focussed on developers.
 
 ## 🙌 License
 
@@ -101,9 +101,9 @@ yarn test --silent
 
 #### Debug
 
-* Circular dependences: 
-     * with dpdm: 
-        `npm i -g dpdm 
+* Circular dependences:
+     * with dpdm:
+        `npm i -g dpdm
         dpdm internal.ts`
      * with madge:
         `npx madge --circular --extensions ts internal.ts`

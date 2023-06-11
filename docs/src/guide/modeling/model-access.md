@@ -2,7 +2,7 @@
 
 ## Shape and ShapeCollections
 
-Accessing Shapes is done mostly by using variables. In the future we might add more easy ways to access certain Shapes in the Scene. 
+Accessing Shapes is done mostly by using variables. In the future we might add more easy ways to access certain Shapes in the Scene.
 ShapeCollections already have a variety of ways to select Shapes within:
 
 ```js
@@ -16,7 +16,7 @@ solids = c.getShapesByType('Solid'); // ShapeCollection<[box,sphere]>
 
 ## Subshapes
 
-There is a huge variety of 3D shapes but in essence all consist of *Vertices*, *Edges*, *Wires*, *Faces*, *Shells* and *Solids*. And even better; an Edge is nothing more than a linear Shape between two Vertices. A Wire a sequence of Edges, a Face the surface bound by a closed Wire and so on. See more on these *Topology* entities in section [Modeling with Topology primivites](../modeling/topology.md).
+There is a huge variety of 3D shapes but in essence all consist of *Vertices*, *Edges*, *Wires*, *Faces*, *Shells* and *Solids*. And even better; an Edge is nothing more than a linear Shape between two Vertices. A Wire a sequence of Edges, a Face the surface bound by a closed Wire and so on. See more on these *Topology* entities in section [Modeling with Topology primitives](../modeling/topology.md).
 
 So any Shape is just some configuration of the Topology primitives and can be accessed as such:
 
@@ -31,17 +31,17 @@ print(b.solids()); // ShapeCollection with 1 Solid
 b.faces()[0].moved(-200);
 // add a sphere to all Vertices of box
 // forEach iterates over all Vertices in collection
-b.vertices().forEach( v => sphere(5,v)); 
+b.vertices().forEach( v => sphere(5,v));
 ```
 ![Accessing Subshapes](/modeling_access_subshapes.png)
 
-Accessing all subshapes of a type as a ShapeCollection is one thing, but for a lot of detailed modeling you need to select more specifically. This is where Selectors come in. 
+Accessing all subshapes of a type as a ShapeCollection is one thing, but for a lot of detailed modeling you need to select more specifically. This is where Selectors come in.
 
 ## Selectors
 
 ### Basics
 
-With selectors you can select subshapes based on specific conditions. You start a selection on a Shape with the *select('{{SELECTION_STRING}})* method. 
+With selectors you can select subshapes based on specific conditions. You start a selection on a Shape with the *select('{{SELECTION_STRING}})* method.
 The selection string contains a reference to the type of subshape you are looking for, a operator and a value. For example:
 
 ```js
@@ -59,7 +59,7 @@ print(b.select('E|[1,1,1]').length); // Console: 0
 If a select(..) does not yield any results a warning is given in the console (under warning tab).
 
 ::: tip
-Combining selector strings is also possible: 
+Combining selector strings is also possible:
 ```js
 box(100).shell(-5,'F||top and F||front');
 ```
@@ -75,17 +75,17 @@ Archiyou currently offers the following Selectors:
 | on side | `{SHAPE}||{SIDE}` | `box().select('F||front') or box().select('V||frontrightbottom')`
 | parallel to | `{SHAPE}|{AXIS} or {SHAPE}|{POINT}` | `box().select('E|Z') or box().select('E|[0,0,1]')`
 | at coord | `{SHAPE}@{AXIS}={COORD} or {SHAPE}@{AXIS}={COORD}~{TOLERANCE}` | `box(100).select('V@X=50') or box(100).select('V@X=45~5')`
-| in bbox| `{SHAPE}@B{POINT,POINT}` | `box(100).select('V@B[0,0,0][100,100,100]')` | Shapes need to be fully in bbox 
+| in bbox| `{SHAPE}@B{POINT,POINT}` | `box(100).select('V@B[0,0,0][100,100,100]')` | Shapes need to be fully in bbox
 | ofsubtype | `{SHAPE}:{SUBTYPE}>` | `cylinder(30,80).select('E:Line') or cylinder(30,80).select('E:Circle')`
 | closest | `{SHAPE}<<->{POINT}` | `box(100).select('V<<->[500,0,0]')`
 | furthest| `{SHAPE}<->>{AXIS}` | `box(100).select('V<->>[500,0,0]')`
-| heighest coord along axis | `{SHAPE}>>{AXIS}` | `box(100).select('F>>X')`
+| highest coord along axis | `{SHAPE}>>{AXIS}` | `box(100).select('F>>X')`
 | smallest coord along axis | `{SHAPE}<<{AXIS}` | `box(100).select('F<<X')`
 | in range | `{SHAPE}<->{POINT}<{RANGE}` | `box(100).select('V<->[50,50,50]<10')`
 | positive | `{SHAPE}+{AXIS}` | `box().select('E+X')`
 | negative | `{SHAPE-{AXIS}` | `box().select('V-Z')`
 
-More Selectors will probably be added later. 
+More Selectors will probably be added later.
 
 ### Combining Selectors
 
@@ -101,9 +101,9 @@ Here are some examples:
 arc([0,0],[100,100],[200,0]).populated(10); // Generate 10 vertices from Arc Edge
 line([0,0,0],[100,100,100]).middle(); // Point<50,50,50>
 // Get direction/tangent of Arc at [100,100] => [1,0,0]
-arc([0,0],[100,100],[200,0]).directionAt([100,100]); 
+arc([0,0],[100,100],[200,0]).directionAt([100,100]);
 // Get center of Solid (Point) and make into a Vertex
-box().center().toVertex().addToScene().color('red'); 
+box().center().toVertex().addToScene().color('red');
 ```
 
 Now that we get a grip on modeling terminology, can manage topology Shapes and access subshapes; Let's jump into real modeling!

@@ -10,7 +10,7 @@ While working with increasingly complex models it becomes important to organize 
 
 ## Components
 
-Bricks, tree branches, screws, windows, braquets; Most of the physical world can be intepretated as components, that themselves can consist of other components. Components enable great flexibility while maximizing re-use of smart solutions, especially when they are *parametric*. This is very important for Archiyou (see: [What and why Archiyou](../introduction/why-archiyou.md)).
+Bricks, tree branches, screws, windows, brackets; Most of the physical world can be interpreted as components, that themselves can consist of other components. Components enable great flexibility while maximizing re-use of smart solutions, especially when they are *parametric*. This is very important for Archiyou (see: [What and why Archiyou](../introduction/why-archiyou.md)).
 
 With Archiyou you can import a (parametric) script/model as a component and use it in another. When you start off in Archiyou code editor this might not be the first thing you do, but if your project grows this might become essential. You can also import shared components by others to quick-start your own modeling.
 
@@ -23,7 +23,7 @@ Like a lot of other CAD application Archiyou offers a (simple) layer system. It 
 ```js
 layer('test').color('blue');
 // now the box is placed inside the 'test' layer with color blue
-box(100,200,100); 
+box(100,200,100);
 ```
 
 ![Modeling Layers](/modeling_layers.png)
@@ -68,7 +68,7 @@ box(); // you can make a Shape without assigning it to a variable
 b = box();
 b.move(100); // but it is easy to manipulate with variable
 // use simple names for variables
-pnt = point(0,0,0); 
+pnt = point(0,0,0);
 vec = vector(100,0,0);
 // and of course avoid overwriting the creation methods
 vector = vector(100,0,0);
