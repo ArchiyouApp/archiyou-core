@@ -1,12 +1,12 @@
 # Constructive Solid Geometry Modeling
 
-Constructuve Solid Geometry Modeling (CSG) is probably the most intuitive way of modeling. You start with primitive 3D shapes like a box, cylinder, sphere, cone and just place and then add them together in some ways to create more complex shapes.
+Constructive Solid Geometry Modeling (CSG) is probably the most intuitive way of modeling. You start with primitive 3D shapes like a box, cylinder, sphere, cone and just place and then add them together in some ways to create more complex shapes.
 
 ## Making primitive shapes and position them
 
 Archiyou offers some basic 3D shapes. Here are some examples:
 
-![Constructive Solid Modeling Primities](/modeling_csg_primitives.png)
+![Constructive Solid Modeling Primitives](/modeling_csg_primitives.png)
 cd do
 ```js
 plane();
@@ -29,12 +29,12 @@ After you got your primitive shapes into the Scene, let's do some transformation
 
 ![Constructive Solid Modeling Transformations](/modeling_csg_transformations.png)
 
-Here is the code without the styling. See if you can connect the statements with the above shown shape. 
+Here is the code without the styling. See if you can connect the statements with the above shown shape.
 
 ```js
 b1 = box(100,50,120);
 // move 100 units on x-axis
-b2 = b.copy().move('+200'); 
+b2 = b.copy().move('+200');
 // rotate 45 deg around local z-axis
 b3 = b2.copy().rotateZ(45);
 // rotate back 45 deg and rotate around z-axis
@@ -47,7 +47,7 @@ An overview of basic transformations:
 |----------------|-------------------------------|---------------------------------------------------------------------------------|--------------------------------------------------|
 | move()         | x,y,z                         | move shape a given vector                                                                   | myBox.move(100,0,0)                              |
 | moved()        | x,y,z                         | copy and move                                                                   | myBox.moved('+100','+50',200)                    |
-| moveTo()       | x,y,z                         | move to point in absolute coordinates                                           |                                                  | 
+| moveTo()       | x,y,z                         | move to point in absolute coordinates                                           |                                                  |
 | copy()         |                               | copy                                                                            |                                                  |
 | rotateX()      | degrees, [pivot]              | rotate shape around X axis with pivot in the center of the Shape or given pivot | myBox.rotateX(45) or myBox.rotateX(45,[100,0,0]) |
 | rotateY()      | degrees, [pivot]              | same but around Y axis                                                          |                                                  |
@@ -64,7 +64,7 @@ These *Boolean* operations are simple:
 * *Shape.subtract(other)* - Subtract *other* from Shape
 * *Shape.intersect(other)* - Make new Shapes from the intersections of *Shape* and *other* shape
 
-As always the *-ed* versions of the operations create a new Shape without touching the previous one: *added()*, *subtracted()*, *intersected()*. 
+As always the *-ed* versions of the operations create a new Shape without touching the previous one: *added()*, *subtracted()*, *intersected()*.
 See this overview:
 
 ![Constructive Solid Geometry Modeling](/modeling_csg_booleans.png)
@@ -97,7 +97,7 @@ Here is a overview of current boolean operations:
 
 ## Finishes: Fillet and chamfer
 
-After you created a nice combined shape out of multiple shapes and boolean operations you are ready for the last part of CSG: Finishing with fillet and chamfers. These are rounded or straight Edge details and are used both for esthetical and functional purposes. While using fillet and chamfer operations it's essential to be able to select the right part of the Shape by using *Selectors*. So check out the section [Accessing parts of your model](./model-access.md).
+After you created a nice combined shape out of multiple shapes and boolean operations you are ready for the last part of CSG: Finishing with fillet and chamfers. These are rounded or straight Edge details and are used both for aesthetical and functional purposes. While using fillet and chamfer operations it's essential to be able to select the right part of the Shape by using *Selectors*. So check out the section [Accessing parts of your model](./model-access.md).
 
 ### Fillets
 
@@ -112,10 +112,10 @@ b = box().color('blue');
 b.filleted(10).move(70); // by default fillet all edges
 b.filleted(10, 'E||top').move(140); // use a selection string to select top edges
 b.filleted(10, 'V||top').move(210); // although filleting works with Edges ...
-// you can select Vertices too, then related Edges will be selected automatically 
+// you can select Vertices too, then related Edges will be selected automatically
 ```
 
-### Chamfers 
+### Chamfers
 
 Chamfers are extra surfaces that are added at Edges - mostly at a angle of 45 degrees - so that edges and corners become less sharp and nicely accentuated.
 
@@ -165,7 +165,7 @@ There is also *Shape*.alignByPoints(). Have a look at the API reference for more
 
 ## Making shapes hollow: Shell
 
-When you want to create a hollow shape, for example for 3d printing boxes and vases: Shape.*shell()* is very important. 
+When you want to create a hollow shape, for example for 3d printing boxes and vases: Shape.*shell()* is very important.
 Here is an example:
 
 ![Shelling](/modeling_csg_shelling.png)
