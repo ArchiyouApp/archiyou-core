@@ -365,7 +365,7 @@ export class Sketch
         let methodName = OP_TYPE_TO_DO_METHOD[op.type];
         if (!methodName)
         {
-            console.log(`Sketch::_doOperation: Cannot do operation of type "${op.type}". Check OP_TYPE_TO_DO_METHOD to have a method bound to it!`);
+            console.warn(`Sketch::_doOperation: Cannot do operation of type "${op.type}". Check OP_TYPE_TO_DO_METHOD to have a method bound to it!`);
         }
         else {
             this[methodName](newShapes, op.params); // do operation
@@ -459,8 +459,6 @@ export class Sketch
         this._setCursor({ 
             point: toPointWorld,  // auto converted
             direction: new Vector(1,0,0) }); 
-        
-        console.log(`Sketch::moveTo: Moved cursor to point ${toPointWorld}`);
 
         return this;
     }
@@ -469,8 +467,6 @@ export class Sketch
     @checkInput('PointLike', 'auto') // don't resolve just yet
     lineTo(point:PointLike, ...args):Sketch
     {
-        console.log('SKETCH::lineTo');
-
         let localPoint:Point;
         let worldPoint:Point;
         let line:Edge;
@@ -485,8 +481,6 @@ export class Sketch
 
         // update cursor with line Edge
         this._setCursorByShape(line);
-
-        console.log(`Sketch::lineTo: Created line from "${line.start().toArray()}" to "${line.end().toArray()}"`);
 
         return this;
     }

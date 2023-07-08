@@ -104,8 +104,6 @@ export class Point
     /** Set cursor on this Point instance, so we can make relative coords */
     cursor(cursor:Point|Cursor):Point
     {
-        console.log('CURSOR');
-        console.log(cursor);
         
         this._cursor = (isCursor(cursor)) ? cursor : (Point.isPoint(cursor)) ? { point: cursor, direction: new Vector(1,0,0) } : null;
 

@@ -3829,8 +3829,8 @@ export class Shape
     _getObjStyle():ObjStyle
     {
         // TODO: we can avoid copying the style by refering to another Obj that is its parent layer
-        let objStyle = this?._obj?._style;
-        let parentObjStyle = this?._parent?._obj?._style;
+        let objStyle = this.object()._style;
+        let parentObjStyle = this.object()?._parent?._style;
         // TODO: recurse to above layers?
         return (objStyle || parentObjStyle) as ObjStyle;
     }
