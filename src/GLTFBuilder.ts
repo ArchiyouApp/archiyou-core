@@ -140,10 +140,10 @@ export class GLTFBuilder
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                 annotations: ay.geom._annotator.getAnnotations(),
-                messages: messages, // add flattened messages from Console
-                docs: ay.doc.toData(),
-                pipelines: ay.geom.getPipelineNames(),
-                /* TODO: pipelineModels
+                messages: messages, // Console Messages
+                docs: ay.doc.toData(), // Document data by document name in special format for AY doc viewers (PDF and web)
+                pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
+                /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:
                     pipelineModels: {
