@@ -3,7 +3,8 @@
 // Enables fine grained settings
 // See App settings in settings.ts
 
-//// GLOBAL SETTINGS
+//// MISC SETTINGS
+
 export const MESHING_MAX_DEVIATION = 0.1;
 export const MESHING_ANGULAR_DEFLECTION = 0.5;
 export const MESHING_MINIMUM_POINTS = 2;
@@ -11,6 +12,9 @@ export const MESHING_TOLERANCE = 1e-6;
 export const MESHING_EDGE_MIN_LENGTH = 1e-6;
 
 export const DEFAULT_WORKPLANE = [0,0,1]
+
+//// SHAPES DEFAULTS ////
+
 export const SHAPE_ARRAY_DEFAULT_OFFSET = 100;
 export const SHAPE_EXTRUDE_DEFAULT_AMOUNT = 100;
 export const SHAPE_SWEEP_DEFAULT_SOLID = true;
@@ -83,11 +87,32 @@ export const FACE_FILLET_RADIUS = 5;
 export const FACE_CHAMFER_DISTANCE = 10;
 export const FACE_CHAMFER_ANGLE = 45;
 
+//// MESH QUALITY OUTPUT SETTINGS ////
 
 export const MESH_QUALITY_PRESETS = {
     'low' : { linearDeflection: 5.0, angularDeflection: 1.0, tolerance: 0.01, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
     'medium' : { linearDeflection: 1.0, angularDeflection: 0.3, tolerance: 0.001, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
     'high' : { linearDeflection: 0.4, angularDeflection: 0.1, tolerance: 0.001, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
 }
+
+//// WORKER UTILS ////
+
+//// Methods from geom that are imported into global under samen name and lowercase ////
+export const GEOM_METHODS_INTO_GLOBAL = [
+    'Point', 'Vector', 
+    'Vertex', 'Edge', 'Line', 'Arc', 'Spline', 
+    'Wire', 'Polyline', 'Spiral', 'Helix',
+    'Face', 'Plane', 'PlaneBetween', 'Rect', 'RectBetween', 'BasePlane', 'Circle',
+    'Shell', 'Solid', 'Box', 'BoxBetween', 'Sphere', 'Cone', 'Cylinder',
+    'group', 'layer', 'collection',
+    'sketch', 'all', 'isTemp', 'select', 'atVertices', 'moveTo', 'lineTo', 'splineTo', 'arcTo', 
+    'rectTo', 'rect', 'circleTo', 'circle', 'mirror', 'offset', 'offsetted', 'fillet', 'chamfer', 'thicken', 'thickened','combine',
+    'close', 'importSketch',
+    'units',
+    'pipeline',
+    ];
+
+
+//// PIPELINES ////
 
 export const PIPELINE_VALID_NAMES = ['3dprint', 'cnc', 'techdraw',  'laser']; // To structurize pipelines. TODO: more
