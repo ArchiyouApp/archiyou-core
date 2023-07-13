@@ -1,6 +1,9 @@
 import { MeshingQualitySettings, Shape, AnyShape, ShapeCollection} from './internal'
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
-import { GLTFBuilder } from './GLTFBuilder';
+import { GLTFBuilder, exportGLTFOptions } from './GLTFBuilder';
+
+
+//// TYPES ////
 
 // avoid TS errors by extending global
 declare global {
@@ -32,6 +35,14 @@ export class Exporter
         edgeMinimalPoints: MESHING_MINIMUM_POINTS,
         edgeMinimalLength: MESHING_EDGE_MIN_LENGTH,
     }
+
+    DEFAULT_GLTF_OPTIONS = {
+        binary: true,
+        archiyouFormat: true,
+        includePointsAndLines: true,
+        extraShapesAsPointLines: true,
+        messages: [],
+    } as exportGLTFOptions
 
     //// END SETTINGS ////
 
@@ -151,12 +162,13 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=true):ArrayBuffer|string
+    exportToGLTF(options?:exportGLTFOptions):ArrayBuffer|string
     {
         const oc = this._parent.geom._oc;
+        options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : options;
         
-        const meshingQuality = quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
-        const filename = `file.${(binary) ? 'glb' : 'gltf'}`
+        const meshingQuality = options.quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
+        const filename = `file.${(options.binary) ? 'glb' : 'gltf'}`
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
 
         const ocShapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get(); // autonaming is on by default
@@ -198,7 +210,7 @@ export class Exporter
             }
         })
 
-        const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), binary);
+        const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), meshingQuality);
         
         const ocCoordSystemConverter = ocGLFTWriter.CoordinateSystemConverter();
         ocCoordSystemConverter.SetInputCoordinateSystem_2(oc.RWMesh_CoordinateSystem.RWMesh_CoordinateSystem_Zup);
@@ -207,10 +219,10 @@ export class Exporter
         ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
         
         // TODO: We might need to pick up the seperate bin file for text-based GLTF
-        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (binary) ? 'binary' : 'utf8' });
+        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (options.binary) ? 'binary' : 'utf8' });
         oc.FS.unlink("./" + filename);
         
-        let gltfContent =  (binary) ? gltfFile.buffer : gltfFile;
+        let gltfContent =  (options.binary) ? gltfFile.buffer : gltfFile;
 
         // clean up OC classes
         ocShapeTool.delete();
@@ -218,26 +230,25 @@ export class Exporter
         ocCoordSystemConverter.delete();
 
         // Force inclusion of points and lines to export
-        if (includePointsAndLines)
+        if (options.includePointsAndLines)
         {
-            const pointAndLineShapes:ShapeCollection = this._parent.geom.all().filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type())));
-            if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, quality); 
+            const pointAndLineShapes:ShapeCollection = this._parent.geom.all()
+                        .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type())));
+            if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, meshingQuality); 
         }
 
         // Add special archiyou data in GLTF asset.extras section
-        if(archiyouFormat)
+        if(options.archiyouFormat)
         {
             // add special Archiyou data to GLTF
-            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay); 
+            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, options.messages); 
         }
 
-        // extra base vertices and lines for every Shape used for specific visualization styles
-        if (extraShapesAsPointLines)
+        // extra vertices and lines for specific visualization styles
+        if (options.extraShapesAsPointLines)
         {
-            const EXCLUDE_SHAPES_FOR_EXPORT = ['Vertex']; // We want to output vertices of edges/wires too! 
-            // GLTFBuilder.addSeperatePointsAndLinesForShapes() skips the lines for these, but includes the points
-            const extraOutputShapes = this._parent.geom.all().filter(s => (s.visible() && !EXCLUDE_SHAPES_FOR_EXPORT.includes(s.type())));
-            gltfContent = new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, quality); 
+            const extraOutputShapes = this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type())));
+            gltfContent = new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
         }
         
         
@@ -276,8 +287,9 @@ export class Exporter
 
     exportToSVG():string
     {
-        // For now only export 2D Shapes on XY plane
-        return this._parent.geom.all().toSvg();
+        // For now only export 2D edges on XY plane
+        let edges2DCollection = this._parent.geom.all().filter(s => s.visible() && s.type() === 'Edge' && s.is2DXY());
+        return edges2DCollection.toSvg();
     }
 
     async exportToSVGWindow(content:string)

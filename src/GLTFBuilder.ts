@@ -1,4 +1,5 @@
-import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, ArchiyouApp, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
+import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, 
+            ArchiyouApp, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
 import { toRad, MeshingQualitySettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
@@ -21,8 +22,20 @@ export interface ArchiyouData
     annotations: Array<DimensionLineData>, 
     docs: {[key:string]:DocData} // all documents in data and serialized content
     errors?: Array<StatementError>, // only needed for internal use in the future
-    messages?: Array<ConsoleMessage>, // only needed for internal use in the future
+    messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
 }
+
+export interface exportGLTFOptions 
+{
+    // exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=false):ArrayBuffer|string
+    quality?: MeshingQualitySettings
+    binary?: boolean
+    archiyouFormat?: boolean // use Archiyou format
+    includePointsAndLines?: boolean // export loose points and edges 
+    extraShapesAsPointLines?: boolean // for visualization purposes seperate points and lines
+    messages?:Array<ConsoleMessage> 
+}   
+
 
 export class GLTFBuilder
 {
@@ -108,7 +121,7 @@ export class GLTFBuilder
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp):ArrayBuffer
+    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, messages:Array<ConsoleMessage>):ArrayBuffer
     {
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
@@ -127,7 +140,17 @@ export class GLTFBuilder
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                 annotations: ay.geom._annotator.getAnnotations(),
-                // Dont do: messages, errors
+                messages: messages, // add flattened messages from Console
+                docs: ay.doc.toData(),
+                pipelines: ay.geom.getPipelineNames(),
+                /* TODO: pipelineModels
+                    Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
+                    something like:
+                    pipelineModels: {
+                        'cnc' : { 'glb' : { ... }, 'dxf' : { .... }},
+                        '3dprint' : { 'glb : { ... }, 'stl' : { ...} }
+                    }
+                */
             } as ArchiyouData
             
             let buffer = io.writeBinary(this.doc); 
@@ -144,7 +167,7 @@ export class GLTFBuilder
         this.doc = io.readBinary(gltfContent);
         let buffer = this.doc.getRoot().listBuffers()[0];
 
-        // Create a node for every loose Vertex (TODO: check performance implications?)
+        // Create a node for every loose Vertex (TODO: check performace implications?)
         shapes.getShapesByType('Vertex').forEach(v => this._addPoints(v, buffer));
        
         // For every Edge and Wire make a seperate node
@@ -180,8 +203,8 @@ export class GLTFBuilder
             .setAttribute('POSITION', gltfVertexBuffer)
             .setMode(0) // Point mode see: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive_mode
 
-        // name - if Shape is a Vertex just use its name, if higher order use subshape addition '::Points'
-        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}${(shape.type() !== 'Vertex') ? '::Points' : ''}`;
+        // color (TODO: check if this property is saved correctly)
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj' }${this.SUBSHAPE_OUTPUT_NAME_SEPERATOR}Points`;
         const rgba = shape._getColorRGBA();
         if (rgba)
         {
@@ -232,9 +255,8 @@ export class GLTFBuilder
             .setAttribute('POSITION', gltfLineBuffer)
             .setMode(1); // line mode
 
-        // name - if Shape is linear just use its name, if higher order use subshape addition '::Lines'
-        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}${(!['Edge','Wire'].includes(shape.type())) ? '::Lines' : ''}`; // default is 'Line' is name is undefined
         // color
+        const shapeName = `${shape.getId()}__${shape.getName() || 'UnnamedObj'}${this.SUBSHAPE_OUTPUT_NAME_SEPERATOR}Lines`; // default is 'Line' is name is undefined
         const rgba = shape._getColorRGBA();
         if (rgba)
         {
@@ -262,11 +284,7 @@ export class GLTFBuilder
         shapes.forEach(shape =>
         {
             this._addPoints(shape, buffer); // Add Vertices of Shape
-            // Only output lines if Shape is higher order than Edge/Wire (mostly because these are already outputted in GLTFBuilder().addPointsAndLines())
-            if(!['Edge', 'Wire'].includes(shape.type()))
-            {
-                this._addShapeLines(shape, buffer,quality); // Add Edges of Shape to GLTF 
-            }
+            this._addShapeLines(shape, buffer,quality); // Add Edges of Shape to GLTF 
         })
 
         // export new GLTF binary content

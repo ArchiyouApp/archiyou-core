@@ -31,6 +31,7 @@ export * from './Exporter'
 export * from './Geom'
 export * from './Annotator'
 export * from './IO'
+export * from './GLTFBuilder'
 
 export * from './typeguards'
 export * from './decorators'
