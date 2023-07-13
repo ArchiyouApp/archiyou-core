@@ -50,6 +50,7 @@ export class Geom
   _captureShapesStart:ShapeCollection = null;
   _activeLayerGroup:Obj = null;
   _activeLayerGroupInObj:Obj = null;
+  _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
   // NOTE: meshingQuality is either in Main or Webworker scope
 
   constructor()
@@ -800,6 +801,7 @@ export class Geom
     this.resetLayers();
     this._annotator.reset();
     this.scene.isEmpty();
+    this._pipelines = [];
   }
 
   /** Get a name for a layer based on existing ones and a pattern */
@@ -891,6 +893,22 @@ export class Geom
     let tmpLayerGroup = this._activeLayerGroup;
     this._activeLayerGroup = null;
     return tmpLayerGroup;
+  }
+
+  //// PIPELINES ////
+
+  /** Make a new pipeline. Use .execute(fn) to set function later */
+  pipeline(name?:string, fn?:() => ShapeCollection):Pipeline
+  {
+    const p = new Pipeline(name);
+    if (fn){ p.does(fn); }
+    if(!this._pipelines.includes(p)) this._pipelines.push(p);
+    return p;
+  }
+
+  getPipelineNames():Array<string>
+  {
+      return [...new Set(this._pipelines.map( p => p.name))]
   }
 
   //// CAPTURE SHAPES STATE ////

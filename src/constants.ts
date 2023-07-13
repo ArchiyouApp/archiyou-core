@@ -1,6 +1,7 @@
 //// CONSTANTS ////
 // Used in all of the codebase
 // Enables fine grained settings
+// See App settings in settings.ts
 
 //// GLOBAL SETTINGS
 export const MESHING_MAX_DEVIATION = 0.1;
@@ -82,21 +83,11 @@ export const FACE_FILLET_RADIUS = 5;
 export const FACE_CHAMFER_DISTANCE = 10;
 export const FACE_CHAMFER_ANGLE = 45;
 
-export const GEOM_METHODS_INTO_GLOBAL = [
-    'Point', 'Vector', 
-    'Vertex', 'Edge', 'Line', 'Arc', 'Spline', 
-    'Wire', 'Polyline', 'Spiral', 'Helix',
-    'Face', 'Plane', 'PlaneBetween', 'Rect', 'RectBetween', 'BasePlane', 'Circle',
-    'Shell', 'Solid', 'Box', 'BoxBetween', 'Sphere', 'Cone', 'Cylinder',
-    'group', 'layer', 'collection',
-    'sketch', 'all', 'isTemp', 'select', 'atVertices', 'moveTo', 'lineTo', 'splineTo', 'arcTo', 
-    'rectTo', 'rect', 'circleTo', 'circle', 'mirror', 'offset', 'offsetted', 'fillet', 'chamfer', 'thicken', 'thickened','combine',
-    'close', 'importSketch'
-    ];
-
 
 export const MESH_QUALITY_PRESETS = {
     'low' : { linearDeflection: 5.0, angularDeflection: 1.0, tolerance: 0.01, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
     'medium' : { linearDeflection: 1.0, angularDeflection: 0.3, tolerance: 0.001, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
     'high' : { linearDeflection: 0.4, angularDeflection: 0.1, tolerance: 0.001, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
 }
+
+export const PIPELINE_VALID_NAMES = ['3dprint', 'cnc', 'techdraw',  'laser']; // To structurize pipelines. TODO: more

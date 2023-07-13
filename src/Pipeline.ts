@@ -4,29 +4,14 @@
  *      Like making cutting plans or different representations of the model.
  *      Able to run automatically or manually
  * 
- *      Pipeline have a common structure:
- *          - assemble
- *          - layout (including disassemble)
- *          - annotate
- *          - process - process shapes
- *          - [ pages ]
- *          - [ toolpaths ]
+ *      For now a pipeline is just a simple function that is run when needed.
+ *      Later we can add structure to it (layout, annotate etc)
  */ 
 
 import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom } from './internal'
-import { AnyShape,  AnyShapeOrCollection, Layout } from './internal'
-import { gp_Ax3, gp_Trsf, gp_Pnt } from '../libs/archiyou-opencascade/archiyou-opencascade'
-import { checkInput } from './decorators' // NOTE: needs to be direct
-
-import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal' // Face
+import { PIPELINE_VALID_NAMES } from './internal'
 
 //// SETTINGS ////
-
-
-interface PipelineAnnotate
-{
-    // TODO
-}
 
 
 export class Pipeline
@@ -39,41 +24,46 @@ export class Pipeline
     _geom:Geom; // also set on Pipeline prototype when making Geom
     name:string;
     _shapes:ShapeCollection
+    _function:() => ShapeCollection
 
 
     /** Create a Pipeline */
-    constructor(name:string)
+    constructor(name?:string)
     {   
-        this.name = name;
+        if(PIPELINE_VALID_NAMES.includes(name))
+        {
+            this.name = name;
+            return this;
+        }
+        else {
+            throw new Error(`pipeline(name): Pipeline names can be any of these: ${PIPELINE_VALID_NAMES.join('","')}`);
+        }
     }
 
-    /** Select shapes that go into the Pipeline */
-    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    shapes(shapes:AnyShapeOrCollection)
+    /** Things for the pipeline to do
+     *   NOTE: the given function is executed in the WebWorker global scope, 
+     *   this means previous variables are available
+     */
+    does(fn:() => ShapeCollection):this
     {
-        this._shapes = shapes as ShapeCollection; // auto converted
-        return this;
+        if (typeof fn === 'function')
+        {
+            this._function = fn;
+            return this;
+        }
+        else {
+            throw new Error(`pipeline.execute(fn): Please supply a function with structure fn(shapes) => shapes to pipeline!`);
+        }
     }
 
-    /** Disassemble and layout in a given order */
-    layout(layout:Layout):Pipeline
+    /** Run pipeline and get a ShapeCollection back */
+    run():ShapeCollection
     {
-        // TODO
-        return this;
-    }
-
-    /** Annotate shapes */
-    annotate(options:PipelineAnnotate):Pipeline
-    {
-        // TODO
-        return this;
-    }
-
-    /** Process Shapes or pipeline */
-    process(fn:(shape:AnyShape, index:number, all:ShapeCollection) => any):Pipeline
-    {
-        // TODO
-        return this;
+        if(!this._function)
+        {
+            throw new Error(`pipeline.run(): No pipeline function defined. Use myPipeline.set(fn)`);
+        }
+        return this._function();
     }
 
 }

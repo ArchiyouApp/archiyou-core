@@ -1039,6 +1039,14 @@ export class Edge extends Shape
         return dimLine
     }
 
+    /** Alias for dimension() */
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dim(dim?:DimensionOptions):IDimensionLine
+    {
+        return this.dimension(dim);
+    }
+
+
     //// OUTPUT ////
 
     /** Minimal raw data of this Edge */
