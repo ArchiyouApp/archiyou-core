@@ -26,8 +26,8 @@
     async loadDanfo():Promise<any> // TODO TS typing
     {   
         // detect context of JS
-        const isNode = typeof process !== 'undefined';
         const isBrowser = typeof window === 'object'
+        const isNode = !isBrowser && typeof process !== 'undefined';
         const isWorker = !isNode && !isBrowser;
          
         if(isWorker || isBrowser)
@@ -37,7 +37,11 @@
         }
         else {
             console.log('==== LOAD DANFO FOR NODE ====')
-            this._danfo = await import('danfojs-node')
+            // keep this out import(..) to avoid being picked up by Webpack in client
+            // looks like NodeJS can search node_modules in webworker for the library
+            const nodeDanfoPath = 'danfojs-node'; 
+            
+            this._danfo = await import(nodeDanfoPath)
         }
  
         return this._danfo;
