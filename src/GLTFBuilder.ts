@@ -143,6 +143,7 @@ export class GLTFBuilder
                 messages: messages, // Console Messages
                 docs: ay.doc.toData(), // Document data by document name in special format for AY doc viewers (PDF and web)
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
+                // TODO: calc.toData() // Raw data like metrics and tables
                 /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:

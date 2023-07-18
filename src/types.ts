@@ -78,7 +78,8 @@ export interface ArchiyouApp
     doc: Doc,
     console?: Console,
     executor: CodeParser,
-    exporter: Exporter, 
+    exporter: Exporter,
+    // TODO: calc
     make?: Make,
     // TODO: importer?
     gizmos: Array<Gizmo>, // TODO: move this to Geom?
