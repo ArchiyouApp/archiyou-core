@@ -5,7 +5,7 @@ import chroma from 'chroma-js' // direct import like in documentation does not w
 
 type DataRows = Array<{[key:string]:any}>;
 
-export interface TableOptions
+export interface TableContainerOptions
 {
     fontsize?: number
     fontcolor?: string  
@@ -17,7 +17,7 @@ export interface TableOptions
 
 //// MAIN CLASS ////
 
-export class Table extends Container
+export class TableContainer extends Container
 {
     DEFAULT_FONT_SIZE = 10; // in points
     DEFAULT_FONT_COLOR = 'black'; // converted to hex
@@ -28,9 +28,9 @@ export class Table extends Container
     DEFAULT_TABLE_HEIGHT = '100mm';
 
     _data:DataRows; // DataRows: Array of column-values
-    _options:TableOptions = {}
+    _options:TableContainerOptions = {}
 
-    constructor(data:DataRows, options:TableOptions)
+    constructor(data:DataRows, options:TableContainerOptions)
     {
         super('table');
         this._type = 'table';
@@ -49,7 +49,7 @@ export class Table extends Container
     }
 
     /** Set options and defaults */
-    setOptions(options:TableOptions = {})
+    setOptions(options:TableContainerOptions = {})
     {
         this._setFontSize(options?.fontsize || this.DEFAULT_FONT_SIZE);
         this._setFontColor(options?.fontcolor || this.DEFAULT_FONT_COLOR);

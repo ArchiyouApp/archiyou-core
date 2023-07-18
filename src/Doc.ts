@@ -26,9 +26,9 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, Page, PageSize, Container, AnyContainer, View, TableOptions, ArchiyouApp } from './internal' // classes
+import { Geom, ModelUnits, ShapeCollection, Page, PageSize, Container, AnyContainer, View, TableContainerOptions, ArchiyouApp } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
-            Position, isPosition, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, Table } from './internal' // types and type guards
+            Position, isPosition, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
 import { convertValueFromToUnit } from './internal' // utils
 
@@ -380,7 +380,7 @@ export class Doc
      *  @param input name of Calc table
      * 
     */
-    table(name:TableInput, options?:TableOptions):Doc
+    table(name:TableInput, options?:TableContainerOptions):Doc
     {
         if(!isTableInput){ throw new Error(`Doc::table: Please enter a name of existing Calc Table or data rows in format [{ col1:val1, col2:val2},{...}]`); }
         if(typeof name === 'string' && !this._calc){ throw new Error(`Doc::table: Cannot get table data from Calc module. Calc is not initialized. Use calc.init()`); }
@@ -389,7 +389,7 @@ export class Doc
         // either get data from Calc or use raw data input
         const dataRows = this._calc.db.table(name as string).toDataRows();
 
-        const newTableContainer = new Table(dataRows, options).on(this._activePage);
+        const newTableContainer = new TableContainer(dataRows, options).on(this._activePage);
         newTableContainer.name = name;
         this._activeContainer = newTableContainer;
         

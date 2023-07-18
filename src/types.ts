@@ -1,5 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
-import { Geom, Doc, CodeParser, Exporter, Make, Pipeline } from './internal'
+import { Geom, Doc, CodeParser, Exporter, Make, Table, Calc } from './internal'
 import { Console } from './Console'
 
 //// SETTINGS ////
@@ -68,7 +68,7 @@ export type MakeFaceInput = Wire|PointLikeSequence|AnyShapeSequence
 export type MakeShellInput = Array<Face|Edge>|ShapeCollection
 export type MakeSolidInput = Array<Shell>|ShapeCollection
 
-export type PipelineType = '3dprint' | 'cnc' | 'techdraw' | 'laser' // see above PIPELINE_VALID_NAMES
+export type PipelineType = '3dprint' | 'cnc' | 'techdraw' | 'laser'
 
 //// INTERFACES ////
 
@@ -81,7 +81,7 @@ export interface ArchiyouApp
     console?: Console,
     executor: CodeParser,
     exporter: Exporter,
-    // TODO: calc
+    calc: Calc,
     make?: Make,
     // TODO: importer?
     gizmos: Array<Gizmo>, // TODO: move this to Geom?
@@ -372,4 +372,102 @@ export interface Layout
     type?: LayoutOrderType
     options: LayoutOptions // TODO: type
     flatten:boolean // flatten to 2D
+}
+
+//// CALC MODULE ////
+
+export type DataRowColumnValue = {[key:string]:any} // DataRow in column-value format
+export type DataRowValues = Array<any> // DataRow with values only
+export type DataRowsColumnValue = Array<DataRowColumnValue> // Array of DataRow as column-value
+export type DataRowsValues = Array<DataRowValues> // Array of DataRow as values only
+export type DataRows = DataRowsColumnValue | DataRowsValues // DataRows
+
+
+/** Metric is a element that outputs data in some way */
+export interface Metric {
+    name: string // name and label of Metric
+    type:'text'|'bar'|'line'|'radar' // TODO: more
+    data: Array<number|string> // raw data (either value, array<value> or array<object>)
+    options: TextMetricOptions // TODO: other options
+}
+
+export interface MetricOptionsBase
+{
+    type:'text'|'bar'|'line'|'radar' // TODO: more
+}
+
+/** Options for TextMetric */
+export interface TextMetricOptions extends MetricOptionsBase {
+    icon: string // materialdesign icon name
+    color: any // TODO: typing
+    pre: string // string before value
+    unit: string // string after value
+}
+
+export type MetricOptions = TextMetricOptions // TODO more
+
+/** Get data from table location  */
+export interface TableLocation
+{
+    location: string // raw table location
+    table: Table, // for easy access to meta data like column names later
+    column?: string // name of column
+    row?:number // index of row
+    data: any|Array<any>, // any data - format to be defined more clear
+}
+
+export interface DbCompareStatement 
+{
+    column: string,
+    comparator: string,
+    value: any,
+    combine: string,
+}
+
+/** Metric data to be shown in MetricBoard */
+export interface MetricBoard
+{
+    name: string,
+    label : string,
+    value: any,
+    unit: string,
+    pre : string,
+    icon : string,
+}
+
+export interface CalcData
+{
+    tables: Object // { tablename: [{col, val}] }
+    metrics: Object // { name : Metric, name2: Metric }
+}
+
+//// CALC TYPEGUARDS ////
+
+export function isDataRowColumnValue(o:any): o is DataRowColumnValue
+{
+    return typeof o === 'object'
+        && Object.keys(o).every(k => typeof k === 'string')
+        && Object.values(o).every(v => (typeof v === 'string') || typeof v === 'number')
+}
+
+export function isDataRowValues(o:any): o is DataRowsValues
+{
+    return (Array.isArray(o)) && o.every(v => (typeof v === 'string') || (typeof v === 'number'))
+}
+
+export function isDataRowsColumnValue(o:any): o is DataRowsColumnValue
+{
+    return Array.isArray(o) 
+        && o.every(rcv => isDataRowColumnValue(rcv))
+}
+
+export function isDataRowsValues(o:any): o is DataRowsValues
+{
+    return Array.isArray(o) 
+        && o.every(rcv => isDataRowValues(rcv))
+}
+
+export function isDataRows(o:any): o is DataRows
+{
+    return isDataRowsColumnValue(o) || isDataRowsValues(o);
 }
