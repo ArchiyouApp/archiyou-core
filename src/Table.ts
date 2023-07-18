@@ -1,17 +1,16 @@
 /** a AY table: basically a wrapper over a Danfo dataframe  */
 
 // Danfo docs: https://danfo.jsdata.org/api-re
-import * as danfo from 'danfojs';
-import { DataFrame } from 'danfojs';
-import { Db } from './Db';
+import { Db } from './internal';
 import { DbCompareStatement } from './internal'; // types.ts
+import * as StringMatchAll from 'string.prototype.matchall' // polyfill for es5
 
-const StringMatchAll = require('string.prototype.matchall') // polyfill for es5
-
+type DataFrame = any; // avoid problems
 
 export class Table
 {
     _name:string;
+    _danfo:any; // Danfo module
     _db:Db; // reference to database parent
     _dataframe:DataFrame;
 
@@ -192,7 +191,7 @@ export class Table
             }
             else {
                 // OR logic: query original DF and concat to current
-                currentDf = danfo.concat({ dfList: [currentDf, this._dataframe.query(query)], axis: 0 }) as DataFrame; // TS FIX DataFrame|Series
+                currentDf = this._danfo.concat({ dfList: [currentDf, this._dataframe.query(query)], axis: 0 }) as DataFrame; // TS FIX DataFrame|Series
             }
         
         });
@@ -244,7 +243,7 @@ export class Table
         // map over rows to create new DF
         rowObjs.forEach(func);
 
-        return new Table( new danfo.DataFrame(rowObjs) );
+        return new Table( new this._danfo.DataFrame(rowObjs) );
     }
 
     /** Add Column with certain value to Dataframe and return the new Table
@@ -357,7 +356,7 @@ export class Table
     /** Join two table on a specific key or multiple keys */
     join(other:Table, keys:string|Array<string>)
     {
-        return new Table( danfo.merge(
+        return new Table( this._danfo.merge(
                             { left : this._dataframe, 
                               right : other._dataframe, 
                               on : (keys instanceof Array) ? keys : [keys], 
@@ -367,9 +366,9 @@ export class Table
 
     // ==== OUTPUT ====
 
-    async toData()
+    toData()
     {
-        return danfo.toJSON(this._dataframe)
+        return this._danfo.toJSON(this._dataframe)
     }
 
     // ==== utils ====

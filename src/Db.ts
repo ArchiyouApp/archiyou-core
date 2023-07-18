@@ -1,10 +1,7 @@
 /** Convert AY scene to a database with tables/dataframes and basic analytics and IO */
 
 
-import { Geom } from './Geom'
-import { Table } from './Table'
-
-import * as danfo from "danfojs";
+import { Geom, Table } from './internal'
 
 export class Db
 {
@@ -12,6 +9,7 @@ export class Db
     DEBUG = false;
     UNNAMED_TABLE = 'Table'
 
+    _danfo:any; // dynamic Danfo module
     _geom:Geom; // bind to geom module to d data of Shapes and Scene
     _tables:Object = {}; // name : Table
     shapes:Table; // all Shapes in the current model (see _geom)
@@ -20,9 +18,10 @@ export class Db
     data:Object; // output data { tablename : [datarows] }
 
 
-    constructor(geom:Geom)
+    constructor(geom:Geom, danfo:any)
     {
         this._geom = geom;
+        this._danfo = danfo;
 
         this.init(); // try to init immediately. Maybe there are not Shapes in Geom instance. When there are use init()
     }
@@ -51,26 +50,27 @@ export class Db
     {
         // add reference to the parent database in every Table instance
         Table.prototype._db = this;
+        Table.prototype._danfo = this._danfo;
 
         if (this.DEBUG || this._geom == null)
         {
             console.warn(`---- DB init in DEBUG MODE ----`);
-            this.shapes = new Table(new danfo.DataFrame(this.generateTestShapesData()));
-            this.objects = new Table(new danfo.DataFrame(this.generateTestObjsData()));
+            this.shapes = new Table(new this._danfo.DataFrame(this.generateTestShapesData()));
+            this.objects = new Table(new this._danfo.DataFrame(this.generateTestObjsData()));
         }
         else {
             let shapesDataRows = this.generateShapesData();
             
             if(shapesDataRows.length > 0)
             {
-                this.shapes = new Table(new danfo.DataFrame(shapesDataRows));
+                this.shapes = new Table(new this._danfo.DataFrame(shapesDataRows));
                 this.shapes.save("shapes");
             }
 
             let objDataRows = this.generateObjsData();
             if(objDataRows.length > 0)
             {
-                this.objects = new Table(new danfo.DataFrame(objDataRows));
+                this.objects = new Table(new this._danfo.DataFrame(objDataRows));
                 // register shapes and object table
                 this.objects.save("objects");
             }

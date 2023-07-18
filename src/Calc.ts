@@ -2,31 +2,44 @@
  *  Calc.ts
  *      Generate data tables and do basic data analytics 
  */
-
- //import { Db } from './Db'; // TMP DISABLED
- //import { Table } from './Table'; // TMP DISABLED
- import { Geom } from './Geom';
+ 
+ import { Db, Table, Geom } from './internal'; 
  import { Metric, MetricOptions, TableLocation, DataRows, isDataRows } from './types'
- // import * as danfo from "danfojs"; // TMP DISABLED
 
  export class Calc
  {
+    _danfo;
     _geom;
-    db:any // TMP DISABLED: Db; // the virtual database with table in there
-
-    dbData:Object // raw outputted data
+    db:Db // TMP DISABLED: Db; // the virtual database with table in there
+    dbData:Object // raw outputted data 
     _metrics:{[key:string]:Metric} = {};
 
     constructor(geom:Geom = null)
     {
         this._geom = geom; // needed to get data from the model
-        //this.db = new Db(this._geom);
+        this.loadDanfo().then(() => this.init());
+    }
+
+    /** Load Danfo module dynamically based on enviroment */
+    async loadDanfo():Promise<any> // TODO TS typing
+    {      
+        if (typeof window === 'object')
+        {
+            console.log('==== LOAD DANFO BROWSER ====')
+            this._danfo = await import("danfojs");
+        }
+        else {
+            console.log('==== LOAD DANFO NODEJS ====')
+            this._danfo = await import('danfojs-node')
+        }
+
+        return this._danfo;
     }
 
     /** We need to know when we can load the Shapes */
     init()
     {
-        this?.db?.init();
+        this.db = new Db(this._geom, this._danfo);
     }
 
     /** Automatically calc.init() when user uses calc module */
@@ -57,18 +70,16 @@
     */
     table(name:string, data:DataRows, columns:Array<string>):Calc
     {   
-        /* // TMP DISABLED
         this.autoInit();
 
         if(!name){ throw new Error(`Calc::table: Please supply a table name`); }
         if(this.tables().includes(name)){ throw new Error(`Calc::table: Table name "${name}" already exists! Please use an unique name`); }
         if(!isDataRows(data)){ throw new Error(`Calc::table: Please supply data in format [{ col1: val1, col2: val2}] or [val1,val2] and supply column names as third parameter!`); }
         
-        const df = (columns) ? new danfo.DataFrame(data, { columns: columns }) : new danfo.DataFrame(data);
+        const df = (columns) ? new this._danfo.DataFrame(data, { columns: columns }) : new this._danfo.DataFrame(data);
         const newTable = new Table(df)
         newTable.name(name);
         this.db.saveTable(newTable);
-        */
         
         return this;
     }
@@ -88,9 +99,9 @@
     }
 
     /** Output raw data */
-    async toTableData():Promise<{[key:string]:Object}>
+    toTableData():{[key:string]:Object}
     {   
-        return await this?.db?.toTableData(); 
+        return this?.db?.toTableData(); 
     }
 
     //// METRIC BOARD ////

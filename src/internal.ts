@@ -54,9 +54,8 @@ export * from './DocPage'
 export * from './DocUtils'
 
 
-// TMP DISABLED
-//export * from './Table'
-//export * from './Db'
+export * from './Table'
+export * from './Db'
 export * from './Calc'
 
 
