@@ -1,12 +1,12 @@
-/**  OCCI models (simplified)
+/**  OCCI standard models (simplified)
  *  
  *  Used by the cloud compute worker
- * 
  *  Not used internally (yet)
+ *  
  * 
  * */ 
 
-export interface ModelRequest
+export interface OcciModelRequest
 {
     hash?:string // instance hash (name with parameters and values)
     params?: {[key:string]:any}
@@ -16,7 +16,7 @@ export interface ModelRequest
     meta?: any // TODO
 }
 
-export interface ModelResult
+export interface OcciModelResult
 {
     id?:string
     success:boolean
@@ -30,7 +30,7 @@ export interface ModelResult
     duration?:number
 }
 
-export interface CadScript
+export interface OcciCadScript
 {
     id?:string
     name:string // always lowercase
@@ -53,12 +53,12 @@ export interface CadScript
     meta?:{[key:string]:any}
 }
 
-export interface CadScriptRequest extends CadScript
+export interface OcciCadScriptRequest extends OcciCadScript
 {
-    request?:ModelRequest
+    request?:OcciModelRequest
 }
 
-export interface CadScriptResult extends CadScriptRequest
+export interface OcciCadScriptResult extends OcciCadScriptRequest
 {
-    results: ModelResult
+    results: OcciModelResult
 }

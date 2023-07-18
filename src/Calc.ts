@@ -85,6 +85,12 @@
         });
     }
 
+    /** Output raw data */
+    async toTableData():Promise<{[key:string]:Object}>
+    {   
+        return await this.db.toTableData(); 
+    }
+
     //// METRIC BOARD ////
 
     /** Export metrics */

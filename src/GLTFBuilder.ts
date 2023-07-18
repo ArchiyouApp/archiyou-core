@@ -23,6 +23,7 @@ export interface ArchiyouData
     docs: {[key:string]:DocData} // all documents in data and serialized content
     errors?: Array<StatementError>, // only needed for internal use in the future
     messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
+    tables?:{[key:string]:any}, // raw data tables
 }
 
 export interface exportGLTFOptions 
@@ -120,8 +121,15 @@ export class GLTFBuilder
 
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
+    /** Sometimes we need to wait on results from Archiyou, use this method to start */
+    async gatherArchiyouAsyncData(ay:ArchiyouApp):Promise<{[key:string]:any}>
+    {
+        const tableData = await ay.calc.toTableData();
+        return { tables: tableData };
+    }
+
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, messages:Array<ConsoleMessage>):ArrayBuffer
+    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, data:{[key:string]:any}):ArrayBuffer
     {
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
@@ -140,10 +148,11 @@ export class GLTFBuilder
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                 annotations: ay.geom._annotator.getAnnotations(),
-                messages: messages, // Console Messages
+                messages: data?.messages, // Console Messages
                 docs: ay.doc.toData(), // Document data by document name in special format for AY doc viewers (PDF and web)
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
-                // TODO: calc.toData() // Raw data like metrics and tables
+                metrics: ay.calc.metrics(),
+                tables: data?.tables,
                 /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:

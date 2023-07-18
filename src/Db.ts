@@ -118,6 +118,17 @@ export class Db
 
     // ==== OUTPUTS ====
 
+    /** Output tables as json data async */
+    async toTableData():Promise<{[key:string]:Object}>
+    {
+        let data = {}; // key: data
+        for (const [key,tableObj] of Object.entries(this._tables))
+        {
+            data[tableObj.name()] = await tableObj.toData();
+        }
+        return data;
+    }
+
     /** Export Database with saves Tables to Json format */
     requestData(onDone : (data:Object) => void )
     {
@@ -143,8 +154,7 @@ export class Db
         }
     }   
 
-
-    // ==== OUTPUT METHODS ====
+    //// DEBUG OUTPUT METHODS ////
 
     generateTestShapesData(amount:number=50):Array<Object> // TODO: make output Object an Interface?
     {
