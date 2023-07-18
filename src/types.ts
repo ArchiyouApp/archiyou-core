@@ -68,6 +68,8 @@ export type MakeFaceInput = Wire|PointLikeSequence|AnyShapeSequence
 export type MakeShellInput = Array<Face|Edge>|ShapeCollection
 export type MakeSolidInput = Array<Shell>|ShapeCollection
 
+export type PipelineType = '3dprint' | 'cnc' | 'techdraw' | 'laser' // see above PIPELINE_VALID_NAMES
+
 //// INTERFACES ////
 
 /** A group of all modules of Archiyou for easy access  */

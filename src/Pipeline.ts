@@ -8,8 +8,8 @@
  *      Later we can add structure to it (layout, annotate etc)
  */ 
 
-import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom } from './internal'
-import { PIPELINE_VALID_NAMES } from './internal'
+import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, isPipelineType } from './internal'
+import { PIPELINE_VALID_NAMES } from './internal' // from typeguards.ts
 
 //// SETTINGS ////
 
@@ -30,7 +30,7 @@ export class Pipeline
     /** Create a Pipeline */
     constructor(name?:string)
     {   
-        if(PIPELINE_VALID_NAMES.includes(name))
+        if(isPipelineType(name))
         {
             this.name = name;
             return this;

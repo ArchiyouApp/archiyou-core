@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData, PipelineType  } from './internal'
 import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
           AnyShapeOrCollection, AnyShapeOrSequence, PointLikeOrAnyShapeOrCollection, ColorInput,
@@ -304,4 +304,12 @@ export function isSelectorPointRange(o:any): o is SelectorPointRange
 export function isLayoutOptions(o:any): o is LayoutOptions
 {   
     return true; // TODO
+}
+
+//// PIPELINES ////
+
+export const PIPELINE_VALID_NAMES = ['3dprint', 'cnc', 'techdraw',  'laser']; // To structurize pipelines. TODO: more
+export function isPipelineType(o:any) : o is PipelineType
+{
+    return PIPELINE_VALID_NAMES.includes(o);
 }

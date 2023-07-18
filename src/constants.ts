@@ -113,6 +113,3 @@ export const GEOM_METHODS_INTO_GLOBAL = [
     ];
 
 
-//// PIPELINES ////
-
-export const PIPELINE_VALID_NAMES = ['3dprint', 'cnc', 'techdraw',  'laser']; // To structurize pipelines. TODO: more

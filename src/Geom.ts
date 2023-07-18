@@ -908,7 +908,7 @@ export class Geom
 
   getPipelineNames():Array<string>
   {
-      return [...new Set(this._pipelines.map( p => p.name))]
+      return Array.from( new Set(this._pipelines.map( p => p.name)))
   }
 
   //// CAPTURE SHAPES STATE ////
