@@ -27,9 +27,9 @@
     {   
         // detect context of JS
         const isBrowser = typeof window === 'object'
-        const isNode = !isBrowser && typeof process !== 'undefined';
+        const isNode = !isBrowser && (typeof WorkerGlobalScope === 'undefined');
         const isWorker = !isNode && !isBrowser;
-         
+
         if(isWorker || isBrowser)
         {
             console.log('==== LOAD DANFO FOR BROWSER/WORKER ====')
@@ -38,7 +38,7 @@
         else {
             console.log('==== LOAD DANFO FOR NODE ====')
             // keep this out import(..) to avoid being picked up by Webpack in client
-            // looks like NodeJS can search node_modules in webworker for the library
+            // looks like NodeJS can search node_modules in webworker for the danfojs-node library
             const nodeDanfoPath = 'danfojs-node'; 
             
             this._danfo = await import(nodeDanfoPath)
