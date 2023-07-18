@@ -22,16 +22,10 @@
 
     /** Load Danfo module dynamically based on enviroment */
     async loadDanfo():Promise<any> // TODO TS typing
-    {      
-        if (typeof window === 'object')
-        {
-            console.log('==== LOAD DANFO BROWSER ====')
-            this._danfo = await import("danfojs");
-        }
-        else {
-            console.log('==== LOAD DANFO NODEJS ====')
-            this._danfo = await import('danfojs-node')
-        }
+    {    
+        let danfoLib = (typeof window === 'object') ? 'danfojs' : 'danfojs-node';
+        console.log(`==== LOADING DANFO VERSION "${danfoLib}" ====`);
+        this._danfo = await import(danfoLib)
 
         return this._danfo;
     }
