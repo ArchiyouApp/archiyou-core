@@ -17,17 +17,23 @@
     constructor(geom:Geom = null)
     {
         this._geom = geom; // needed to get data from the model
-        this.loadDanfo().then(() => this.init());
+        this.loadDanfo()
+            .then(() => this.init())
+
     }
 
     /** Load Danfo module dynamically based on enviroment */
     async loadDanfo():Promise<any> // TODO TS typing
-    {    
-        let danfoLib = (typeof window === 'object') ? 'danfojs' : 'danfojs-node';
-        console.log(`==== LOADING DANFO VERSION "${danfoLib}" ====`);
-        this._danfo = await import(danfoLib)
-
-        return this._danfo;
+    {   
+         // detect context of JS
+         const isWorker = typeof WorkerGlobalScope !== 'undefined';
+         const isBrowser = typeof window === 'object'
+ 
+         let danfoLib = (isWorker || isBrowser) ? 'danfojs' : 'danfojs-node';
+         console.log(`==== LOADING DANFO VERSION "${danfoLib}" ====`);
+         this._danfo = await import(danfoLib)
+ 
+         return this._danfo;
     }
 
     /** We need to know when we can load the Shapes */
