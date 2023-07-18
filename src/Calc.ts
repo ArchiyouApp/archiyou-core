@@ -25,15 +25,22 @@
     /** Load Danfo module dynamically based on enviroment */
     async loadDanfo():Promise<any> // TODO TS typing
     {   
-         // detect context of JS
-         const isWorker = typeof WorkerGlobalScope !== 'undefined';
-         const isBrowser = typeof window === 'object'
+        // detect context of JS
+        const isNode = typeof process !== 'undefined';
+        const isBrowser = typeof window === 'object'
+        const isWorker = !isNode && !isBrowser;
+         
+        if(isWorker || isBrowser)
+        {
+            console.log('==== LOAD DANFO FOR BROWSER/WORKER ====')
+            this._danfo = await import('danfojs')
+        }
+        else {
+            console.log('==== LOAD DANFO FOR NODE ====')
+            this._danfo = await import('danfojs-node')
+        }
  
-         let danfoLib = (isWorker || isBrowser) ? 'danfojs' : 'danfojs-node';
-         console.log(`==== LOADING DANFO VERSION "${danfoLib}" ====`);
-         this._danfo = await import(danfoLib)
- 
-         return this._danfo;
+        return this._danfo;
     }
 
     /** We need to know when we can load the Shapes */
