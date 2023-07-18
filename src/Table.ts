@@ -1,8 +1,8 @@
 /** a AY table: basically a wrapper over a Danfo dataframe  */
 
 // Danfo docs: https://danfo.jsdata.org/api-re
-import * as danfo from 'danfojs/src/index';
-import { DataFrame } from 'danfojs/src/index';
+import * as danfo from 'danfojs';
+import { DataFrame } from 'danfojs';
 import { Db } from './Db';
 import { DbCompareStatement } from './internal'; // types.ts
 
@@ -85,7 +85,7 @@ export class Table
     }
 
     /** Return index labels. By default serial integers */
-    index():Array<string>
+    index():Array<string|number>
     {
         return this._dataframe.index;
     }
@@ -192,7 +192,7 @@ export class Table
             }
             else {
                 // OR logic: query original DF and concat to current
-                currentDf = danfo.concat({ df_list: [currentDf, this._dataframe.query(query)], axis: 0 });
+                currentDf = danfo.concat({ dfList: [currentDf, this._dataframe.query(query)], axis: 0 }) as DataFrame; // TS FIX DataFrame|Series
             }
         
         });
@@ -263,7 +263,7 @@ export class Table
                 value = new Array(this.numRows()).fill(this._protectNullUndefined(value));
             }
             let newDf = this._dataframe.copy();
-            newDf.addColumn({ "column": name, "value": value }); 
+            newDf.addColumn(name, value); 
 
             return new Table(newDf);
         }
@@ -357,7 +357,11 @@ export class Table
     /** Join two table on a specific key or multiple keys */
     join(other:Table, keys:string|Array<string>)
     {
-        return new Table( danfo.merge({ 'left' : this._dataframe, 'right' : other._dataframe, 'on' : (keys instanceof Array) ? keys : [keys]  }) );
+        return new Table( danfo.merge(
+                            { left : this._dataframe, 
+                              right : other._dataframe, 
+                              on : (keys instanceof Array) ? keys : [keys], 
+                              how : 'inner' } ) ); // see: https://danfo.jsdata.org/api-reference/general-functions/danfo.merge
     }
 
 
@@ -365,10 +369,8 @@ export class Table
 
     async toData()
     {
-        let data = JSON.parse(await this._dataframe.to_json());
-        return data;
+        return danfo.toJSON(this._dataframe)
     }
-
 
     // ==== utils ====
 

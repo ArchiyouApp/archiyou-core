@@ -7,7 +7,7 @@
  import { Table } from './Table';
  import { Geom } from './Geom';
  import { Metric, MetricOptions, TableLocation, DataRows, isDataRows } from './types'
- import * as danfo from "danfojs/src/index";
+ import * as danfo from "danfojs";
 
  export class Calc
  {

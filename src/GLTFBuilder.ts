@@ -121,13 +121,6 @@ export class GLTFBuilder
 
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
-    /** Sometimes we need to wait on results from Archiyou, use this method to start */
-    async gatherArchiyouAsyncData(ay:ArchiyouApp):Promise<{[key:string]:any}>
-    {
-        const tableData = await ay.calc.toTableData();
-        return { tables: tableData };
-    }
-
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
     addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, data:{[key:string]:any}):ArrayBuffer
     {
@@ -152,7 +145,7 @@ export class GLTFBuilder
                 docs: ay.doc.toData(), // Document data by document name in special format for AY doc viewers (PDF and web)
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
                 metrics: ay.calc.metrics(),
-                tables: data?.tables,
+                tables: ay.calc.toTableData(),
                 /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:
@@ -168,7 +161,6 @@ export class GLTFBuilder
         }
     }
 
-   
 
     /** Add all loose point and line Shapes (Vertex,Edge,Wire) to the GLTF buffer */
     addPointsAndLines(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):ArrayBuffer

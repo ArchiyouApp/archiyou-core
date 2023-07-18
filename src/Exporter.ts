@@ -162,7 +162,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:exportGLTFOptions):Promise<ArrayBuffer|string>
+    exportToGLTF(options?:exportGLTFOptions):Promise<ArrayBuffer|string>
     {
         const oc = this._parent.geom._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : options;
@@ -241,8 +241,7 @@ export class Exporter
         if(options.archiyouFormat)
         {
             // add special Archiyou data to GLTF
-            const asyncData = await new GLTFBuilder().gatherArchiyouAsyncData(this._parent.ay);
-            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, { messages: options.messages, ...asyncData }); 
+            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, { messages: options.messages }); 
         }
 
         // extra vertices and lines for specific visualization styles

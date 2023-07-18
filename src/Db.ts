@@ -4,7 +4,7 @@
 import { Geom } from './Geom'
 import { Table } from './Table'
 
-import * as danfo from "danfojs/src/index";
+import * as danfo from "danfojs";
 
 export class Db
 {
@@ -118,13 +118,13 @@ export class Db
 
     // ==== OUTPUTS ====
 
-    /** Output tables as json data async */
-    async toTableData():Promise<{[key:string]:Object}>
+    /** Output tables as json data */
+    toTableData():{[key:string]:Object}
     {
         let data = {}; // key: data
         for (const [key,tableObj] of Object.entries(this._tables))
         {
-            data[tableObj.name()] = await tableObj.toData();
+            data[tableObj.name()] = tableObj.toData();
         }
         return data;
     }
