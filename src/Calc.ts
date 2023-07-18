@@ -27,8 +27,13 @@
     {   
         // detect context of JS
         const isBrowser = typeof window === 'object'
-        const isNode = !isBrowser && (typeof WorkerGlobalScope === 'undefined');
-        const isWorker = !isNode && !isBrowser;
+        let isWorker = false;
+        try {
+            isWorker = !isBrowser && (typeof self !== 'undefined');
+        }
+        catch(e){  };
+        
+        const isNode = !isWorker && !isBrowser;
 
         if(isWorker || isBrowser)
         {
