@@ -53,9 +53,12 @@ export * from './DocPageContainerTable'
 export * from './DocPage'
 export * from './DocUtils'
 
-export * from './Table'
-export * from './Db'
+
+// TMP DISABLED
+//export * from './Table'
+//export * from './Db'
 export * from './Calc'
+
 
 export * from './Make'
 

@@ -3,16 +3,16 @@
  *      Generate data tables and do basic data analytics 
  */
 
- import { Db } from './Db';
- import { Table } from './Table';
+ //import { Db } from './Db'; // TMP DISABLED
+ //import { Table } from './Table'; // TMP DISABLED
  import { Geom } from './Geom';
  import { Metric, MetricOptions, TableLocation, DataRows, isDataRows } from './types'
- import * as danfo from "danfojs";
+ // import * as danfo from "danfojs"; // TMP DISABLED
 
  export class Calc
  {
     _geom;
-    db:Db; // the virtual database with table in there
+    db:any // TMP DISABLED: Db; // the virtual database with table in there
 
     dbData:Object // raw outputted data
     _metrics:{[key:string]:Metric} = {};
@@ -20,13 +20,13 @@
     constructor(geom:Geom = null)
     {
         this._geom = geom; // needed to get data from the model
-        this.db = new Db(this._geom);
+        //this.db = new Db(this._geom);
     }
 
     /** We need to know when we can load the Shapes */
     init()
     {
-        this.db.init();
+        this?.db?.init();
     }
 
     /** Automatically calc.init() when user uses calc module */
@@ -34,19 +34,19 @@
     {
         if(!this.db.isInitiated())
         {
-            this.db.init();
+            this?.db?.init();
         }
     }
 
     reset()
     {
-        this.db.reset();
+        this?.db?.reset();
         this._metrics = {};
     }
 
     tables()
     {
-        return this.db.tables();
+        return this?.db?.tables();
     }
 
     //// CREATION API ////
@@ -56,7 +56,8 @@
      *  @param data [ val1, val2, val3 ] or [{ col1: val1, col2: val2 }{ ... }]
     */
     table(name:string, data:DataRows, columns:Array<string>):Calc
-    {
+    {   
+        /* // TMP DISABLED
         this.autoInit();
 
         if(!name){ throw new Error(`Calc::table: Please supply a table name`); }
@@ -67,7 +68,8 @@
         const newTable = new Table(df)
         newTable.name(name);
         this.db.saveTable(newTable);
-
+        */
+        
         return this;
     }
 
@@ -78,7 +80,7 @@
     exportDb(onDone: (data:Object) => void)
     {
         this.autoInit();
-        this.db.requestData( (data) => 
+        this?.db?.requestData( (data) => 
         { 
             this.dbData = data;
             onDone(this.dbData);
@@ -88,7 +90,7 @@
     /** Output raw data */
     async toTableData():Promise<{[key:string]:Object}>
     {   
-        return await this.db.toTableData(); 
+        return await this?.db?.toTableData(); 
     }
 
     //// METRIC BOARD ////
@@ -151,6 +153,9 @@
     */
     _resolveTableLocation(tableLocation:string):TableLocation
     {
+        // TMP DISABLED
+        if (!this.db) return 
+
         // basic error checking
         if(typeof tableLocation !== 'string'){ throw new Error(`Calc::_resolveTableLocation: Please supply a string such as 'tablename', 'tablename.columname' or 'tablename[1]!`)}
         

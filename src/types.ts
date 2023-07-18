@@ -1,5 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
-import { Geom, Doc, CodeParser, Exporter, Make, Table, Calc } from './internal'
+import { Geom, Doc, CodeParser, Exporter, Make, Calc } from './internal' // TMP DISABLED: Table
 import { Console } from './Console'
 
 //// SETTINGS ////
@@ -410,7 +410,7 @@ export type MetricOptions = TextMetricOptions // TODO more
 export interface TableLocation
 {
     location: string // raw table location
-    table: Table, // for easy access to meta data like column names later
+    table: any // TMP DISABLED: Table, // for easy access to meta data like column names later
     column?: string // name of column
     row?:number // index of row
     data: any|Array<any>, // any data - format to be defined more clear
