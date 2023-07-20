@@ -21,7 +21,7 @@
         this._geom = geom; // needed to get data from the model
         this.loadDanfo()
             .catch(this.handleFailedDanfoImport)
-            .then(() => this.initDb())
+            .then(() => this.init())
 
     }
 
@@ -48,7 +48,7 @@
 
         if(this._danfo)
         {
-            console.info('==== Danfo loading SUCCES ====');
+            console.info('==== DANFO LOADED ====');
         }
  
         return this._danfo;
@@ -56,11 +56,12 @@
 
     handleFailedDanfoImport(e)
     {
-        console.error('!!!! Calc: Cannot import Danfo module. \nCalc will have limited abilities. Add danfojs or danfojs-node to your node_modules!!!!');
+        console.error(`!!!! Calc: Cannot import Danfo module: "${e}"
+        Calc will have limited abilities. Add danfojs or danfojs-node to your node_modules!!!!`);
     }
 
     /** We need to know when we can load the Shapes */
-    initDb()
+    init()
     {
         this.db = new Db(this._geom, this._danfo);
     }
@@ -87,15 +88,28 @@
 
     //// CREATION API ////
 
-    /** Make table with data 
+    /** Make or get table with data 
      *  @param name string
      *  @param data [ val1, val2, val3 ] or [{ col1: val1, col2: val2 }{ ... }]
     */
-    table(name:string, data:DataRows, columns:Array<string>):Calc
+    table(name:string, data?:DataRows, columns?:Array<string>):Calc|Table
     {   
         this.autoInit();
 
         if(!name){ throw new Error(`Calc::table: Please supply a table name`); }
+
+        // get table
+        if(name && !data && !columns)
+        {
+            if(!this.tables().includes(name))
+            { 
+                throw new Error(`Calc::table(${name}): Table name "${name}" doest not exist! Use tables() to get available tables`); 
+            }
+            else {
+                return this.db.table(name);
+            }
+        }
+
         if(this.tables().includes(name)){ throw new Error(`Calc::table: Table name "${name}" already exists! Please use an unique name`); }
         if(!isDataRows(data)){ throw new Error(`Calc::table: Please supply data in format [{ col1: val1, col2: val2}] or [val1,val2] and supply column names as third parameter!`); }
         

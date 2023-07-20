@@ -51,30 +51,21 @@ export class Db
         // add reference to the parent database in every Table instance
         Table.prototype._db = this;
         Table.prototype._danfo = this._danfo;
-
-        if (this.DEBUG || this._geom == null)
+    
+        let shapesDataRows = this.generateShapesData();
+        
+        if(shapesDataRows.length > 0)
         {
-            console.warn(`---- DB init in DEBUG MODE ----`);
-            this.shapes = new Table(new this._danfo.DataFrame(this.generateTestShapesData()));
-            this.objects = new Table(new this._danfo.DataFrame(this.generateTestObjsData()));
+            this.shapes = new Table(new this._danfo.DataFrame(shapesDataRows));
+            this.shapes.save("shapes");
         }
-        else {
-            let shapesDataRows = this.generateShapesData();
-            
-            if(shapesDataRows.length > 0)
-            {
-                this.shapes = new Table(new this._danfo.DataFrame(shapesDataRows));
-                this.shapes.save("shapes");
-            }
 
-            let objDataRows = this.generateObjsData();
-            if(objDataRows.length > 0)
-            {
-                this.objects = new Table(new this._danfo.DataFrame(objDataRows));
-                // register shapes and object table
-                this.objects.save("objects");
-            }
-            
+        let objDataRows = this.generateObjsData();
+        if(objDataRows.length > 0)
+        {
+            this.objects = new Table(new this._danfo.DataFrame(objDataRows));
+            // register shapes and object table
+            this.objects.save("objects");
         }
         
     }
@@ -124,7 +115,13 @@ export class Db
         let data = {}; // key: data
         for (const [key,tableObj] of Object.entries(this._tables))
         {
-            data[tableObj.name()] = tableObj.toData();
+            if (tableObj)
+            {
+                data[tableObj.name()] = tableObj.toData();
+            }
+            else {
+                console.warn(`Got a undefined Table under name ${key}`)
+            }
         }
         return data;
     }

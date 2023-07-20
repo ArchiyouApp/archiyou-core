@@ -200,7 +200,6 @@ export class Table
         }
 
         // We have one or more Danfo query objects. We combine them into one dataframe
-
         let currentDf = this._dataframe;
         dfQueries.forEach( query => 
         {
