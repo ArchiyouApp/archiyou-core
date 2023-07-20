@@ -6,6 +6,8 @@
  import { Db, Table, Geom } from './internal'; 
  import { Metric, MetricOptions, TableLocation, DataRows, isDataRows } from './types'
 
+ declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
+
  export class Calc
  {
     _danfo;
@@ -18,7 +20,8 @@
     {
         this._geom = geom; // needed to get data from the model
         this.loadDanfo()
-            .then(() => this.init())
+            .catch(this.handleFailedDanfoImport)
+            .then(() => this.initDb())
 
     }
 
@@ -27,12 +30,7 @@
     {   
         // detect context of JS
         const isBrowser = typeof window === 'object'
-        let isWorker = false;
-        try {
-            isWorker = !isBrowser && (typeof self !== 'undefined');
-        }
-        catch(e){  };
-        
+        let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
         const isNode = !isWorker && !isBrowser;
 
         if(isWorker || isBrowser)
@@ -45,15 +43,24 @@
             // keep this out import(..) to avoid being picked up by Webpack in client
             // looks like NodeJS can search node_modules in webworker for the danfojs-node library
             const nodeDanfoPath = 'danfojs-node'; 
-            
             this._danfo = await import(nodeDanfoPath)
+        }
+
+        if(this._danfo)
+        {
+            console.info('==== Danfo loading SUCCES ====');
         }
  
         return this._danfo;
     }
 
+    handleFailedDanfoImport(e)
+    {
+        console.error('!!!! Calc: Cannot import Danfo module. \nCalc will have limited abilities. Add danfojs or danfojs-node to your node_modules!!!!');
+    }
+
     /** We need to know when we can load the Shapes */
-    init()
+    initDb()
     {
         this.db = new Db(this._geom, this._danfo);
     }

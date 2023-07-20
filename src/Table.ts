@@ -14,15 +14,23 @@ export class Table
     _db:Db; // reference to database parent
     _dataframe:DataFrame;
 
-    constructor(dataframe:DataFrame)
+    /** Make Table from either rows with Objects or Danfo Dataframe */
+    constructor(data:Array<Object>|DataFrame)
     {
-        this._dataframe = dataframe;
-        console.info(`Table: Created a table from dataframe with ${this.numRows()} rows and ${this.numColumns()} columns`);
+        if(this._danfo)
+        {
+            this._dataframe = (Array.isArray(data)) ? new this._danfo.DataFrame(data) : data;
+            console.info(`Table: Created a table with ${this.numRows()} rows and ${this.numColumns()} columns`);
+        }
+        else {
+            console.error(`Table: Cannot create a table. Danfo module is disabled!`)
+        }
     }
 
     /** Print table to console */
     print()
     {
+        if (!this._danfo) return 'Table is disabled due to missing Danfo module';
         return this._dataframe.print();
     }
 
@@ -38,6 +46,8 @@ export class Table
     /** Save this Table is the database*/
     save(name:string):Table
     {
+        if (!this._danfo) return null;
+
         if(!this._db)
         {
             console.error(`Table::save: Table cannot register to the database. None given!`);
@@ -54,7 +64,7 @@ export class Table
     /** Get size of table in rows and columns */
     shape():Array<number> // [rows,columns]
     {
-        return this._dataframe.shape;
+        return this?._dataframe?.shape;
     }
 
     size():Array<number>
@@ -75,41 +85,46 @@ export class Table
     /** Return column labels */
     columns():Array<string>
     {
-        return this._dataframe.columns;
+        return this?._dataframe?.columns;
     }
 
     copy():Table 
     {
+        if (!this._danfo) return null;
         return new Table(this._dataframe.copy())
     }
 
     /** Return index labels. By default serial integers */
     index():Array<string|number>
     {
-        return this._dataframe.index;
+        return this?._dataframe?.index;
     }
 
     // ==== slicing and dicing methods ====
 
     head(amount:number):Table
     {
+        if (!this._danfo) return null;
         return new Table(this._dataframe.head(amount));
     }
 
     tail(amount:number):Table
     {
+        if (!this._danfo) return null;
         return new Table(this._dataframe.tail(amount));
     }
 
     /** Get general statistics of Table */
     describe()
     {
-        this._dataframe.describe().print();
+        this?._dataframe?.describe()?.print();
     }
 
     /** Slice rows based on start and end index */
     slice(startIndex:number, endIndex:number=null):Table
     {
+        if (!this._danfo) return null;
+
         // see Danfo docs: https://danfo.jsdata.org/api-reference/dataframe/danfo.dataframe.iloc
         endIndex = (endIndex == 0 ) ? null : endIndex; // protect against zero, otherwise an error occurs
 
@@ -128,6 +143,8 @@ export class Table
     /** Select specific column labels */
     select(columns:string|Array<string>):Table
     {
+        if (!this._danfo) return null;
+
         if (typeof columns == 'string')
         {
             columns = [ columns ];
@@ -139,6 +156,8 @@ export class Table
     /** Sorting of Table */
     sort(columns:string|Array<string>, ascending:boolean):Table
     {
+        if (!this._danfo) return null;
+
         const DEFAULT_ORDER = true; // true = ascending, false = descending
 
         ascending = ascending || DEFAULT_ORDER;
@@ -154,6 +173,7 @@ export class Table
 
     filter(query:string|Object):Table
     {
+        if (!this._danfo) return null;
         let dfQueries = []; 
 
         if (query instanceof Object)
@@ -200,43 +220,13 @@ export class Table
 
     }
 
-    /** Output to Row objects */
-    toDataRows():Array<Object> // TODO: TS typing
-    {
-        let rawRows = this._dataframe.values; // returns [ [row1],[row2],[row3] ]
-        let columnNames = this.columns();
-
-        let rows = [];
-        rawRows.forEach( rowValues => {
-            rows.push( this._zip(columnNames, rowValues));
-        })
-        
-        return rows;
-    }
-
-    /** Output to raw Array of values of this column */
-    toDataColumn(columnName:string):Array<number|string>
-    {
-        let colIndex = this.columns().indexOf(columnName);
-        if(colIndex !== -1)
-        {
-            let colValues = [];
-            this._dataframe.values.forEach( rowValues => 
-            {
-                colValues.push(rowValues[colIndex])
-            });
-
-            return colValues;
-        }
-
-        return [];
-    }
-
     /** Iterate over rows with a function and write new values 
      *  Danfo does not offer something like this. Got inspiration from PETL
     */
     apply(func:(row:Object,index?:number,all?:Array<any>) => void):Table
     {
+        if (!this._danfo) return null;
+
         // For example: write a certain value to column 'x': apply( (row,df) => row.x = '1' );
         // NOTE: Danfo has limited options here, only the gather crude apply. Fallback on JS/TS functions
         let rowObjs = this.toDataRows();
@@ -253,6 +243,8 @@ export class Table
      */
     addColumn(name:string, value:any|Array<any>|((row:Object,index?:number, all?:Array<Object>) => any)=NaN):Table
     {
+        if (!this._danfo) return null;
+
         // an normal static value
         if( !(typeof value == 'function'))
         {
@@ -281,6 +273,7 @@ export class Table
     /** GroupBy: Grouping rows by column values and run aggregate functions */
     groupBy(columns:string|Array<string>, aggFuncs:string|Array<string>, aggColumns:string|Array<string>):Table
     {
+        if (!this._danfo) return null;
         // TODO: agg reducer functions 
 
         // see more: https://danfo.jsdata.org/api-reference/dataframe
@@ -354,8 +347,10 @@ export class Table
     }
 
     /** Join two table on a specific key or multiple keys */
-    join(other:Table, keys:string|Array<string>)
+    join(other:Table, keys:string|Array<string>):Table
     {
+        if (!this._danfo) return null;
+
         return new Table( this._danfo.merge(
                             { left : this._dataframe, 
                               right : other._dataframe, 
@@ -366,7 +361,44 @@ export class Table
 
     // ==== OUTPUT ====
 
-    toData()
+    /** Output to Row objects */
+    toDataRows():Array<Object> // TODO: TS typing
+    {
+        if (!this._danfo) return [];
+
+        let rawRows = this._dataframe.values; // returns [ [row1],[row2],[row3] ]
+        let columnNames = this.columns();
+
+        let rows = [];
+        rawRows.forEach( rowValues => {
+            rows.push( this._zip(columnNames, rowValues));
+        })
+        
+        return rows;
+    }
+
+    /** Output to raw Array of values of this column */
+    toDataColumn(columnName:string):Array<number|string>
+    {
+        if (!this._danfo) return [];
+
+        let colIndex = this.columns().indexOf(columnName);
+        if(colIndex !== -1)
+        {
+            let colValues = [];
+            this._dataframe.values.forEach( rowValues => 
+            {
+                colValues.push(rowValues[colIndex])
+            });
+
+            return colValues;
+        }
+
+        return [];
+    }
+
+    /** Output raw data in rows */
+    toData():Array<Object>
     {
         return this._danfo.toJSON(this._dataframe)
     }

@@ -45,7 +45,7 @@ export class Db
         this.setupTables();
     }
 
-    /** Setup standard tables  */
+    /** Generate standard tables  */
     setupTables()
     {
         // add reference to the parent database in every Table instance
