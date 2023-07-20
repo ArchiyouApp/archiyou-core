@@ -144,9 +144,11 @@ export class Doc
         return this;
     }
 
-    /** Execute pipeline for docs 
+    /** Execute pipeline for docs in worker scope
      *  @param include list of docs to include (if empty all)
      *  @param exclude list of docs to include (if empty exclude none)
+     * 
+     *  NOTE: this is pretty black magic. We should give more structure to Workers, execution and scopes.
     */
     executePipelines(include:Array<string> = [], exclude:Array<string> = [])
     {
@@ -158,7 +160,17 @@ export class Doc
                     (exclude.length === 0 || !exclude.includes(docName))
             )
             {
-                this._ay.worker.funcs.executeFunc(pipelineFn)
+                try {
+                    console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
+                    this._ay.worker.funcs.executeFunc(pipelineFn)
+                }
+                catch(e){
+                    console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: ${e}`);
+                    console.error('* Worker:')
+                    console.error(this._ay.worker);
+                    console.error('* Worker.funcs:');
+                    console.error(this._ay.worker.funcs)
+                }
             }
         }
     }

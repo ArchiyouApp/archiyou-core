@@ -37,16 +37,24 @@ export class View extends Container
             throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapes}" is not a string!`) 
         } 
 
-        const workerScope = this._page._doc._ay.worker.self;
-        const realShapes = workerScope[shapes];
+        const workerScope = this._page._doc._ay.worker?.self || this._page._doc._ay.worker; // either in Webworker or Nodejs global
 
-        if(!Shape.isShape(realShapes) && !ShapeCollection.isShapeCollection(realShapes))
-        { 
-            throw new Error(`View::resolveShapeNameToSVG(): Given shapes "{shapes}" does not refer to a valid Shape or ShapeCollection!`) 
-        } 
-        
-        const s = new ShapeCollection(realShapes); // make sure we got a ShapeCollection
-        return s.toSvg();
+        if (workerScope)
+        {
+            const realShapes = workerScope[shapes];
+
+            if(!Shape.isShape(realShapes) && !ShapeCollection.isShapeCollection(realShapes))
+            { 
+                throw new Error(`View::resolveShapeNameToSVG(): Given shapes "{shapes}" does not refer to a valid Shape or ShapeCollection!`) 
+            } 
+            
+            const s = new ShapeCollection(realShapes); // make sure we got a ShapeCollection
+            return s.toSvg();
+        }
+        else {
+            console.warn('DocPageContainerView:resolveShapenameToSVG(): Could not determine worker scope: Could not resolve shapes variable. No shapes were outputted!');
+            return null;
+        }
     }
 
     /** Bind ShapeCollection to View */
