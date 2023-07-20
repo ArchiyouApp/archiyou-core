@@ -1,7 +1,7 @@
 import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, 
             ArchiyouApp, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
-import { toRad, MeshingQualitySettings } from './internal'
-import { Document, Accessor, Scene, WebIO, Node, BufferUtils } from '@gltf-transform/core';
+import { toRad, MeshingQualitySettings, ArchiyouData } from './internal'
+import { Document, Accessor, Scene, WebIO, Node, BufferUtils  } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
 
 /* Docs:
@@ -10,21 +10,6 @@ import { sequence } from '@gltf-transform/functions';
     - animation sequence options: https://github.com/donmccurdy/glTF-Transform/blob/8d1eba3de55b93e1f3a656f1701c37dea48b3af1/packages/functions/src/sequence.ts#L6
 
 */
-
-/** Special Archiyou data inserted into asset.archiyou
-    TODO: We use ComputeResult internally - which has a lot of overlap with this
-    When we start using GLB format internally these types will merge
-*/
-export interface ArchiyouData
-{
-    scenegraph: SceneGraphNode
-    gizmos: Array<Gizmo>,
-    annotations: Array<DimensionLineData>, 
-    docs: {[key:string]:DocData} // all documents in data and serialized content
-    errors?: Array<StatementError>, // only needed for internal use in the future
-    messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
-    tables?:{[key:string]:any}, // raw data tables
-}
 
 export interface exportGLTFOptions 
 {
@@ -291,6 +276,16 @@ export class GLTFBuilder
 
         // export new GLTF binary content
         return io.writeBinary(this.doc); 
+    }
+
+    //// READ-ONLY FUNCTIONS ////
+
+    /** Get ArchiyouData from GLTF binary */
+    async readArchiyouData(gltf:ArrayBuffer):Promise<ArchiyouData>
+    {   
+        const io = new WebIO();
+        const doc = await io.readBinary(gltf);
+        return doc.getRoot().getAsset()?.extras?.archiyou as ArchiyouData
     }
 
 }

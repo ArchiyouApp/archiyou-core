@@ -95,6 +95,21 @@ export interface ArchiyouAppInfoBbox
     height: number
 }
 
+/** Special Archiyou data inserted into asset.archiyou
+    TODO: We use ComputeResult internally - which has a lot of overlap with this
+    When we start using GLB format internally these types will merge
+*/
+export interface ArchiyouData
+{
+    scenegraph: SceneGraphNode
+    gizmos: Array<Gizmo>,
+    annotations: Array<DimensionLineData>, 
+    docs: {[key:string]:DocData} // all documents in data and serialized content
+    errors?: Array<StatementError>, // only needed for internal use in the future
+    messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
+    tables?:{[key:string]:any}, // raw data tables
+}
+
 /** Data structure on the current state of the Archiyou App (mostly inside a worker) */
 export interface ArchiyouAppInfo
 {
@@ -387,7 +402,7 @@ export type DataRows = DataRowsColumnValue | DataRowsValues // DataRows
 export interface Metric {
     name: string // name and label of Metric
     type:'text'|'bar'|'line'|'radar' // TODO: more
-    data: Array<number|string> // raw data (either value, array<value> or array<object>)
+    data: number|string|Array<number|string> // raw data (either value, array<value> or array<object>)
     options: TextMetricOptions // TODO: other options
 }
 
