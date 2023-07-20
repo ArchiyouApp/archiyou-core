@@ -113,6 +113,9 @@ export class Db
     toTableData():{[key:string]:Object}
     {
         let data = {}; // key: data
+
+        if(!this._danfo){ return data }; // protect against unavailable Danfo module
+
         for (const [key,tableObj] of Object.entries(this._tables))
         {
             if (tableObj)

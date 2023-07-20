@@ -145,7 +145,7 @@ export class GLTFBuilder
                 docs: ay.doc.toData(), // Document data by document name in special format for AY doc viewers (PDF and web)
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
                 metrics: ay.calc.metrics(),
-                tables: (typeof window === "object") ? ay.calc.toTableData() : [], // danfojs-nodejs has problems. Disable on node for now
+                tables: ay.calc.toTableData(), // danfojs-nodejs has problems. Disable on node for now
                 /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:
