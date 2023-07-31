@@ -364,6 +364,13 @@ export interface Obbox
     zDirection: Vector
 }
 
+export interface BeamLikeDims
+{
+    small:number // smallest dimension
+    mid:number
+    length:number // length
+}
+
 //// LAYOUTS ////
 
 export type LayoutOrderType = 'line'|'grid'|'binpack'|'nest'

@@ -27,7 +27,7 @@ import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
 import { Alignment, isAlignment, isShapeType, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
 import { Annotation, DimensionOptions, DimensionLine } from './internal'
-import { Obbox } from './internal'
+import { Obbox, BeamLikeDims } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
 type IVertex = Vertex
@@ -520,6 +520,35 @@ export class Shape
         }
     }
 
+    //// SPECIAL TYPES ////
+
+    /** If Shape is beam-like */
+    beamLike():boolean
+    {
+        if (this.type() !== 'Solid')
+            return false;
+
+        const obboxDims = this._getOBbox() as Obbox;
+        const obbox = new Solid().makeBox(obboxDims.width, obboxDims.depth, obboxDims.height);
+        return (this.volume() / obbox.volume() > 0.95) 
+    }
+
+    beamDims():BeamLikeDims
+    {
+        if(this.beamLike())
+        {
+            const bbox = this._getOBbox() as Obbox; // data of obbox() not Shape
+            const dimsSorted = [bbox.width, bbox.height, bbox.depth].sort((a,b) => a - b )
+            return {
+                small : dimsSorted[0],
+                mid : dimsSorted[1],
+                length : dimsSorted[2],
+            } as BeamLikeDims
+        }
+
+        return null;
+    }
+
     /** is this Shape 2D */
     is2D():boolean
     {
@@ -700,7 +729,9 @@ export class Shape
         return obbox;
     }
 
-    /** Calculate Orientated Bounding Box of Shape (returning a Solid or Face) */
+    /** Calculate Orientated Bounding Box of Shape (returning a Solid or Face) 
+     *  NOT YET IMPLEMENTED
+    */
     obbox():AnyShape
     {
         /**
@@ -711,7 +742,7 @@ export class Shape
         if(this._ocShape)
         {
             let obbox = this._getOBbox();
-            // TODO
+            console.warn('Shape.obbox(): Not yet implemented!')
 
             return null;
         }

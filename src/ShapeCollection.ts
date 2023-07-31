@@ -57,7 +57,7 @@
             entities = (Array.isArray(entities) && !isCoordArray(entities)) ? entities.concat(args) : [entities, ...args];
             // NOTE: Array.flat() might be interesting, except it does collapse coord arrays. Manual way to flatten entities?
             entities = flattenEntities(entities); // NOTE: we could also use flattenEntitiesToArray
-       
+
             this.fromAll(entities);
          }
       }
@@ -95,10 +95,13 @@
          }
          
          let allEntities = flattenEntitiesToArray(entities);
-         let addedShapes = []; // keep track of added Shapes for grouping
+
+         // auto grouping strategy: for now only group when incoming entities is a Collection and if a name is given to the collection
          
          allEntities.forEach( es => 
          {
+            let addedShapes = []; // keep track of added Shapes for grouping
+            
             if (es === null)
             {
                console.warn('ShapeCollection::_addEntities: Skipped null!')
@@ -112,6 +115,13 @@
             // single ShapeCollection
             else if(isAnyShapeCollection(es))
             {
+               // auto grouping
+               if(!group) // if not already user defined group
+               { 
+                  const collName = (es as ShapeCollection).getName() as string;
+                  group =  (collName !== 'UnnamedShapeCollection') ? collName : null;
+               }
+
                // flatten an given ShapeCollection into this one
                let shapes = (es as ShapeCollection).shapes;
                this.shapes = this.shapes.concat(shapes);
@@ -162,20 +172,22 @@
             else {
                console.warn(`ShapeCollection::_addEntities: Unknown entity ${es}: Skipped!`);
             }
+
+            // order incoming entities in group (NOTE: can be an array of ShapeCollections)
+            if (group)
+            {
+               if(this._groups[group])
+               {
+                  this._groups[group] = this._groups[group].concat(addedShapes)
+               }
+               else {
+                  this._groups[group] = addedShapes;
+               }
+               group = null; // reset
+            }
          }
          );
 
-         // order in group
-         if (group)
-         {
-            if(this._groups[group])
-            {
-               this._groups[group] = this._groups[group].concat(addedShapes)
-            }
-            else {
-               this._groups[group] = addedShapes;
-            }
-         }
          this._setFakeGroupKeys();
 
          return this;

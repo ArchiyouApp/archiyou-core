@@ -6,6 +6,7 @@
  */
 
 import { ArchiyouApp, Point, Vector, Edge, Face, ShapeCollection, LayoutOptions } from './internal' // classes
+import { Table } from './internal'; 
 
 //// TYPES, TYPEGUARDS AND INTERFACES ////
 
@@ -257,5 +258,17 @@ export class Make
         return (!withSpace) ? 
                     strut : 
                     new ShapeCollection(strut, new Face().makeRectBetween([0,0],space).toWire().addToScene().color('blue'));
+    }
+
+    //// DATA GATHERING
+
+    /** Generate part list Calc table from ShapeCollection for beam-like shapes */
+    partList(shapes:ShapeCollection):Table
+    {
+        const COLUMNS = ['label', 'part', 'subpart', 'section', 'length', 'quantity', 'material'];
+
+        
+
+
     }
 }

@@ -37,15 +37,15 @@ export function flattenEntitiesToArray(entities:any):Array<any>
 /** Alternative to the above. Faster? */
 export function flattenEntities(arr:Array<any>)
 {
-    return arr.reduce((new_array, next) => {
+    return arr.reduce((newArray, next) => {
         if ( next instanceof Array && !isCoordArray(next)  ) 
-            new_array.push(...flattenEntities(next));
+            newArray.push(...flattenEntities(next));
         else { 
             // if the element is not an array, it does not need expansion and can be pushed immediately
-            new_array.push(next);
+            newArray.push(next);
         }
         //return the array to the next call of the reduce lambda
-        return new_array;
+        return newArray;
     }, []);
 }
 
