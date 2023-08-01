@@ -46,6 +46,11 @@ export function Layout2DOptions(o:any): o is Layout2DOptions
     return typeof(o) === 'object' && o?.start && o?.direction && o?.width && o?.height && o?.stockWidth && o?.stockHeight
 }
 
+export interface PartListOptions
+{
+    sortBy: 'part'|'section'|'length'|'quantity' // TODO
+}
+
 //// MAIN MODULE ////
 
 export class Make
@@ -262,13 +267,60 @@ export class Make
 
     //// DATA GATHERING
 
-    /** Generate part list Calc table from ShapeCollection for beam-like shapes */
+    /** Generate part list Calc table from ShapeCollection for beam-like shapes 
+     *  For optimal information gathering:
+     *   - Beam-like shapes only
+     *   - group shapes into groups (will be used for part names)
+     *   - name individual shapes (will be used as subpart name) 
+    */
     partList(shapes:ShapeCollection):Table
     {
-        const COLUMNS = ['label', 'part', 'subpart', 'section', 'length', 'quantity', 'material'];
+        const COLUMNS = ['part', 'subpart', 'section', 'length', 'quantity',]; // TODO: label system, materials
 
+        if(!ShapeCollection.isShapeCollection(shapes) || shapes.length === 0)
+        {
+            throw new Error(`Make::partList: Please supply valid ShapeCollection of beam-like shapes to generate a partlist!`)
+        }
+
+        const partRowsAll = [];
+
+        shapes.forEachGroup((groupName,groupedShapes) =>
+        {
+            console.log(groupName);
+            console.log(groupedShapes)
+            groupedShapes.forEach((shape) => 
+            {
+                if(shape.beamLike())
+                {
+                    // part (0), subpart (1), section (2), length (3), quantity (4)
+                    const beamDims = shape.beamDims();
+                    partRowsAll.push([groupName, shape.getName(), `${beamDims.small}x${beamDims.mid}`, beamDims.length, 1])   
+                }
+            })
+        });
+
+        const groupedPartRows = {};
+        const genId = (row) => `${row[0]}-x${row[2]}-${row[3]}`; // group by main part, section dims and length
         
+        partRowsAll.forEach(row => {
+            const id = genId(row);
+            if(!groupedPartRows[id])
+            {
+                groupedPartRows[id] = row;
+            }
+            else {
+                if(row[1]){ groupedPartRows[id][1] += `,${row[1]}` } // add subpart names together
+                groupedPartRows[id][4] += 1;
+            }
+        })
 
+        // make Calc table
+        return this._ay.calc.table(
+            'parts',
+            Object.values(groupedPartRows),
+            COLUMNS
+        ) as Table
+        
 
     }
 }

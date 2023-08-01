@@ -101,7 +101,7 @@
          allEntities.forEach( es => 
          {
             let addedShapes = []; // keep track of added Shapes for grouping
-            
+
             if (es === null)
             {
                console.warn('ShapeCollection::_addEntities: Skipped null!')
@@ -243,6 +243,26 @@
       {
          return this.getGroup(name);
       }
+
+      /** Iterate over Shapes by group, ungrouped Shapes are grouped together */
+      forEachGroup(func:(groupName:string, groupedShapes:ShapeCollection) => void)
+      {
+         const allGroupedShapes = new ShapeCollection();
+         this.groups().forEach((groupName) => 
+         {
+            const groupedShapes = this.getGroup(groupName)
+            func(groupName, groupedShapes);
+            allGroupedShapes.add(groupedShapes);
+         })
+
+         // gather ungrouped Shapes as one group
+         const nonGroupedShapes = this.removed(allGroupedShapes)
+         if (nonGroupedShapes.length)
+         {
+            func(null, nonGroupedShapes)
+         }
+      }
+
 
       /* EXPERIMENTAL: try to be compatible with Arrays by setting index keys on this instance */
       _setFakeArrayKeys()
@@ -393,6 +413,15 @@
          this._setFakeGroupKeys();
 
          return this;
+      }
+
+      /** Return a new Collection of given Shapes removed */
+      @checkInput('AnyShapeOrCollection', 'ShapeCollection')
+      removed(shapes:AnyShapeOrCollection): ShapeCollection
+      {
+         const newCollection = this.shallowCopy();
+         newCollection.remove(shapes)
+         return newCollection;
       }
 
 
