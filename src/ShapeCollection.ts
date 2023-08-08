@@ -872,17 +872,23 @@
       /** Shape API: Copy entire ShapeCollection and its Shapes and return a new one */
       _copy():ShapeCollection
       {
-         let copiedShapes = this.shapes.map(s => s._copy() as Shape);
-         return new ShapeCollection(copiedShapes);
+         const newShapeCollection = new ShapeCollection();
+         // copy by group - including non-grouped shapes as seperate group (=null)
+         this.forEachGroup( (groupName, groupShapes) => 
+         {
+            const copiedShapes = groupShapes.map(shape => shape._copy())
+            newShapeCollection.addGroup(groupName, copiedShapes); 
+         })
+         newShapeCollection.name( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
+
+         return newShapeCollection;
       }
 
       /** Shape API: Copy entire ShapeCollection and its Shapes and return a new one (add to Scene) */
       // NOTE: this is a deep copy! We use this by default to be in line with Shape API
       copy():ShapeCollection
       {
-         let copiedShapes = this.shapes.map(s => s._copy() as Shape);
-         let newShapeCollection = new ShapeCollection(copiedShapes);
-         newShapeCollection.name( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
+         const newShapeCollection = this._copy();
          newShapeCollection.addToScene();
          return newShapeCollection;
       }
@@ -1160,7 +1166,7 @@
       }
 
       /** Shape API: Generate elevation from a given side without adding to Scene */
-      @checkInput([['Side', 'top'], ['Boolean', false]], ['auto'])
+      @checkInput([['Side', 'top'], ['Boolean', false]], ['auto', 'auto'])
       _elevation(side?:Side, all?:boolean):ShapeCollection
       {
          const visibleShapes = this.filter( shape => shape.visible() === true)
@@ -1168,15 +1174,16 @@
          // Again: We are hacking the Shape class a bit here
          const tmpShape = new Shape();
          tmpShape._ocShape = ocCompoundShape; 
-         return tmpShape._elevation(side);
+         
+         return tmpShape._elevation(side, all);
       }
       
       /** Shape API: Generate elevation from a given side and add to Scene */
       @addResultShapesToScene
-      @checkInput([['Side', 'top'], ['Boolean', false]], ['auto'])
+      @checkInput([['Side', 'top'], ['Boolean', false]], ['auto', 'auto'])
       elevation(side?:Side, all?:boolean):ShapeCollection
       {
-         return this._elevation(side);
+         return this._elevation(side, all);
       }
 
       /** Shape API: Generate isometric view from Side or corner of ViewCube ('frontlefttop') or PointLike coordinate

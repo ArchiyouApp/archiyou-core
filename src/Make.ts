@@ -273,7 +273,7 @@ export class Make
      *   - group shapes into groups (will be used for part names)
      *   - name individual shapes (will be used as subpart name) 
     */
-    partList(shapes:ShapeCollection):Table
+    partList(shapes:ShapeCollection, name?:string):Table
     {
         const COLUMNS = ['part', 'subpart', 'section', 'length', 'quantity',]; // TODO: label system, materials
 
@@ -286,15 +286,14 @@ export class Make
 
         shapes.forEachGroup((groupName,groupedShapes) =>
         {
-            console.log(groupName);
-            console.log(groupedShapes)
             groupedShapes.forEach((shape) => 
             {
                 if(shape.beamLike())
                 {
                     // part (0), subpart (1), section (2), length (3), quantity (4)
                     const beamDims = shape.beamDims();
-                    partRowsAll.push([groupName, shape.getName(), `${beamDims.small}x${beamDims.mid}`, beamDims.length, 1])   
+                    // NOTE: round to integer for now
+                    partRowsAll.push([groupName, shape.getName(), `${Math.round(beamDims.small)}x${Math.round(beamDims.mid)}`, Math.round(beamDims.length), 1])   
                 }
             })
         });
@@ -309,14 +308,17 @@ export class Make
                 groupedPartRows[id] = row;
             }
             else {
-                if(row[1]){ groupedPartRows[id][1] += `,${row[1]}` } // add subpart names together
+                if(row[1] && groupedPartRows[id][1].indexOf(row[1]) === -1 ) // avoid repeating names
+                { 
+                    groupedPartRows[id][1] += `,${row[1]}` 
+                } // add subpart names together
                 groupedPartRows[id][4] += 1;
             }
         })
 
         // make Calc table
         return this._ay.calc.table(
-            'parts',
+            name || shapes.getName() as string || 'parts',
             Object.values(groupedPartRows),
             COLUMNS
         ) as Table

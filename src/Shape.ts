@@ -3577,7 +3577,7 @@ export class Shape
     _getSide(sidesString:string):AnyShape
     {
         const SIDE_FUZZYNESS = 0.5;
-        const SIDE_SCALE_FUZZYNESS = 1.01;
+        const SIDE_SCALE_FUZZYNESS = 1.05;
         const SEARCH_SORT_FUNC = ((a,b) => 
                 a.center()._toVertex().distance(bboxSideShape.center()._toVertex()) 
                 - b.center()._toVertex().distance(bboxSideShape.center()._toVertex()) );
@@ -3998,7 +3998,7 @@ export class Shape
     }
 
     /** Generate elevation from a given side without adding to Scene */
-    @checkInput([['Side', 'top'], ['Boolean', false]], ['auto'])
+    @checkInput([['Side', 'top'], ['Boolean', false]], ['auto', 'auto'])
     _elevation(side?:Side, all?:boolean):AnyShapeCollection
     {
         // to make sure we always have the projection on XY plane, with +Y is top
@@ -4024,9 +4024,11 @@ export class Shape
 
     /** Generate elevation from a given side and add to Scene */
     @addResultShapesToScene
-    @checkInput([['Side', 'top'], ['Boolean', false]], ['auto'])
+    @checkInput([['Side', 'top'], ['Boolean', false]], ['auto', 'auto'])
     elevation(side?:Side, all?:boolean):AnyShapeCollection
     {
+        console.log('==== ELEVATION ====');
+        console.log(all);
         return this._elevation(side, all);
     }
 

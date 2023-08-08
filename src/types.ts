@@ -469,7 +469,7 @@ export function isDataRowColumnValue(o:any): o is DataRowColumnValue
 {
     return typeof o === 'object'
         && Object.keys(o).every(k => typeof k === 'string')
-        && Object.values(o).every(v => (typeof v === 'string') || typeof v === 'number')
+        && Object.values(o).every(v => !v || (typeof v === 'string') || typeof v === 'number')
 }
 
 export function isDataRowValues(o:any): o is DataRowsValues
