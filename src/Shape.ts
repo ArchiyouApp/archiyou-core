@@ -3577,7 +3577,7 @@ export class Shape
     _getSide(sidesString:string):AnyShape
     {
         const SIDE_FUZZYNESS = 0.5;
-        const SIDE_SCALE_FUZZYNESS = 1.05;
+        const SIDE_SCALE_FUZZYNESS = 1.02;
         const SEARCH_SORT_FUNC = ((a,b) => 
                 a.center()._toVertex().distance(bboxSideShape.center()._toVertex()) 
                 - b.center()._toVertex().distance(bboxSideShape.center()._toVertex()) );
@@ -3603,7 +3603,7 @@ export class Shape
                 fuzzySideShape = bboxSideShape._thickened(SIDE_FUZZYNESS, 'center' ).scale(SIDE_SCALE_FUZZYNESS); // Solid
                 break;
             case 'Edge':
-                // TODO
+                // TODO: fuzzyness
                 fuzzySideShape = bboxSideShape; // Edge
                 break;
             case 'Vertex':

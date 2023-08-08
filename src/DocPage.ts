@@ -10,10 +10,10 @@ export interface PageData {
     _entity:'page'
     name:string
     size:PageSize
-    width:number
-    height:number
+    width:number // in units given in docUnits
+    height:number // in units given in docUnits
     orientation:PageOrientation
-    padding:Array<number>
+    padding:Array<number|number> // horizontal (left and right), vertical (top and bottom) relative to Page width/height
     containers:Array<ContainerData>
     variables?:{[key:string]:any}
     docUnits:DocUnits, // gets taken from parent doc
