@@ -72,11 +72,12 @@ export class DocPDFExporter
 
                 if(!this.DEBUG)
                 {
-                    console.log(data);
                     await this.run(data);
                     await this._export(null);
                 }
                 else {
+                    console.info('DocPDFExporter::init: [[DEBUG]]. Data: ')
+                    console.info(data);
                     this.generateTestDoc();
                 }
             }) // To be in instance scope
@@ -111,7 +112,7 @@ export class DocPDFExporter
 
     handleSuccesImport()
     {
-        console.log(`DocPDFExporter:loadPDFKit: PDFKit loaded!`)
+        console.info(`DocPDFExporter:loadPDFKit: PDFKit loaded!`)
         this._hasPDFKit = true;
     }
 
@@ -162,8 +163,8 @@ export class DocPDFExporter
         doc.fontSize(25).text('Test text', 100, 80);
         doc.end();
         docStream.on('finish', function() {
-          console.log('==== TEST PDF BLOB ====')
-          console.log(docStream.toBlob('application/pdf'));
+          console.info('DocPDFExporter::generateTestDoc: Exporting Blob:')
+          console.info(docStream.toBlob('application/pdf'));
         });
     }
 
@@ -191,7 +192,7 @@ export class DocPDFExporter
         const stream = BlobStream();
         this.activeStream = this.activePDFDoc.pipe(stream)
 
-        // NOTE: cannot use forEach: not sequentially!
+        // NOTE: cannot use forEach because it is not sequentially!
         for (const p of this.activeDoc.pages)
         {
             await this._makePage(p)
@@ -212,7 +213,7 @@ export class DocPDFExporter
             {
                 docStream.on('finish', () => 
                     {
-                        console.log(`DocPDFExporter::_endDoc: Finished Doc stream of ${doc.name}`)
+                        console.info(`DocPDFExporter::_endDoc: Finished Doc stream of ${doc.name}`)
                         this.blobs[doc.name] = docStream.toBlob('application/pdf');
                         resolve(this.blobs[doc.name]);
                     }                
@@ -244,7 +245,7 @@ export class DocPDFExporter
 
     async _placeContainer(c:ContainerData, p:PageData)
     {
-        console.log(`DocPDFExporter::_placeContainer: Placing container "${c.name}" of type "${c.type}" on page "${p.name}"`)
+        console.info(`DocPDFExporter::_placeContainer: Placing container "${c.name}" of type "${c.type}" on page "${p.name}"`)
 
         switch(c.type)
         {
@@ -305,8 +306,6 @@ export class DocPDFExporter
             fillColor: t?.content?.settings?.color
         };
 
-        console.log(this.removeEmptyValueKeysObj(pdfTextOptions));
-
         return this.removeEmptyValueKeysObj(pdfTextOptions); 
     }
 
@@ -316,9 +315,13 @@ export class DocPDFExporter
     async _placeImage(img:ContainerData, p:PageData)
     {
         // see docs: http://pdfkit.org/docs/images.html
-        /* NOTES:
+        /* 
+            NOTES:
+            - PDFkit places images with [left,top] as pivot and y-axis in [left,top]    
             - container width and height are relative to page width/height (if widthRelativeTo = 'page')
             - heightAbs/widthAbs are in docUnits
+            - We use a reference to PageData here to avoid this.activePage while working with async methods
+            
         */
         
         const url = img.content.main;
@@ -328,17 +331,12 @@ export class DocPDFExporter
         if(imgExt) // imgExt
         {
             const imgUriBase64 = `data:image/${imgExt};base64,${arrayBufferToBase64(imgBuffer)}`
-            const position = this.containerToPositionPoints(img, p);
-
-            console.log('PLACE IMAGE');
-            console.log(img);
-            console.log(position.x);
-            console.log(position.y);
+            const { x, y } = this.containerToPositionPoints(img, p);
             
             this.activePDFDoc.image(
                 imgUriBase64,
-                position.x,
-                position.y,
+                x,
+                y,
                 {
                     // options            
                     ...this._parseImageOptions(img, p)
@@ -416,21 +414,9 @@ export class DocPDFExporter
         const pageVerticalPadding = (transformWithPadding) ? ( (page.padding[1]||0) * page.height) : 0; // in page.docUnits
         const pageContentHeight = convertValueFromToUnit(page.height - 2*pageVerticalPadding, page.docUnits, 'mm'); // in mm
 
-        console.log('**** coordRelHeightToPoints ****');
-        console.log(a);
-        console.log(pageContentHeight);
-        console.log(pageVerticalPadding);
-        console.log(this.mmToPoints(a*pageContentHeight));
-        console.log(this.mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')));
-        console.log(this.pageHeightPoints());
-
         const coordInPoints = this.pageHeightPoints()
                     - this.mmToPoints(a*pageContentHeight) 
-                    + this.mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in pdfkit space for padding
-        
-        console.log('====')
-        console.log(coordInPoints)
-
+                    - this.mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in pdfkit space for padding
 
         return coordInPoints;
     }               
@@ -446,9 +432,6 @@ export class DocPDFExporter
     */
     containerToPositionPoints(c:ContainerData, p:PageData):Record<string, number>
     {
-        console.log('==== containerToPositionPoints ===');
-        console.log(c.name)
-
         const x = this.coordRelWidthToPoints(
                     c.position[0] - ((c?.width) ? c.pivot[0] * c.width : 0),
                     p); 
@@ -457,22 +440,8 @@ export class DocPDFExporter
                 c.position[1] + ((c?.height) ? (1-c.pivot[1]) * c.height : 0), // here still in Doc/PDF native coord system (origin: [left,bottom])
                 p); 
 
-        console.log(y)
-
-        console.log('---- END containerToPositionPoints ')
-
         return { x : x, y : y }
     }
-
-    /*
-    relPivotArrToPoints(p:Array<number|number>):Array<number|number>
-    {
-        return [
-            this.coordRelWidthToPoints(p[0]),
-            this.coordRelHeightToPoints(p[1]),
-        ]
-    }
-    */
 
     removeEmptyValueKeysObj(obj:Object)
     {
