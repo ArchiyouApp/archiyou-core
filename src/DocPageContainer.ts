@@ -3,12 +3,15 @@ type ContainerType = 'view'|'image'|'text'|'textarea'|'table'
 import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits } from './internal'
 
 //// TYPES AND INTERFACES ////
-export type ContainerAlignment = 'center'|'top'|'left'|'right'|'bottom'|'topleft'|'topright'|'bottomleft'|'bottomright'
+export type ContainerHAlignment = 'left'|'center'|'right'
+export type ContainerVAlignment = 'top' | 'center' | 'bottom'
+export type ContainerAlignment = Array<ContainerHAlignment | ContainerVAlignment> // like [left,top]
 export type ContainerSide = 'width'|'height'
 export type ZoomRelativeTo = 'container'|'world'
 export type ScaleInput = 'auto'|number;
 export type ContainerSizeRelativeTo = 'page' | 'page-content-area'; // page-content area is page without the padding on both sides
-export type Position = Array<number|number>|ContainerAlignment
+export type Position = Array<number|number>
+export type PositionLike = Position|ContainerAlignment
 
 export type ContainerData = { // Combine all Container types for convenience
     _entity:string
@@ -21,14 +24,14 @@ export type ContainerData = { // Combine all Container types for convenience
     height:number // relative to (see: widthRelativeTo)
     heightRelativeTo:ContainerSizeRelativeTo
     heightAbs?:number // in doc units (added on place)
-    position:Array<number|number> // relative to page-content-area
-    pivot:Array<number|number>
+    position:Position // relative to page-content-area
+    pivot:Position
     frame?:any // TODO
     index?:number
     caption?:string
-    contentAlign:ContainerAlignment
+    contentAlign:ContainerAlignment // alignment of content inside container
     content:any; // TODO: raw content
-    zoomLevel:ScaleInput, // number or 'auto
+    zoomLevel:ScaleInput, // number or 'auto' [default]
     zoomRelativeTo:ZoomRelativeTo,
     docUnits:DocUnits, 
     modelUnits:ModelUnits,
@@ -49,12 +52,23 @@ export interface ContainerContent
 
 //// TYPEGUARDS
 
-export function isContainerAlignment(o:any): o is ContainerAlignment
+export function isContainerHAlignment(o:any): o is ContainerHAlignment
 {
-    return ['center','top','left','right','bottom','topleft','topright','bottomleft','bottomright'].includes(o)
+    return ['left', 'center', 'right'].includes(o)
 }
 
-export function isPosition(o:any): o is Position
+export function isContainerVAlignment(o:any): o is ContainerHAlignment
+{
+    return ['top', 'center', 'bottom'].includes(o)
+}
+
+export function isContainerAlignment(o:any): o is ContainerAlignment
+{
+    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[0])
+}
+
+/** Things that can be turned into a Position (Array<number|number>) */
+export function isPositionLike(o:any): o is Position
 {
     return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
         || isContainerAlignment(o);
@@ -72,19 +86,8 @@ export class Container
     //// SETTINGS ////
     WIDTH_DEFAULT = 1.0; // in perc of content area
     HEIGHT_DEFAULT = 1.0;
-    PIVOT_DEFAULT:ContainerAlignment = 'center';
-    POSITION_DEFAULT:ContainerAlignment = 'center';
-    ALIGNMENT_TO_WPERC_HPERC = { // NOTE: [0,0] is at leftbottom
-        'center' : [0.5,0.5],
-        'top' : [0,1],
-        'left' : [0,0.5],
-        'right' : [1,0.5],
-        'bottom' : [0.5,0],
-        'topleft' : [0,1],
-        'topright' : [1,1],
-        'bottomleft' : [0,0],
-        'bottomright' : [1,0],
-    }
+    PIVOT_DEFAULT:ContainerAlignment = ['center', 'center'];
+    POSITION_DEFAULT:ContainerAlignment = ['center', 'center'];
 
     //// END SETTINGS ////
 
@@ -145,15 +148,18 @@ export class Container
     }
 
     /** Set position with a ContainerAlignment ('top', 'topright') or percentage of width and height [x,y]  */
-    position(p:Position):Container
+    position(p:PositionLike):Container
     {
-        if(!isPosition(p)){ throw new Error(`Container::pivot: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
+        if(!isPositionLike(p)){ throw new Error(`Container::pivot: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
         if(isContainerAlignment(p))
         {
-            this._position = this.ALIGNMENT_TO_WPERC_HPERC[p];
+            console.log('isContainerAlignment')
+            this._position = this._containerAlignmentToPosition(p);
+            console.log(this._position)
             return this;
         }
         else {
+            // Array[xr,yr]
             this._position = p as Array<number|number>;
             return this;
         }   
@@ -161,12 +167,12 @@ export class Container
 
     /** Set pivot with a ContainerAlignment ('top', 'topright') or percentage of width and height [x,y]  */
     // TODO: enable 20%, 2cm from origin
-    pivot(p:Position):Container
+    pivot(p:PositionLike):Container
     {
-        if(!isPosition(p)){ throw new Error(`Container::position(): Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
+        if(!isPositionLike(p)){ throw new Error(`Container::position(): Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
         if(isContainerAlignment(p))
         {
-            this._pivot = this.ALIGNMENT_TO_WPERC_HPERC[p];
+            this._pivot = this._containerAlignmentToPosition(p);
             return this;
         }
         else {
@@ -214,7 +220,9 @@ export class Container
     // NOTE: We use toData from the subclasses of Container (they use this function)
     _toContainerData():ContainerData
     {
-        return {
+        console.log('===== _toContainerData')
+
+        const c = {
             _entity: 'container',
             name: this.name,
             parent: this._parent?.name,
@@ -237,6 +245,9 @@ export class Container
             docUnits: this._page._units, // needed to scale the content
             modelUnits: this._page._units, // needed to scale the content
         }
+
+        console.log(c);
+        return c;
     }
 
     toData():ContainerData
@@ -248,5 +259,21 @@ export class Container
 
     //// UTILS ////
 
+    _containerAlignmentToPosition(a:ContainerAlignment):Position
+    {
+        if(!isContainerAlignment(a)){ throw new Error(`DocPageContainer::_containerAlignmentToPosition: Please supply a valid ContainerAlignment like ['left','center']`) }
+
+        const ALIGNMENT_TO_WPERC = { 'center' : 0.5, 'left' : 0.0, 'right' : 1.0 }
+
+        const ALIGNMENT_TO_HPERC = { 'top' : 1.0, 'center' : 0.5, 'bottom' : 0.0 }
+
+        let hAlign = ALIGNMENT_TO_WPERC[a[0]];
+        let vAlign = ALIGNMENT_TO_HPERC[a[1]];
+
+        if(hAlign === undefined){ hAlign = 0.5; }
+        if(vAlign === undefined){ vAlign = 0.5; }
+
+        return [hAlign, vAlign] as Position
+    }
 
 }

@@ -26,9 +26,9 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, Page, PageSize, Container, AnyContainer, View, TableContainerOptions, ArchiyouApp } from './internal' // classes
+import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyContainer, View, TableContainerOptions, ArchiyouApp } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
-            Position, isPosition, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
+            PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
 import { convertValueFromToUnit } from './internal' // utils
 
@@ -445,14 +445,14 @@ export class Doc
      *   - Alignment: topleft, bottom(center)
      *   TODO: in world units from origin
      */
-    position(x:number|Position, y?:number):Doc
+    position(x:number|PositionLike, y?:number):Doc
     {
         if(!this._activeContainer || !this._activePage)
         {
             throw new Error(`Doc::position(): Can not set position of active container. No active container and/or Page created!`);
         }
 
-        if (isPosition(x))
+        if (isPositionLike(x)) // array with coords or alignments
         {
             this._activeContainer.position(x)    
         }
@@ -471,14 +471,14 @@ export class Doc
      *   - Alignment: topleft, bottom(center)
      *   TODO: in world units from origin
      */
-    pivot(x:number|Position, y?:number):Doc
+    pivot(x:number|PositionLike, y?:number):Doc
     {
         if(!this._activeContainer || !this._activePage)
         {
             throw new Error(`Doc::position(): Can not set position of active container. No active container and/or Page created!`);
         }
 
-        if (isPosition(x))
+        if (isPositionLike(x))
         {
             this._activeContainer.pivot(x)    
         }

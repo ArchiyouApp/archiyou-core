@@ -17,7 +17,11 @@ import { convertValueFromToUnit } from './utils'
 import { PageData, ContainerData, Page } from './internal'
 
 import type { PDFDocument, PDFPage } from '@types/pdfkit'
+import SVGtoPDF from 'svg-to-pdfkit'
+
 import BlobStream from 'blob-stream' // BlobStream for Web - TODO: disable for node
+
+import { DocViewSVGEdit } from './DocViewSVGEdit'
 
 import { arrayBufferToBase64 } from './utils'
 
@@ -258,7 +262,7 @@ export class DocPDFExporter
                 break;
 
             case 'view':
-                // TODO
+                this._placeViewSVG(c,p);
                 break;
 
             case 'image':
@@ -361,7 +365,7 @@ export class DocPDFExporter
     /** Fetch with proxy for CORS headers */
     async _loadImage(url:string):Promise<ArrayBuffer>
     {
-        const PROXY_URL = 'http://127.0.0.1:8090/proxy'
+        const PROXY_URL = 'http://localhost:8090/proxy'
         let r = await fetch(PROXY_URL, 
             {
                 method: 'POST',
@@ -376,8 +380,8 @@ export class DocPDFExporter
 
     _parseImageOptions(img:ContainerData, p:PageData):Object
     {
-        const w = this.coordRelWidthToPoints(img.width, p);
-        const h = this.coordRelHeightToPoints(img.height, p);
+        const w = this.relWidthToPoints(img.width, p);
+        const h = this.relHeightToPoints(img.height, p);
         const pdfImgOptions = {
             fit: (w && h && img?.content?.settings?.fit === 'contain') ? [w,h] : null,
             cover : (w && h && img?.content?.settings?.fit === 'cover') ? [w,h] : null,
@@ -386,7 +390,37 @@ export class DocPDFExporter
         return this.removeEmptyValueKeysObj(pdfImgOptions)
     }
     
+    //// SVG VIEW ////
 
+    /** Place View SVG on page 
+     *     
+     *      - view.content.main contains raw SVG string (<svg _bbox="..." _worldUnits='mm'><path .. >... )
+     *      - TODO: Implement view.zoomLevel, view.zoomRelativeTo etc. - NOW: only automatic filling of viewport/container
+     * 
+     *      see svg-to-pdfkit: https://github.com/alafr/SVG-to-PDFKit
+    */
+    _placeViewSVG(view:ContainerData, p:PageData)
+    {
+        const svgEdit = new DocViewSVGEdit(view);
+        svgEdit.setViewBox();
+        svgEdit.setNoStrokeScaling();
+        const svgStr = svgEdit.export();
+
+        const { x, y } = this.containerToPositionPoints(view, p);
+
+        SVGtoPDF(
+            this.activePDFDoc, 
+            svgStr, 
+            x,
+            y,
+            {
+                // options
+                width: this.relWidthToPoints(view.width, p),
+                height: this.relHeightToPoints(view.height, p),
+                preserveAspectRatio : this.getSVGPreserveAspectRatioOption(view)
+            }
+        );
+    }
 
     //// UTILS ////
 
@@ -419,7 +453,23 @@ export class DocPDFExporter
                     - this.mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in pdfkit space for padding
 
         return coordInPoints;
-    }               
+    }
+
+    /** Convert relative width (to page size or page-content) to points */
+    relWidthToPoints(a:number, page:PageData, withPadding:boolean=true):number
+    {
+        const pageHorizontalPadding = (withPadding) ? ( (page.padding[0]||0) * page.width) : 0; // in page.DocUnits
+        const pageContentWidth = convertValueFromToUnit(page.width - 2*pageHorizontalPadding, page.docUnits, 'mm'); // always to mm
+        return this.mmToPoints(a*pageContentWidth + convertValueFromToUnit(pageHorizontalPadding, page.docUnits, 'mm'));
+    }
+
+    /** Convert relative height (to page size or page-content) to points */
+    relHeightToPoints(a:number, page:PageData, withPadding:boolean=true):number
+    {
+        const pageVerticalPadding = (withPadding) ? ( (page.padding[1]||0) * page.height) : 0; // in page.docUnits
+        const pageContentHeight = convertValueFromToUnit(page.height - 2*pageVerticalPadding, page.docUnits, 'mm'); // in mm
+        return this.mmToPoints(a*pageContentHeight + convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm'));
+    }
 
     pageHeightPoints():number
     {
@@ -490,6 +540,31 @@ export class DocPDFExporter
         await writable.close();
     }
 
+    //// SVG UTILS ////
+
+    /** Transform contentAlign on View to pdfkit-svg option preserveAspectRatio */
+    getSVGPreserveAspectRatioOption(view?:ContainerData)
+    {
+        const DEFAULT = 'xMidYMid meet';
+        
+        if (!view) { return DEFAULT; }
+        if (!view.contentAlign) { return DEFAULT; }
+
+        // Now map contentAlign values (like ['left','top']) to preserveAspectRatio
+        const H_ALIGN_TO_PAR = {
+            'left' : 'xMin',
+            'center' : 'xMid',
+            'right' : 'xMax',
+        }
+        const V_ALIGN_TO_PAR = {
+            'top' : 'YMin',
+            'center' : 'YMid',
+            'bottom' : 'YMax',
+        }
+
+        return `${H_ALIGN_TO_PAR[view.contentAlign[0]] || 'xMid'}${V_ALIGN_TO_PAR[view.contentAlign[1]] || 'YMid'} meet`
+
+    }
 
 }
 
