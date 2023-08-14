@@ -444,6 +444,7 @@ export class Point
         });
 
         return projectedPoints.sort( (a,b) => a.distance(this) - b.distance(this)  ); // order by distance ascending
+        // TODO: return single if only one
     }
 
     /** Does current Point share plane with the other */

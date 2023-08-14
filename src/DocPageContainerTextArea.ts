@@ -92,11 +92,14 @@ export class TextArea extends Container
 
     //// OUTPUT ////
 
-    toData():any // TODO
+    async toData():Promise<any> // TODO
     {
         return {
             ...this._toContainerData(),
-            content: { main: this._text, settings: this._options } as ContainerContent,
+            content: { 
+                data: this._text, 
+                settings: this._options 
+            } as ContainerContent,
         }
     }
 

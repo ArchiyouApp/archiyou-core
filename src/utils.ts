@@ -200,6 +200,7 @@ export function convertValueFromToUnit(v:number, from:Units, to:Units):number
 {
     const INCH_TO_MM = 25.4;
     const MM_TO_INCH = 0.0393700787;
+    const INCH_TO_PNT = 72;
 
     if( typeof v !== 'number'){ console.warn(`utils::convertValueFromToUnit(): Please supply a number!`); return null; }
     if(!isDocUnits(from) || !isDocUnits(to)){ console.warn(`utils::convertValueFromToUnit(): Please supply valid from/to units ('mm', 'cm', 'inch'). Got "${from}"=>"${to}"`); return null; } 
@@ -212,16 +213,19 @@ export function convertValueFromToUnit(v:number, from:Units, to:Units):number
     {
         if(to === 'mm'){ return v*INCH_TO_MM }
         if(to === 'cm'){ return v*INCH_TO_MM/10 }
+        if(to === 'pnt'){ return v*INCH_TO_PNT }
     }
     else if(from === 'cm')
     {
         if(to === 'mm'){ return v*10 }
         if(to === 'inch'){ return v*10*MM_TO_INCH }
+        if(to === 'pnt'){ return v/10*MM_TO_INCH*INCH_TO_PNT }
     }
     else if(from === 'mm')
     {
         if(to === 'cm'){ return v/10 }
         if(to === 'inch'){ return v*10*MM_TO_INCH }
+        if(to === 'pnt'){ return v*MM_TO_INCH*INCH_TO_PNT }
     }
 
     console.warn(`Doc::_convertValueFromToUnit(): Could not convert. Check values for from ("${from}") and to ("${to}")!`);

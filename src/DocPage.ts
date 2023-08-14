@@ -173,8 +173,15 @@ export class Page
 
     //// OUTPUTS ////
 
-    toData()
+    async toData(cache?:Record<string,any>)
     {
+        // async load (some) containers
+        const containersData = [];
+        for(let i = 0; i < this._containers.length; i++)
+        {
+            containersData.push(await this._containers[i].toData(cache));
+        }
+
         return {
             _entity: 'page',
             name: this.name,
@@ -183,7 +190,7 @@ export class Page
             height: this._height,
             orientation: this._orientation,
             padding: this._padding,
-            containers: this._containers.map(c => c.toData()),
+            containers: containersData,
             docUnits: this._units // taken from doc, used in rendering
         }
     }

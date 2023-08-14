@@ -1,4 +1,4 @@
-import { Page, Container, AnyContainer, Pipeline, Shape, AnyShape, AnyShapeOrCollection, 
+import { Page, Container, ContainerData, AnyContainer, Pipeline, Shape, AnyShape, AnyShapeOrCollection, 
     ShapeCollection, isAnyShapeCollection, Alignment, ZoomRelativeTo, ContainerContent} from './internal'
 import { checkInput  } from './internal';
 
@@ -17,12 +17,12 @@ export class View extends Container
 
     //// OUTPUT ////
 
-    toData():any // TODO
+    async toData():Promise<ContainerData> // TODO
     {
         return {
             ...this._toContainerData(),
             content: { 
-                main: (ShapeCollection.isShapeCollection(this._shapes)) ? 
+                data: (ShapeCollection.isShapeCollection(this._shapes)) ? 
                                 (this._shapes as ShapeCollection)?.toSvg() : 
                                 this.resolveShapeNameToSVG(this._shapes as string), 
                 settings: {} 

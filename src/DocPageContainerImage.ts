@@ -1,5 +1,7 @@
-import { Page, Container, AnyContainer, Pipeline, AnyShape, AnyShapeOrCollection, 
-    ShapeCollection, isAnyShapeCollection, Alignment, ZoomRelativeTo, ContainerContent} from './internal'
+import { Page, Container, ContainerData, AnyContainer, Pipeline, AnyShape, AnyShapeOrCollection, 
+    ShapeCollection, isAnyShapeCollection, Alignment, ZoomRelativeTo, ContainerContent, ContainerAlignment, isContainerAlignment} from './internal'
+
+import { arrayBufferToBase64 } from './internal' // utils
 
 type ImageOptionsFit = 'fill'|'contain'|'cover' // taken from CSS, see https://www.w3schools.com/css/css3_object-fit.asp
 // fill is unproportianlly, contain is fit inside with margin, cover is fill proportianally
@@ -11,7 +13,8 @@ function isImageOptionsFit(o:any): o is ImageOptionsFit
 
 export interface ImageOptions 
 {
-    fit?: ImageOptionsFit  
+    fit?: ImageOptionsFit
+    align?: ContainerAlignment // for example ['left', 'top]  
     opacity?: number // [0-100]
     brightness?:number // [0-100]
     contrast?:number // [0-100]
@@ -22,6 +25,7 @@ export interface ImageOptions
 export class Image extends Container
 {
     DEFAULT_FIT:ImageOptionsFit = 'contain';
+    DEFAULT_ALIGN:ContainerAlignment = ['left','top'];
     DEFAULT_BRIGHTNESS = 100;
     DEFAULT_CONTRAST = 100;
     DEFAULT_SATURATION = 1;
@@ -32,16 +36,32 @@ export class Image extends Container
 
     constructor(url:string, options:ImageOptions)
     {
-        super('image');
+        super();
         this._type = 'image';
         this._url = url;
+        this.setName(this.urlToName(url)); 
         this.setOptions(options);
+    }
+
+    urlToName(url:string):string
+    {
+        const urlElems = url.split('/');
+        return urlElems[urlElems.length-1].split('.')[0]
     }
 
     /** Set options and defaults */
     setOptions(options:ImageOptions)
     {
         this._options.fit = isImageOptionsFit(options?.fit) ? options.fit : this.DEFAULT_FIT;
+        
+        // set in both options and on main container _contentAlign
+        console.log('SET OPTIONS');
+        console.log(options.align);
+        console.log(isContainerAlignment(options.align));
+
+        this._options.align = isContainerAlignment(options?.align) ? options.align : this.DEFAULT_ALIGN;
+        this._contentAlign = this._options.align;
+
         this._options.brightness = (typeof options?.brightness === 'number') ? options.brightness : this.DEFAULT_BRIGHTNESS;
         this._options.contrast = (typeof options?.brightness === 'number') ? options.contrast : this.DEFAULT_CONTRAST;
         this._options.saturation = (typeof options?.brightness === 'number') ? options.contrast : this.DEFAULT_SATURATION;
@@ -50,12 +70,74 @@ export class Image extends Container
 
     //// OUTPUT ////
 
-    toData():any // TODO
+    async toData(cache?:Record<string,any>):Promise<ContainerData> // TODO
     {
-        return {
-            ...this._toContainerData(),
-            content: { main: this._url, settings: this._options } as ContainerContent,
+        const format = this.getImageFormat();
+
+        let data;
+        if(format) // load data
+        {  
+            data = await this.loadImageData(cache);
         }
+
+        const containerData = {
+            ...this._toContainerData(),
+            content: { 
+                source: this._url,
+                format: format,
+                data: data, 
+                settings: this._options } as ContainerContent,
+        }
+
+        return containerData;
+    }
+
+    /** We want to load the raw data of the image in the ContainerContent for easy access later (in HTML and PDF exporter) */
+    async loadImageData(cache?:Record<string,any>):Promise<any>
+    {
+        let data;
+        if(cache[this._url]) // get from cache
+        {
+            console.info(`DocPageContainerImage::loadImageData: Loaded image "${this._url}" data from cache`)
+            data = cache[this._url];
+        }
+        else {
+            // async load the image
+            const proxyUrl = this._page._doc.IMAGE_PROXY
+
+            try 
+            {
+                let r = await fetch(proxyUrl, 
+                    {
+                        method: 'POST',
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url : this._url })       
+                    }
+                );
+                data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer()); 
+                cache[this._url] = data;
+            }
+            catch(e)
+            {
+                console.warn('DocPageContainerImage::loadImageData: Could not load image. Check if proxy if configured correctly or image exists!')
+            }
+
+        }
+
+        return data;
+    }
+
+    _exportImageDataBase64(data:ArrayBuffer):string
+    {
+        return `data:image/${this.getImageFormat()};base64,${arrayBufferToBase64(data)}`
+    }
+
+    getImageFormat():'jpg'|'png'|'svg'
+    {
+        const urlElems = this._url.split('/');
+        const file = urlElems[urlElems.length-1]
+        const m = file.match(/(?<=\.)jpg|png|svg/)
+        return (m) ? m[0] as 'jpg'|'png'|'svg': null;
     }
 
 }

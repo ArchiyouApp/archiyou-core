@@ -10,6 +10,8 @@
  */
 
 // see example loading of fonts for pdfkit: https://github.com/foliojs/pdfkit/tree/master/examples/webpack
+
+
 import fs from 'fs'; // virtual pdfkit filesystem as replacement of node
 
 import { DocData } from './Doc'
@@ -262,7 +264,7 @@ export class DocPDFExporter
                 break;
 
             case 'view':
-                this._placeViewSVG(c,p);
+                this._placeViewSVG(c, p)
                 break;
 
             case 'image':
@@ -328,27 +330,47 @@ export class DocPDFExporter
             
         */
         
-        const url = img.content.main;
-        const imgBuffer = await this._loadImage(url);
-        const imgExt = this._getImageExt(url);
 
-        if(imgExt) // imgExt
+        if(img?.content?.data && img?.content?.source)
         {
-            const imgUriBase64 = `data:image/${imgExt};base64,${arrayBufferToBase64(imgBuffer)}`
-            const { x, y } = this.containerToPositionPoints(img, p);
+            const imgExt = this._getImageExt(img.content.source);    
+
+            // if SVG image
+            if (imgExt === 'svg')
+            {
+                const { x, y } = this.containerToPositionPoints(img, p);
+        
+                SVGtoPDF(
+                    this.activePDFDoc, 
+                    img.content.data, 
+                    x,
+                    y,
+                    {
+                        // options
+                        width: this.relWidthToPoints(img.width, p),
+                        height: this.relHeightToPoints(img.height, p),
+                        preserveAspectRatio : this.getSVGPreserveAspectRatioOption(img)
+                    }
+                );
+            }
+            else 
+            {
+                // if a bitmap (jpg or png)
+                const { x, y } = this.containerToPositionPoints(img, p);
             
-            this.activePDFDoc.image(
-                imgUriBase64,
-                x,
-                y,
-                {
-                    // options            
-                    ...this._parseImageOptions(img, p)
-                }
-            )
+                this.activePDFDoc.image(
+                    img.content.data, // already saved in base64 format
+                    x,
+                    y,
+                    {
+                        // options            
+                        ...this._parseImageOptions(img, p)
+                    }
+                )    
+            }
         }
         else {
-            console.error(`DocPDFExporter:_placeImage: Error placing image at url "${url}"!`);
+            console.error(`DocPDFExporter:_placeImage: Error placing image from url "${img.content.source}"!`);
         }
 
     }
@@ -356,25 +378,10 @@ export class DocPDFExporter
     /** Returns extension (without .) from url */
     _getImageExt(url:string):string
     {
-        const VALID_IMAGE_EXTS = ['jpg', 'png']
+        const VALID_IMAGE_EXTS = ['jpg', 'png', 'svg']
         const extsRe = new RegExp(VALID_IMAGE_EXTS.map((e) => `.${e}`).join('|'), 'g')
         const matches = url.match(extsRe);
         return (matches) ? matches[0].replace('.', '') : null;
-    }
-    
-    /** Fetch with proxy for CORS headers */
-    async _loadImage(url:string):Promise<ArrayBuffer>
-    {
-        const PROXY_URL = 'http://localhost:8090/proxy'
-        let r = await fetch(PROXY_URL, 
-            {
-                method: 'POST',
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url : url })       
-            }
-        );
-
-        return await r.arrayBuffer()
     }
     
 
@@ -401,12 +408,18 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
+        console.log('==== PLACE VIEW ====')
         const svgEdit = new DocViewSVGEdit(view);
+        svgEdit.toPDFDocPaths(this,view,p)
+
+        /*
         svgEdit.setViewBox();
         svgEdit.setNoStrokeScaling();
         const svgStr = svgEdit.export();
 
         const { x, y } = this.containerToPositionPoints(view, p);
+
+        console.log(svgStr);
 
         SVGtoPDF(
             this.activePDFDoc, 
@@ -420,6 +433,8 @@ export class DocPDFExporter
                 preserveAspectRatio : this.getSVGPreserveAspectRatioOption(view)
             }
         );
+
+        */
     }
 
     //// UTILS ////
@@ -460,7 +475,7 @@ export class DocPDFExporter
     {
         const pageHorizontalPadding = (withPadding) ? ( (page.padding[0]||0) * page.width) : 0; // in page.DocUnits
         const pageContentWidth = convertValueFromToUnit(page.width - 2*pageHorizontalPadding, page.docUnits, 'mm'); // always to mm
-        return this.mmToPoints(a*pageContentWidth + convertValueFromToUnit(pageHorizontalPadding, page.docUnits, 'mm'));
+        return this.mmToPoints(a*pageContentWidth);
     }
 
     /** Convert relative height (to page size or page-content) to points */
@@ -468,7 +483,7 @@ export class DocPDFExporter
     {
         const pageVerticalPadding = (withPadding) ? ( (page.padding[1]||0) * page.height) : 0; // in page.docUnits
         const pageContentHeight = convertValueFromToUnit(page.height - 2*pageVerticalPadding, page.docUnits, 'mm'); // in mm
-        return this.mmToPoints(a*pageContentHeight + convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm'));
+        return this.mmToPoints(a*pageContentHeight);
     }
 
     pageHeightPoints():number
@@ -545,7 +560,7 @@ export class DocPDFExporter
     /** Transform contentAlign on View to pdfkit-svg option preserveAspectRatio */
     getSVGPreserveAspectRatioOption(view?:ContainerData)
     {
-        const DEFAULT = 'xMidYMid meet';
+        const DEFAULT = 'xMinYMin meet'; // NOTE: origin is [left,top]
         
         if (!view) { return DEFAULT; }
         if (!view.contentAlign) { return DEFAULT; }
@@ -565,6 +580,8 @@ export class DocPDFExporter
         return `${H_ALIGN_TO_PAR[view.contentAlign[0]] || 'xMid'}${V_ALIGN_TO_PAR[view.contentAlign[1]] || 'YMid'} meet`
 
     }
+
+
 
 }
 

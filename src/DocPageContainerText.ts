@@ -1,4 +1,4 @@
-import { Page, Container, ContainerContent , DocUnits, isDocUnits } from './internal'
+import { Page, Container, ContainerData, ContainerContent , DocUnits, isDocUnits } from './internal'
 import { convertSizeUnitsToFontPoints } from './internal'
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
@@ -63,11 +63,14 @@ export class Text extends Container
 
     //// OUTPUT ////
 
-    toData():any // TODO
+    async toData():Promise<ContainerData> // TODO
     {
         return {
             ...this._toContainerData(),
-            content: { main: this._text, settings: this._options } as ContainerContent,
+            content: { 
+                data: this._text, 
+                settings: this._options 
+            } as ContainerContent,
         }
     }
 

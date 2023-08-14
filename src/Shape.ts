@@ -3899,6 +3899,12 @@ export class Shape
         return this;
     }
 
+    show():Shape
+    {
+        this.checkObj().show();
+        return this;
+    }
+
     /** Return if the Shape Obj is set visible or not */
     visible():boolean
     {

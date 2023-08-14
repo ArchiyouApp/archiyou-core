@@ -33,7 +33,7 @@ import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide
 import { convertValueFromToUnit } from './internal' // utils
 
 //// TYPES AND INTERFACES ////
-export type DocUnits = 'mm'|'cm'|'inch'; 
+export type DocUnits = 'mm'|'cm'|'inch'|'pnt'; 
 export type PercentageString = string // 100%, 0.5%, -10%
 export type ValueWithUnitsString = string
 export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
@@ -86,6 +86,7 @@ export class Doc
     DOC_UNITS_DEFAULT:DocUnits = 'mm';
     PAGE_SIZE_DEFAULT:PageSize = 'A4';
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
+    IMAGE_PROXY:string='http://localhost:8090/proxy' // IMPORTANT: on browser you can not simply load image data: use a proxy
 
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
@@ -103,6 +104,8 @@ export class Doc
 
     _activePage:Page
     _activeContainer:AnyContainer
+
+    _assetsCache:Record<string,any> = {}; // keep assets like images in cache to avoid reloading on every toData() call
     
 
     constructor(ay?:ArchiyouApp) // null is allowed
@@ -526,19 +529,28 @@ export class Doc
 
     //// OUTPUT ////
 
-    toData():{[key:string]:DocData}
+    async toData():Promise<{[key:string]:DocData} | undefined>
     {
         this.executePipelines();
 
         let docs = {};
-        this._docs.forEach( doc => {
+
+        for(let i = 0; i < this._docs.length; i++)
+        {
+            const doc = this._docs[i];
+            const docPagesData = [];
+            for(let i = 0; i < this._pagesByDoc[doc].length; i++)
+            {
+                docPagesData.push(await this._pagesByDoc[doc][i].toData(this._assetsCache));
+            }
+
             docs[doc] = {
                 name: doc,
                 units: this._unitsByDoc[doc],
-                pages: this._pagesByDoc[doc].map(p => p.toData()) as Array<PageData>,
+                pages: docPagesData,
                 modelUnits: this._geom._units, // set model units to calculate scale later
             }
-        })
+        }
 
         return docs;
     }

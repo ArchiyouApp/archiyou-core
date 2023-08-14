@@ -1,4 +1,4 @@
-import { Page, Container, ContainerContent } from './internal'
+import { Page, Container, ContainerData, ContainerContent } from './internal'
 import { convertSizeUnitsToFontPoints } from './internal'
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
@@ -75,11 +75,14 @@ export class TableContainer extends Container
 
     //// OUTPUT ////
 
-    toData():any // TODO
+    async toData():Promise<ContainerData> // TODO
     {
         return {
             ...this._toContainerData(),
-            content: { main: this._data, settings: this._options } as ContainerContent,
+            content: { 
+                data: this._data, 
+                settings: this._options 
+            } as ContainerContent,
         }
     }
 

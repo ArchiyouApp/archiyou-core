@@ -46,8 +46,10 @@ export interface Frame {
 
 export interface ContainerContent 
 {
+    source?:string, // source url (used for quick access if possible)
+    format?:'jpg'|'svg'|'png';
+    data:any; // main data
     settings:{[key:string]:any}
-    main:any; // main data
 }
 
 //// TYPEGUARDS
@@ -64,7 +66,7 @@ export function isContainerVAlignment(o:any): o is ContainerHAlignment
 
 export function isContainerAlignment(o:any): o is ContainerAlignment
 {
-    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[0])
+    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
 }
 
 /** Things that can be turned into a Position (Array<number|number>) */
@@ -86,8 +88,8 @@ export class Container
     //// SETTINGS ////
     WIDTH_DEFAULT = 1.0; // in perc of content area
     HEIGHT_DEFAULT = 1.0;
-    PIVOT_DEFAULT:ContainerAlignment = ['center', 'center'];
-    POSITION_DEFAULT:ContainerAlignment = ['center', 'center'];
+    PIVOT_DEFAULT:ContainerAlignment = ['left', 'top'];
+    POSITION_DEFAULT:ContainerAlignment = ['left', 'top'];
 
     //// END SETTINGS ////
 
@@ -109,13 +111,14 @@ export class Container
     _zoomLevel:ScaleInput;
     _zoomRelativeTo:ZoomRelativeTo;
 
-    constructor(name:string)
+    constructor(name?:string)
     {
         this.name = name;
     }
 
     _setDefaults()
     {
+        // NOTE: this is set up when in constructor, don't apply options here because they will overwrite options in constructor
         this.width(this.WIDTH_DEFAULT);
         this.height(this.HEIGHT_DEFAULT);
         this.pivot(this.PIVOT_DEFAULT);
@@ -129,6 +132,12 @@ export class Container
         page.add(this); // Add to Page
 
         return this;
+    }
+
+    setName(n:string):string
+    {
+        this.name = n; 
+        return n;
     }
 
     /** Set width of this Container. Either in percentage ([0-1]) of (page or content) width or in % or units */
@@ -147,13 +156,12 @@ export class Container
         console.info(`Container::width(): Set container height to :${this._height}`);
     }
 
-    /** Set position with a ContainerAlignment ('top', 'topright') or percentage of width and height [x,y]  */
+    /** Set position with a ContainerAlignment or percentage of width and height [x,y]  */
     position(p:PositionLike):Container
     {
         if(!isPositionLike(p)){ throw new Error(`Container::pivot: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
         if(isContainerAlignment(p))
         {
-            console.log('isContainerAlignment')
             this._position = this._containerAlignmentToPosition(p);
             console.log(this._position)
             return this;
@@ -216,11 +224,17 @@ export class Container
         return this._height * relToSize;
     }
 
+    /** Export Data of Container */
+    async toData(cache?:Record<string,any>):Promise<ContainerData>
+    {
+        // will be overriden by subclasses (DocPageContainerImage, DocPageContainerText etc)
+        return null;
+    }
+
     /** Output raw Container data */
     // NOTE: We use toData from the subclasses of Container (they use this function)
     _toContainerData():ContainerData
     {
-        console.log('===== _toContainerData')
 
         const c = {
             _entity: 'container',
@@ -246,15 +260,9 @@ export class Container
             modelUnits: this._page._units, // needed to scale the content
         }
 
-        console.log(c);
         return c;
     }
 
-    toData():ContainerData
-    {
-        // will be overriden by subclasses
-        return null;
-    }
   
 
     //// UTILS ////
