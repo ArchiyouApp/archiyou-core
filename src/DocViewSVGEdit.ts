@@ -68,13 +68,10 @@ export class DocViewSVGEdit
 
     setNoStrokeScaling()
     {
-        //// !!!! NOT WORKING WITH SVG-TO-PDFKIT !!!!
+        // NOTE: this does not work with svg-to-pdfkit
         const APPLY_TO_TAGS = ['path'];
         const pathNodes = txml.filter(this._svgXML.children, node => APPLY_TO_TAGS.includes(node.tagName))
         pathNodes.forEach(path => path.attributes['vector-effect'] = 'non-scaling-stroke' )
-
-        // main svg too
-        this._svgXML.attributes['vector-effect'] = 'non-scaling-stroke';
     }
 
     /** Transform and scale SVG data to PDF space coordinates (points) 
