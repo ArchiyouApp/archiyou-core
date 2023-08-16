@@ -6,29 +6,13 @@
 */
 
 import { convertValueFromToUnit } from './utils'
+import { CLASS_TO_STYLE } from './internal' // constants.s
 
 import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
 import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
 
-
-import { ContainerData, DocPDFExporter } from './internal'
-
-interface PDFPathStyle {
-    // see: https://pdfkit.org/docs/vector.html
-    lineWidth:number
-    lineCap:'butt'|'round'|'square'
-    lineJoin:'miter'|'bevel'|'round'
-    dash:Array<number|number> // size, space
-    strokeColor:string // 'red', '#FF0000'
-    strokeOpacity:number // [0.0-1.0]
-    fillColor:string
-    fillOpacity:number
-}
-
-interface PDFPath {
-    path: string // the d of SVG paths in PDF coords
-    style: PDFPathStyle
-}
+import { PageData, ContainerData, DocPDFExporter } from './internal'
+import { DocPathStyle, PDFLinePath } from './internal'
 
 export class DocViewSVGEdit
 {
@@ -38,9 +22,6 @@ export class DocViewSVGEdit
     constructor(view:ContainerData)
     {
         this._svg = view?.content?.data
-
-        console.log('LOAD SVG');
-        console.log(this._svg);
 
         if (!this._svg){ throw new Error(`DocViewSVGEdit: No valid SVG data found in view with name "${view.name}"!`) }
         else {
@@ -80,10 +61,11 @@ export class DocViewSVGEdit
      *      - incoming SVG units are worldUnits (in <svg _worldUnits="..">) [ NOTE: after parsing XML nodes _ is removed!]
      *      - bbox is in <svg _bbox="left top width height"
     */
-    toPDFDocPaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData)
+    toPDFDocPaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
     {
         // first basic translation/scaling aspects
 
+        // TODO: this is needed when zoomLevel is calculated later (now we simply fill the container no matter what the svg model units)
         const svgUnits = this._svgXML.attributes['worldUnits'] || 'mm'; // default is mm
 
         const svgLeft = parseFloat(this._svgXML.attributes['bbox'].split(' ')[0]);
@@ -93,6 +75,8 @@ export class DocViewSVGEdit
 
         const pdfViewWidthPnts = pdfExporter.relWidthToPoints(view.width, page);
         const pdfViewHeightPnts = pdfExporter.relHeightToPoints(view.height, page);
+        const pdfViewOffsetXPnts = pdfExporter.coordRelWidthToPoints(view.position[0], page, true);
+        const pdfViewOffsetYPnts = pdfExporter.coordRelHeightToPoints(view.position[1], page, true);
 
         const pdfViewRatio = pdfViewWidthPnts/pdfViewHeightPnts;
         const svgRatio = svgWidth/svgHeight;
@@ -105,23 +89,43 @@ export class DocViewSVGEdit
                                     pdfViewWidthPnts / svgWidth :
                                     pdfViewHeightPnts / svgHeight;
         
-        const paths:Array<PDFPath> = new Array(); 
+        // gather paths in such a way that we can directly apply them with pdfkit in native PDF coordinate space
+        const linePaths:Array<PDFLinePath> = new Array(); 
         const pathNodes = txml.filter(this._svgXML.children, (node) => node.tagName === 'path')
-        if (pathNodes)
+
+        if(!pathNodes || pathNodes.length === 0)
+        {
+            console.warn('DocViewSVGEdit:toPDFDocPaths: No paths found. Returned empty array.')
+        }
+        else
         {
             pathNodes.forEach( node => 
             {
-                const line = this._pathCmdToLineData(node.attributes.d);  // There are only single lines in the commands: 'M275,35 L325,35'
+                // There are only single lines in the commands: 'M275,35 L325,35'
+                const line = this._pathCmdToLineData(node.attributes.d);  // [x1,y1,x2,y2]
                 if(line)
                 {
-                    console.log(line);
-                    // TODO: transform
+                    // translate and scale coords to PDF coord space and size of view container
+                    // TODO: implement zoomLevels later
+                    const containerPositionPnts = pdfExporter.containerToPositionPoints(view, page); // includes offsets for pivot
+
+                    let x1 = (line[0] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x;  // TODO: implement contentAlign (now:lefttop)
+                    let y1 = (line[1] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y;
+                    let x2 = (line[2] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x;
+                    let y2 = (line[3] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y;
+
+                    linePaths.push(
+                        {
+                            path: `M${x1},${y1} L${x2},${y2}`,
+                            style: this._pathClassesToPDFPathStyle(node.attributes?.class)
+                        });
                 }
                 
             })
             
         }
         
+        return linePaths;
     }
 
     _pathCmdToLineData(d:string):Array<number|number|number|number>
@@ -135,6 +139,47 @@ export class DocViewSVGEdit
         else {
             console.error(`DocViewSVGEdit::_pathCmdToLineData: Failed to parse path: "${d}"`);
         }
+    }
+
+    /** Translate the classes applied to svg path to a PDF style map 
+     *  
+     *   Settings are in constants.ts: CLASS_TO_STYLE
+     * 
+     *   Currently these styles exists:
+     *   - line - the default line edge
+     *   - dashed - dashed line edge
+     *   - hidden - a line edge that is hidden behind other shapes used in elevations
+     *   - outline - a line edge that is the outline of a projection
+     *   - dimensionline - a dimension line (see: Annotator)
+     * 
+     *  Classes are applied in order (last has priority)
+    */
+    _pathClassesToPDFPathStyle(classesStr?:string):DocPathStyle
+    {
+        const FALLBACK_STYLE:DocPathStyle = { lineWidth: 0.15  };
+
+        if(!classesStr || (typeof classesStr) !== 'string' || classesStr === '')
+        {
+            return FALLBACK_STYLE;
+        }
+
+        const classes = classesStr.split(' '); // for example: classesStr = 'line dashed'
+        let docStyle:DocPathStyle = {};
+
+        classes.forEach( className => 
+        {
+            const classStyle = CLASS_TO_STYLE[className];
+            if(!classStyle)
+            {
+                console.warn(`DocViewSVGEdit::_pathClassesToPDFPathStyle: Encountered unknown style: ${className}`)
+            }
+            else {
+                // apply style of this class
+                docStyle = { ...docStyle, ...classStyle };
+            }
+        })
+
+        return docStyle;
     }
 
 

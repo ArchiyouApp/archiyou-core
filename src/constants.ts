@@ -3,6 +3,33 @@
 // Enables fine grained settings
 // See App settings in settings.ts
 
+import { DocPathStyle } from './internal'
+
+//// DRAWING STYLES
+
+// units are in points (corresponding to PDF units)
+export const CLASS_TO_STYLE:Record<string, DocPathStyle> = {
+    // standard line
+    line: { 
+        lineWidth: 0.425, // 0.15 mm
+        lineCap: 'butt',
+        lineJoin: 'miter',
+    },
+    dashed: {
+        lineWidth: 0.425, // 0.15 mm
+        dash: [ 11.339, 11.339] // size, space in points
+    },
+    hidden: {
+        lineWidth: 0.142, // 0.05mm
+    },
+    outline : {
+        lineWidth: 0.709, // 0.25mm
+    },
+    dimensionline : {
+        lineWidth: 0.709, // 0.1mm
+    },
+}
+
 //// MISC SETTINGS
 
 export const MESHING_MAX_DEVIATION = 0.1;

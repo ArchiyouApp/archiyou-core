@@ -371,6 +371,29 @@ export interface BeamLikeDims
     length:number // length
 }
 
+//// DOC STYLING ////
+
+
+/** Configurator on how to draw shapes on documents (HTML or PDF) */
+export interface DocPathStyle {
+    // see: https://pdfkit.org/docs/vector.html
+    lineWidth?:number
+    lineCap?:'butt'|'round'|'square'
+    lineJoin?:'miter'|'bevel'|'round'
+    dash?:Array<number|number> // size, space
+    strokeColor?:string // 'red', '#FF0000'
+    strokeOpacity?:number // [0.0-1.0]
+    fillColor?:string
+    fillOpacity?:number
+}
+
+export interface PDFLinePath 
+{
+    path: string // the d of SVG paths in PDF coords
+    style: DocPathStyle
+}
+
+
 //// LAYOUTS ////
 
 export type LayoutOrderType = 'line'|'grid'|'binpack'|'nest'

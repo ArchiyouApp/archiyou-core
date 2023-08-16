@@ -14,16 +14,18 @@
 
 import fs from 'fs'; // virtual pdfkit filesystem as replacement of node
 
-import { DocData } from './Doc'
-import { convertValueFromToUnit } from './utils'
+import { DocData } from './internal' // Doc
+import { PDFLinePath } from './internal' // types
+import { convertValueFromToUnit } from './internal'
 import { PageData, ContainerData, Page } from './internal'
+
+import { DocViewSVGEdit } from './DocViewSVGEdit'
 
 import type { PDFDocument, PDFPage } from '@types/pdfkit'
 import SVGtoPDF from 'svg-to-pdfkit'
-
 import BlobStream from 'blob-stream' // BlobStream for Web - TODO: disable for node
 
-import { DocViewSVGEdit } from './DocViewSVGEdit'
+
 
 import { arrayBufferToBase64 } from './utils'
 
@@ -82,8 +84,6 @@ export class DocPDFExporter
                     await this._export(null);
                 }
                 else {
-                    console.info('DocPDFExporter::init: [[DEBUG]]. Data: ')
-                    console.info(data);
                     this.generateTestDoc();
                 }
             }) // To be in instance scope
@@ -408,33 +408,39 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
-        console.log('==== PLACE VIEW ====')
+        const DRAW_BORDER = true;
+
         const svgEdit = new DocViewSVGEdit(view);
-        svgEdit.toPDFDocPaths(this,view,p)
+        const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocPaths(this,view,p)
 
-        /*
-        svgEdit.setViewBox();
-        svgEdit.setNoStrokeScaling();
-        const svgStr = svgEdit.export();
+        if(pdfLinePaths)
+        {
+            pdfLinePaths.forEach( path => {
+                // draw line onto PDF document
+                let d = this.activePDFDoc.path(path.path)
+                        .stroke();
+                // style attributes translate directly into methods on d
+                for (const [fn,val] of Object.entries(path.style))
+                {
+                    if(typeof d[fn] === 'function')
+                    {
+                        d = d[fn](val); // execute style function
+                    }
+                }
+            })
+        }
 
-        const { x, y } = this.containerToPositionPoints(view, p);
-
-        console.log(svgStr);
-
-        SVGtoPDF(
-            this.activePDFDoc, 
-            svgStr, 
-            x,
-            y,
-            {
-                // options
-                width: this.relWidthToPoints(view.width, p),
-                height: this.relHeightToPoints(view.height, p),
-                preserveAspectRatio : this.getSVGPreserveAspectRatioOption(view)
-            }
-        );
-
-        */
+        // debug
+        const viewPositionPnts = this.containerToPositionPoints(view, p);
+        if (DRAW_BORDER)
+        {
+            this.activePDFDoc.rect(
+                viewPositionPnts.x,
+                viewPositionPnts.y,
+                this.relWidthToPoints(view.width, p),
+                this.relHeightToPoints(view.height, p),
+            )
+        }
     }
 
     //// UTILS ////
