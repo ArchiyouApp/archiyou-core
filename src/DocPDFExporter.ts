@@ -408,7 +408,7 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
-        const DRAW_BORDER = true;
+        const DRAW_DEBUG_BORDER = true;
 
         const svgEdit = new DocViewSVGEdit(view);
         const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocPaths(this,view,p)
@@ -432,14 +432,14 @@ export class DocPDFExporter
 
         // debug
         const viewPositionPnts = this.containerToPositionPoints(view, p);
-        if (DRAW_BORDER)
+        if (DRAW_DEBUG_BORDER)
         {
             this.activePDFDoc.rect(
                 viewPositionPnts.x,
                 viewPositionPnts.y,
                 this.relWidthToPoints(view.width, p),
                 this.relHeightToPoints(view.height, p),
-            )
+            ).stroke();
         }
     }
 
