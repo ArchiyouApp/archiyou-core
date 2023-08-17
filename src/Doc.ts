@@ -26,7 +26,8 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyContainer, View, TableContainerOptions, ArchiyouApp } from './internal' // classes
+import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
+            ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
@@ -87,6 +88,7 @@ export class Doc
     PAGE_SIZE_DEFAULT:PageSize = 'A4';
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
     IMAGE_PROXY:string='http://localhost:8090/proxy' // IMPORTANT: on browser you can not simply load image data: use a proxy
+    CONTENT_ALIGN_DEFAULT:ContainerAlignment = ['left', 'top'];
 
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
@@ -495,7 +497,39 @@ export class Doc
         return this;
     }
 
-    //// Forward to active View Container ////
+    /** Turn on border on active container with optional styling */
+    border(style?:DocPathStyle):Doc
+    {
+        if(!this._activeContainer){ throw new Error(`Doc::border(): Cannot set border on actie container! Make a container first!`)};
+        (this._activeContainer as View).border(style);
+
+        return this;
+    }
+
+    /** set contentAlign on active container */
+    contentAlign(align:ContainerHAlignment|ContainerVAlignment|ContainerAlignment):Doc
+    {
+        if(!this._activeContainer){ throw new Error(`Doc::contentAlign(): Cannot set contentAlign. No active container. Please make one first!`)};
+        let newContentAlign:ContainerAlignment = [...this.CONTENT_ALIGN_DEFAULT];
+        if(isContainerHAlignment(align))
+        {
+            newContentAlign[0] = align;
+        }
+        else if(isContainerVAlignment(align))
+        {
+            newContentAlign[1] = align;
+        }
+        else if(isContainerAlignment(align))
+        {
+            newContentAlign = align;
+        }
+
+        this._activeContainer._contentAlign = newContentAlign;
+
+        return this;
+    }
+
+    //// FORWARD TO SPECIFIC CONTAINER TYPES ////
 
     /** Bind ShapeCollection to View: either a real reference or the name of a ShapeCollection after running the doc pipeline */
     shapes(shapes:ShapeCollection|string):Doc
@@ -526,6 +560,7 @@ export class Doc
 
         return this;
     }
+
 
     //// OUTPUT ////
 

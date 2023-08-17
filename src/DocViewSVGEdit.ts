@@ -63,6 +63,10 @@ export class DocViewSVGEdit
     */
     toPDFDocPaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
     {
+
+        console.log('**************************');
+        console.log(view);
+
         // first basic translation/scaling aspects
 
         // TODO: this is needed when zoomLevel is calculated later (now we simply fill the container no matter what the svg model units)
@@ -80,12 +84,13 @@ export class DocViewSVGEdit
 
         const pdfViewRatio = pdfViewWidthPnts/pdfViewHeightPnts;
         const svgRatio = svgWidth/svgHeight;
-        const containedBy = (pdfViewRatio < svgRatio) ? 'width' : 'height';
+        const boundBy = (pdfViewRatio < svgRatio) ? 'width' : 'height';
 
         // transformation variables
         const svgToPDFTranslateX = -svgLeft;
         const svgToPDFTranslateY = -svgTop;
-        const svgToPDFScale = (containedBy === 'width') ?
+        // scale factor from svg to pdf
+        const svgToPDFScale = (boundBy === 'width') ?
                                     pdfViewWidthPnts / svgWidth :
                                     pdfViewHeightPnts / svgHeight;
         
@@ -109,10 +114,23 @@ export class DocViewSVGEdit
                     // TODO: implement zoomLevels later
                     const containerPositionPnts = pdfExporter.containerToPositionPoints(view, page); // includes offsets for pivot
 
-                    let x1 = (line[0] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x;  // TODO: implement contentAlign (now:lefttop)
-                    let y1 = (line[1] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y;
-                    let x2 = (line[2] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x;
-                    let y2 = (line[3] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y;
+                    // Content align: see what dimension is bound by Container (width or height) and then align along the other dimension
+                    const contentOffsetX = (boundBy === 'width' || !view.contentAlign || view.contentAlign[0] === 'left') 
+                                            ? 0 
+                                            : (pdfViewWidthPnts - svgWidth * svgToPDFScale)/((view.contentAlign[0] === 'center') ? 2 : 1)
+
+                    const contentOffsetY = (boundBy === 'height' || !view.contentAlign || view.contentAlign[1] === 'top') 
+                                            ? 0 
+                                            : (pdfViewHeightPnts - svgWidth * svgToPDFScale)/((view.contentAlign[1] === 'center') ? 2 : 1)
+
+                    console.log(contentOffsetX);
+                    console.log(contentOffsetY);
+
+
+                    let x1 = (line[0] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x + contentOffsetX; 
+                    let y1 = (line[1] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y + contentOffsetY;
+                    let x2 = (line[2] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x + contentOffsetX;
+                    let y2 = (line[3] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y + contentOffsetY;
 
                     linePaths.push(
                         {

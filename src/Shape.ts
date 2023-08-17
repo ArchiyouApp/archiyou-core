@@ -142,6 +142,12 @@ export class Shape
         return this;
     }
 
+    /** Alias for attribute() */
+    attr(key?:string, value?:any):any|AnyShape
+    {   
+        return this.attribute(key, value);
+    }
+
     /** Get attributes of Shape */
     attrs():ShapeAttributes
     {
@@ -3931,26 +3937,31 @@ export class Shape
             - HLRAlgo_Projector: https://dev.opencascade.org/doc/refman/html/class_h_l_r_algo___projector.html
             - HLRBRep_HLRToShape: https://dev.opencascade.org/doc/refman/html/class_h_l_r_b_rep___h_l_r_to_shape.html#a7c587980991a24c4a36dd60c1f8b8f60
 
+            
+            IMPORTANT: Outlines in OC are not what normally is considered an outline. 
+            Outlines in OC are edges that don't overlap with existing 3D Edges of the shape (like the contour of a sphere, but NOT sides of a box)
             NOTE: Looks like Y axis of 3D space is always aligned with the projected Y axis
+
+
         */
         
         let ocHiddenLineRemoval = new this._oc.HLRBRep_Algo_1();
         ocHiddenLineRemoval.Add_2(this._ocShape, 0); // Shape and number of isoparameters
         let ocProjector = new this._oc.HLRAlgo_Projector_2(new this._oc.gp_Ax2_3(new Point()._toOcPoint(), (planeNormal as Vector)._toOcDir()));
         ocHiddenLineRemoval.Projector_1(ocProjector); // NOTE: different between OC versions
-        ocHiddenLineRemoval.Update();
-        ocHiddenLineRemoval.Hide_1();
-
-        let ocHiddenLinesToShape =  new this._oc.HLRBRep_HLRToShape(new this._oc.Handle_HLRBRep_Algo_2(ocHiddenLineRemoval));
+        ocHiddenLineRemoval.Update(); // compute outlines
+        ocHiddenLineRemoval.Hide_1(); // compute hidden lines
 
         let groupedProjectedEdges = new ShapeCollection();
+
+        let ocHiddenLinesToShape =  new this._oc.HLRBRep_HLRToShape(new this._oc.Handle_HLRBRep_Algo_2(ocHiddenLineRemoval));
         
-        let visibleSharpEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.VCompound_1()); 
+        let visibleOutlines = new Shape()._fromOcShape(ocHiddenLinesToShape.OutLineVCompound_1()); // outlines are edges that are not lying on existing edges of the shape (like the outline of a sphere)
+        let visibleSharpEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.VCompound_1()); // sharp edges are between discontinuous faces
         if (visibleSharpEdges){ groupedProjectedEdges.addGroup('sharp', visibleSharpEdges) };
-        let visibleSmoothEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.Rg1LineVCompound_1())
-        if(visibleSmoothEdges){ groupedProjectedEdges.addGroup('smooth', visibleSmoothEdges) };
-        
-        let visibleOutlines = new Shape()._fromOcShape(ocHiddenLinesToShape.OutLineVCompound_1());
+        let visibleSmoothEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.Rg1LineVCompound_1()); // smooth edges are between continuous surfaces
+        if(visibleSmoothEdges){ groupedProjectedEdges.addGroup('smooth', visibleSmoothEdges) }; 
+
         if(visibleOutlines)
         {  
             visibleOutlines.attribute('outline', true); // for later reference (toSvg())
@@ -4033,8 +4044,6 @@ export class Shape
     @checkInput([['Side', 'top'], ['Boolean', false]], ['auto', 'auto'])
     elevation(side?:Side, all?:boolean):AnyShapeCollection
     {
-        console.log('==== ELEVATION ====');
-        console.log(all);
         return this._elevation(side, all);
     }
 

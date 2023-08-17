@@ -1,6 +1,6 @@
 type ContainerType = 'view'|'image'|'text'|'textarea'|'table'
 
-import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits } from './internal'
+import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPathStyle } from './internal'
 
 //// TYPES AND INTERFACES ////
 export type ContainerHAlignment = 'left'|'center'|'right'
@@ -26,7 +26,9 @@ export type ContainerData = { // Combine all Container types for convenience
     heightAbs?:number // in doc units (added on place)
     position:Position // relative to page-content-area
     pivot:Position
-    frame?:any // TODO
+    border?:boolean // border around container
+    borderStyle?:DocPathStyle // style to draw border
+    frame?:any // advanced shapes as border
     index?:number
     caption?:string
     contentAlign:ContainerAlignment // alignment of content inside container
@@ -59,7 +61,7 @@ export function isContainerHAlignment(o:any): o is ContainerHAlignment
     return ['left', 'center', 'right'].includes(o)
 }
 
-export function isContainerVAlignment(o:any): o is ContainerHAlignment
+export function isContainerVAlignment(o:any): o is ContainerVAlignment
 {
     return ['top', 'center', 'bottom'].includes(o)
 }
@@ -90,6 +92,7 @@ export class Container
     HEIGHT_DEFAULT = 1.0;
     PIVOT_DEFAULT:ContainerAlignment = ['left', 'top'];
     POSITION_DEFAULT:ContainerAlignment = ['left', 'top'];
+    CONTENT_ALIGN_DEFAULT:ContainerAlignment = ['left','top'];
 
     //// END SETTINGS ////
 
@@ -103,6 +106,8 @@ export class Container
     _heightRelativeTo:ContainerSizeRelativeTo = 'page-content-area';
     _position:Array<number|number>; // x,y in relative coords [0-1] of page-content-area
     _pivot:Array<number|number>; // x,y in percentage [0-1] of [containerWidth,containerHeight] - leftbottom = [0,0]
+    _border:boolean = false;
+    _borderStyle:DocPathStyle;
     _frame:Frame;
     _index:number; // ordering z-index
     _caption:string;
@@ -205,6 +210,12 @@ export class Container
         this._zoomRelativeTo = 'world';
     }
 
+    /** Turn on border on this container. Use without param to use default style */
+    border(style?:DocPathStyle)
+    {
+        this._border = true;
+        this._borderStyle = style;
+    }
 
     //// OUTPUT ////
 
@@ -249,15 +260,17 @@ export class Container
             heightAbs: this._calculateAbsHeight(), // in doc units
             position: this._position,
             pivot: this._pivot,
+            border: this._border,
+            borderStyle: this._borderStyle,
             frame: this._frame,
             index: this._index,
             caption: this._caption,
-            contentAlign: this._contentAlign,
+            contentAlign: this._contentAlign || this.CONTENT_ALIGN_DEFAULT,
             content: null,
             zoomLevel: this._zoomLevel || 1,
             zoomRelativeTo: this._zoomRelativeTo || 'container',
             docUnits: this._page._units, // needed to scale the content
-            modelUnits: this._page._units, // needed to scale the content
+            modelUnits: this._page?._doc?._geom?._units, // needed to scale the content
         }
 
         return c;

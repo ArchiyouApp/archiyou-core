@@ -14,7 +14,7 @@
 
 import fs from 'fs'; // virtual pdfkit filesystem as replacement of node
 
-import { DocData } from './internal' // Doc
+import { DocData, DocPathStyle } from './internal' // Doc
 import { PDFLinePath } from './internal' // types
 import { convertValueFromToUnit } from './internal'
 import { PageData, ContainerData, Page } from './internal'
@@ -408,10 +408,9 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
-        const DRAW_DEBUG_BORDER = true;
-
         const svgEdit = new DocViewSVGEdit(view);
-        const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocPaths(this,view,p)
+        // Transform incoming SVG paths (in model space) into PDF paths in the space defined by the View Container
+        const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocPaths(this,view,p);
 
         if(pdfLinePaths)
         {
@@ -419,28 +418,37 @@ export class DocPDFExporter
                 // draw line onto PDF document
                 let d = this.activePDFDoc.path(path.path)
                         .stroke();
-                // style attributes translate directly into methods on d
-                for (const [fn,val] of Object.entries(path.style))
-                {
-                    if(typeof d[fn] === 'function')
-                    {
-                        d = d[fn](val); // execute style function
-                    }
-                }
+                d = this._applyPathStyle(d, path.style);
             })
         }
-
-        // debug
+        // draw border around container
         const viewPositionPnts = this.containerToPositionPoints(view, p);
-        if (DRAW_DEBUG_BORDER)
+        if (view.border)
         {
-            this.activePDFDoc.rect(
+            let d = this.activePDFDoc.rect(
                 viewPositionPnts.x,
                 viewPositionPnts.y,
                 this.relWidthToPoints(view.width, p),
                 this.relHeightToPoints(view.height, p),
             ).stroke();
+            this._applyPathStyle(d, view?.borderStyle)
         }
+    }
+
+    _applyPathStyle(doc:PDFDocument, style?:DocPathStyle)
+    {
+        if (!style || typeof style !== 'object') return doc;
+
+        // style attributes translate directly into methods on d
+        for (const [fn,val] of Object.entries(style))
+        {
+            if(typeof doc[fn] === 'function')
+            {
+                doc = doc[fn](val); // execute style function
+            }
+        }
+
+        return doc;
     }
 
     //// UTILS ////
