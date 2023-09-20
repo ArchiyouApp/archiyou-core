@@ -1281,6 +1281,34 @@
          return this.collapse();
       }
 
+      //// SHAPE COMBINATION ALGORITHMS ////
+
+      /** Try to calculate the bounding Wire 
+       *   Work in progress
+       *    See original code: https://github.com/Open-Cascade-SAS/OCCT/blob/ae1683705ef5c9a7e767c5c873e7d725b04d262f/src/ShapeAnalysis/ShapeAnalysis_FreeBounds.cxx#L89
+      */
+      boundary():Wire
+      {
+         console.log('=========== BOUNDARY ===========');
+         console.log(this._oc.TopTools_HSequenceOfShape);
+         console.log(this._oc.TopTools);
+         console.log(this._oc.TopTools.HSequenceOfShape);
+         console.log(this._oc.Handle_TopTools_HSequenceOfShape);
+         console.log(new this._oc.TopTools().TopTools_HSequenceOfShape);
+
+         const ocShapeSequence = new this._oc.Handle_TopTools_HSequenceOfShape_2(new this._oc.TopTools_ListOfShape_1());
+         const ocEdges = new this._oc.Handle_TopTools_HSequenceOfShape_2(new this._oc.TopTools_ListOfShape_1());
+         this.edges().forEach( e => ocEdges.Append_1(e._ocShape));
+
+         this._oc.ShapeAnalysis_FreeBounds.ConnectEdgesToWires(
+                  ocEdges, 
+                  0.1, 
+                  false,
+                  ocShapeSequence);
+
+         return null;
+      }
+
       //// NAVIGATING SHAPES ////
 
       /** Get Shapes of given type in ShapeCollection */

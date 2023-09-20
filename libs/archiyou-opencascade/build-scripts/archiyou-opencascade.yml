@@ -16,7 +16,6 @@ mainBuild:
   - symbol: Handle_TColStd_HArray1OfBoolean
   - symbol: IntTools_FaceFace
   - symbol: BndLib_Add2dCurve
-  - symbol: ShapeAnalysis_FreeBounds
   - symbol: GeomAbs_SurfaceType
   - symbol: TopoDS_Builder
   - symbol: ChFi3d_FilletShape
@@ -277,6 +276,12 @@ mainBuild:
   - symbol: Quantity_Color
   - symbol: RWMesh_CoordinateSystemConverter
   - symbol: RWMesh_CoordinateSystem
+  - symbol: Handle_TopTools_HSequenceOfShape
+  - symbol: ShapeAnalysis_FreeBounds
+  - symbol: ShapeAnalysis_FreeBoundsProperties
+  - symbol: TopTools
+  - symbol: TopTools_SequenceOfShape  
+  - symbol: TopTools_HSequenceOfShape
   - symbol: OCJS
   emccFlags:
     - -sEXPORT_ES6=1
@@ -287,7 +292,16 @@ mainBuild:
     - -sEXPORTED_RUNTIME_METHODS=["FS"]
     - -O3
     - -sUSE_FREETYPE=1
+    - sEXPORTED_FUNCTIONS=TopTools_HSequenceOfShape
   name: archiyou-opencascade.js
+
+# PROBLEM: can not import symbol 'TopTools_HSequence'
+# fix TopTools_HSequence. See hints: https://github.com/donalffons/opencascade.js/issues?q=is%3Aissue+is%3Aclosed
+# DEFINE_HSEQUENCE(TopTools_HSequenceOfShape, TopTools_SequenceOfShape);
+# see: https://github.com/Open-Cascade-SAS/OCCT/blob/ae1683705ef5c9a7e767c5c873e7d725b04d262f/src/NCollection/NCollection_DefineHSequence.hxx#L27
+# POSSIBLE SOLUTION:
+# Convert ConnectEdgesToWires/ConnectWiresToWires to not using TopTools_HSequenceOfShape, but TopTools_HArray1OfShape
+# https://github.com/Open-Cascade-SAS/OCCT/blob/ae1683705ef5c9a7e767c5c873e7d725b04d262f/src/ShapeAnalysis/ShapeAnalysis_FreeBounds.cxx#L135
 
 additionalCppCode: |
   typedef Handle(IMeshTools_Context) Handle_IMeshTools_Context;

@@ -1,3 +1,4 @@
+// @ts-nocheck to archiyou-opencascade.d.ts
 export declare class BRepAdaptor_CompCurve extends Adaptor3d_Curve {
   static get_type_name(): Standard_Character;
   static get_type_descriptor(): Handle_Standard_Type;
@@ -2218,6 +2219,41 @@ export declare class ShapeAnalysis_Surface extends Standard_Transient {
   delete(): void;
 }
 
+export declare class ShapeAnalysis_FreeBoundsProperties {
+  Init_1(shape: TopoDS_Shape, tolerance: Standard_Real, splitclosed: Standard_Boolean, splitopen: Standard_Boolean): void;
+  Init_2(shape: TopoDS_Shape, splitclosed: Standard_Boolean, splitopen: Standard_Boolean): void;
+  Perform(): Standard_Boolean;
+  IsLoaded(): Standard_Boolean;
+  Shape(): TopoDS_Shape;
+  Tolerance(): Standard_Real;
+  NbFreeBounds(): Graphic3d_ZLayerId;
+  NbClosedFreeBounds(): Graphic3d_ZLayerId;
+  NbOpenFreeBounds(): Graphic3d_ZLayerId;
+  ClosedFreeBounds(): Handle_ShapeAnalysis_HSequenceOfFreeBounds;
+  OpenFreeBounds(): Handle_ShapeAnalysis_HSequenceOfFreeBounds;
+  ClosedFreeBound(index: Graphic3d_ZLayerId): Handle_ShapeAnalysis_FreeBoundData;
+  OpenFreeBound(index: Graphic3d_ZLayerId): Handle_ShapeAnalysis_FreeBoundData;
+  DispatchBounds(): Standard_Boolean;
+  CheckContours(prec: Standard_Real): Standard_Boolean;
+  CheckNotches_1(prec: Standard_Real): Standard_Boolean;
+  CheckNotches_2(fbData: Handle_ShapeAnalysis_FreeBoundData, prec: Standard_Real): Standard_Boolean;
+  CheckNotches_3(freebound: TopoDS_Wire, num: Graphic3d_ZLayerId, notch: TopoDS_Wire, distMax: Standard_Real, prec: Standard_Real): Standard_Boolean;
+  FillProperties(fbData: Handle_ShapeAnalysis_FreeBoundData, prec: Standard_Real): Standard_Boolean;
+  delete(): void;
+}
+
+  export declare class ShapeAnalysis_FreeBoundsProperties_1 extends ShapeAnalysis_FreeBoundsProperties {
+    constructor();
+  }
+
+  export declare class ShapeAnalysis_FreeBoundsProperties_2 extends ShapeAnalysis_FreeBoundsProperties {
+    constructor(shape: TopoDS_Shape, tolerance: Standard_Real, splitclosed: Standard_Boolean, splitopen: Standard_Boolean);
+  }
+
+  export declare class ShapeAnalysis_FreeBoundsProperties_3 extends ShapeAnalysis_FreeBoundsProperties {
+    constructor(shape: TopoDS_Shape, splitclosed: Standard_Boolean, splitopen: Standard_Boolean);
+  }
+
 export declare class ShapeAnalysis_FreeBounds {
   GetClosedWires(): TopoDS_Compound;
   GetOpenWires(): TopoDS_Compound;
@@ -3092,6 +3128,85 @@ export declare type BRepOffset_Mode = {
   BRepOffset_Pipe: {};
   BRepOffset_RectoVerso: {};
 }
+
+export declare class Handle_TopTools_HSequenceOfShape {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: TopTools_HSequenceOfShape): void;
+  get(): TopTools_HSequenceOfShape;
+  delete(): void;
+}
+
+  export declare class Handle_TopTools_HSequenceOfShape_1 extends Handle_TopTools_HSequenceOfShape {
+    constructor();
+  }
+
+  export declare class Handle_TopTools_HSequenceOfShape_2 extends Handle_TopTools_HSequenceOfShape {
+    constructor(thePtr: TopTools_HSequenceOfShape);
+  }
+
+  export declare class Handle_TopTools_HSequenceOfShape_3 extends Handle_TopTools_HSequenceOfShape {
+    constructor(theHandle: Handle_TopTools_HSequenceOfShape);
+  }
+
+  export declare class Handle_TopTools_HSequenceOfShape_4 extends Handle_TopTools_HSequenceOfShape {
+    constructor(theHandle: Handle_TopTools_HSequenceOfShape);
+  }
+
+export declare class TopTools {
+  constructor();
+  static Dump(Sh: TopoDS_Shape, S: Standard_OStream): void;
+  static Dummy(I: Graphic3d_ZLayerId): void;
+  delete(): void;
+}
+
+export declare class TopTools_SequenceOfShape extends NCollection_BaseSequence {
+  begin(): any;
+  end(): any;
+  cbegin(): any;
+  cend(): any;
+  Size(): Standard_Integer;
+  Length(): Standard_Integer;
+  Lower(): Standard_Integer;
+  Upper(): Standard_Integer;
+  IsEmpty(): Standard_Boolean;
+  Reverse(): void;
+  Exchange(I: Standard_Integer, J: Standard_Integer): void;
+  static delNode(theNode: NCollection_SeqNode, theAl: Handle_NCollection_BaseAllocator): void;
+  Clear(theAllocator: Handle_NCollection_BaseAllocator): void;
+  Assign(theOther: TopTools_SequenceOfShape): TopTools_SequenceOfShape;
+  Remove_2(theIndex: Standard_Integer): void;
+  Remove_3(theFromIndex: Standard_Integer, theToIndex: Standard_Integer): void;
+  Append_1(theItem: TopoDS_Shape): void;
+  Append_2(theSeq: TopTools_SequenceOfShape): void;
+  Prepend_1(theItem: TopoDS_Shape): void;
+  Prepend_2(theSeq: TopTools_SequenceOfShape): void;
+  InsertBefore_1(theIndex: Standard_Integer, theItem: TopoDS_Shape): void;
+  InsertBefore_2(theIndex: Standard_Integer, theSeq: TopTools_SequenceOfShape): void;
+  InsertAfter_2(theIndex: Standard_Integer, theSeq: TopTools_SequenceOfShape): void;
+  InsertAfter_3(theIndex: Standard_Integer, theItem: TopoDS_Shape): void;
+  Split(theIndex: Standard_Integer, theSeq: TopTools_SequenceOfShape): void;
+  First(): TopoDS_Shape;
+  ChangeFirst(): TopoDS_Shape;
+  Last(): TopoDS_Shape;
+  ChangeLast(): TopoDS_Shape;
+  Value(theIndex: Standard_Integer): TopoDS_Shape;
+  ChangeValue(theIndex: Standard_Integer): TopoDS_Shape;
+  SetValue(theIndex: Standard_Integer, theItem: TopoDS_Shape): void;
+  delete(): void;
+}
+
+  export declare class TopTools_SequenceOfShape_1 extends TopTools_SequenceOfShape {
+    constructor();
+  }
+
+  export declare class TopTools_SequenceOfShape_2 extends TopTools_SequenceOfShape {
+    constructor(theAllocator: Handle_NCollection_BaseAllocator);
+  }
+
+  export declare class TopTools_SequenceOfShape_3 extends TopTools_SequenceOfShape {
+    constructor(theOther: TopTools_SequenceOfShape);
+  }
 
 export declare class TopTools_ListOfShape extends NCollection_BaseList {
   begin(): any;
@@ -8808,6 +8923,10 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   gp_Cylinder_1: typeof gp_Cylinder_1;
   gp_Cylinder_2: typeof gp_Cylinder_2;
   ShapeAnalysis_Surface: typeof ShapeAnalysis_Surface;
+  ShapeAnalysis_FreeBoundsProperties: typeof ShapeAnalysis_FreeBoundsProperties;
+  ShapeAnalysis_FreeBoundsProperties_1: typeof ShapeAnalysis_FreeBoundsProperties_1;
+  ShapeAnalysis_FreeBoundsProperties_2: typeof ShapeAnalysis_FreeBoundsProperties_2;
+  ShapeAnalysis_FreeBoundsProperties_3: typeof ShapeAnalysis_FreeBoundsProperties_3;
   ShapeAnalysis_FreeBounds: typeof ShapeAnalysis_FreeBounds;
   ShapeAnalysis_FreeBounds_1: typeof ShapeAnalysis_FreeBounds_1;
   ShapeAnalysis_FreeBounds_2: typeof ShapeAnalysis_FreeBounds_2;
@@ -8909,6 +9028,16 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   Adaptor3d_Curve: typeof Adaptor3d_Curve;
   Adaptor3d_Surface: typeof Adaptor3d_Surface;
   BRepOffset_Mode: BRepOffset_Mode;
+  Handle_TopTools_HSequenceOfShape: typeof Handle_TopTools_HSequenceOfShape;
+  Handle_TopTools_HSequenceOfShape_1: typeof Handle_TopTools_HSequenceOfShape_1;
+  Handle_TopTools_HSequenceOfShape_2: typeof Handle_TopTools_HSequenceOfShape_2;
+  Handle_TopTools_HSequenceOfShape_3: typeof Handle_TopTools_HSequenceOfShape_3;
+  Handle_TopTools_HSequenceOfShape_4: typeof Handle_TopTools_HSequenceOfShape_4;
+  TopTools: typeof TopTools;
+  TopTools_SequenceOfShape: typeof TopTools_SequenceOfShape;
+  TopTools_SequenceOfShape_1: typeof TopTools_SequenceOfShape_1;
+  TopTools_SequenceOfShape_2: typeof TopTools_SequenceOfShape_2;
+  TopTools_SequenceOfShape_3: typeof TopTools_SequenceOfShape_3;
   TopTools_ListOfShape: typeof TopTools_ListOfShape;
   TopTools_ListOfShape_1: typeof TopTools_ListOfShape_1;
   TopTools_ListOfShape_2: typeof TopTools_ListOfShape_2;

@@ -1713,6 +1713,14 @@ export class Shape
         let ocMakeRevol = new this._oc.BRepPrimAPI_MakeRevol_1(this._ocShape, ocAxis, toRad(angle), true);
         let newOcShape = ocMakeRevol.Shape();
         let revolvedShape = new Shape()._fromOcShape(newOcShape);
+
+        // NOTE: Often the result is a Shellm which intuitively should be a Solid to the user
+        // Try to upgrade
+        if(revolvedShape.type() === 'Shell')
+        {
+            const solidRevolvedShape = (revolvedShape as Shell)._toSolid();
+            revolvedShape = solidRevolvedShape || revolvedShape; // upgraded to Solid if not null
+        }
         
         return revolvedShape
     }
