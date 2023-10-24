@@ -238,6 +238,11 @@ mainBuild:
   - symbol: Extrema_ExtFlag
   - symbol: Extrema_ExtAlgo
   - symbol: GeomAdaptor_Curve
+  - symbol: BOPAlgo_Algo
+  - symbol: BOPAlgo_BuilderShape
+  - symbol: BOPAlgo_Builder
+  - symbol: BOPAlgo_ToolsProvider
+  - symbol: BOPAlgo_Options
   - symbol: BOPAlgo_Operation
   - symbol: BOPAlgo_Splitter
   - symbol: BRepBuilderAPI_WireError
@@ -282,7 +287,7 @@ mainBuild:
   - symbol: ShapeAnalysis_FreeBoundsProperties
   - symbol: TopTools
   - symbol: TopTools_SequenceOfShape  
-  - symbol: TopTools_HSequenceOfShape
+  #- symbol: TopTools_HSequenceOfShape # not there
   - symbol: OCJS
   emccFlags:
     - -sEXPORT_ES6=1
@@ -293,7 +298,7 @@ mainBuild:
     - -sEXPORTED_RUNTIME_METHODS=["FS"]
     - -O3
     - -sUSE_FREETYPE=1
-    - sEXPORTED_FUNCTIONS=TopTools_HSequenceOfShape
+    #- sEXPORTED_FUNCTIONS=
   name: archiyou-opencascade.js
 
 # PROBLEM: can not import symbol 'TopTools_HSequence'

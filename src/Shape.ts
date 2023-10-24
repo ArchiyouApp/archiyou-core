@@ -2344,44 +2344,54 @@ export class Shape
     /** Split current Shape into multiple ones using the given other Shapes (Private method: without adding to Scene)
      *     The other Shapes are removed after the operation
      */
-    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    _splitted(others:AnyShapeOrCollection):AnyShapeOrCollection
+    @checkInput([['AnyShapeOrCollection', null],['Boolean', false]], ['ShapeCollection', 'auto'])
+    _splitted(others:AnyShapeOrCollection, excludeOverlapping:boolean):AnyShapeOrCollection
     {
         /* OC docs:
             * https://dev.opencascade.org/doc/refman/html/class_b_o_p_algo___splitter.html
             * https://documentation.help/Open-Cascade/occt_user_guides__boolean_operations.html#occt_algorithms_8
         */
 
+        const OVERLAP_PERC_TOLERANCE = 0.05; // For filtering out results that overlap with operants
+
         let thisCollection = new ShapeCollection(this);
         let otherCollection = others as ShapeCollection; // auto-converted by @checkInput
 
-        
-        console.log('HIERO!')
-        console.log(this._oc.BOPAlgo_Splitter_1)
-        console.log(this._oc.BOPAlgo_Splitter)
         let ocSplitter = new this._oc.BOPAlgo_Splitter_1();
         
         ocSplitter.SetArguments(thisCollection._toOcListOfShape()); // the main Shape(s)
         ocSplitter.SetTools(otherCollection._toOcListOfShape());
-        ocSplitter.Perform();
+        ocSplitter.Perform(new this._oc.Message_ProgressRange_1());
         let ocShape = ocSplitter.Shape();
-        let shapeOrColl = new Shape()._fromOcShape(ocShape);
+        
+        let splitShapes = new ShapeCollection(new Shape()._fromOcShape(ocShape));
 
-        return shapeOrColl;
+        // if flag set, don't include the results that overlap with operant others
+        if(splitShapes.length && excludeOverlapping)
+        {
+            return (splitShapes as ShapeCollection)
+                    .filter((s) => {
+                        // filter out result splitted Shapes that overlap with any of the operant Shapes
+                        return !otherCollection.toArray().some( o => s.overlapPerc(o) > OVERLAP_PERC_TOLERANCE)
+                    })
+                    .checkSingle();
+        }
+        
+        return splitShapes.checkSingle();
     }
 
     /** Split current Shape into multiple ones using the given other Shapes */
     @addResultShapesToScene
-    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    splitted(others:AnyShapeOrCollection):AnyShapeOrCollection
+    @checkInput([['AnyShapeOrCollection', null],['Boolean', false]], ['ShapeCollection', 'auto'])
+    splitted(others:AnyShapeOrCollection,  excludeOverlapping:boolean):AnyShapeOrCollection
     {
-        return this._splitted(others);
+        return this._splitted(others, excludeOverlapping);
     }
 
-    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    split(others:AnyShapeOrCollection):AnyShapeOrCollection
+    @checkInput([['AnyShapeOrCollection', null],['Boolean', false]], ['ShapeCollection', 'auto'])
+    split(others:AnyShapeOrCollection, excludeOverlapping:boolean):AnyShapeOrCollection
     {
-        let splittedShape = this._splitted(others);
+        let splittedShape = this._splitted(others, excludeOverlapping);
         this.replaceShape(splittedShape)
         return splittedShape;
     }
@@ -2677,6 +2687,21 @@ export class Shape
     overlaps(other:AnyShape):boolean 
     {
         return (this._intersections(other) != null ) ? true : false;
+    }
+
+    /** Get amount of overlap [0-1] between this shape and given other */
+    @checkInput('AnyShape', 'auto')
+    overlapPerc(other:AnyShape):number
+    {
+        let overlappingVolume = 0.0;
+        // NOTE: Shapes can have multiple intersections
+        this._intersections(other).forEach(intersectionShape => 
+        {
+            overlappingVolume += intersectionShape.volume();
+        })
+
+        const thisVolume = this.volume();
+        return (thisVolume) ? overlappingVolume / this.volume() : 0; // avoid divide by zero
     }
 
     /** Test if a one Shape completely contains the other. 

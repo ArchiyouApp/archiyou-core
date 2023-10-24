@@ -1,4 +1,3 @@
-// @ts-nocheck to archiyou-opencascade.d.ts
 export declare class BRepAdaptor_CompCurve extends Adaptor3d_Curve {
   static get_type_name(): Standard_Character;
   static get_type_descriptor(): Handle_Standard_Type;
@@ -2662,6 +2661,118 @@ export declare type BOPAlgo_GlueEnum = {
   BOPAlgo_GlueShift: {};
   BOPAlgo_GlueFull: {};
 }
+
+export declare class BOPAlgo_Splitter extends BOPAlgo_ToolsProvider {
+  Perform(theRange: Message_ProgressRange): void;
+  delete(): void;
+}
+
+  export declare class BOPAlgo_Splitter_1 extends BOPAlgo_Splitter {
+    constructor();
+  }
+
+  export declare class BOPAlgo_Splitter_2 extends BOPAlgo_Splitter {
+    constructor(theAllocator: Handle_NCollection_BaseAllocator);
+  }
+
+export declare class BOPAlgo_BuilderShape extends BOPAlgo_Algo {
+  Shape(): TopoDS_Shape;
+  Modified(theS: TopoDS_Shape): TopTools_ListOfShape;
+  Generated(theS: TopoDS_Shape): TopTools_ListOfShape;
+  IsDeleted(theS: TopoDS_Shape): Standard_Boolean;
+  HasModified(): Standard_Boolean;
+  HasGenerated(): Standard_Boolean;
+  HasDeleted(): Standard_Boolean;
+  History(): Handle_BRepTools_History;
+  SetToFillHistory(theHistFlag: Standard_Boolean): void;
+  HasHistory(): Standard_Boolean;
+  delete(): void;
+}
+
+export declare class BOPAlgo_Algo extends BOPAlgo_Options {
+  Perform(theRange: Message_ProgressRange): void;
+  delete(): void;
+}
+
+export declare class BOPAlgo_Builder extends BOPAlgo_BuilderShape {
+  Clear(): void;
+  PPaveFiller(): BOPAlgo_PPaveFiller;
+  PDS(): BOPDS_PDS;
+  Context(): Handle_IntTools_Context;
+  AddArgument(theShape: TopoDS_Shape): void;
+  SetArguments(theLS: TopTools_ListOfShape): void;
+  Arguments(): TopTools_ListOfShape;
+  SetNonDestructive(theFlag: Standard_Boolean): void;
+  NonDestructive(): Standard_Boolean;
+  SetGlue(theGlue: BOPAlgo_GlueEnum): void;
+  Glue(): BOPAlgo_GlueEnum;
+  SetCheckInverted(theCheck: Standard_Boolean): void;
+  CheckInverted(): Standard_Boolean;
+  Perform(theRange: Message_ProgressRange): void;
+  PerformWithFiller(theFiller: BOPAlgo_PaveFiller, theRange: Message_ProgressRange): void;
+  BuildBOP_1(theObjects: TopTools_ListOfShape, theObjState: TopAbs_State, theTools: TopTools_ListOfShape, theToolsState: TopAbs_State, theRange: Message_ProgressRange, theReport: Handle_Message_Report): void;
+  BuildBOP_2(theObjects: TopTools_ListOfShape, theTools: TopTools_ListOfShape, theOperation: BOPAlgo_Operation, theRange: Message_ProgressRange, theReport: Handle_Message_Report): void;
+  Images(): TopTools_DataMapOfShapeListOfShape;
+  Origins(): TopTools_DataMapOfShapeListOfShape;
+  ShapesSD(): TopTools_DataMapOfShapeShape;
+  delete(): void;
+}
+
+  export declare class BOPAlgo_Builder_1 extends BOPAlgo_Builder {
+    constructor();
+  }
+
+  export declare class BOPAlgo_Builder_2 extends BOPAlgo_Builder {
+    constructor(theAllocator: Handle_NCollection_BaseAllocator);
+  }
+
+export declare class BOPAlgo_ToolsProvider extends BOPAlgo_Builder {
+  Clear(): void;
+  AddTool(theShape: TopoDS_Shape): void;
+  SetTools(theShapes: TopTools_ListOfShape): void;
+  Tools(): TopTools_ListOfShape;
+  delete(): void;
+}
+
+  export declare class BOPAlgo_ToolsProvider_1 extends BOPAlgo_ToolsProvider {
+    constructor();
+  }
+
+  export declare class BOPAlgo_ToolsProvider_2 extends BOPAlgo_ToolsProvider {
+    constructor(theAllocator: Handle_NCollection_BaseAllocator);
+  }
+
+export declare class BOPAlgo_Options {
+  Allocator(): Handle_NCollection_BaseAllocator;
+  Clear(): void;
+  AddError(theAlert: Handle_Message_Alert): void;
+  AddWarning(theAlert: Handle_Message_Alert): void;
+  HasErrors(): Standard_Boolean;
+  HasError(theType: Handle_Standard_Type): Standard_Boolean;
+  HasWarnings(): Standard_Boolean;
+  HasWarning(theType: Handle_Standard_Type): Standard_Boolean;
+  GetReport(): Handle_Message_Report;
+  DumpErrors(theOS: Standard_OStream): void;
+  DumpWarnings(theOS: Standard_OStream): void;
+  ClearWarnings(): void;
+  static GetParallelMode(): Standard_Boolean;
+  static SetParallelMode(theNewMode: Standard_Boolean): void;
+  SetRunParallel(theFlag: Standard_Boolean): void;
+  RunParallel(): Standard_Boolean;
+  SetFuzzyValue(theFuzz: Standard_Real): void;
+  FuzzyValue(): Standard_Real;
+  SetUseOBB(theUseOBB: Standard_Boolean): void;
+  UseOBB(): Standard_Boolean;
+  delete(): void;
+}
+
+  export declare class BOPAlgo_Options_1 extends BOPAlgo_Options {
+    constructor();
+  }
+
+  export declare class BOPAlgo_Options_2 extends BOPAlgo_Options {
+    constructor(theAllocator: Handle_NCollection_BaseAllocator);
+  }
 
 export declare class Handle_GeomFill_Boundary {
   Nullify(): void;
@@ -8957,6 +9068,20 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   Bnd_Box_2: typeof Bnd_Box_2;
   BOPAlgo_Operation: BOPAlgo_Operation;
   BOPAlgo_GlueEnum: BOPAlgo_GlueEnum;
+  BOPAlgo_Splitter: typeof BOPAlgo_Splitter;
+  BOPAlgo_Splitter_1: typeof BOPAlgo_Splitter_1;
+  BOPAlgo_Splitter_2: typeof BOPAlgo_Splitter_2;
+  BOPAlgo_BuilderShape: typeof BOPAlgo_BuilderShape;
+  BOPAlgo_Algo: typeof BOPAlgo_Algo;
+  BOPAlgo_Builder: typeof BOPAlgo_Builder;
+  BOPAlgo_Builder_1: typeof BOPAlgo_Builder_1;
+  BOPAlgo_Builder_2: typeof BOPAlgo_Builder_2;
+  BOPAlgo_ToolsProvider: typeof BOPAlgo_ToolsProvider;
+  BOPAlgo_ToolsProvider_1: typeof BOPAlgo_ToolsProvider_1;
+  BOPAlgo_ToolsProvider_2: typeof BOPAlgo_ToolsProvider_2;
+  BOPAlgo_Options: typeof BOPAlgo_Options;
+  BOPAlgo_Options_1: typeof BOPAlgo_Options_1;
+  BOPAlgo_Options_2: typeof BOPAlgo_Options_2;
   Handle_GeomFill_Boundary: typeof Handle_GeomFill_Boundary;
   Handle_GeomFill_Boundary_1: typeof Handle_GeomFill_Boundary_1;
   Handle_GeomFill_Boundary_2: typeof Handle_GeomFill_Boundary_2;
