@@ -901,10 +901,37 @@ export class Shape
 
     /** Move Shape to a specific location using the pivot as center */
     @checkInput('PointLike','Vector')
-    moveTo(to:PointLike, ...args):AnyShape
+    moveTo(to:PointLike, ...args):this
     {
         let moveVec = (to as Vector).subtracted(this.center());
         this.move(moveVec);
+        return this;
+    }
+
+    /** Move Shape to specific x coordinate while keeping the other coords the same */
+    @checkInput([['Number', 0], ['Alignment', 'center']],['auto', 'auto'])
+    moveToX(x:number, pivot:Alignment):this
+    {
+        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
+        this.move(x - pivotPoint.x );
+        return this;
+    }
+
+    /** Move Shape to specific y coordinate while keeping the other coords the same */
+    @checkInput([['Number', 0], ['Alignment', 'center']],['auto', 'auto'])
+    moveToY(y:number, pivot:Alignment):this
+    {
+        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
+        this.move(y - pivotPoint.y );
+        return this;
+    }
+
+    /** Move Shape to specific z coordinate while keeping the other coords the same */
+    @checkInput([['Number', 0], ['Alignment', 'center']],['auto', 'auto'])
+    moveToZ(z:number, pivot:Alignment):this
+    {
+        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
+        this.move(z - pivotPoint.z );
         return this;
     }
 
@@ -1153,7 +1180,7 @@ export class Shape
 
         if (!(fromPoints instanceof Array) || !(toPoints instanceof Array))
         {
-            console.error(`Shape::alignToPoint: Please supply Array of PointLikes`)
+            console.error(`Shape::alignByPoints: Please supply Array of PointLikes`)
             return this;
         }
 
@@ -2317,7 +2344,7 @@ export class Shape
     /** Split current Shape into multiple ones using the given other Shapes (Private method: without adding to Scene)
      *     The other Shapes are removed after the operation
      */
-    @checkInput('AnyShape', 'ShapeCollection')
+    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     _splitted(others:AnyShapeOrCollection):AnyShapeOrCollection
     {
         /* OC docs:
@@ -2328,7 +2355,12 @@ export class Shape
         let thisCollection = new ShapeCollection(this);
         let otherCollection = others as ShapeCollection; // auto-converted by @checkInput
 
-        let ocSplitter = new this._oc. BOPAlgo_Splitter_1();
+        
+        console.log('HIERO!')
+        console.log(this._oc.BOPAlgo_Splitter_1)
+        console.log(this._oc.BOPAlgo_Splitter)
+        let ocSplitter = new this._oc.BOPAlgo_Splitter_1();
+        
         ocSplitter.SetArguments(thisCollection._toOcListOfShape()); // the main Shape(s)
         ocSplitter.SetTools(otherCollection._toOcListOfShape());
         ocSplitter.Perform();
@@ -2340,13 +2372,13 @@ export class Shape
 
     /** Split current Shape into multiple ones using the given other Shapes */
     @addResultShapesToScene
-    @checkInput('AnyShape', 'ShapeCollection')
+    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     splitted(others:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._splitted(others);
     }
 
-    @checkInput('AnyShape', 'ShapeCollection')
+    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     split(others:AnyShapeOrCollection):AnyShapeOrCollection
     {
         let splittedShape = this._splitted(others);

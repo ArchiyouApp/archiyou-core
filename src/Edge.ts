@@ -1157,9 +1157,6 @@ export class Edge extends Shape
     /** Based on attributes or tests add classes to Svg that help us select and style these SVG elements later */
     _getSvgClasses():string
     {
-        console.log('========= SVG CLASSES ======');
-        console.log(this.attributes);
-
         const ATTRIBUTE_TRUE_TO_CLASS = {
             hidden : 'hidden',
             outline : 'outline',

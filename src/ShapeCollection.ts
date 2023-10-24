@@ -1037,6 +1037,37 @@
       {
          return this.filter(shape => shape.contains(other));
       }
+
+      /** Return nearest Shape within this Collection to other given Shape(s) */
+      // TODO: write test
+      @checkInput('PointLikeOrAnyShapeOrCollection', 'auto')
+      nearest(other:PointLikeOrAnyShapeOrCollection):AnyShape
+      {  
+         const otherShapes = new ShapeCollection();  
+         // convert PointLikes to Vertex
+         if (isPointLike(other))
+         {
+            otherShapes.add(new Point(other as PointLike)._toVertex())
+         }
+         else {
+            otherShapes.add(new ShapeCollection(other));
+         }
+         
+         let nearestShape:AnyShape = null;
+         let nearestDistance:number = null;
+
+         this.forEach( colShape => {
+            otherShapes.forEach( otherShape => {
+               if(!nearestDistance || colShape.distance(otherShape) < nearestDistance)
+               {
+                  nearestShape = colShape;
+                  nearestDistance = colShape.distance(otherShape);
+               }
+            })
+         })
+
+         return nearestShape;
+      }
       
       /** Shape API */
       _intersectionsWithEdge()
@@ -1289,12 +1320,14 @@
       */
       boundary():Wire
       {
+         /*
          console.log('=========== BOUNDARY ===========');
          console.log(this._oc.TopTools_HSequenceOfShape);
          console.log(this._oc.TopTools);
          console.log(this._oc.TopTools.HSequenceOfShape);
          console.log(this._oc.Handle_TopTools_HSequenceOfShape);
          console.log(new this._oc.TopTools().TopTools_HSequenceOfShape);
+         */
 
          const ocShapeSequence = new this._oc.Handle_TopTools_HSequenceOfShape_2(new this._oc.TopTools_ListOfShape_1());
          const ocEdges = new this._oc.Handle_TopTools_HSequenceOfShape_2(new this._oc.TopTools_ListOfShape_1());

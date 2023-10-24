@@ -473,7 +473,7 @@ export class Doc
 
      /** Set Pivot of active Container
      *   - relative to page content area (0.5,0.5 => center)
-     *   - Alignment: topleft, bottom(center)
+     *   - ContainerAlignment: 'left', 'top'
      *   TODO: in world units from origin
      */
     pivot(x:number|PositionLike, y?:number):Doc
@@ -482,17 +482,25 @@ export class Doc
         {
             throw new Error(`Doc::position(): Can not set position of active container. No active container and/or Page created!`);
         }
+        
+        const args = [...arguments]; // IMPORTANT: needs to be an array
 
-        if (isPositionLike(x))
+        // Some forgiveness with order of alignment strings (top,left versus left,top)
+        if(isContainerVAlignment(args[0]) && isContainerHAlignment(args[1]))
         {
-            this._activeContainer.pivot(x)    
+            args.reverse();
+        }
+
+        if (isPositionLike(args))
+        {
+            this._activeContainer.pivot(args as PositionLike)    
         }
         else if (typeof x === 'number')
         {
             this._activeContainer.pivot([x,y||0]);
         }
         else {
-            throw new Error(`Doc::pivot(): Invalid pivot. Try Alignment like 'topleft' or coords relative ([0-1]) relative to page content area origin`);
+            throw new Error(`Doc::pivot(): Invalid pivot. Try Alignment like ('left', 'top') or coords relative ([0-1],[0-1]) relative to page content area origin`);
         }
         return this;
     }

@@ -239,6 +239,7 @@ mainBuild:
   - symbol: Extrema_ExtAlgo
   - symbol: GeomAdaptor_Curve
   - symbol: BOPAlgo_Operation
+  - symbol: BOPAlgo_Splitter
   - symbol: BRepBuilderAPI_WireError
   - symbol: BRepBuilderAPI_FaceError
   #- symbol: Adaptor3d_HCurve

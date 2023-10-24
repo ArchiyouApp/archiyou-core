@@ -82,28 +82,41 @@ export class Obj
     /** Get or set style
      *  NOTE: We don't use get/setters because we want to be able to return Obj for setter
      */
-    style(newStyle:any):Obj
+    style(newStyle:any, extend:boolean=false):Obj
     {
+        // We can either completely renew or extend
+        if(this._style && extend) // extend existing style
+        {
+            const appendStyle = { ...this._style }; // set base as current
+            // then override from incoming newStyle
+            for (const [elemType, style] of Object.entries(newStyle))
+            {
+                appendStyle[elemType] = { ...appendStyle[elemType], ...newStyle[elemType] }
+            }
+            newStyle = appendStyle
+        }
         this._style  = this._compileStyle(newStyle);
         return this;
     }
 
-    /** set Color for Obj/Layer. Shortcut of style */
-    color(newColor:string|number|Array<number>):Obj
+    /** set Color for Obj/Layer. Shortcut of style
+     *  Append style by default. Use style() to reset
+     */
+    color(newColor:string|number|Array<number>, extend:boolean = true):Obj
     {
-        return this.style( { color: newColor });
+        return this.style( { color: newColor }, true);
     }
 
-    /** set Lines dashed */
+    /** set Lines to dashed (keeps existing styling) */
     dashed():Obj
     {
-        return this.style({ line: { dashed: true }});
+        return this.style({ line: { dashed: true }}, true);
     }
 
-    /** set strokeWidth */
+    /** set strokeWidth (keeps existing styling) */
     strokeWidth(n:number):Obj
     {
-        return this.style({ line: { width: n }});
+        return this.style({ line: { width: n }}, true);
     }
 
     /** Get current Obj color or the one that is defined by one of the parents up the hierarchy */
