@@ -761,26 +761,16 @@ export class Shape
         return null;
     }
 
-    /** Get max coordinate of Bbox of this Shape */
-    max(axis:string):number
+    /** Get max Point coordinate of Bbox of this Shape */
+    max():Point
     {
-        axis = axis.replace('-', ''); // ignore sign
-        if(this._checkAxis(axis))
-        {
-            return this.bbox().max()[axis.toLowerCase()]; // NOTE: bbox.max returns a Vector
-        }
-        return null;
+        return this.bbox().max()
     }
 
-    /** Get min coordinate of Bbox of this Shape */
-    min(axis:string):number
+    /** Get min Point of Bbox of this Shape */
+    min():Point
     {
-        axis = axis.replace('-', ''); // ignore sign
-        if(this._checkAxis(axis))
-        {
-            return this.bbox().min()[axis.toLowerCase()];
-        }
-        return null;
+        return this.bbox().min()
     }
 
 
@@ -2469,6 +2459,13 @@ export class Shape
         return this;
     }
 
+    /** Copy and then align */
+    @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
+    aligned(other:AnyShape, pivot?:Pivot, alignment?:Alignment):AnyShape
+    {
+        return this.copy().align(other, pivot, alignment);
+    }
+
     @checkInput('Alignment', 'auto')
     _alignStringToAlignPerc(alignment:Alignment): Array<number>
     {
@@ -2694,14 +2691,17 @@ export class Shape
     overlapPerc(other:AnyShape):number
     {
         let overlappingVolume = 0.0;
+        const intersections = this._intersections(other);
         // NOTE: Shapes can have multiple intersections
-        this._intersections(other).forEach(intersectionShape => 
+        if(!intersections){  return overlappingVolume; }
+
+        intersections.forEach(intersectionShape => 
         {
             overlappingVolume += intersectionShape.volume();
         })
 
         const thisVolume = this.volume();
-        return (thisVolume) ? overlappingVolume / this.volume() : 0; // avoid divide by zero
+        return (thisVolume) ? overlappingVolume / this.volume() : 0.0; // avoid divide by zero
     }
 
     /** Test if a one Shape completely contains the other. 
@@ -3944,12 +3944,23 @@ export class Shape
         return this;
     }
 
-    /** Set name of container Obj */
-    name(newName?:string):Shape
+    set name(newName:string)
+      {
+         if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };   
+         this.setName(newName)
+      }
+
+    get name()
     {
-        
-        this.checkObj().name(newName);
-        return this;   
+        return this.getName();
+    }
+
+    /** Get name of container Obj */
+    setName(newName?:string):Shape
+    {   
+        if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };
+        this.checkObj().name(newName);  
+        return this;
     }
 
     /** Get name of container Obj */
@@ -3959,9 +3970,10 @@ export class Shape
     }
 
     /** Get name of container Obj */
-    getName():string
+    getName():string|undefined
     {
-        return this?._obj?.name() as string;
+        const r = this?._obj?.name();
+        return (typeof r === 'string') ? r : undefined;
     }
 
     hide():Shape
@@ -4098,7 +4110,7 @@ export class Shape
 
         let resultCollection = this._project(sidePlaneNormal, all).rotateZ(rotationZ);
         let capitalizedSide = side.charAt(0).toUpperCase() + side.slice(1);
-        resultCollection.name(`Elevation${capitalizedSide}Collection`);
+        resultCollection.setName(`Elevation${capitalizedSide}Collection`);
         resultCollection.moveToOrigin(); // for easy of handling make sure the result is centered on origin
 
         return resultCollection;

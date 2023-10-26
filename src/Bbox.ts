@@ -51,7 +51,7 @@ export class Bbox
         let maxX = (maxv.x > minv.x) ? maxv.x : minv.x;
         let minY = (minv.y < maxv.y) ? minv.y : maxv.y;
         let maxY = (maxv.y > minv.y) ? maxv.y : minv.y;
-        let minZ = (minv.z < maxv.y) ? minv.z : maxv.z;
+        let minZ = (minv.z < maxv.z) ? minv.z : maxv.z;
         let maxZ = (maxv.z > minv.z) ? maxv.z : minv.z;
 
         let minVec = new Vector(minX,minY,minZ);
@@ -328,17 +328,12 @@ export class Bbox
     added(other:Bbox):Bbox
     {
         let combinedBounds = [];
-        this.bounds.forEach((b,i) => {
-            // lower bound
-            if(i%2==0)
-            {
-                combinedBounds[i] = (this.bounds[i] < other.bounds[i]) ? this.bounds[i] : other.bounds[i];
-            }
-            else {
-                // upperbound
-                combinedBounds[i] = (this.bounds[i] > other.bounds[i]) ? this.bounds[i] : other.bounds[i];
-            }
+        this.bounds.forEach((b,i) => 
+        {
+            combinedBounds[i] = (i % 2 == 0) ? ((b < other.bounds[i]) ? b : other.bounds[i]) // lower bound = even index
+                                        : ((b > other.bounds[i]) ? b : other.bounds[i]);
         })
+
         return new Bbox(
             new Point(combinedBounds[0],combinedBounds[2], combinedBounds[4]),
             new Point(combinedBounds[1],combinedBounds[3], combinedBounds[5])

@@ -120,7 +120,7 @@ export class Geom
   {
     const v = p as Vertex; // auto converted
     v.addToScene();
-    v.name(this.getNextObjName('Vertex')); // auto name
+    v.name = (this.getNextObjName('Vertex')); // auto name
     console.geom(`Geom::Vertex: Created a Vertex at ${v.x},${v.y},${v.z}`);
     return v;
   }
@@ -132,7 +132,7 @@ export class Geom
     // NOTE: we don't allow creating empty Edges from geom. use new Edge() instead.
     let edge = new Edge(start as Vertex,end as Vertex);
     edge.addToScene();
-    edge.name(this.getNextObjName('Edge')); // auto name
+    edge.setName(this.getNextObjName('Edge')); // auto name
     
     console.geom(`Geom::Edge: Created a Edge with length ${edge.length()}`);
 
@@ -145,7 +145,7 @@ export class Geom
   {
     let edge = new Edge(start as Vertex, end as Vertex);
     edge.addToScene();
-    edge.name(this.getNextObjName('Line')); // auto name
+    edge.name = this.getNextObjName('Line'); // auto name
     console.geom(`Geom::Line: Created a Line Edge with length ${edge.length()}`);
     return edge;
   }
@@ -160,7 +160,7 @@ export class Geom
 
     let edge = new Edge().makeArc(startVertex, midVertex, endVertex);
     edge.addToScene();
-    edge.name(this.getNextObjName('Arc')); // auto name
+    edge.name = (this.getNextObjName('Arc')); // auto name
 
     console.geom(`Geom::Arc: Created a Arc Edge with start [${startVertex.x},${startVertex.y},${startVertex.z}], mid [${midVertex.x},${midVertex.y},${midVertex.z}] and end [${endVertex.x},${endVertex.y},${endVertex.y}]`);
     return edge;
@@ -173,7 +173,7 @@ export class Geom
     let vertices = points as VertexCollection; // auto converted
     let edge = new Edge().makeSpline(vertices);
     edge.addToScene();
-    edge.name(this.getNextObjName('Spline')); // auto name
+    edge.name = this.getNextObjName('Spline'); // auto name
 
     console.geom(`Geom::Spline: Created a Spline Edge through ${vertices.length} points with length "${edge.length()}"`);
     return edge;
@@ -186,7 +186,7 @@ export class Geom
     // NOTE: We don't allow empty wires here, use new Wire() instead
     let wire = new Wire(entities, ...args);
     wire.addToScene();
-    wire.name(this.getNextObjName('Wire')); // auto name
+    wire.name = this.getNextObjName('Wire'); // auto name
     
     console.geom(`Geom::Wire: Created a Wire with ${wire.edges().length} Edges and total length ${wire.length()}`);
     
@@ -198,7 +198,7 @@ export class Geom
   Polyline(entities:MakeWireInput, ...args):Wire
   {
     let w = this.Wire(entities);
-    w.name(this.getNextObjName('Polyline')); // auto name
+    w.name = this.getNextObjName('Polyline'); // auto name
     return w;
   }
 
@@ -208,7 +208,7 @@ export class Geom
   {
     let spiral = new Wire().makeSpiral(firstRadius, secondRadius, angle, lefthand);
     spiral.addToScene();
-    spiral.name(this.getNextObjName('Spiral')); // auto name
+    spiral.name = this.getNextObjName('Spiral'); // auto name
     
     console.geom(`Geom::Wire: Created a Spiral`);
     
@@ -220,7 +220,7 @@ export class Geom
   {
     let helix = new Wire().makeHelix(radius, height, angle, pivot, direction, lefthand, coneSemiAngle);
     helix.addToScene();
-    helix.name(this.getNextObjName('Helix')); // auto name
+    helix.name = this.getNextObjName('Helix'); // auto name
     
     console.geom(`Geom::Wire: Created a Helix`);
     
@@ -237,7 +237,7 @@ export class Geom
     */
     let faceOrShell = face._toShellWhenOcShell();
     faceOrShell.addToScene();
-    faceOrShell.name(this.getNextObjName('Face')); // auto name
+    faceOrShell.name = this.getNextObjName('Face'); // auto name
     console.geom(`Geom::Face: Created a ${faceOrShell.type()} with ${faceOrShell.vertices().length} vertices`);
     return faceOrShell;
   }
@@ -248,7 +248,7 @@ export class Geom
   {
     let plane = new Face().makePlane(width, depth, normal, position);
     plane.addToScene();
-    plane.name(this.getNextObjName('Plane')); // auto name
+    plane.name = this.getNextObjName('Plane'); // auto name
     console.geom(`Geom::Plane: Created a Plane Face with area ${plane.area()}`);
     return plane;
   }
@@ -259,7 +259,7 @@ export class Geom
   {
     let plane = new Face().makePlaneBetween(from as Vector, to as Vector);
     plane.addToScene();
-    plane.name(this.getNextObjName('Plane')); // auto name
+    plane.name = this.getNextObjName('Plane'); // auto name
     console.geom(`Geom::Plane: Created a Plane Face with area ${plane.area()}`);
     return plane;
   }
@@ -277,7 +277,7 @@ export class Geom
   {
     let rect = new Face().makeRectBetween(from as Point,to as Point);
     rect.addToScene();
-    rect.name(this.getNextObjName('Rect')); // auto name
+    rect.name = this.getNextObjName('Rect'); // auto name
     console.geom(`Geom::Rect: Created a Rect Face with size [${rect.bbox().width()},${rect.bbox().depth()}]`);
     return rect;
   }
@@ -288,7 +288,7 @@ export class Geom
   {
     let plane = new Face().makeBasePlane(axis as Axis,size);
     plane.addToScene(); // new API (TODO: update others)
-    plane.name(this.getNextObjName('Plane')); // auto name
+    plane.name = this.getNextObjName('Plane'); // auto name
     console.geom(`Geom::Plane: Created a Plane Face with size [${plane.bbox().width()},${plane.bbox().depth()}]`);
     return plane;
   }
@@ -299,7 +299,7 @@ export class Geom
   {
     let circleFace = new Face().fromWire(new Edge().makeCircle(radius)._toWire());
     circleFace.addToScene();
-    circleFace.name(this.getNextObjName('Circle')); // auto name
+    circleFace.name = this.getNextObjName('Circle'); // auto name
     console.geom(`Geom::Circle: Created a Circular Face with radius ${radius}`);
     return circleFace;
   }
@@ -331,7 +331,7 @@ export class Geom
   {
     let box = new Solid().makeBox(width, depth, height, position as Point);
     box.addToScene();
-    box.name(this.getNextObjName('Box')); // auto name
+    box.name = this.getNextObjName('Box'); // auto name
     console.geom(`Geom::Box: Created a Box Solid with size [${width}, ${depth||width}, ${height||width}] at [${box.center().x},${box.center().y},${box.center().z}]`);
     return box;
   }
@@ -352,7 +352,7 @@ export class Geom
       throw Error(`Geom::Box: Failed to create Box between points ${from} and ${to}. Check if Point span a 3D space!`);
     }
     box.addToScene();
-    box.name(this.getNextObjName('Box')); // auto name
+    box.name = this.getNextObjName('Box'); // auto name
     console.geom(`Geom::Box: Created a Box Solid with size [${box.bbox().width()}, ${box.bbox().depth()}, ${box.bbox().height()}] at [${box.center().x},${box.center().y},${box.center().z}]`);
     return box;
   }
@@ -363,7 +363,7 @@ export class Geom
   {
     let sphere = new Solid().makeSphere(radius, position);
     sphere.addToScene();
-    sphere.name(this.getNextObjName('Sphere')); // auto name
+    sphere.name = this.getNextObjName('Sphere'); // auto name
     console.geom(`Geom::Sphere: Created a Sphere Solid with radius ${radius} at [${sphere.center().x},${sphere.center().y},${sphere.center().z}]`);
     return sphere;
   }
@@ -375,7 +375,7 @@ export class Geom
   {
     let cone = new Solid().makeCone(bottomRadius, topRadius, height, position, 360).move(0,0,-height/2);
     cone.addToScene();
-    cone.name(this.getNextObjName('Cone')); // auto name
+    cone.name = this.getNextObjName('Cone'); // auto name
     console.geom(`Geom::Cone: Created a Cone Solid with radii [${bottomRadius},${topRadius}] at [${cone.center().x},${cone.center().y},${cone.center().z}]`);
     return cone as Solid;
   }
@@ -387,7 +387,7 @@ export class Geom
   {
     let cylinder = new Solid().makeCylinder(radius, height, position, angle).move(0,0,-height/2);
     cylinder.addToScene();
-    cylinder.name(this.getNextObjName('Cone')); // auto name
+    cylinder.name = this.getNextObjName('Cone'); // auto name
     console.geom(`Geom::Cylinder: Created a Cylinder Solid with radius ${radius} at [${cylinder.center().x},${cylinder.center().y},${cylinder.center().z}]`);
     return cylinder as Solid;
   }
@@ -809,7 +809,6 @@ export class Geom
   {
     // strip possible numbering from name
     let baseName = name.replace(/_[0-9]+$/, '');
-    console.log(baseName);
 
     let layersWithBaseName = this.getLayerNames().filter( name => name.includes(baseName));
     if(layersWithBaseName.length == 0)
@@ -833,7 +832,9 @@ export class Geom
         }
       })
 
-      return `${baseName}_${max+1}`; 
+      const layerName = `${baseName}_${max+1}`; 
+
+      return layerName;
     }
   }
 

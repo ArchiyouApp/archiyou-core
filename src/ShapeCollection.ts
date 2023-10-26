@@ -194,6 +194,7 @@
       }
 
       /** Add entities as named group */
+      // TODO: organize scene tree too!
       @checkInput([['String', null], 'MakeShapeCollectionInput'], ['auto','auto']) // no conversion of types
       addGroup(group?:string, entities?:MakeShapeCollectionInput):AnyShapeCollection
       {
@@ -342,7 +343,7 @@
       //// ARRAY API ////
 
       /** Array API - for consitent API with Array */
-      get length()
+      get length():number
       {
          return this.count();
       }
@@ -879,7 +880,7 @@
             const copiedShapes = groupShapes.map(shape => shape._copy())
             newShapeCollection.addGroup(groupName, copiedShapes); 
          })
-         newShapeCollection.name( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
+         newShapeCollection.setName( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
 
          return newShapeCollection;
       }
@@ -1869,7 +1870,6 @@
       dashed():this
       {
          this.forEach( shape => shape.dashed());
-
          return this;
       }
       
@@ -1902,17 +1902,29 @@
           return this._obj;
       }
 
-      name(newName:string):ShapeCollection
+      set name(newName:string)
       {
-         // TODO: make a bit more robust!
+         if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };         
+         this.setName(newName)
+      }
+
+      get name()
+      {
+         return this.getName();
+      }
+
+      /** Set name */
+      setName(newName:string):ShapeCollection
+      {
          this.checkObj().name(newName);
          return this;
       }
 
       /** Get name of container Obj */
-      getName()
+      getName():string|undefined
       {
-         return this?._obj?.name() || 'UnnamedShapeCollection';
+         const r = this?._obj?.name();
+         return (typeof r === 'string') ? r : 'UnnamedShapeCollection'; // TODO: we better return undefined if not there, but we have some algoritms depending on this
       }
 
       /** Shape API - hide all Shapes in Collection */

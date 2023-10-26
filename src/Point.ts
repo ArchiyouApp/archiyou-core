@@ -308,6 +308,30 @@ export class Point
         return this;
     }
 
+    /** Move Point along x axis */
+    @checkInput('Number', 'auto')
+    moveX(dx:number):Point
+    {
+        this.x += dx
+        return this;
+    }
+
+    /** Move Point along y axis */
+    @checkInput('Number', 'auto')
+    moveY(dy:number):Point
+    {
+        this.y += dy;
+        return this;
+    }
+
+    /** Move Point along y axis */
+    @checkInput('Number', 'auto')
+    moveZ(dz:number):Point
+    {
+        this.z += dz;
+        return this;
+    }
+
     @checkInput('PointLike', 'Vector')
     moved(vec:PointLike, ...args):Point
     {

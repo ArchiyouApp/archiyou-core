@@ -1107,10 +1107,10 @@ export class Sketch
         
         if (isCollection)
         { 
-            importedShapeOrCollection.name(sketchName);
+            importedShapeOrCollection.setName(sketchName);
         }
         else {
-            importedShapeOrCollection.name(sketchName + 'Shape')
+            importedShapeOrCollection.setName(sketchName + 'Shape')
         }
 
 

@@ -4,14 +4,7 @@
 
 import JSONfn from 'json-fn';
 
-/** A console Message */
-export interface ConsoleMessage
-{
-    type: string,
-    time: string,
-    from: string, // component
-    message: string,
-}
+import { ConsoleMessage } from './types'
 
 export class Console
 {

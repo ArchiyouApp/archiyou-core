@@ -96,6 +96,15 @@ export interface ArchiyouAppInfoBbox
     height: number
 }
 
+/** A console Message */
+export interface ConsoleMessage
+{
+    type: string,
+    time: string,
+    from: string, // component
+    message: string,
+}
+
 /** Special Archiyou data inserted into asset.archiyou
     TODO: We use ComputeResult internally - which has a lot of overlap with this
     When we start using GLB format internally these types will merge

@@ -782,7 +782,7 @@ export class Wire extends Shape
             verticesOnWire.add( curEdge.pointAt( travelledOnEdge / curEdge.length())._toVertex() ); // add Vertex to ShapeCollection
        }
 
-       verticesOnWire.name(`PopulatedVertices`); // set name in scenegraph. TODO: smart names like PopulatedVerticesOf{ParentShape}
+       verticesOnWire.setName(`PopulatedVertices`); // set name in scenegraph. TODO: smart names like PopulatedVerticesOf{ParentShape}
 
        return verticesOnWire;
     }

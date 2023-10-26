@@ -235,7 +235,7 @@ export class IO
         }
 
         let svgShapeCollection = new ShapeCollection();
-        svgShapeCollection.name('importedSVG');
+        svgShapeCollection.name = 'importedSVG';
 
         // parse SVG nodes
         svgNodesWithTransform.forEach( nodeAndTransform => 
@@ -249,7 +249,7 @@ export class IO
             {
                 case 'path':
                     shapeOrShapes = this._importSVGPath(node.attributes.d, transform);
-                    shapeOrShapes.name(this._geom.getNextObjName('ImportedSVGPath'));
+                    shapeOrShapes.setName(this._geom.getNextObjName('ImportedSVGPath'));
                     break;
             }
             svgShapeCollection.add(shapeOrShapes)
