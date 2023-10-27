@@ -126,8 +126,8 @@ export class GLTFBuilder
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                 annotations: ay.geom._annotator.getAnnotations(),
-                // Console Messages. Include or not, or select types
-                messages: (settings?.messages !== false) ? ay?.console.getBufferedMessages(settings?.messages) : [], 
+                // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
+                messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
                 // Document data by document name in special format for AY doc viewers (PDF and web)
                 docs: (settings?.docs !== false) ? ay.doc.toData(settings?.docs) : {},  // TODO: toData is async: problem?
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
