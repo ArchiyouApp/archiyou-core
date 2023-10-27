@@ -96,6 +96,16 @@ export interface ArchiyouAppInfoBbox
     height: number
 }
 
+export type ArchiyouOutputFormatType = 'step'|'stl'|'gltf'
+
+export interface ArchiyouOutputSettings
+{
+    // what to calculate/output
+    docs:boolean
+    pipelines:boolean|Array<string> // true for all, false for none, or array with names to include
+    formats:boolean|Array<ArchiyouOutputFormatType> // true for all, false for none, or names of formats to include
+}
+
 /** A console Message */
 export interface ConsoleMessage
 {

@@ -6,14 +6,18 @@
  * 
  * */ 
 
+import { ArchiyouOutputFormatType, ArchiyouOutputSettings } from './internal' // types
+
+export type ModelRequestOutputType = 'full'|'model'
+
 export interface OcciModelRequest
 {
     hash?:string // instance hash (name with parameters and values)
     params?: {[key:string]:any}
-    format?: 'step'|'stl'|'gltf'
-    output?: 'full'|'model'
+    format?: ArchiyouOutputFormatType
+    output?: ModelRequestOutputType
     quality?: 'low'|'medium'|'high'
-    meta?: any // TODO
+    settings?: ArchiyouOutputSettings // specific compute settings
 }
 
 export interface OcciModelResult
@@ -48,14 +52,16 @@ export interface OcciCadScript
     params?:{[key:string]:any}
     parameter_presets?:{[key:string]:{[key:string]:any}}
     code: string
-    script_cad_language?:string
-    script_cad_version?:string
+    cad_engine?:string
+    cad_engine_version?:string
+    cad_engine_config?:Record<string,any> // special settings for script cad engine
     meta?:{[key:string]:any}
 }
 
 export interface OcciCadScriptRequest extends OcciCadScript
 {
-    request?:OcciModelRequest
+    status?:'success'|'error' // TODO: nice TS typing
+    request?:OcciModelRequest // specifies the request
 }
 
 export interface OcciCadScriptResult extends OcciCadScriptRequest
