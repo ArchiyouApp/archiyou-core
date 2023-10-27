@@ -170,11 +170,7 @@ export class Doc
                     this._ay.worker.funcs.executeFunc(pipelineFn)
                 }
                 catch(e){
-                    console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: ${e}`);
-                    console.error('* Worker:')
-                    console.error(this._ay.worker);
-                    console.error('* Worker.funcs:');
-                    console.error(this._ay.worker.funcs)
+                    console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: Error: "${e}"`);
                 }
             }
         }
