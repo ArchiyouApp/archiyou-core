@@ -2373,7 +2373,7 @@ export class Shape
     /** Split current Shape into multiple ones using the given other Shapes */
     @addResultShapesToScene
     @checkInput([['AnyShapeOrCollection', null],['Boolean', false]], ['ShapeCollection', 'auto'])
-    splitted(others:AnyShapeOrCollection,  excludeOverlapping:boolean):AnyShapeOrCollection
+    splitted(others:AnyShapeOrCollection,  excludeOverlapping?:boolean):AnyShapeOrCollection
     {
         return this._splitted(others, excludeOverlapping);
     }
@@ -3345,6 +3345,7 @@ export class Shape
         @param alongAxis: x,y or z or -x,-y,-z
     */
     // TODO: @checkInput (own SelectorInput Type?)
+    // TODO: NEEDS REFACTOR
     _selectorDistanceAlongAxis(shapes:AnyShapeCollection, alongAxis:string):AnyShapeCollection
     {
         if (shapes.length == 0 || !this._checkAxis(alongAxis))
@@ -3354,10 +3355,11 @@ export class Shape
 
         alongAxis = alongAxis.toLowerCase();
         let minus = alongAxis.includes('-');
+        alongAxis = alongAxis.replace('-', '');
 
         let sortedShapes:Array<AnyShape> = shapes._copy().sort( (s1,s2) => {
-            let m1 = s1.max(alongAxis) + s1.center()[alongAxis]; // NOTE: working only with max gives not really what we want
-            let m2 = s2.max(alongAxis) + s2.center()[alongAxis];
+            let m1 = s1.max()[alongAxis] + s1.center()[alongAxis]; // NOTE: working only with max gives not really what we want
+            let m2 = s2.max()[alongAxis] + s2.center()[alongAxis];
 
             return (!minus) ? (m2 - m1) : (m1 - m2); // descending order when not minus otherwise reverse
         }).all();  // convert to real array for robustness
@@ -3368,7 +3370,7 @@ export class Shape
         for (let i = 0; i < sortedShapes.length; i++)
         {    
             let curShape = sortedShapes[i];
-            let curFurthest = curShape.max(alongAxis) + curShape.center()[alongAxis]
+            let curFurthest = curShape.max()[alongAxis] + curShape.center()[alongAxis]
 
             if (i == 0 || curFurthest == prevFurthest)
             { 

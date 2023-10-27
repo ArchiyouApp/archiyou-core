@@ -1,42 +1,8 @@
-import { Doc, Container, View, WidthHeightInput, ContainerData, DocUnits } from './internal'
+import { Doc, Container, View, WidthHeightInput, ContainerData, 
+    DocUnits, PageSize, PageOrientation, AnyContainer, isPageSize,
+    isPageOrientation,  isAnyContainer} from './internal'
 import { convertValueFromToUnit } from './internal' // utils
-
-//// TYPES AND INTERFACES ////
-export type PageSize = 'A0'|'A1'|'A2'|'A3'|'A4'|'A5'|'A6'|'A7';
-export type PageOrientation = 'landscape'|'portrait';
-export type AnyContainer = Container|View
-
-export interface PageData {
-    _entity:'page'
-    name:string
-    size:PageSize
-    width:number // in units given in docUnits
-    height:number // in units given in docUnits
-    orientation:PageOrientation
-    padding:Array<number|number> // horizontal (left and right), vertical (top and bottom) relative to Page width/height
-    containers:Array<ContainerData>
-    variables?:{[key:string]:any}
-    docUnits:DocUnits, // gets taken from parent doc
-}   
-
-//// TYPE GUARDS ////
-export function isPageSize(o:any): o is PageSize
-{
-    if(typeof o !== 'string'){ return false };
-    return o.match(/A[0-7]$/) !== null;
-}
-
-export function isPageOrientation(o:any): o is PageOrientation
-{
-    if(typeof o !== 'string'){ return false };
-    return ['landscape','portrait'].includes(o as string);
-}
-
-export function isAnyContainer(o:any): o is AnyContainer
-{
-    return o instanceof Container ||
-            o instanceof View; // TODO: more
-}
+ 
 
 //// PAGE CLASS ////
 

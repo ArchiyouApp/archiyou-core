@@ -241,7 +241,7 @@ export class Exporter
         if(options.archiyouFormat)
         {
             // add special Archiyou data to GLTF
-            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, { messages: options.messages }); 
+            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, {}); 
         }
 
         // extra vertices and lines for specific visualization styles

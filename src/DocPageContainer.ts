@@ -1,89 +1,9 @@
-type ContainerType = 'view'|'image'|'text'|'textarea'|'table'
-
 import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPathStyle } from './internal'
 
-//// TYPES AND INTERFACES ////
-export type ContainerHAlignment = 'left'|'center'|'right'
-export type ContainerVAlignment = 'top' | 'center' | 'bottom'
-export type ContainerAlignment = Array<ContainerHAlignment | ContainerVAlignment> // like [left,top]
-export type ContainerSide = 'width'|'height'
-export type ZoomRelativeTo = 'container'|'world'
-export type ScaleInput = 'auto'|number;
-export type ContainerSizeRelativeTo = 'page' | 'page-content-area'; // page-content area is page without the padding on both sides
-export type Position = Array<number|number>
-export type PositionLike = Position|ContainerAlignment
-
-export type ContainerData = { // Combine all Container types for convenience
-    _entity:string
-    name:string
-    parent:string
-    type:ContainerType
-    width:number // relative to (see: widthRelativeTo)
-    widthRelativeTo:ContainerSizeRelativeTo
-    widthAbs?:number // in doc units (added on place)
-    height:number // relative to (see: widthRelativeTo)
-    heightRelativeTo:ContainerSizeRelativeTo
-    heightAbs?:number // in doc units (added on place)
-    position:Position // relative to page-content-area
-    pivot:Position
-    border?:boolean // border around container
-    borderStyle?:DocPathStyle // style to draw border
-    frame?:any // advanced shapes as border
-    index?:number
-    caption?:string
-    contentAlign:ContainerAlignment // alignment of content inside container
-    content:any; // TODO: raw content
-    zoomLevel:ScaleInput, // number or 'auto' [default]
-    zoomRelativeTo:ZoomRelativeTo,
-    docUnits:DocUnits, 
-    modelUnits:ModelUnits,
-    _domElem?:HTMLDivElement, // added on placement
-}
-
-export interface Frame {
-    color:string // TODO
-    thickness:number
-    shape:'rect'|'circle'
-}
-
-export interface ContainerContent 
-{
-    source?:string, // source url (used for quick access if possible)
-    format?:'jpg'|'svg'|'png';
-    data:any; // main data
-    settings:{[key:string]:any}
-}
-
-//// TYPEGUARDS
-
-export function isContainerHAlignment(o:any): o is ContainerHAlignment
-{
-    return ['left', 'center', 'right'].includes(o)
-}
-
-export function isContainerVAlignment(o:any): o is ContainerVAlignment
-{
-    return ['top', 'center', 'bottom'].includes(o)
-}
-
-export function isContainerAlignment(o:any): o is ContainerAlignment
-{
-    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
-}
-
-/** Things that can be turned into a Position (Array<number|number>) */
-export function isPositionLike(o:any): o is Position
-{
-    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
-        || isContainerAlignment(o);
-}
-
-export function isScaleInput(o:any): o is ScaleInput {
-    return (typeof o === 'string' && o === 'auto') || (typeof o === 'number')
-}
-
-
-//// CONTAINER CLASS
+import { ContainerType, ContainerHAlignment, ContainerVAlignment, ContainerAlignment, ContainerSide, ZoomRelativeTo, ScaleInput,
+    ContainerSizeRelativeTo, Position, PositionLike, ContainerData, Frame,
+    ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, isPositionLike,
+    isScaleInput } from './internal'
 
 export class Container
 {

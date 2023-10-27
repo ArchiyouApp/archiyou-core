@@ -1,26 +1,10 @@
 import { Page, Container, ContainerData, AnyContainer, Pipeline, AnyShape, AnyShapeOrCollection, 
     ShapeCollection, isAnyShapeCollection, Alignment, ZoomRelativeTo, ContainerContent, ContainerAlignment, isContainerAlignment} from './internal'
 
+import { ImageOptionsFit, isImageOptionsFit, ImageOptions} from './internal'
+
 import { arrayBufferToBase64 } from './internal' // utils
 
-type ImageOptionsFit = 'fill'|'contain'|'cover' // taken from CSS, see https://www.w3schools.com/css/css3_object-fit.asp
-// fill is unproportianlly, contain is fit inside with margin, cover is fill proportianally
-
-function isImageOptionsFit(o:any): o is ImageOptionsFit
-{
-    return ['fill','contain','cover'].includes(o);
-}
-
-export interface ImageOptions 
-{
-    fit?: ImageOptionsFit
-    align?: ContainerAlignment // for example ['left', 'top]  
-    opacity?: number // [0-100]
-    brightness?:number // [0-100]
-    contrast?:number // [0-100]
-    saturation?:number
-    grayscale?:number // [0-100]
-}
 
 export class Image extends Container
 {

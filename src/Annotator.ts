@@ -11,39 +11,7 @@ import { Coord, Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, V
 import { AnyShape,  AnyShapeOrCollection, Layout, roundToTolerance, roundTo } from './internal'
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
-/** Bring all annotations in one type */
-export type AnnotationType = 'base'|'dimensionLine' | 'label' // TODO MORE
-export type Annotation = DimensionLine  // TODO: more: label
-
-/** Exporting DimensionLine instances as data */
-export interface DimensionLineData
-{
-    _id?:string, // internal id
-    type:'dimensionLine'|'label', // TODO: more annotation types
-    start:Array<number|number|number>
-    end:Array<number|number|number>
-    dir:Array<number|number|number>
-    value:number
-    static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
-    units?:string
-    offset?:Array<number|number|number> // offset vector with length in model units
-    interactive:boolean
-    round?:boolean 
-    roundDecimals?:number
-    param:string // name param binded to this dimension line
-    _labelPosition?:Array<number|number|number> // for internal use
-    showUnits?:boolean
-}
-
-/** Used with Shape.dimension() as options 
- *  NOTE: update typeguards when adding fields to this
-*/
-export interface DimensionOptions 
-{
-    units?:ModelUnits
-    offset?:number // offsetLength (minus for other direction)
-    roundDecimals?:number // round to number decimals. Default is 0
-}
+import { AnnotationType, DimensionOptions, DimensionLineData } from './internal'
 
 export class BaseAnnotation
 {

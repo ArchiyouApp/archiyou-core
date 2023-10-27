@@ -2,11 +2,7 @@ import { Page, Container, ContainerData, ContainerContent , DocUnits, isDocUnits
 import { convertSizeUnitsToFontPoints } from './internal'
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-export interface TextOptions
-{
-    size?:number // saved in traditional 'point' (like in Word) - units are also allowed but converted in options
-    color?:string // always converted to hex
-}
+import { TextOptions } from './internal'
 
 export class Text extends Container
 {

@@ -1,5 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
-import { Geom, Doc, CodeParser, Exporter, Make, Calc } from './internal' // TMP DISABLED: Table
+import { Geom, Doc, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
 import { Console } from './Console'
 
 //// SETTINGS ////
@@ -285,6 +285,265 @@ export interface SelectorIndex
 {
     indices?: Array<number>, // indices of Subshapes
 }
+
+//// ANNOTATIONS ////
+
+/** Bring all annotations in one type */
+export type AnnotationType = 'base'|'dimensionLine' | 'label' // TODO MORE
+export type Annotation = DimensionLine  // TODO: more: label
+
+/** Exporting DimensionLine instances as data */
+export interface DimensionLineData
+{
+    _id?:string, // internal id
+    type:'dimensionLine'|'label', // TODO: more annotation types
+    start:Array<number|number|number>
+    end:Array<number|number|number>
+    dir:Array<number|number|number>
+    value:number
+    static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
+    units?:string
+    offset?:Array<number|number|number> // offset vector with length in model units
+    interactive:boolean
+    round?:boolean 
+    roundDecimals?:number
+    param:string // name param binded to this dimension line
+    _labelPosition?:Array<number|number|number> // for internal use
+    showUnits?:boolean
+}
+
+/** Used with Shape.dimension() as options 
+ *  NOTE: update typeguards when adding fields to this
+*/
+export interface DimensionOptions 
+{
+    units?:ModelUnits
+    offset?:number // offsetLength (minus for other direction)
+    roundDecimals?:number // round to number decimals. Default is 0
+}
+
+//// DOC ////
+
+export type DocUnits = 'mm'|'cm'|'inch'|'pnt'; 
+export type PercentageString = string // 100%, 0.5%, -10%
+export type ValueWithUnitsString = string
+export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
+export type TableInput = string
+
+export interface DocData {
+    name:string
+    units:DocUnits
+    pages:Array<PageData>
+    modelUnits:ModelUnits
+}
+
+//// TYPE GUARDS ////
+export function isDocUnits(o:any): o is DocUnits
+{
+    if(typeof o !== 'string'){ return false };
+    return ['mm','cm','inch'].includes(o as string);
+}
+
+export function isPercentageString(o:any): o is PercentageString 
+{
+    if(typeof o !== 'string'){ return false };
+    return o.match(/\-*[\d\.]+%$/) !== null;
+}
+
+export function isValueWithUnitsString(o:any): o is PercentageString 
+{
+    if(typeof o !== 'string'){ return false };
+    return o.match(/\-*[\d\.]+mm|cm|inch|\"$/) !== null;
+}
+
+export function isWidthHeightInput(o:any): o is WidthHeightInput
+{
+    return typeof o === 'number' ||
+        isPercentageString(o) ||
+        isValueWithUnitsString(o);
+}
+
+export function isTableInput(o:any): o is TableInput
+{
+    return (typeof o === 'string') 
+}
+
+//// DOC:PAGE ////
+
+export type PageSize = 'A0'|'A1'|'A2'|'A3'|'A4'|'A5'|'A6'|'A7';
+export type PageOrientation = 'landscape'|'portrait';
+export type AnyContainer = Container|View
+
+export interface PageData {
+    _entity:'page'
+    name:string
+    size:PageSize
+    width:number // in units given in docUnits
+    height:number // in units given in docUnits
+    orientation:PageOrientation
+    padding:Array<number|number> // horizontal (left and right), vertical (top and bottom) relative to Page width/height
+    containers:Array<ContainerData>
+    variables?:{[key:string]:any}
+    docUnits:DocUnits, // gets taken from parent doc
+}   
+
+export function isPageSize(o:any): o is PageSize
+{
+    if(typeof o !== 'string'){ return false };
+    return o.match(/A[0-7]$/) !== null;
+}
+
+export function isPageOrientation(o:any): o is PageOrientation
+{
+    if(typeof o !== 'string'){ return false };
+    return ['landscape','portrait'].includes(o as string);
+}
+
+export function isAnyContainer(o:any): o is AnyContainer
+{
+    return o instanceof Container ||
+            o instanceof View; // TODO: more
+}
+
+//// DOC:PAGE:CONTAINER ////
+
+export type ContainerType = 'view'|'image'|'text'|'textarea'|'table'
+export type ContainerHAlignment = 'left'|'center'|'right'
+export type ContainerVAlignment = 'top' | 'center' | 'bottom'
+export type ContainerAlignment = Array<ContainerHAlignment | ContainerVAlignment> // like [left,top]
+export type ContainerSide = 'width'|'height'
+export type ZoomRelativeTo = 'container'|'world'
+export type ScaleInput = 'auto'|number;
+export type ContainerSizeRelativeTo = 'page' | 'page-content-area'; // page-content area is page without the padding on both sides
+export type Position = Array<number|number>
+export type PositionLike = Position|ContainerAlignment
+
+export type ContainerData = { // Combine all Container types for convenience
+    _entity:string
+    name:string
+    parent:string
+    type:ContainerType
+    width:number // relative to (see: widthRelativeTo)
+    widthRelativeTo:ContainerSizeRelativeTo
+    widthAbs?:number // in doc units (added on place)
+    height:number // relative to (see: widthRelativeTo)
+    heightRelativeTo:ContainerSizeRelativeTo
+    heightAbs?:number // in doc units (added on place)
+    position:Position // relative to page-content-area
+    pivot:Position
+    border?:boolean // border around container
+    borderStyle?:DocPathStyle // style to draw border
+    frame?:any // advanced shapes as border
+    index?:number
+    caption?:string
+    contentAlign:ContainerAlignment // alignment of content inside container
+    content:any; // TODO: raw content
+    zoomLevel:ScaleInput, // number or 'auto' [default]
+    zoomRelativeTo:ZoomRelativeTo,
+    docUnits:DocUnits, 
+    modelUnits:ModelUnits,
+    _domElem?:HTMLDivElement, // added on placement
+}
+
+export interface Frame {
+    color:string // TODO
+    thickness:number
+    shape:'rect'|'circle'
+}
+
+export interface ContainerContent 
+{
+    source?:string, // source url (used for quick access if possible)
+    format?:'jpg'|'svg'|'png';
+    data:any; // main data
+    settings:{[key:string]:any}
+}
+
+
+export function isContainerHAlignment(o:any): o is ContainerHAlignment
+{
+    return ['left', 'center', 'right'].includes(o)
+}
+
+export function isContainerVAlignment(o:any): o is ContainerVAlignment
+{
+    return ['top', 'center', 'bottom'].includes(o)
+}
+
+export function isContainerAlignment(o:any): o is ContainerAlignment
+{
+    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
+}
+
+/** Things that can be turned into a Position (Array<number|number>) */
+export function isPositionLike(o:any): o is Position
+{
+    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
+        || isContainerAlignment(o);
+}
+
+export function isScaleInput(o:any): o is ScaleInput {
+    return (typeof o === 'string' && o === 'auto') || (typeof o === 'number')
+}
+
+//// DOC:PAGE:CONTAINER:IMAGE ////
+
+
+export type ImageOptionsFit = 'fill'|'contain'|'cover' // taken from CSS, see https://www.w3schools.com/css/css3_object-fit.asp
+// fill is unproportianlly, contain is fit inside with margin, cover is fill proportianally
+
+export function isImageOptionsFit(o:any): o is ImageOptionsFit
+{
+    return ['fill','contain','cover'].includes(o);
+}
+
+export interface ImageOptions 
+{
+    fit?: ImageOptionsFit
+    align?: ContainerAlignment // for example ['left', 'top]  
+    opacity?: number // [0-100]
+    brightness?:number // [0-100]
+    contrast?:number // [0-100]
+    saturation?:number
+    grayscale?:number // [0-100]
+}
+
+//// DOC:PAGE:CONTAINER:TABLE ////
+
+export type ContainerTableDataRows = Array<{[key:string]:any}>;
+
+export interface TableContainerOptions
+{
+    fontsize?: number
+    fontcolor?: string  
+}
+
+//// DOCS:PAGE:CONTAINER:TEXT ////
+
+export interface TextOptions
+{
+    size?:number // saved in traditional 'point' (like in Word) - units are also allowed but converted in options
+    color?:string // always converted to hex
+}
+
+//// DOCS:PAGE:CONTAINER:TEXTAREA ////
+
+export type TextAreaAlign = 'left'|'right'|'center'|'fill';
+
+export interface TextAreaOptions
+{
+    size?:number // saved in traditional 'point' (like in Word) - units are also allowed but converted in options
+    color?:string // always converted to hex
+    align?:TextAreaAlign
+}
+
+//// TYPE GUARDS ////
+
+export function isTextAreaAlign(o:any): o is TextAreaAlign
+{
+    return ['left', 'right', 'center', 'fill'].includes(o);
+}
+
 
 //// INTERFACES FOR OUTPUTS ////
 

@@ -31,52 +31,12 @@ import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyContainer, View, 
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
+import { DocUnits, PercentageString, ValueWithUnitsString, WidthHeightInput, 
+    TableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, 
+        isWidthHeightInput, isTableInput
+            } from './internal'
+
 import { convertValueFromToUnit } from './internal' // utils
-
-//// TYPES AND INTERFACES ////
-export type DocUnits = 'mm'|'cm'|'inch'|'pnt'; 
-export type PercentageString = string // 100%, 0.5%, -10%
-export type ValueWithUnitsString = string
-export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
-export type TableInput = string
-
-export interface DocData {
-    name:string
-    units:DocUnits
-    pages:Array<PageData>
-    modelUnits:ModelUnits
-}
-
-//// TYPE GUARDS ////
-export function isDocUnits(o:any): o is DocUnits
-{
-    if(typeof o !== 'string'){ return false };
-    return ['mm','cm','inch'].includes(o as string);
-}
-
-export function isPercentageString(o:any): o is PercentageString 
-{
-    if(typeof o !== 'string'){ return false };
-    return o.match(/\-*[\d\.]+%$/) !== null;
-}
-
-export function isValueWithUnitsString(o:any): o is PercentageString 
-{
-    if(typeof o !== 'string'){ return false };
-    return o.match(/\-*[\d\.]+mm|cm|inch|\"$/) !== null;
-}
-
-export function isWidthHeightInput(o:any): o is WidthHeightInput
-{
-    return typeof o === 'number' ||
-        isPercentageString(o) ||
-        isValueWithUnitsString(o);
-}
-
-export function isTableInput(o:any): o is TableInput
-{
-    return (typeof o === 'string') 
-}
 
 //// MAIN CLASS ////
 

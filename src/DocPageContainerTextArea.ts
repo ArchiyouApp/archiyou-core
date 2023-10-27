@@ -1,25 +1,10 @@
 import { Page, Container, ContainerContent, TextOptions } from './internal'
+import { TextAreaAlign, isTextAreaAlign, TextAreaOptions } from './internal'
+
 import { convertSizeUnitsToFontPoints } from './internal'
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-export type TextAreaAlign = 'left'|'right'|'center'|'fill';
 
-export interface TextAreaOptions
-{
-    size?:number // saved in traditional 'point' (like in Word) - units are also allowed but converted in options
-    color?:string // always converted to hex
-    align?:TextAreaAlign
-}
-
-//// TYPE GUARDS ////
-
-export function isTextAreaAlign(o:any): o is TextAreaAlign
-{
-    return ['left', 'right', 'center', 'fill'].includes(o);
-}
-
-
-//// MAIN CLASS ////
 
 export class TextArea extends Container
 {
