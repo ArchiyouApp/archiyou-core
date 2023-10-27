@@ -1,6 +1,6 @@
 import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, 
             ArchiyouApp, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
-import { toRad, MeshingQualitySettings, ArchiyouData } from './internal'
+import { toRad, MeshingQualitySettings, ArchiyouData, ArchiyouOutputSettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils  } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';
 
@@ -107,7 +107,7 @@ export class GLTFBuilder
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp):ArrayBuffer
+    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):ArrayBuffer
     {
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
@@ -126,11 +126,13 @@ export class GLTFBuilder
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                 annotations: ay.geom._annotator.getAnnotations(),
-                messages: ay?.console.getBufferedMessages(), // Console Messages
-                docs: ay.doc.toData(), // Document data by document name in special format for AY doc viewers (PDF and web)
+                // Console Messages. Include or not, or select types
+                messages: (settings?.messages !== false) ? ay?.console.getBufferedMessages(settings?.messages) : [], 
+                // Document data by document name in special format for AY doc viewers (PDF and web)
+                docs: (settings?.docs !== false) ? ay.doc.toData(settings?.docs) : {},  // TODO: toData is async: problem?
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
-                metrics: ay.calc.metrics(),
-                tables: ay.calc.toTableData(), // danfojs-nodejs has problems. Disable on node for now
+                metrics: (settings?.metrics !== false) ? ay.calc.metrics() : {},
+                tables: (settings?.tables !== false) ? ay.calc.toTableData() : {}, // danfojs-nodejs has problems. Disable on node for now
                 /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:

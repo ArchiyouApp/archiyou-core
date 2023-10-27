@@ -101,15 +101,20 @@ export type ArchiyouOutputFormatType = 'step'|'stl'|'gltf'
 export interface ArchiyouOutputSettings
 {
     // what to calculate/output
-    docs:boolean
-    pipelines:boolean|Array<string> // true for all, false for none, or array with names to include
-    formats:boolean|Array<ArchiyouOutputFormatType> // true for all, false for none, or names of formats to include
+    metrics?:boolean
+    tables?:boolean
+    docs?:boolean|Array<string> // true/false, or names of included docs
+    pipelines?:boolean|Array<string> // true for all, false for none, or array with names to include
+    formats?:boolean|Array<ArchiyouOutputFormatType> // true for all, false for none, or names of formats to include
+    messages?:boolean|Array<ConsoleMessageType> // true/false, or names of included message types
 }
+
+export type ConsoleMessageType = 'info'|'geom'|'user'|'warn'|'error'|'exec'
 
 /** A console Message */
 export interface ConsoleMessage
 {
-    type: string,
+    type: ConsoleMessageType,
     time: string,
     from: string, // component
     message: string,

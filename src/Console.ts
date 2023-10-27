@@ -4,7 +4,7 @@
 
 import JSONfn from 'json-fn';
 
-import { ConsoleMessage } from './types'
+import { ConsoleMessage, ConsoleMessageType } from './types'
 
 export class Console
 {
@@ -66,12 +66,12 @@ export class Console
     {
         // directly output to console
         const MESSAGE_TO_CONSOLE_TYPE = { 
-            'info' : 'info',
-            'geom' : 'info',
-            'user' : 'user',
-            'warn' : 'warn',
-            'error' : 'error',
-            'exec' : 'info',
+            info : 'info',
+            geom : 'info',
+            user : 'user',
+            warn : 'warn',
+            error : 'error',
+            exec : 'info',
         }
 
         switch(this._getOutputType())
@@ -102,7 +102,7 @@ export class Console
         }
     }
 
-    newMessage(type:string, message:any)
+    newMessage(type:ConsoleMessageType, message:any)
     {
         // NOTE: we allow in console mode to output non-strings - for example Objects
         
@@ -192,9 +192,13 @@ export class Console
         return `${t.toLocaleTimeString()}.${t.getMilliseconds()}`;
     }
 
-    getBufferedMessages()
+    getBufferedMessages(types?:any|Array<ConsoleMessageType>)
     {
-        return this.buffer;
+        types = (Array.isArray(types) ? 
+                    (types.length > 0) ? types : undefined 
+                    : undefined)
+        return (!types) ? this.buffer
+                    : this.buffer.filter(m => types.includes(m.type))
     }
 
 }

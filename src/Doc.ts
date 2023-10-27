@@ -568,8 +568,12 @@ export class Doc
 
     //// OUTPUT ////
 
-    async toData():Promise<{[key:string]:DocData} | undefined>
+    async toData(only:Array<string>|any=[]):Promise<{[key:string]:DocData} | undefined>
     {
+        // checks
+        only = (Array.isArray(only)) ? only : [];
+        const filter = only.length > 0;
+
         this.executePipelines();
 
         let docs = {};
@@ -577,17 +581,21 @@ export class Doc
         for(let i = 0; i < this._docs.length; i++)
         {
             const doc = this._docs[i];
-            const docPagesData = [];
-            for(let i = 0; i < this._pagesByDoc[doc].length; i++)
+            
+            if(filter && only.includes(doc))
             {
-                docPagesData.push(await this._pagesByDoc[doc][i].toData(this._assetsCache));
-            }
+                const docPagesData = [];
+                for(let i = 0; i < this._pagesByDoc[doc].length; i++)
+                {
+                    docPagesData.push(await this._pagesByDoc[doc][i].toData(this._assetsCache));
+                }
 
-            docs[doc] = {
-                name: doc,
-                units: this._unitsByDoc[doc],
-                pages: docPagesData,
-                modelUnits: this._geom._units, // set model units to calculate scale later
+                docs[doc] = {
+                    name: doc,
+                    units: this._unitsByDoc[doc],
+                    pages: docPagesData,
+                    modelUnits: this._geom._units, // set model units to calculate scale later
+                }
             }
         }
 
