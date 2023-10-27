@@ -5,7 +5,6 @@
  * 
  */
 
-import { Shape } from 'three';
 import { ConsoleMessage, ArchiyouApp, Point, Vector, Vertex, Edge, Face, Solid, ShapeCollection, LayoutOptions } from './internal' // classes
 import { Table } from './internal'; 
 import { PointLike } from './internal' // types

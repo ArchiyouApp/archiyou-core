@@ -21,18 +21,11 @@ import { PageData, ContainerData, Page } from './internal'
 
 import { DocViewSVGEdit } from './DocViewSVGEdit'
 
-import type { PDFDocument, PDFPage } from '@types/pdfkit'
-import SVGtoPDF from 'svg-to-pdfkit'
+// import type { PDFDocument, PDFPage } from '@types/pdfkit' // disabled because it does not work
 import BlobStream from 'blob-stream' // BlobStream for Web - TODO: disable for node
-
-
 
 import { arrayBufferToBase64 } from './utils'
 
-// all fonts in pdfkit: 
-// Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
-import Helvetica from 'pdfkit/js/data/Helvetica.afm';
-fs.writeFileSync('data/Helvetica.afm', Helvetica);
 
 // IMPORTANT: pdfkit needs fontkit ^2.0.0. Please add that requirement in package.json:
 //     "resolutions": {
@@ -58,11 +51,12 @@ export class DocPDFExporter
     activeDoc:DocData
     activePage:PageData
 
-    activePDFDoc:PDFDocument
-    activePDFPage:PDFPage
+    activePDFDoc:any // PDFDocument
+    activePDFPage:any // PDFPage
     activeStream:any // TODO TS typing
 
     _PDFDocument:any; // PDFDocument
+    _SVGtoPDF:any; // 
     _hasPDFKit:boolean = false;
 
     constructor(data:DocData|Record<string, DocData>)
@@ -100,10 +94,20 @@ export class DocPDFExporter
         if(isWorker || isBrowser)
         {
             this._PDFDocument = await import('pdfkit');
+            this._SVGtoPDF = await import('svg-to-pdfkit')
+            
+            // load fonts in virtual fs
+            // all fonts in pdfkit: 
+            // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
+            const helveticaPath = '../node_modules/pdfkit/js/data/Helvetica.afm';
+            const helveticaFont = await import(helveticaPath); // avoid TS erros
+            fs.writeFileSync('data/Helvetica.afm', helveticaFont);
         }
         else {
-            const nodePDFKitPath = 'pdfkit'; 
+            const nodePDFKitPath = 'pdfkit'; // To keep warnings out
             this._PDFDocument = await import(nodePDFKitPath)
+            const svgToPDFPath = 'svg-to-pdfkit'
+            this._SVGtoPDF = await import(svgToPDFPath);
         }
 
         this._PDFDocument = this._PDFDocument.default; // we need the default
@@ -228,7 +232,7 @@ export class DocPDFExporter
         )
     }
 
-    async _makePage(p:PageData):PDFPage
+    async _makePage(p:PageData):Promise<any> // PDFPage
     {
         // PDFKit Page docs: https://github.com/foliojs/pdfkit/blob/master/lib/page.js
 
@@ -340,7 +344,7 @@ export class DocPDFExporter
             {
                 const { x, y } = this.containerToPositionPoints(img, p);
         
-                SVGtoPDF(
+                this._SVGtoPDF(
                     this.activePDFDoc, 
                     img.content.data, 
                     x,
@@ -435,7 +439,7 @@ export class DocPDFExporter
         }
     }
 
-    _applyPathStyle(doc:PDFDocument, style?:DocPathStyle)
+    _applyPathStyle(doc:any, style?:DocPathStyle) // doc: PDFDocument
     {
         if (!style || typeof style !== 'object') return doc;
 
