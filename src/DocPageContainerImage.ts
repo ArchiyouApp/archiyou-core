@@ -1,4 +1,4 @@
-import { Page, Container, ContainerData, AnyContainer, Pipeline, AnyShape, AnyShapeOrCollection, 
+import { Page, Container, ContainerData, AnyPageContainer, Pipeline, AnyShape, AnyShapeOrCollection, 
     ShapeCollection, isAnyShapeCollection, Alignment, ZoomRelativeTo, ContainerContent, ContainerAlignment, isContainerAlignment} from './internal'
 
 import { ImageOptionsFit, isImageOptionsFit, ImageOptions} from './internal'

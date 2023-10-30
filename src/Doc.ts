@@ -26,7 +26,7 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
+import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyPageContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
@@ -65,7 +65,7 @@ export class Doc
     _pipelinesByDoc:{[key:string]:() => void} = {}; 
 
     _activePage:Page
-    _activeContainer:AnyContainer
+    _activeContainer:AnyPageContainer
 
     _assetsCache:Record<string,any> = {}; // keep assets like images in cache to avoid reloading on every toData() call
     

@@ -1,4 +1,4 @@
-import { Page, Container, ContainerData, AnyContainer, Pipeline, Shape, AnyShape, AnyShapeOrCollection, 
+import { Page, Container, ContainerData, AnyPageContainer, Pipeline, Shape, AnyShape, AnyShapeOrCollection, 
     ShapeCollection, isAnyShapeCollection, Alignment, ZoomRelativeTo, ContainerContent} from './internal'
 import { checkInput  } from './internal';
 

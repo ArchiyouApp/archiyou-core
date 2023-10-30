@@ -372,7 +372,7 @@ export function isTableInput(o:any): o is TableInput
 
 export type PageSize = 'A0'|'A1'|'A2'|'A3'|'A4'|'A5'|'A6'|'A7';
 export type PageOrientation = 'landscape'|'portrait';
-export type AnyContainer = Container|View
+export type AnyPageContainer = Container|View
 
 export interface PageData {
     _entity:'page'
@@ -386,24 +386,6 @@ export interface PageData {
     variables?:{[key:string]:any}
     docUnits:DocUnits, // gets taken from parent doc
 }   
-
-export function isPageSize(o:any): o is PageSize
-{
-    if(typeof o !== 'string'){ return false };
-    return o.match(/A[0-7]$/) !== null;
-}
-
-export function isPageOrientation(o:any): o is PageOrientation
-{
-    if(typeof o !== 'string'){ return false };
-    return ['landscape','portrait'].includes(o as string);
-}
-
-export function isAnyContainer(o:any): o is AnyContainer
-{
-    return o instanceof Container ||
-            o instanceof View; // TODO: more
-}
 
 //// DOC:PAGE:CONTAINER ////
 

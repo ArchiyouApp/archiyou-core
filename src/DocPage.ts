@@ -1,6 +1,6 @@
 import { Doc, Container, View, WidthHeightInput, ContainerData, 
-    DocUnits, PageSize, PageOrientation, AnyContainer, isPageSize,
-    isPageOrientation,  isAnyContainer} from './internal'
+    DocUnits, PageSize, PageOrientation, AnyPageContainer, isPageSize,
+    isPageOrientation,  isAnyPageContainer} from './internal'
 import { convertValueFromToUnit } from './internal' // utils
  
 
@@ -34,7 +34,7 @@ export class Page
     _height:number;
     _orientation:PageOrientation = 'landscape';
     _padding:Array<number>; // relative to [width,height]
-    _containers:Array<AnyContainer> = [];
+    _containers:Array<AnyPageContainer> = [];
     _variables: {[key:string]:any} = {}; // template variables
 
     constructor(doc:Doc, documentName:string, name:string)
@@ -124,10 +124,10 @@ export class Page
         return this;
     }
 
-    /** Add AnyContainer to page */
-    add(container:AnyContainer)
+    /** Add AnyPageContainer to page */
+    add(container:AnyPageContainer)
     {
-        if(!isAnyContainer){  throw new Error(`Page::add: Invalid container!`);}
+        if(!isAnyPageContainer){  throw new Error(`Page::add: Invalid container!`);}
         if(this._containerExists(container.name)){  throw new Error(`Page::add: Container with name "${container.name}" already exists!`);}
         
         if(!this._containers.includes(container))

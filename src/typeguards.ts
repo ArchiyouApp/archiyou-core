@@ -11,8 +11,10 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           ShapeAttributes
         } from './internal' // types
 
+import { BaseStyle, ContainerAlignment, Position, ScaleInput, 
+            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View } from './internal' // NOTE: Position is a DOC type
+
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS } from './internal' // types
-import { BaseStyle } from './internal'
 import { isNumeric, isRelativeCoordString } from './internal'
 
 
@@ -312,4 +314,49 @@ export const PIPELINE_VALID_NAMES = ['3dprint', 'cnc', 'techdraw',  'laser']; //
 export function isPipelineType(o:any) : o is PipelineType
 {
     return PIPELINE_VALID_NAMES.includes(o);
+}
+
+//// DOC ////
+
+export function isContainerAlignment(o:any): o is ContainerAlignment
+{
+    return ['center','top','left','right','bottom','topleft','topright','bottomleft','bottomright'].includes(o)
+}
+
+export function isPosition(o:any): o is Position
+{
+    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
+        || isContainerAlignment(o);
+}
+
+export function isScaleInput(o:any): o is ScaleInput {
+    return (typeof o === 'string' && o === 'auto') || (typeof o === 'number')
+}
+
+function isImageOptionsFit(o:any): o is ImageOptionsFit
+{
+    return ['fill','contain','cover'].includes(o);
+}
+
+export function isTextAreaAlign(o:any): o is TextAreaAlign
+{
+    return ['left', 'right', 'center', 'fill'].includes(o);
+}
+
+export function isPageSize(o:any): o is PageSize
+{
+    if(typeof o !== 'string'){ return false };
+    return o.match(/A[0-7]$/) !== null;
+}
+
+export function isPageOrientation(o:any): o is PageOrientation
+{
+    if(typeof o !== 'string'){ return false };
+    return ['landscape','portrait'].includes(o as string);
+}
+
+export function isAnyPageContainer(o:any): o is AnyPageContainer
+{
+    return o instanceof Container ||
+            o instanceof View; // TODO: more
 }
