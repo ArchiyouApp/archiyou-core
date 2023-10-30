@@ -68,7 +68,7 @@ export class Console
         const MESSAGE_TO_CONSOLE_TYPE = { 
             info : 'info',
             geom : 'info',
-            user : 'user',
+            user : 'warn',
             warn : 'warn',
             error : 'error',
             exec : 'info',
@@ -97,7 +97,7 @@ export class Console
 
             default: // put in buffer
                 this.buffer.push(message);
-                this._originalConsole[MESSAGE_TO_CONSOLE_TYPE[message.type]](message.message); // also put into normal console for debug
+                this._originalConsole[MESSAGE_TO_CONSOLE_TYPE[message.type] || 'log'](message.message); // also put into normal console for debug
 
         }
     }
