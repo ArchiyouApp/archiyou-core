@@ -442,34 +442,7 @@ export interface ContainerContent
 }
 
 
-export function isContainerHAlignment(o:any): o is ContainerHAlignment
-{
-    return ['left', 'center', 'right'].includes(o)
-}
-
-export function isContainerVAlignment(o:any): o is ContainerVAlignment
-{
-    return ['top', 'center', 'bottom'].includes(o)
-}
-
-export function isContainerAlignment(o:any): o is ContainerAlignment
-{
-    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
-}
-
-/** Things that can be turned into a Position (Array<number|number>) */
-export function isPositionLike(o:any): o is Position
-{
-    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
-        || isContainerAlignment(o);
-}
-
-export function isScaleInput(o:any): o is ScaleInput {
-    return (typeof o === 'string' && o === 'auto') || (typeof o === 'number')
-}
-
 //// DOC:PAGE:CONTAINER:IMAGE ////
-
 
 export type ImageOptionsFit = 'fill'|'contain'|'cover' // taken from CSS, see https://www.w3schools.com/css/css3_object-fit.asp
 // fill is unproportianlly, contain is fit inside with margin, cover is fill proportianally
@@ -518,14 +491,6 @@ export interface TextAreaOptions
     color?:string // always converted to hex
     align?:TextAreaAlign
 }
-
-//// TYPE GUARDS ////
-
-export function isTextAreaAlign(o:any): o is TextAreaAlign
-{
-    return ['left', 'right', 'center', 'fill'].includes(o);
-}
-
 
 //// INTERFACES FOR OUTPUTS ////
 

@@ -12,7 +12,9 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
         } from './internal' // types
 
 import { BaseStyle, ContainerAlignment, Position, ScaleInput, 
-            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View } from './internal' // NOTE: Position is a DOC type
+            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
+            ContainerHAlignment, ContainerVAlignment
+        } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS } from './internal' // types
 import { isNumeric, isRelativeCoordString } from './internal'
@@ -318,9 +320,19 @@ export function isPipelineType(o:any) : o is PipelineType
 
 //// DOC ////
 
+export function isContainerHAlignment(o:any): o is ContainerHAlignment
+{
+    return ['left', 'center', 'right'].includes(o)
+}
+
+export function isContainerVAlignment(o:any): o is ContainerVAlignment
+{
+    return ['top', 'center', 'bottom'].includes(o)
+}
+
 export function isContainerAlignment(o:any): o is ContainerAlignment
 {
-    return ['center','top','left','right','bottom','topleft','topright','bottomleft','bottomright'].includes(o)
+    return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
 }
 
 export function isPosition(o:any): o is Position
@@ -359,4 +371,11 @@ export function isAnyPageContainer(o:any): o is AnyPageContainer
 {
     return o instanceof Container ||
             o instanceof View; // TODO: more
+}
+
+/** Things that can be turned into a Position (Array<number|number>) */
+export function isPositionLike(o:any): o is Position
+{
+    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
+        || isContainerAlignment(o);
 }
