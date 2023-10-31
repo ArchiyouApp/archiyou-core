@@ -3,8 +3,9 @@
  *      Generate data tables and do basic data analytics 
  */
  
- import { Db, Table, Geom } from './internal'; 
- import { Metric, MetricOptions, TableLocation, DataRows, isDataRows } from './types'
+ import { Db, Table, Geom,  } from './internal'; 
+ import { Metric, MetricName, MetricOptions, TableLocation, DataRows, isDataRows, isMetricName } from './internal' // types and typeguards
+ import { METRICS } from './internal' // constants
 
  declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
 
@@ -150,11 +151,15 @@
     }   
 
     /** Add Metric element to dashboard */
-    metric(name:string, data:string|number, options:MetricOptions):Metric // TODO: Metric setting typing
+    metric(name:MetricName, data:string|number, options:MetricOptions):Metric // TODO: Metric setting typing
     {
         // some decent checking
         if (!name){ throw new Error(`Calc::metric: Please name your metric! metric('name of your metric', ...)`)}
         if (!data){ throw new Error(`Calc::metric: Please supply some data reference. Either an real value or table name or location as string!`)};
+        if(!isMetricName(name))
+        {
+            throw new Error(`Calc::metric: Please use any of these metric names: ${METRICS.join(', ')}`);
+        }
 
         this.autoInit();
 
@@ -181,10 +186,12 @@
         // make metric data structure
         let metric = {  
                 name: name,
-                type: options?.type || 'text', // default is text
+                label: options?.label || name,
+                type: 'text', // only text is implemented now
                 data: parsedData,
                 options: options
-        }
+        } as Metric
+
         this._metrics[name] = metric;
         
         return metric;

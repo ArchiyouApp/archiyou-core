@@ -658,22 +658,25 @@ export type DataRowsColumnValue = Array<DataRowColumnValue> // Array of DataRow 
 export type DataRowsValues = Array<DataRowValues> // Array of DataRow as values only
 export type DataRows = DataRowsColumnValue | DataRowsValues // DataRows
 
+export type MetricName = 'cost_material' | 'cost_labor' | 'production_time' | 'price_est' | 'price' | 'weight' | 'volume' | 'size' | 'r-value' // TODO: more
 
 /** Metric is a element that outputs data in some way */
 export interface Metric {
-    name: string // name and label of Metric
+    name: MetricName // standardized name of Metric
+    label: string // Label to be shown to user
     type:'text'|'bar'|'line'|'radar' // TODO: more
     data: number|string|Array<number|string> // raw data (either value, array<value> or array<object>)
-    options: TextMetricOptions // TODO: other options
+    options: TextMetricOptions // some options per type of Metric
 }
 
 export interface MetricOptionsBase
 {
-    type:'text'|'bar'|'line'|'radar' // TODO: more
+    label: string
 }
 
 /** Options for TextMetric */
 export interface TextMetricOptions extends MetricOptionsBase {
+    label:string
     icon: string // materialdesign icon name
     color: any // TODO: typing
     pre: string // string before value
@@ -698,17 +701,6 @@ export interface DbCompareStatement
     comparator: string,
     value: any,
     combine: string,
-}
-
-/** Metric data to be shown in MetricBoard */
-export interface MetricBoard
-{
-    name: string,
-    label : string,
-    value: any,
-    unit: string,
-    pre : string,
-    icon : string,
 }
 
 export interface CalcData

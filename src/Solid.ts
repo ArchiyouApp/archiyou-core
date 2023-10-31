@@ -591,6 +591,15 @@ export class Solid extends Shape
         return null;
     }
 
+    /** Even for Volume we try to calculate length
+     *  For now just the largest size of the bbox
+     *  Works well for boxes, but not more complex
+     */
+    length():number
+    {
+        return [this.bbox().width(),this.bbox().height(), this.bbox().depth()].sort((a,b) => b -a )[0]
+    }
+
     area():number
     {
         return this.faces().reduce( ( sum,f) => sum + f.area(), 0 )

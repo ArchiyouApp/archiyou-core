@@ -13,10 +13,10 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
 
 import { BaseStyle, ContainerAlignment, Position, ScaleInput, 
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
-            ContainerHAlignment, ContainerVAlignment
+            ContainerHAlignment, ContainerVAlignment, MetricName
         } from './internal' // NOTE: Position is a DOC type
 
-import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS } from './internal' // types
+import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
 import { isNumeric, isRelativeCoordString } from './internal'
 
 
@@ -316,6 +316,13 @@ export const PIPELINE_VALID_NAMES = ['3dprint', 'cnc', 'techdraw',  'laser']; //
 export function isPipelineType(o:any) : o is PipelineType
 {
     return PIPELINE_VALID_NAMES.includes(o);
+}
+
+//// CALC ////
+
+export function isMetricName(o:any): o is MetricName
+{
+    return METRICS.includes(o);
 }
 
 //// DOC ////

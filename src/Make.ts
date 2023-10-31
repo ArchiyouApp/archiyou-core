@@ -40,10 +40,13 @@ export interface Layout2DOptions
     height:number, // total height of layout in model units
     stockWidth?:number // the boxes that need to fit
     stockHeight?:number
-    seams?:number // make sure the boxes are the right size to have their seams on given grid lines
+    grid?:number // snap to a grid in primary axis
+    gridOffset?:number // offset the primary grid in direction of primary axis
+    secondaryGrid?:number // TODO
+    secondaryGridOffset?:number // TODO
     // !!!! TODO: seamsDirection - NOW only vertical
     seamsStartOffset?: number // let seams start later then start of layout
-    leftover?:boolean
+    leftover?:boolean // 
     cutMargin?:number
 }
 
@@ -123,13 +126,16 @@ export class Make
     _checkLayoutOptions(o:Layout2DOptions):Layout2DOptions
     {
         return {
-            width: o?.width || 500,
-            height: o?.height || 200,
-            stockWidth: o?.stockWidth || 20,
-            stockHeight: o?.stockHeight || 20,
+            width: o?.width || 1000,
+            height: o?.height || 1000,
+            stockWidth: o?.stockWidth || 100,
+            stockHeight: o?.stockHeight || 100,
             start: o?.start || 'bottomleft',
             direction: o?.direction || 'horizontal',
-            seams: o?.seams,
+            grid: o?.grid,
+            gridOffset: o?.gridOffset || 0,
+            secondaryGrid: o?.secondaryGrid, // not yet implemented
+            secondaryGridOffset: o?.secondaryGridOffset || 0, // not yet implemented
             leftover: o?.leftover || false,
             cutMargin: o?.cutMargin || this.LAYOUT2D_BOX_DEFAULT_FITTING_MARGIN_SIZE,
         }
@@ -138,17 +144,17 @@ export class Make
     _layout2DBoxesNewBox(cursor:Point, o:Layout2DOptions, leftOverSize?:number):Face
     {   
         const direction = (o.direction === 'horizontal') ? new Vector(1,0) : new Vector(0,1); // TODO: from right to left
+        const secDirection = direction.swappedXY();
         
         const mainAxis =  (o.direction === 'horizontal') ? 'x' : 'y'; // axis of direction
         const secAxis =  (o.direction === 'horizontal') ? 'y' : 'x'; // axis of secondary direction
 
-        const secDirection = direction.swappedXY();
         const layoutVec = new Vector(o.width, o.height);
         const mainLimit = layoutVec.scaled(direction).length(); // limit of layout in primary direction
         const secLimit = layoutVec.scaled(secDirection).length();
 
         const origBoxVec = new Vector(o.stockWidth, o.stockHeight);
-        let boxVec = origBoxVec.copy();
+        const boxVec = origBoxVec.copy();
 
         if (leftOverSize) // left over from previous box 
         {
@@ -159,18 +165,33 @@ export class Make
         if(cursor.moved(boxVec)[secAxis] > secLimit)
         {
             boxVec[secAxis] = secLimit - cursor[secAxis];
-        }
+        } 
+
+        let boxLimitedPrim = false;
         // check along primary axis if out of limit 
+
         if(cursor.moved(boxVec)[mainAxis] > mainLimit)
         {
             boxVec[mainAxis] = mainLimit - cursor[mainAxis];
-        } 
-        else if(o.seams) // check if box arrives in primary direction at seams as defined in o.seams
+            boxLimitedPrim = true;
+        }
+
+        // if not out of primary limit, snap to grid
+        if(!boxLimitedPrim && o.grid) // check if box arrives in primary direction at grid as defined in o.grid, with offset o.gridOffset
         { 
-            let sizeWithSeams = Math.floor(boxVec[mainAxis]/o.seams)*o.seams;
-            // can't fit box to seams (not enought size in primary axis available): register wasted Shape
-            this.stats.waste.addAligned(new Face().makeRectBetween(cursor, cursor.moved(boxVec)))
-            boxVec[mainAxis] = (sizeWithSeams !== 0) ? sizeWithSeams : origBoxVec[mainAxis];
+            const startGridOffset = (cursor[mainAxis] < o.gridOffset) ? o.gridOffset : 0;
+            const sizeAlongGrid = Math.floor((boxVec[mainAxis]-startGridOffset)/o.grid)*o.grid + startGridOffset;
+            // can't fit box to grid (not enought size in primary axis available): register wasted Shape
+            if(sizeAlongGrid < 0)
+            {
+                this.stats.waste.addAligned(new Face().makeRectBetween(cursor, cursor.moved(boxVec)))
+            }
+            // so make the box fit the grid, or start a fresh one (limited to grid or width if needed)
+            boxVec[mainAxis] = (sizeAlongGrid > 0) ? sizeAlongGrid : 
+                        (cursor.moved(origBoxVec)[mainAxis] > mainLimit) ? 
+                            mainLimit - cursor[mainAxis]
+                            : Math.floor((origBoxVec[mainAxis]-startGridOffset)/o.grid)*o.grid + startGridOffset // original width snapped to grid
+
         }
         // now make box
         const boxTo = cursor.moved(boxVec);
@@ -184,7 +205,6 @@ export class Make
         this.resetStats();
         o = this._checkLayoutOptions(o);
 
-
         let createdElems = new ShapeCollection().setName('boards'); 
         let cursor = this._alignment2DToPoint(o.start, o.width, o.height);
         
@@ -192,6 +212,12 @@ export class Make
         const mainDirectionSide = (o.direction === 'horizontal') ? 'width' : 'height';
         const mainDirectionBboxSide = (o.direction === 'horizontal') ? 'width' : 'depth';
         const mainDirectionAxis = (o.direction === 'horizontal') ? 'x' : 'y';
+
+        // Some checks for sanity
+        if((o.direction === 'horizontal' && o?.grid > o.stockWidth) || (o.direction === 'vertical' && o?.grid > o.stockHeight) )
+        {
+            throw new Error(`Make::_layout2DBoxes: Make sure your stock (stockWidth or stockHeight depending on direction) size is bigger then grid!`)
+        }
 
         let leftOverBoxSize; // in main direction
         
@@ -211,9 +237,8 @@ export class Make
                 this.stats.full.add(newBox); // register full shapes, keep position
             }
 
-            
             // move cursor
-            cursor = cursor.moved(new Vector(newBox.bbox().width(),newBox.bbox().depth()).scaled(mainDirectionVec))
+            cursor = cursor.moved(new Vector(newBox.bbox().width(),newBox.bbox().depth()).scaled(mainDirectionVec));
 
             // check if cursor in main direction filled up and return to next row of boxes in main direction
             if( (cursor[mainDirectionAxis] >= o[mainDirectionSide]))
@@ -227,6 +252,7 @@ export class Make
             {
                 break
             }
+
         }
         
         this._layout2DBoxesStats(o);
@@ -342,17 +368,18 @@ export class Make
         // vertical grid
 
         const gridLines= new ShapeCollection();
-        const numGridLines = Math.round(width/grid);
+        const numGridLines = Math.floor(width/grid) + 1;
+        const remainingWallWidth = width - (numGridLines -1) * grid;
+        const skipEndStud = (remainingWallWidth < studThickness) ? true : false;
+
         new Array(numGridLines).fill(null).
             map( (e,i) => gridLines.add(
                                 new Edge().makeLine([0,0,0],[0,0,height]).move(grid*i)
                                 ))
-        gridLines.add(new Edge().makeLine([width,0,0], [width,0,height]));
 
         const studHeight = height - studThickness*2;
 
         // top and bottom-plates
-        
         const bottomPlate = new Solid().makeBoxBetween([0,0,0],[width, depth, studThickness])
                                 .moveY(-depth/2)
         
@@ -373,10 +400,20 @@ export class Make
             if(ENDING_STUDS_INSIDE)
             {
                 if(i === 0){ newStud.move(studThickness/2) }
-                if(i === arr.length - 1){ newStud.move(-studThickness/2) }
             }
             primaryStuds.add(newStud)
         })
+
+        // Ending stud (see: skipEndStud above)
+        if(!skipEndStud)
+        {
+            // Don't add end stud if there is no space between width and last grid line
+            // Meaning the wall needs a filler stud
+            const endStud = stud.moved(width, 0, height/2) 
+            ENDING_STUDS_INSIDE ? endStud.move(-studThickness/2) : endStud;
+            primaryStuds.add(endStud)
+        }
+        
 
         // Openings: Validate openings and give feedback for user when needed
         const checkedOpenings = new ShapeCollection();
@@ -390,6 +427,10 @@ export class Make
         {
             
             let checkedOpening = null;
+            // some flags
+            let openingAlignedToBottom = false;
+            let openingAlignedToTop = false;
+
             const openingStart = o.bbox().min()._toVertex();
 
             if(wallDiagram.contains(o)) // validate opening first
@@ -404,11 +445,17 @@ export class Make
             if(checkedOpening)
             {
                 // openings need to fit in basic outer frame
-                if(checkedOpening.min().z < studThickness)
+                if(checkedOpening.min().z < studThickness*2)
                 { 
-                    checkedOpening.subtract(
-                            new Solid().makeBox(width*2, width*2, studThickness, 
-                                    [width/2, 0, studThickness/2]).hide())
+                    checkedOpening.move(0,0,studThickness-checkedOpening.min().z)
+                    this._ay.console.user(`Snapped bottom Opening #${i} to minimum height of ${studThickness}`);
+                    openingAlignedToBottom = true;
+                }
+                if(checkedOpening.max().z > height-studThickness*2)
+                {
+                    checkedOpening.move(0,0,height-studThickness-checkedOpening.max().z)
+                    this._ay.console.user(`Snapped top of Opening #${i} to maxium height of ${studThickness}`);
+                    openingAlignedToTop = true;
                 }
 
                 // snap start position to match with nearest stud
@@ -485,7 +532,7 @@ export class Make
 
                 // make frame around opening
                 const openingBufferBbox = openingTestBuffer.bbox();
-                const openingFrame = this.rectFrame(
+                let openingFrame = this.rectFrame(
                                 openingBufferBbox.width(),
                                 openingBufferBbox.height(),
                                 depth,
@@ -493,6 +540,16 @@ export class Make
                                 'horizontal'
                             )
                             .moveTo(openingTestBuffer.center())
+
+                // Don't add frame top and bottom if they align (for example with doors)
+                if(openingAlignedToBottom)
+                {
+                    openingFrame = openingFrame.filter(s => s.name !== 'frameBottom')
+                }
+                if(openingAlignedToTop)
+                {
+                    openingFrame = openingFrame.filter(s => s.name !== 'frameTop')
+                }
 
                 openingFrames.add(openingFrame)
 
@@ -544,6 +601,7 @@ export class Make
                 .addGroup('openingFrames', openingFrames.color('red'))
                 .addGroup('openingKingStuds', openingKingStuds.color('brown'))
                 .addGroup('openingJackStuds', openingJackStuds.color('brown'))
+                .addGroup('openingDiagrams', checkedOpenings.color('grey'))
                 .addToScene(); // NOTE: add to scene by default? 
                 // Shall we introduce some kind of reasoning here (for example makeFrame is not added)
     }

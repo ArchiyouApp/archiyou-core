@@ -122,6 +122,10 @@ export const MESH_QUALITY_PRESETS = {
     'high' : { linearDeflection: 0.4, angularDeflection: 0.1, tolerance: 0.001, edgeMinimalPoints: 2, edgeMinimalLength: 0.001 },
 }
 
+//// CALC MODULE ////
+
+export const METRICS = ['cost_material', 'cost_labor', 'production_time', 'price_est', 'price', 'weight' , 'volume', 'size', 'r-value'] // TODO: more
+
 //// WORKER UTILS ////
 
 //// Methods from geom that are imported into global under samen name and lowercase ////

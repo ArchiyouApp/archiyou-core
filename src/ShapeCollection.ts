@@ -957,6 +957,18 @@
          return combinedBbox;
       }
 
+      /** Shape API: get combined Shape area */
+      area():number
+      {
+         return this.reduce((agg,s) => agg + s.area(), 0)
+      }
+
+      /** Shape API: get combined Shape volume */
+      volume():number
+      {
+         return this.reduce((agg,s) => agg + s.volume(), 0)
+      }
+
       /** Shape API */
       _hashcode():string
       {
@@ -1270,10 +1282,12 @@
          return this.shapes.find(func);
       }
 
-      /** Array API - Filter Shapes in this Collection and return a new ShapeCollection */
-      filter(func: (value: any, index: number, arr:Array<any>) => boolean ):ShapeCollection
+      /** Array API - Filter Shapes in this Collection and return a new ShapeCollection or single Shape
+       *  NOTE: Returning one shape is not entirely consistent with Array !
+       */
+      filter(func: (value: any, index: number, arr:Array<any>) => boolean ):AnyShape|ShapeCollection
       {
-         return new ShapeCollection(this.shapes.filter(func));
+         return new ShapeCollection(this.shapes.filter(func)).checkSingle();
       }
 
       reduce(func: (prevValue: number, curValue:AnyShape, index:number, arr:Array<AnyShape>) => number, startSum:number):number
@@ -1736,9 +1750,14 @@
          }
       }
 
+      /** Check null or single, and return single value if the case  */
       checkSingle():AnyShape|ShapeCollection
       {
-         if (this.shapes.length == 1)
+         if(this.shapes.length === 0)
+         {
+            return null;
+         }
+         else if (this.shapes.length == 1)
          {
             return this.shapes[0] as AnyShape;
          }
