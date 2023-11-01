@@ -132,6 +132,7 @@ export interface ArchiyouData
     docs: {[key:string]:DocData} // all documents in data and serialized content
     errors?: Array<StatementError>, // only needed for internal use in the future
     messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
+    metrics?: Record<string, Metric>,  
     tables?:{[key:string]:any}, // raw data tables
 }
 

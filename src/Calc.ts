@@ -155,7 +155,7 @@
     {
         // some decent checking
         if (!name){ throw new Error(`Calc::metric: Please name your metric! metric('name of your metric', ...)`)}
-        if (!data){ throw new Error(`Calc::metric: Please supply some data reference. Either an real value or table name or location as string!`)};
+        if (data === null || data === undefined){ throw new Error(`Calc::metric: Please supply some data reference. Either an real value or table name or location as string!`)};
         if(!isMetricName(name))
         {
             throw new Error(`Calc::metric: Please use any of these metric names: ${METRICS.join(', ')}`);
