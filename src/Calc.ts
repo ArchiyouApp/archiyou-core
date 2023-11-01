@@ -55,6 +55,11 @@
         return this._danfo;
     }
 
+    hasDanfo():boolean
+    {
+        return (this._danfo !== undefined)
+    }
+
     handleFailedDanfoImport(e)
     {
         console.error(`!!!! Calc: Cannot import Danfo module: "${e}"
@@ -70,7 +75,8 @@
     /** Automatically calc.init() when user uses calc module */
     autoInit()
     {
-        if(!this.db.isInitiated())
+        // NOTE: We can't init without danfo loaded!
+        if(this.hasDanfo() && !this.db.isInitiated())
         {
             this?.db?.init();
         }
