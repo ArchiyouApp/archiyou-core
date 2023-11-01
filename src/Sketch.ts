@@ -389,7 +389,7 @@ export class Sketch
         // TODO: both ways of containing: newShapes contain previous
         
         // NOTE: Use all Shapes here, not only pendingShapes, exclude isTmp Shapes
-        let prevShapes = this.shapes.not(newFace).filter( s => !s._isTmp); 
+        let prevShapes = new ShapeCollection(this.shapes.not(newFace).filter( s => !s._isTmp));  // force collection
 
         if(this.pendingOperations.length == 0)
         {
@@ -1088,13 +1088,13 @@ export class Sketch
     getShapes():ShapeCollection|AnyShape
     {
         this.combine();
-        return this.shapes.filter(s => !s._isTmp).checkSingle();
+        return new ShapeCollection(this.shapes.filter(s => !s._isTmp)).checkSingle(); // force collection from filter
     }
 
     import():ShapeCollection|AnyShape
     {
         this.combine(); // check if we can combine/upgrade Shapes. Mostly Edges to Wires
-        let sketchShapes = this.shapes.filter(s => !s._isTmp).checkSingle();
+        let sketchShapes = new ShapeCollection(this.shapes.filter(s => !s._isTmp)).checkSingle();
 
         let isCollection = ShapeCollection.isShapeCollection(sketchShapes);
         

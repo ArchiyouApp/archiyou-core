@@ -2359,11 +2359,11 @@ export class Shape
         // if flag set, don't include the results that overlap with operant others
         if(splitShapes.length && excludeOverlapping)
         {
-            return (splitShapes as ShapeCollection)
+            return new ShapeCollection((splitShapes as ShapeCollection)
                     .filter((s) => {
                         // filter out result splitted Shapes that overlap with any of the operant Shapes
                         return !otherCollection.toArray().some( o => s.overlapPerc(o) > OVERLAP_PERC_TOLERANCE)
-                    })
+                    }))
                     .checkSingle();
         }
         
@@ -2737,7 +2737,7 @@ export class Shape
         let sceneShapes:AnyShapeCollection = this._geom.allShapes(); // get all Shapes in scene
         let intersectingShapeCollection = sceneShapes.filter(shape => (shape as AnyShape)._intersections(this) != null );
 
-        return intersectingShapeCollection;
+        return new ShapeCollection(intersectingShapeCollection); // filter can return single Shape
     }
 
     @checkInput('AnyShape', 'auto')
@@ -3401,14 +3401,14 @@ export class Shape
     @checkInput(['ShapeCollection', 'MainAxis'],['auto', 'auto'])
     _selectorPositiveOnAxis(shapes:AnyShapeCollection, axis:MainAxis):AnyShapeCollection
     {
-        return shapes.filter( shape => shape.min(axis) >= 0 ); 
+        return new ShapeCollection(shapes.filter( shape => shape.min(axis) >= 0 )); // force returning ShapeCollection
     }
 
     /** Selects all Shapes that have negative coordinates along given axis */
     @checkInput(['ShapeCollection', 'MainAxis'],['auto', 'auto'])
     _selectorNegativeOnAxis(shapes:AnyShapeCollection, axis:MainAxis):AnyShapeCollection
     {
-        return shapes.filter( shape => shape.max(axis) < 0 );
+        return new ShapeCollection(shapes.filter( shape => shape.max(axis) < 0 )); // force returning ShapeCollection
     }
 
     /** Selects shapes of a certain subtype  */
@@ -3457,7 +3457,7 @@ export class Shape
 
         console.info(`Shape::_selectorOfSubType: Selected ${selectedShapes.length} of subtype ${subType}`);
 
-        return selectedShapes;
+        return new ShapeCollection(selectedShapes); // force collection (filter can return single)
         
     }
 
@@ -3536,7 +3536,8 @@ export class Shape
         let point = new Vector(pointRange.point);
         pointRange.range = Math.abs(pointRange.range); // negative range does not make sense
         let comparatorFunc = RANGE_OPERATORS_TO_COMPARATORS[pointRange.operator];
-        let selectedShapes = shapes.filter( shape => comparatorFunc(shape.distance(point._toVertex()), pointRange.range ));
+        let selectedShapes = new ShapeCollection(
+                                shapes.filter( shape => comparatorFunc(shape.distance(point._toVertex()), pointRange.range )));
 
         console.info(`Shape::_selectorWithinRange: Selected ${selectedShapes.length} shapes that are within (${pointRange.operator}) of range ${pointRange.range} from Vertex (${point.toArray()})`);
 
@@ -3558,7 +3559,7 @@ export class Shape
             return new ShapeCollection();
         }
 
-        let selectedShapes = shapes.filter( shape => 
+        let selectedShapes = new ShapeCollection(shapes.filter( shape => 
         {
             // more robust than contains dealing with tolerances
             // use Shape.center() instead of real Shape otherwise touching Shapes also get selected
@@ -3567,11 +3568,11 @@ export class Shape
                 return true
             }
             return false;
-        });
+        })); // force collection, filter can return single Shape
 
         console.info(`Shape::_selectorSide: Selected ${selectedShapes.length} shapes that belong to given sides "${sidesString}" of main Shape.`);
 
-        return selectedShapes;
+        return selectedShapes; 
     }
 
     /** Select Shapes that have _all_ vertices at a specific coordinate within a certain tolerance 
@@ -3582,11 +3583,11 @@ export class Shape
     {
         let tolerance = axisCoord.tolerance || 0;
 
-        let selectedShapes = shapes.filter( shape => {
+        let selectedShapes = new ShapeCollection(shapes.filter( shape => {
             // search negatively - when we encounter a Vertex not with that coordinate: quit 
             let vertexNotOnCoord = shape.vertices().toArray().find(v =>  !((v[axisCoord.axis] >= axisCoord.coord - tolerance) && (v[axisCoord.axis] <= axisCoord.coord + tolerance))  ) 
             return vertexNotOnCoord == undefined;
-        })
+        }))
 
         console.info(`Shape::_selectorAtAxisCoord: Selected ${selectedShapes.length} shapes that have all vertices on coordate "${axisCoord.axis}"=${axisCoord.coord} with tolerance ${tolerance}`);
 
@@ -3599,7 +3600,7 @@ export class Shape
     {
         let bbox = new Bbox(bboxSelector.from, bboxSelector.to);
         
-        let selectedShapes = shapes.filter( shape => bbox.contains(shape )).unique(); // avoid doubles (based on geometry)
+        let selectedShapes = new ShapeCollection(shapes.filter( shape => bbox.contains(shape ))).unique(); // avoid doubles (based on geometry)
 
         console.info(`Shape::_selectorInBbox: Selected ${selectedShapes.length} shapes that are within BoundingBox [${bboxSelector.from}][${bboxSelector.to}]`);
 

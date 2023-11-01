@@ -544,11 +544,11 @@ export class Make
                 // Don't add frame top and bottom if they align (for example with doors)
                 if(openingAlignedToBottom)
                 {
-                    openingFrame = openingFrame.filter(s => s.name !== 'frameBottom')
+                    openingFrame = new ShapeCollection(openingFrame.filter(s => s.name !== 'frameBottom'))
                 }
                 if(openingAlignedToTop)
                 {
-                    openingFrame = openingFrame.filter(s => s.name !== 'frameTop')
+                    openingFrame = new ShapeCollection(openingFrame.filter(s => s.name !== 'frameTop'));
                 }
 
                 openingFrames.add(openingFrame)

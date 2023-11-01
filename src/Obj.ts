@@ -462,7 +462,7 @@ export class Obj
     toMeshShapeBuffer(quality:MeshingQualitySettings ): MeshShapeBuffer
     {
         let allShapes = new ShapeCollection(this.allShapes());
-        allShapes = allShapes.filter( s => s?._obj._visible); // filter out hidden Obj
+        allShapes = new ShapeCollection(allShapes.filter( s => s?._obj._visible)); // filter out hidden Obj. NOTE: filter can return a single Shape!
 
         return allShapes.toMeshShapeBuffer(quality);        
     }

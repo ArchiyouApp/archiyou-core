@@ -925,15 +925,15 @@ export class Geom
   /** Capture all created shapes between points in time by comparing current to _captureShapesStart */
   _captureShapesEnd():ShapeCollection
   {
-    if(!this._captureShapesStart){ throw new Error(`Geom::_captureShapesEnd(): Please use '_captureShapes()' to start capture first!`) }
+    if(!this._captureShapesStart)
+    { 
+      throw new Error(`Geom::_captureShapesEnd(): Please use '_captureShapes()' to start capture first!`) 
+    }
 
     const curShapes = this.all();
     let capturedShapes = new ShapeCollection();
-    capturedShapes = curShapes.filter(shape => !this._captureShapesStart.has(shape));
+    capturedShapes = new ShapeCollection(curShapes.filter(shape => !this._captureShapesStart.has(shape)));
     this._captureShapesStart = null;
-
-    console.log(' ==== END CAPT ====');
-    console.log(capturedShapes);
 
     return capturedShapes.unique();
   }

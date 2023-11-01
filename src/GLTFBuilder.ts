@@ -19,7 +19,6 @@ export interface exportGLTFOptions
     archiyouFormat?: boolean // use Archiyou format
     includePointsAndLines?: boolean // export loose points and edges 
     extraShapesAsPointLines?: boolean // for visualization purposes seperate points and lines
-    messages?:Array<ConsoleMessage> 
 }   
 
 
@@ -142,6 +141,9 @@ export class GLTFBuilder
                     }
                 */
             } as ArchiyouData
+
+            console.log('==== DEBUG OUTPUT METRICS ====');
+            console.log( asset.extras.archiyou.metrics );
             
             let buffer = io.writeBinary(this.doc); 
             return buffer; 
@@ -160,7 +162,7 @@ export class GLTFBuilder
         shapes.getShapesByType('Vertex').forEach(v => this._addPoints(v, buffer));
        
         // For every Edge and Wire make a seperate node
-        const lines = shapes.filter(s => ['Edge', 'Wire'].includes(s.type()))
+        const lines = new ShapeCollection(shapes.filter(s => ['Edge', 'Wire'].includes(s.type()))); // force collection from filter
         lines.forEach( l => 
         {
             this._addShapeLines(l, buffer, quality);

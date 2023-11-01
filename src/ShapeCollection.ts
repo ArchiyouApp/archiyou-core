@@ -1046,7 +1046,7 @@
 
       /** Find Shapes within ShapeCollection that entirely contain given other Shape */
       @checkInput('PointLikeOrAnyShapeOrCollection', 'auto')
-      containers(other:PointLikeOrAnyShapeOrCollection):ShapeCollection
+      containers(other:PointLikeOrAnyShapeOrCollection):ShapeCollection|AnyShape
       {
          return this.filter(shape => shape.contains(other));
       }
@@ -1138,7 +1138,7 @@
       }
 
       /** Return new ShapeCollection with only the visible Shapes */
-      onlyVisible():ShapeCollection
+      onlyVisible():ShapeCollection|AnyShape
       {
          return this.filter(s => s.visible());
       }
@@ -1193,7 +1193,7 @@
       @checkInput([['PointLike',[0,1,0]], ['Boolean', false]],['Vector', 'auto'])
       _project(planeNormal?:PointLike, all?:boolean):ShapeCollection
       {
-         const visibleShapes = this.filter( shape => shape.visible() === true)
+         const visibleShapes = new ShapeCollection(this.filter( shape => shape.visible() === true)); // filter can return single Shape
          const ocCompoundShape = visibleShapes.toOcCompound(); // combine all Shapes in ShapeCollection as CompoundShape
          // We are hacking the Shape class a bit here to be able to use Shape._project on CompoundShape
          const tmpShape = new Shape();
@@ -1213,7 +1213,7 @@
       @checkInput([['Side', 'top'], ['Boolean', false]], ['auto', 'auto'])
       _elevation(side?:Side, all?:boolean):ShapeCollection
       {
-         const visibleShapes = this.filter( shape => shape.visible() === true)
+         const visibleShapes = new ShapeCollection(this.filter( shape => shape.visible() === true)); // filter can return single Shape
          const ocCompoundShape = visibleShapes.toOcCompound(); // combine all Shapes in ShapeCollection as CompoundShape
          // Again: We are hacking the Shape class a bit here
          const tmpShape = new Shape();
@@ -1236,7 +1236,7 @@
        */
       _isometry(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
-         const visibleShapes = this.filter( shape => shape.visible() === true)
+         const visibleShapes = new ShapeCollection(this.filter( shape => shape.visible() === true));
          const ocCompoundShape = visibleShapes.toOcCompound(); // combine all Shapes in ShapeCollection as CompoundShape
          // Again: We are hacking the Shape class a bit here
          const tmpShape = new Shape();
@@ -1305,7 +1305,7 @@
       /** Exclude given Shape from current collection */
       not(shape:AnyShape):ShapeCollection
       {
-         return this.filter(s => !s.same(shape))
+         return new ShapeCollection(this.filter(s => !s.same(shape)))
       }
 
       /** Check if ShapeCollection is empty */
@@ -2337,7 +2337,7 @@
 
          let svgElems:Array<string> = [];
 
-         const flatXYShapes = this.filter(s => s.is2DXY());
+         const flatXYShapes = new ShapeCollection(this.filter(s => s.is2DXY())); // filter can return a single Shape
 
          flatXYShapes.forEach( s => 
          {

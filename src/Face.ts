@@ -394,7 +394,7 @@ export class Face extends Shape
     innerWires():ShapeCollection
     {
         let outerWire = this.outerWire();
-        let innerWires = this.wires().filter(w => !w.same(outerWire));
+        let innerWires = new ShapeCollection(this.wires().filter(w => !w.same(outerWire))); // filter can return single Shape
         return innerWires;
     }
 
