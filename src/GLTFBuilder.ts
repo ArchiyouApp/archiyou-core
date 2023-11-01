@@ -141,9 +141,6 @@ export class GLTFBuilder
                     }
                 */
             } as ArchiyouData
-
-            console.log('==== DEBUG OUTPUT METRICS ====');
-            console.log( JSON.stringify(asset.extras.archiyou.metrics));
             
             let buffer = io.writeBinary(this.doc); 
             return buffer; 
