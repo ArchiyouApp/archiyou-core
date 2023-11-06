@@ -881,6 +881,7 @@
             newShapeCollection.addGroup(groupName, copiedShapes); 
          })
          newShapeCollection.setName( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
+         newShapeCollection._setFakeArrayKeys();
 
          return newShapeCollection;
       }

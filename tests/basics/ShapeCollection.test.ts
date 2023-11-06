@@ -21,3 +21,18 @@ test("Bbox", () =>
     expect(c.bbox().toData()).toEqual([-50,100,-50,100,0,0]);
 });
 
+test("copy", () => 
+{
+    const g1 = geom.group(geom.Box(10),geom.Box(20));
+    const g2 = g1.copy();
+    expect(g2[0].bbox().width() === g1[0].bbox().width()).toEqual(true);
+}
+);
+
+test("fakeKeyIndices", () =>
+{
+    const g1 = geom.group(geom.Box(10),geom.Box(20));
+    const g2 = g1.shallowCopy();
+    expect(g2[0].equals(g1[0])).toEqual(true);
+});
+

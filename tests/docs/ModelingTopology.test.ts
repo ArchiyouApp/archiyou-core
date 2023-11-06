@@ -156,7 +156,7 @@ test("ModelingTopologyUpgrade", () =>
     let l = geom.Line([-100,0,0],[0,0,0]);
     let a = geom.Arc([0,0,0],[100,100,0],[0,0,200]);
     // combine and added to scene
-    expect(geom.collection(l,a).upgraded()[0].type()).toEqual('Wire');
+    expect(geom.collection(l,a).upgraded().first().type()).toEqual('Wire');
 })
     
 
