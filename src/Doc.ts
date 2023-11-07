@@ -432,7 +432,7 @@ export class Doc
      *   - ContainerAlignment: 'left', 'top'
      *   TODO: in world units from origin
      */
-    pivot(x:number|PositionLike|string, y?:number):Doc
+    pivot(x:number|PositionLike|string|Array<number|number>, y?:number):Doc
     {
         if(!this._activeContainer || !this._activePage)
         {
@@ -441,11 +441,17 @@ export class Doc
         
         const args = Array.from(arguments); // IMPORTANT: needs to be an array
 
-        // if something like pivot('topleft') - this was the older API
+        // if something like pivot('topleft') - backward compatable
         if (typeof x === 'string')
         {
             args[0] = x.match(/left|right|center/gi)?.at(0) || 'center';
             args[1] = x.match(/top|center|bottom/gi)?.at(0) || 'center';
+        }
+        // pivot([1,0]) - backward compatable
+        else if(Array.isArray(x))
+        {
+            args[0] = x[0];
+            args[1] = x[1];
         }
         // Some forgiveness with order of alignment strings (top,left versus left,top)
         else if(isContainerVAlignment(args[0]) && isContainerHAlignment(args[1]))
@@ -538,7 +544,7 @@ export class Doc
     {
         // checks
         only = (Array.isArray(only)) ? only : [];
-        const filter = only.length > 0;
+        const doFilter = only.length > 0;
 
         this.executePipelines();
 
@@ -548,7 +554,7 @@ export class Doc
         {
             const doc = this._docs[i];
             
-            if(filter && only.includes(doc))
+            if(!doFilter || (doFilter && only.includes(doc)))
             {
                 const docPagesData = [];
                 for(let i = 0; i < this._pagesByDoc[doc].length; i++)

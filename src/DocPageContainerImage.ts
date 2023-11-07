@@ -39,9 +39,6 @@ export class Image extends Container
         this._options.fit = isImageOptionsFit(options?.fit) ? options.fit : this.DEFAULT_FIT;
         
         // set in both options and on main container _contentAlign
-        console.log('SET OPTIONS');
-        console.log(options.align);
-        console.log(isContainerAlignment(options.align));
 
         this._options.align = isContainerAlignment(options?.align) ? options.align : this.DEFAULT_ALIGN;
         this._contentAlign = this._options.align;

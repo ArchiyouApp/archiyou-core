@@ -140,6 +140,7 @@ export interface ArchiyouData
 export interface ArchiyouAppInfo
 {
     units?:ModelUnits // units of Geom._units
+    numShapes?:number
     bbox?:ArchiyouAppInfoBbox // bbox of all shapes in scene
     hasDocs?:boolean // if there are docs part of the script
 }
