@@ -432,17 +432,23 @@ export class Doc
      *   - ContainerAlignment: 'left', 'top'
      *   TODO: in world units from origin
      */
-    pivot(x:number|PositionLike, y?:number):Doc
+    pivot(x:number|PositionLike|string, y?:number):Doc
     {
         if(!this._activeContainer || !this._activePage)
         {
             throw new Error(`Doc::position(): Can not set position of active container. No active container and/or Page created!`);
         }
         
-        const args = [...arguments]; // IMPORTANT: needs to be an array
+        const args = Array.from(arguments); // IMPORTANT: needs to be an array
 
+        // if something like pivot('topleft') - this was the older API
+        if (typeof x === 'string')
+        {
+            args[0] = x.match(/left|right|center/gi)?.at(0) || 'center';
+            args[1] = x.match(/top|center|bottom/gi)?.at(0) || 'center';
+        }
         // Some forgiveness with order of alignment strings (top,left versus left,top)
-        if(isContainerVAlignment(args[0]) && isContainerHAlignment(args[1]))
+        else if(isContainerVAlignment(args[0]) && isContainerHAlignment(args[1]))
         {
             args.reverse();
         }
@@ -456,7 +462,7 @@ export class Doc
             this._activeContainer.pivot([x,y||0]);
         }
         else {
-            throw new Error(`Doc::pivot(): Invalid pivot. Try Alignment like ('left', 'top') or coords relative ([0-1],[0-1]) relative to page content area origin`);
+            throw new Error(`Doc::pivot(): Invalid pivot. Try Alignment like ('topleft') or ('left', 'top') or coords relative ([0-1],[0-1]) relative to page content area origin`);
         }
         return this;
     }

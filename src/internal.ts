@@ -29,6 +29,7 @@ export * from './Pipeline'
 export * from './Exporter'
 
 export * from './Geom'
+export * from './workerUtils'
 export * from './Annotator'
 export * from './IO'
 export * from './GLTFBuilder'

@@ -136,6 +136,7 @@ export const GEOM_METHODS_INTO_GLOBAL = [
     'Face', 'Plane', 'PlaneBetween', 'Rect', 'RectBetween', 'BasePlane', 'Circle',
     'Shell', 'Solid', 'Box', 'BoxBetween', 'Sphere', 'Cone', 'Cylinder',
     'group', 'layer', 'collection',
+    'layerShapes',
     'sketch', 'all', 'isTemp', 'select', 'atVertices', 'moveTo', 'lineTo', 'splineTo', 'arcTo', 
     'rectTo', 'rect', 'circleTo', 'circle', 'mirror', 'offset', 'offsetted', 'fillet', 'chamfer', 'thicken', 'thickened','combine',
     'close', 'importSketch',
