@@ -63,7 +63,8 @@ export class Exporter
         */
 
         const filename = this._getFileName() + '.step';
-        let sceneCompoundShape = this._parent.geom.all().filter(s => s.visible()).toOcCompound();
+        let sceneCompoundShape = new ShapeCollection(this._parent.geom.all()
+                                    .filter(s => s.visible())).toOcCompound(); // filter might return only one Shape
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
 
@@ -117,7 +118,8 @@ export class Exporter
         const oc = this._parent.geom._oc;
         const filename = this._getFileName() + '.stl';
         
-        let sceneCompoundShape = this._parent.geom.all().filter(s => s.visible()).toOcCompound();
+        let sceneCompoundShape = new ShapeCollection(
+                                        this._parent.geom.all().filter(s => s.visible())).toOcCompound();
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
         let ocStlWriter = new oc.StlAPI_Writer();
@@ -178,7 +180,7 @@ export class Exporter
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
         
-        this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())).forEach(entity => {
+        new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))).forEach(entity => {
             if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
             {
                 const shape = entity as AnyShape;
@@ -232,8 +234,9 @@ export class Exporter
         // Force inclusion of points and lines to export
         if (options.includePointsAndLines)
         {
-            const pointAndLineShapes:ShapeCollection = this._parent.geom.all()
-                        .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type())));
+            const pointAndLineShapes:ShapeCollection = new ShapeCollection(
+                        this._parent.geom.all()
+                        .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type()))));
             if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, meshingQuality); 
         }
 
@@ -247,7 +250,7 @@ export class Exporter
         // extra vertices and lines for specific visualization styles
         if (options.extraShapesAsPointLines)
         {
-            const extraOutputShapes = this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type())));
+            const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
             gltfContent = new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
         }
         
@@ -288,7 +291,7 @@ export class Exporter
     exportToSVG():string
     {
         // For now only export 2D edges on XY plane
-        let edges2DCollection = this._parent.geom.all().filter(s => s.visible() && s.type() === 'Edge' && s.is2DXY());
+        let edges2DCollection = new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && s.type() === 'Edge' && s.is2DXY()));
         return edges2DCollection.toSvg();
     }
 

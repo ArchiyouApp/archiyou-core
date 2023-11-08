@@ -2934,6 +2934,13 @@ export class Shape
         return arrayCollection;
     }
 
+    //// SHAPECOLLECTION API ////
+    /** TODO: offer some forgiveness for treating a Shape like a ShapeCollection? 
+     *      - filter
+     *      - first()
+    */
+    
+
     //// UTILS ////
 
     /** Get all geometries in this shape, you can specify the types (Vertex, Edge, Wire etc) */
