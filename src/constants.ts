@@ -124,7 +124,18 @@ export const MESH_QUALITY_PRESETS = {
 
 //// CALC MODULE ////
 
-export const METRICS = ['cost_material', 'cost_labor', 'production_time', 'price_est', 'price', 'weight' , 'volume', 'size', 'r-value'] // TODO: more
+export const METRICS = [
+    'cost_material', 
+    'cost_labor', 
+    'production_time', 
+    'price_est', 
+    'price', 
+    'weight' , 
+    'volume', 
+    'size', 
+    'r-value', 
+    'gwp', // global warming potential with CO2 sequester
+    ] // TODO: more
 
 //// WORKER UTILS ////
 
