@@ -175,6 +175,7 @@ export class Make
             boxVec[mainAxis] = mainLimit - cursor[mainAxis];
             boxLimitedPrim = true;
         }
+        
 
         // if not out of primary limit, snap to grid
         if(!boxLimitedPrim && o.grid) // check if box arrives in primary direction at grid as defined in o.grid, with offset o.gridOffset
