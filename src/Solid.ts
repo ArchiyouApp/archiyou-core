@@ -179,7 +179,7 @@ export class Solid extends Shape
         
         if (fromP.x == toP.x || fromP.y == toP.y || fromP.z == toP.z )
         {
-            console.error(`Solid::makeBoxBetween: Failed to create a Box. Please supply two seperate Points (${fromP} and ${toP}) that are not coplanar! Use Rect for 2D!`);
+            console.warn(`Solid::makeBoxBetween: Failed to create a Box. Please supply two seperate Points (${fromP} and ${toP}) that are not coplanar! Use Rect for 2D! Returned null!`);
             return null;
         }
         

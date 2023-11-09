@@ -399,7 +399,7 @@ export class Sketch
 
                 if (intersections.length > 0)
                 {
-                    let containers = prevShapes.containers(newFace); // Shape or ShapeCollection            
+                    let containers = new ShapeCollection(prevShapes.containers(newFace)); // Shape or ShapeCollection            
 
                     // NOTE: containers entirely contains the other Shape, also use bbox
                     let bboxContain = prevShapes.toArray().some( s => s.bbox()._containsBbox(newFace.bbox()))

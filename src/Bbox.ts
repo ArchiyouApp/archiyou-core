@@ -87,7 +87,7 @@ export class Bbox
         }
         else {
             this.updateFromOcBbox();
-            console.info(`Bbox::constructor: Succefully created ${(is2D) ? '2D' : '3D'} Bbox with size [${this.width()},${this.depth()},${this.height()}] `);
+            console.info(`Bbox::constructor: Successfully created ${(is2D) ? '2D' : '3D'} Bbox with size [${this.width()},${this.depth()},${this.height()}] `);
         }
 
     }
@@ -386,7 +386,7 @@ export class Bbox
         }
     }
 
-    /** Create 2D Rectangle Face from Bbox (DEBUG) */
+    /** Create 2D Rectangle Face from Bbox */
     rect():Face
     {
         return new Face().makePlaneBetween(this.min(), this.max()); // Just a simple 2D Plane on XY plane ( normal parallel in Z)

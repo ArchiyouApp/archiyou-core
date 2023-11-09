@@ -1100,7 +1100,7 @@ export class Shape
         let biggestFace;
         let biggestFaceArea = 0;
 
-        const shapeBbox = this.bbox().box() || this.bbox().rect(); // Shape can already be 2D (bbox().box() return null )
+        const shapeBbox = this.bbox().box() || this.bbox().rect(); // Shape can already be 2D
 
         if(!shapeBbox)
         {

@@ -2086,7 +2086,7 @@
             
          })
 
-         // Add bins in seperate gorup
+         // Add bins in seperate group
          const binShapes = new ShapeCollection();
          if(options?.drawStock === undefined || options.drawStock === true)
          {
