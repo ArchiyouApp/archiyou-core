@@ -176,7 +176,7 @@ export class Container
             widthRelativeTo: this._widthRelativeTo,
             widthAbs: this._calculateAbsWidth(),
             height: this._height, // relative to page-content-area or page
-            heightRelativeTo: this._widthRelativeTo,
+            heightRelativeTo: this._heightRelativeTo,
             heightAbs: this._calculateAbsHeight(), // in doc units
             position: this._position,
             pivot: this._pivot,

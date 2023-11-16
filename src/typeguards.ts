@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData, PipelineType  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData, PipelineType, ContainerTableDataRowsColVal  } from './internal'
 import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
           AnyShapeOrCollection, AnyShapeOrSequence, PointLikeOrAnyShapeOrCollection, ColorInput,
@@ -11,9 +11,10 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           ShapeAttributes
         } from './internal' // types
 
-import { BaseStyle, ContainerAlignment, Position, ScaleInput, 
+import { BaseStyle, ContainerAlignment, Position, ScaleInput, DataRows,
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
-            ContainerHAlignment, ContainerVAlignment, MetricName
+            ContainerHAlignment, ContainerVAlignment, MetricName,
+            ContainerTableInput
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
@@ -325,6 +326,11 @@ export function isMetricName(o:any): o is MetricName
     return METRICS.includes(o);
 }
 
+export function isDataRows(o:any): o is DataRows
+{
+    return Array.isArray(o) && o.every(r => typeof r === 'object')
+}
+
 //// DOC ////
 
 export function isContainerHAlignment(o:any): o is ContainerHAlignment
@@ -385,4 +391,34 @@ export function isPositionLike(o:any): o is Position
 {
     return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
         || isContainerAlignment(o);
+}
+
+export function isDocUnits(o:any): o is DocUnits
+{
+    if(typeof o !== 'string'){ return false };
+    return ['mm','cm','inch'].includes(o as string);
+}
+
+export function isPercentageString(o:any): o is PercentageString 
+{
+    if(typeof o !== 'string'){ return false };
+    return o.match(/\-*[\d\.]+%$/) !== null;
+}
+
+export function isValueWithUnitsString(o:any): o is PercentageString 
+{
+    if(typeof o !== 'string'){ return false };
+    return o.match(/\-*[\d\.]+mm|cm|inch|\"$/) !== null;
+}
+
+export function isWidthHeightInput(o:any): o is WidthHeightInput
+{
+    return typeof o === 'number' ||
+        isPercentageString(o) ||
+        isValueWithUnitsString(o);
+}
+
+export function isContainerTableInput(o:any): o is ContainerTableInput
+{
+    return (typeof o === 'string') || isDataRows(o)
 }

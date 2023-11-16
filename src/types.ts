@@ -330,7 +330,11 @@ export type DocUnits = 'mm'|'cm'|'inch'|'pnt';
 export type PercentageString = string // 100%, 0.5%, -10%
 export type ValueWithUnitsString = string
 export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
-export type TableInput = string
+export type ContainerTableInput = string | DataRows
+
+export interface DocSettings {
+    proxy: string // url of proxy
+}
 
 export interface DocData {
     name:string
@@ -339,36 +343,6 @@ export interface DocData {
     modelUnits:ModelUnits
 }
 
-//// TYPE GUARDS ////
-export function isDocUnits(o:any): o is DocUnits
-{
-    if(typeof o !== 'string'){ return false };
-    return ['mm','cm','inch'].includes(o as string);
-}
-
-export function isPercentageString(o:any): o is PercentageString 
-{
-    if(typeof o !== 'string'){ return false };
-    return o.match(/\-*[\d\.]+%$/) !== null;
-}
-
-export function isValueWithUnitsString(o:any): o is PercentageString 
-{
-    if(typeof o !== 'string'){ return false };
-    return o.match(/\-*[\d\.]+mm|cm|inch|\"$/) !== null;
-}
-
-export function isWidthHeightInput(o:any): o is WidthHeightInput
-{
-    return typeof o === 'number' ||
-        isPercentageString(o) ||
-        isValueWithUnitsString(o);
-}
-
-export function isTableInput(o:any): o is TableInput
-{
-    return (typeof o === 'string') 
-}
 
 //// DOC:PAGE ////
 
@@ -467,7 +441,7 @@ export interface ImageOptions
 
 //// DOC:PAGE:CONTAINER:TABLE ////
 
-export type ContainerTableDataRows = Array<{[key:string]:any}>;
+// NOTE: uses DataRows for input from Calc
 
 export interface TableContainerOptions
 {
@@ -658,7 +632,7 @@ export type DataRowColumnValue = {[key:string]:any} // DataRow in column-value f
 export type DataRowValues = Array<any> // DataRow with values only
 export type DataRowsColumnValue = Array<DataRowColumnValue> // Array of DataRow as column-value
 export type DataRowsValues = Array<DataRowValues> // Array of DataRow as values only
-export type DataRows = DataRowsColumnValue | DataRowsValues // DataRows
+export type DataRows = DataRowsColumnValue // DataRows
 
 export type MetricName = 'cost_material' | 'cost_labor' | 'production_time' | 'price_est' | 'price' | 'weight' | 'volume' | 'size' | 'r-value' // TODO: more
 

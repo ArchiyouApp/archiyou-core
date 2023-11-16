@@ -556,7 +556,7 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         if (cacheResult)
         {
             // IMPORTANT: There could be a situation where a function can return null|undefined
-            return (ShapeCollection.isShapeCollection(cacheResult) || Shape.isShape(cacheResult) ?
+            return (ShapeCollection.isShapeCollection(cacheResult) || Shape.isShape(cacheResult)) ?
                 cacheResult._copy() : // return copy of cached version to avoid changing cache version
                 cacheResult; // just return value if not a Shape or ShapeCollection (for example null)
         }       

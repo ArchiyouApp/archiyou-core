@@ -33,6 +33,11 @@ import { arrayBufferToBase64 } from './utils'
 //  }
 // 
 
+// Load font file for pdfkit (special loader in webpack). See raw-loader nuxt.config.js
+// All fonts: Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
+// TODO: check on Node
+import Helvetica from 'pdfkit/js/data/Helvetica.afm';
+
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
 
 export class DocPDFExporter 
@@ -94,14 +99,20 @@ export class DocPDFExporter
         if(isWorker || isBrowser)
         {
             this._PDFDocument = await import('pdfkit');
-            this._SVGtoPDF = await import('svg-to-pdfkit')
+            this._SVGtoPDF = await import('svg-to-pdfkit');
             
             // load fonts in virtual fs
             // all fonts in pdfkit: 
             // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
-            const helveticaPath = '../node_modules/pdfkit/js/data/Helvetica.afm';
-            const helveticaFont = await import(helveticaPath); // avoid TS erros
-            fs.writeFileSync('data/Helvetica.afm', helveticaFont);
+            try {
+                //const helveticaPath = '/node_modules/pdfkit/js/data/Helvetica.afm';
+                //const helveticaFont = await import(helveticaPath); // This does not work now because afm is not a js file
+                fs.writeFileSync('data/Helvetica.afm', Helvetica); // see import on top of this page
+            }
+            catch (e)
+            {
+                console.error(`DocPDFExporter::loadPDFKit(): Could not find Helvetica font. "${e}"`)
+            }
         }
         else {
             const nodePDFKitPath = 'pdfkit'; // To keep warnings out
@@ -111,6 +122,7 @@ export class DocPDFExporter
         }
 
         this._PDFDocument = this._PDFDocument.default; // we need the default
+        this._SVGtoPDF = this._SVGtoPDF.default;
 
         return this._PDFDocument;
     }
@@ -321,7 +333,7 @@ export class DocPDFExporter
 
     //// IMAGE ////
 
-    /** First load the image (async) and then supply its buffer to pdfkit */
+    /** First load the SVG or Bitmap image and then supply its buffer to pdfkit */
     async _placeImage(img:ContainerData, p:PageData)
     {
         // see docs: http://pdfkit.org/docs/images.html
@@ -334,7 +346,6 @@ export class DocPDFExporter
             
         */
         
-
         if(img?.content?.data && img?.content?.source)
         {
             const imgExt = this._getImageExt(img.content.source);    
@@ -443,7 +454,9 @@ export class DocPDFExporter
     {
         if (!style || typeof style !== 'object') return doc;
 
-        // style attributes translate directly into methods on d
+        // style attributes translate directly into methods on doc:PDFDocument
+        // for example: lineWidth(...), fillOpacity(...)
+        // See: https://pdfkit.org/docs/vector.html#fill_and_stroke_styles
         for (const [fn,val] of Object.entries(style))
         {
             if(typeof doc[fn] === 'function')

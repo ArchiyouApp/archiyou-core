@@ -84,23 +84,30 @@ export class Image extends Container
         }
         else {
             // async load the image
-            const proxyUrl = this._page._doc.IMAGE_PROXY
+            const proxyUrl = this._page._doc?._settings?.proxy;
 
-            try 
+            if(!proxyUrl)
             {
-                let r = await fetch(proxyUrl, 
-                    {
-                        method: 'POST',
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ url : this._url })       
-                    }
-                );
-                data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer()); 
-                cache[this._url] = data;
+                console.error(`DocPageContainerImage::loadImageData(): Can't query image data. No proxy given. Please supply settings with proxy url in Doc()!`);
             }
-            catch(e)
+            else 
             {
-                console.warn('DocPageContainerImage::loadImageData: Could not load image. Check if proxy if configured correctly or image exists!')
+                try 
+                {
+                    let r = await fetch(proxyUrl, 
+                        {
+                            method: 'POST',
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ url : this._url })       
+                        }
+                    );
+                    data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer()); 
+                    cache[this._url] = data;
+                }
+                catch(e)
+                {
+                    console.warn('DocPageContainerImage::loadImageData: Could not load image. Check if proxy if configured correctly or image exists!')
+                }
             }
 
         }

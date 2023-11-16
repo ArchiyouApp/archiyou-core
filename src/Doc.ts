@@ -26,14 +26,14 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, Page, PageSize, AnyPageContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
+import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, Page, PageSize, AnyPageContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
-import { DocUnits, PercentageString, ValueWithUnitsString, WidthHeightInput, 
-    TableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, 
-        isWidthHeightInput, isTableInput
+import { DocSettings, DocUnits, PercentageString, ValueWithUnitsString, WidthHeightInput, 
+    ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, 
+        isWidthHeightInput, isContainerTableInput
             } from './internal'
 
 import { convertValueFromToUnit } from './internal' // utils
@@ -47,11 +47,11 @@ export class Doc
     DOC_UNITS_DEFAULT:DocUnits = 'mm';
     PAGE_SIZE_DEFAULT:PageSize = 'A4';
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
-    IMAGE_PROXY:string='http://localhost:8090/proxy' // IMPORTANT: on browser you can not simply load image data: use a proxy
     CONTENT_ALIGN_DEFAULT:ContainerAlignment = ['left', 'top'];
 
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
+    _settings:DocSettings; // some essential settings like _settings.proxy
     _geom:Geom;
     _calc:any; // Cannot use reference to Calc here, because we don't allow references outside core
     
@@ -70,12 +70,23 @@ export class Doc
     _assetsCache:Record<string,any> = {}; // keep assets like images in cache to avoid reloading on every toData() call
     
 
-    constructor(ay?:ArchiyouApp) // null is allowed
+    constructor(settings?:DocSettings, ay?:ArchiyouApp) // null is allowed
     {
         this.setArchiyou(ay)
 
         //// DEFAULTS
         this._setDefaults();
+
+        //// SETTINGS AND CHECKS ////
+        this._settings = settings; 
+        if(!settings)
+        {
+            throw new Error(`Doc::Please supply settings with proxy as first parameter!`)
+        }
+        else {
+            console.info(`Doc::constructor(settings, ay): Init Doc module with settings: "${JSON.stringify(settings)};`)
+        }
+        
     }
 
     hasDocs():boolean
@@ -353,17 +364,21 @@ export class Doc
      *  @param input name of Calc table
      * 
     */
-    table(name:TableInput, options?:TableContainerOptions):Doc
+    table(nameOrData:ContainerTableInput, options?:TableContainerOptions):Doc
     {
-        if(!isTableInput){ throw new Error(`Doc::table: Please enter a name of existing Calc Table or data rows in format [{ col1:val1, col2:val2},{...}]`); }
-        if(typeof name === 'string' && !this._calc){ throw new Error(`Doc::table: Cannot get table data from Calc module. Calc is not initialized. Use calc.init()`); }
-        if(typeof name === 'string' && !this._calc.tables().includes(name as string)){ { throw new Error(`Doc::table: Cannot get table data from Calc module. No such table: '${name}'. Available tables: ${this._calc.tables().join(',')}`); } }
+        if(!isContainerTableInput){ throw new Error(`Doc::table: Please enter a name of existing Calc Table or data rows in format [{ rows: [[x1,y1,z1],[x2,y2,z2]] columns: ['field1', 'field2', 'field3']}`); }
+        if(typeof nameOrData === 'string' && !this._calc){ throw new Error(`Doc::table: Cannot get table data from Calc module. Calc is not initialized. Use calc.init()`); }
+        if(typeof nameOrData === 'string' && !this._calc.tables().includes(nameOrData as string)){ { throw new Error(`Doc::table: Cannot get table data from Calc module. No such table: '${nameOrData}'. Available tables: ${this._calc.tables().join(',')}`); } }
 
         // either get data from Calc or use raw data input
-        const dataRows = this._calc.db.table(name as string).toDataRows();
+        // in form: [{ col1: v1, col2: v2 }, ...]
+        const dataRows = (typeof nameOrData === 'string') ?
+                    this._calc.db.table(nameOrData as string).toDataRows()
+                    : nameOrData as DataRows
 
         const newTableContainer = new TableContainer(dataRows, options).on(this._activePage);
-        newTableContainer.name = name;
+        newTableContainer.name = (typeof nameOrData === 'string') ? nameOrData : this._generateContainerName(newTableContainer);
+
         this._activeContainer = newTableContainer;
         
         return this;
@@ -582,6 +597,39 @@ export class Doc
     }
 
     //// UTILS ////
+
+    /* count containers of a type on active page 
+                and check how many are called table{x}, image{x} etc
+                and iterate count */
+    _generateContainerName(container:Container):string
+    {
+        const START_ITER_COUNT = 1;
+        const type = container._type as ContainerType; // table, view etc
+        const containersWithAutoName = this._activePage._containers.filter( c => c._type === container._type 
+            && c.name.includes(type) && c.name !== type); // don't include simply 'table'
+
+        if(containersWithAutoName.length === 0)
+        {
+            return `${type}${START_ITER_COUNT}`;
+        }
+        else {
+            // look for highest iterator
+            let max = START_ITER_COUNT;
+            containersWithAutoName.forEach( c => 
+            {
+                const nums = c.name.match(/[\d]+/)
+                if (nums)
+                {
+                    const count = parseInt(nums[0]);
+                    if(count > max)
+                    {
+                        max = count; 
+                    }
+                }
+            });
+            return `${type}${(max+1).toString()}`; 
+        }
+    }
 
     _setPageDefaults(page:Page)
     {
