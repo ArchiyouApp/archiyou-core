@@ -5,8 +5,7 @@
 
 */
 
-import { convertValueFromToUnit } from './utils'
-import { CLASS_TO_STYLE } from './internal' // constants.s
+import { CLASS_TO_STYLE, SVGtoPDFtransform } from './internal' // constants.s
 
 import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
 import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
@@ -14,10 +13,20 @@ import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
 import { PageData, ContainerData, DocPDFExporter } from './internal'
 import { DocPathStyle, PDFLinePath } from './internal'
 
+import { convertValueFromToUnit, mmToPoints } from './utils'
+
+import parseSVG from "svg-path-parser"; // https://github.com/hughsk/svg-path-parser
+
 export class DocViewSVGEdit
 {
+    //// SETTINGS ////
+    DIMLINE_LINE_THICKNESS_MM = 0.05;
+
+    //// END SETTINGS ////
+
     _svg:string
     _svgXML:TXmlNode
+    _svgToPDFTransform:SVGtoPDFtransform // save important svg to pdf information for later use
 
     constructor(view:ContainerData)
     {
@@ -31,7 +40,13 @@ export class DocViewSVGEdit
 
     parse()
     {
+        this.reset();
         this._svgXML = txml.parse(this._svg)[0] as TXmlNode; 
+    }
+
+    reset()
+    {
+        this._svgToPDFTransform = undefined;
     }
 
     /** Return changed SVG as string */
@@ -55,20 +70,9 @@ export class DocViewSVGEdit
         pathNodes.forEach(path => path.attributes['vector-effect'] = 'non-scaling-stroke' )
     }
 
-    /** Transform and scale SVG data to PDF space coordinates (points) 
-     * 
-     *  NOTES:
-     *      - incoming SVG units are worldUnits (in <svg _worldUnits="..">) [ NOTE: after parsing XML nodes _ is removed!]
-     *      - bbox is in <svg _bbox="left top width height"
-    */
-    toPDFDocPaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
+    /** Information that is needed to transform SVG shape content to PDF */
+    toPDFDocTransform(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData): SVGtoPDFtransform
     {
-
-        console.log('**************************');
-        console.log(view);
-
-        // first basic translation/scaling aspects
-
         // TODO: this is needed when zoomLevel is calculated later (now we simply fill the container no matter what the svg model units)
         const svgUnits = this._svgXML.attributes['worldUnits'] || 'mm'; // default is mm
 
@@ -91,46 +95,68 @@ export class DocViewSVGEdit
         const svgToPDFTranslateY = -svgTop;
         // scale factor from svg to pdf
         const svgToPDFScale = (boundBy === 'width') ?
-                                    pdfViewWidthPnts / svgWidth :
-                                    pdfViewHeightPnts / svgHeight;
-        
+            pdfViewWidthPnts / svgWidth :
+            pdfViewHeightPnts / svgHeight;
+
+        const containerPositionPnts = pdfExporter.containerToPositionInPnts(view, page); // includes offsets for pivot
+
+        // Content align: see what dimension is bound by Container (width or height) and then align along the other dimension
+        const contentOffsetX = (boundBy === 'width' || !view.contentAlign || view.contentAlign[0] === 'left') 
+                                ? 0 
+                                : (pdfViewWidthPnts - svgWidth * svgToPDFScale)/((view.contentAlign[0] === 'center') ? 2 : 1)
+
+        const contentOffsetY = (boundBy === 'height' || !view.contentAlign || view.contentAlign[1] === 'top') 
+                                ? 0 
+                                : (pdfViewHeightPnts - svgWidth * svgToPDFScale)/((view.contentAlign[1] === 'center') ? 2 : 1)
+
+        const svgToPdfTransform = {
+            svgUnits: svgUnits,
+            scale: svgToPDFScale,
+            translateX: svgToPDFTranslateX,
+            translateY: svgToPDFTranslateY,
+            containerTranslateX: containerPositionPnts.x, 
+            containerTranslateY: containerPositionPnts.y,
+            contentOffsetX: contentOffsetX,
+            contentOffsetY: contentOffsetY,
+            boundBy: boundBy as 'width'|'height',
+        }
+
+        this._svgToPDFTransform = svgToPdfTransform; // save for later use
+
+        return this._svgToPDFTransform;
+    }
+
+    /** Transform and scale SVG Shape data to PDF space coordinates (points) 
+     * 
+     *  NOTES:
+     *      - incoming SVG units are worldUnits (in <svg _worldUnits="..">) [ NOTE: after parsing XML nodes _ is removed!]
+     *      - bbox is in <svg _bbox="left top width height"
+    */
+    toPDFDocShapePaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
+    {
         // gather paths in such a way that we can directly apply them with pdfkit in native PDF coordinate space
         const linePaths:Array<PDFLinePath> = new Array(); 
         const pathNodes = txml.filter(this._svgXML.children, (node) => node.tagName === 'path')
 
         if(!pathNodes || pathNodes.length === 0)
         {
-            console.warn('DocViewSVGEdit:toPDFDocPaths: No paths found. Returned empty array.')
+            console.warn('DocViewSVGEdit:toPDFDocShapePaths: No paths found. Returned empty array.')
         }
         else
         {
+            // Basic translation/scaling aspects
+            const svgToPDFTransform = this.toPDFDocTransform(pdfExporter, view, page);
+
             pathNodes.forEach( node => 
             {
                 // There are only single lines in the commands: 'M275,35 L325,35'
                 const line = this._pathCmdToLineData(node.attributes.d);  // [x1,y1,x2,y2]
                 if(line)
                 {
-                    // translate and scale coords to PDF coord space and size of view container
-                    // TODO: implement zoomLevels later
-                    const containerPositionPnts = pdfExporter.containerToPositionPoints(view, page); // includes offsets for pivot
-
-                    // Content align: see what dimension is bound by Container (width or height) and then align along the other dimension
-                    const contentOffsetX = (boundBy === 'width' || !view.contentAlign || view.contentAlign[0] === 'left') 
-                                            ? 0 
-                                            : (pdfViewWidthPnts - svgWidth * svgToPDFScale)/((view.contentAlign[0] === 'center') ? 2 : 1)
-
-                    const contentOffsetY = (boundBy === 'height' || !view.contentAlign || view.contentAlign[1] === 'top') 
-                                            ? 0 
-                                            : (pdfViewHeightPnts - svgWidth * svgToPDFScale)/((view.contentAlign[1] === 'center') ? 2 : 1)
-
-                    console.log(contentOffsetX);
-                    console.log(contentOffsetY);
-
-
-                    let x1 = (line[0] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x + contentOffsetX; 
-                    let y1 = (line[1] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y + contentOffsetY;
-                    let x2 = (line[2] + svgToPDFTranslateX)*svgToPDFScale + containerPositionPnts.x + contentOffsetX;
-                    let y2 = (line[3] + svgToPDFTranslateY)*svgToPDFScale + containerPositionPnts.y + contentOffsetY;
+                    let x1 = (line[0] + svgToPDFTransform.translateX)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateX + svgToPDFTransform.contentOffsetX; 
+                    let y1 = (line[1] + svgToPDFTransform.translateY)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateY + svgToPDFTransform.contentOffsetY;
+                    let x2 = (line[2] + svgToPDFTransform.translateX)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateX + svgToPDFTransform.contentOffsetX;
+                    let y2 = (line[3] + svgToPDFTransform.translateY)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateY + svgToPDFTransform.contentOffsetY;
 
                     linePaths.push(
                         {
@@ -198,6 +224,138 @@ export class DocViewSVGEdit
         })
 
         return docStyle;
+    }
+
+    // Parsing dimension lines and draw directly on active pdfExporter.activePDFDoc
+    drawDimLinesToPDF(pdfExporter:DocPDFExporter)
+    {      
+        const DIMLINE_CLASS = 'dimensionline';
+        
+        if(!this._svgXML){ throw new Error(`DocViewSVGEdit:drawDimLinesToPDF: Please parse SVG data first!`); }
+        if(!pdfExporter){ throw new Error(`DocViewSVGEdit:drawDimLinesToPDF: Please supply a PDFExporter instance!`); }
+        
+        const dimLineNodes = txml.filter(this._svgXML.children, node => node.attributes?.class?.includes(DIMLINE_CLASS));
+        
+        dimLineNodes.forEach(dimLineNode => 
+        {
+            this._drawDimLineLine(dimLineNode, pdfExporter);
+            this._drawDimLineArrows(dimLineNode, pdfExporter);
+        })
+        
+        
+    }
+
+    /** Draw the line element of a dimLineNode to PDFdocument */
+    _drawDimLineLine(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
+    {
+        const lineNode = txml.filter(dimLineNode.children, node => node.tagName === 'line')[0];
+        const lineX1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x1, 'x');
+        const lineX2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x2, 'x');
+        const lineY1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y1, 'y');
+        const lineY2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y2, 'y');
+        
+        pdfExporter?.activePDFDoc?.moveTo(lineX1, lineY1).lineTo(lineX2, lineY2)
+            .stroke()
+            .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
+            .fillColor('black')
+    }
+
+    /** Draw the line nodes of a dimeLineNode to PDFDocument */
+    _drawDimLineArrows(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
+    {
+        const arrowNodes = txml.filter(dimLineNode.children, node => node.tagName === 'g' && node.attributes?.class?.includes('arrow'));
+        arrowNodes.forEach(a => 
+        {
+            const tm = a.attributes?.transform.match(/translate\(([\-\d]+) ([\-\d]+)\)/);
+            const translateCoords = (tm) ? 
+                        [parseFloat(tm[1])*this._svgToPDFTransform.scale,parseFloat(tm[2])*this._svgToPDFTransform.scale
+                        ] : 
+                    [0,0]
+
+            const rm = a.attributes?.transform.match(/rotate\(([\-\d]+)\)/);
+            const rotateAngle = (rm) ? parseFloat(rm[1]) : 0;
+
+            this._drawSVGPathToPDF(a.children[0].attributes?.d, pdfExporter, 
+                {
+                    translate: translateCoords,
+                    rotate: rotateAngle,
+                }); // path
+        })
+    }
+
+    /** Draw a raw SVG path d datastring to PDF after transforming 
+     *  styles record needs to correspond with those of pdfkit: https://pdfkit.org/docs/vector.html
+    */
+    _drawSVGPathToPDF(d:string, pdfExporter:DocPDFExporter, localTransforms?:Record<string, any>, styles?:Record<string, any>)
+    {
+        const PATH_CMD_TO_PDFKIT = {
+            'M' : 'moveTo',
+            'L' : 'lineTo',
+        }
+
+        const pathCommands = parseSVG(d);
+        let doc = pdfExporter?.activePDFDoc;
+
+        // transforms
+        if(localTransforms)
+        {
+            if(localTransforms.translate){ 
+                doc = doc.translate(localTransforms.translate[0], localTransforms.translate[1])
+            }
+            /*
+            /* TODO: need origin
+            if(localTransforms.rotate){ 
+                doc = doc.rotate(localTransforms.rotate);
+            }
+            */
+        }
+
+        pathCommands.forEach(cmd => {
+            if(doc[PATH_CMD_TO_PDFKIT[cmd.code]]) // basic protection
+            {
+                doc = doc[PATH_CMD_TO_PDFKIT[cmd.code]](
+                    // basically moveTo or lineTo with coordinate pair
+                    this._svgCoordToPDFcoord(this._svgToPDFTransform, cmd.x, 'x'),
+                    this._svgCoordToPDFcoord(this._svgToPDFTransform, cmd.y, 'y')
+                )
+            }
+            else {
+                console.error(`DocViewSVGEdit::_drawSVGPathToPDF: Unknown/unmapped SVG path command: "${cmd.code}"`)
+            }
+        })    
+
+        // wrap up
+        doc.stroke()
+            .fillColor('black')
+            .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
+
+        // reset transforms
+        if(localTransforms)
+        {
+            if(localTransforms.translate){ 
+                doc = doc.translate(-localTransforms.translate[0], -localTransforms.translate[1])
+            }
+            /* TODO: need origin
+            if(localTransforms.rotate)
+            { 
+                doc = doc.rotate(-localTransforms.rotate);
+            }
+            */
+        }
+    }
+
+    //// UTILS ////
+
+    _svgCoordToPDFcoord(transform: SVGtoPDFtransform, c:number|string, axis:'x'|'y'= 'x')
+    {
+        if(!transform){ throw new Error(`DocViewSVGEdit:_svgCoordToPDFcoord(): Please supply a SVGtoPDFtransform object`)}
+
+        const coord = (typeof c === 'string') ? parseFloat(c) : c;
+        
+        return (axis === 'x') 
+            ? (coord + transform.translateX)*transform.scale + transform.containerTranslateX + transform.contentOffsetX
+            : (coord + transform.translateY)*transform.scale + transform.containerTranslateY + transform.contentOffsetY
+        
     }
 
 

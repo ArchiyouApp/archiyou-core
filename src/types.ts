@@ -453,8 +453,32 @@ export interface TableContainerOptions
 
 export interface TextOptions
 {
-    size?:number // saved in traditional 'point' (like in Word) - units are also allowed but converted in options
+    size?:number // saved in 'points' (like in Word) - units are also allowed but converted in options
     color?:string // always converted to hex
+    // above parameters are directly plugged into pdfkit. see: https://pdfkit.org/docs/text.html#text_styling
+    // TODO: other interesting options: font type (now only Helvetica), columns
+    width?:number
+    height?:number
+    underline?:boolean
+    strike?:boolean    
+    oblique?:boolean
+    align?:'left'|'justify'|'right'
+}
+
+//// DOCS:PAGE:CONTAINER:VIEW ////
+
+export interface SVGtoPDFtransform
+{
+    svgUnits:string
+    scale: number // SVG to PDF units scale
+    translateX: number // first SVG transform to center
+    translateY: number
+    containerTranslateX: number // offset for container position including pivot
+    containerTranslateY: number
+    boundBy:'width'|'height' // content is bound by width or height
+    contentOffsetX: number // Offset to align content
+    contentOffsetY: number
+    
 }
 
 //// DOCS:PAGE:CONTAINER:TEXTAREA ////
@@ -463,7 +487,7 @@ export type TextAreaAlign = 'left'|'right'|'center'|'fill';
 
 export interface TextAreaOptions
 {
-    size?:number // saved in traditional 'point' (like in Word) - units are also allowed but converted in options
+    size?:number // saved in 'point' (like in Word) - units are also allowed but converted in options
     color?:string // always converted to hex
     align?:TextAreaAlign
 }

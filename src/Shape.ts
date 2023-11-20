@@ -704,7 +704,7 @@ export class Shape
     }
  
     /** Calculate and set Bounding Box of Shape  */
-    bbox():Bbox
+    bbox(withAnnotations:boolean=false):Bbox
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_bnd_lib.html
 
@@ -713,6 +713,13 @@ export class Shape
             let newBbox = new Bbox();
             this._oc.BRepBndLib.AddOptimal(this._ocShape, newBbox._ocBbox, true, false); // useTriangulation, useShapeTolerance
             newBbox.updateFromOcBbox();
+    
+            if(withAnnotations && this.annotations.length > 0)
+            {
+                const annotationShapes = new ShapeCollection(this.annotations.map(a => a.toShape()));
+                newBbox = newBbox.added(annotationShapes.bbox())
+            }
+
             return newBbox;
         }
     }
@@ -4549,11 +4556,11 @@ export class Shape
     }
 
     /** Export 2D Shape to SVG */
-    toSvg():string
+    toSvg(withAnnotations:boolean=true):string
     {
-        // TODO: How to do this for Shapes that are not 2D?
-        // NOTE: This is overloaded in Edge already
-        return null;
+        // for now use ShapeCollection.toSvg()
+        // NOTE: this method will be overwriten in Edge
+        return new ShapeCollection(this).toSvg(withAnnotations);
     }
 
 }

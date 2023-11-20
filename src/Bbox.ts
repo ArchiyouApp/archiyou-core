@@ -399,6 +399,14 @@ export class Bbox
         return boxShape;
     }
 
+    /** Return flipped Bbox that is mirrored in x-axis. For certain 2D ops */
+    flippedY():Bbox
+    {
+        const min = this.min().setY(-this.max().y);
+        const max = this.max().setY(-this.min().y);
+        return new Bbox(min, max)
+    }
+
     /** Gets the Edge seperating width in two equal halves */
     widthHalfLine():Edge
     {

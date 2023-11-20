@@ -471,6 +471,24 @@ export class Point
         // TODO: return single if only one
     }
 
+    /** Flip x-coordinate */
+    flippedX():Point
+    {
+        return new Point(-this._x, this._y, this._z)
+    }
+
+    /** Flip y-coordinate */
+    flippedY():Point
+    {
+        return new Point(this._x, -this._y, this._z)
+    }
+
+    /** Flip z-coordinate */
+    flippedZ():Point
+    {
+        return new Point(this._x, this._y, -this._z)
+    }
+
     /** Does current Point share plane with the other */
     @checkInput('PointLike', 'Point')
     sharedPlane(other:PointLike):Plane

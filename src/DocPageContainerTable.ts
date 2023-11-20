@@ -2,7 +2,7 @@ import { Page, Container, ContainerData, ContainerContent } from './internal'
 import { convertSizeUnitsToFontPoints } from './internal'
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-import { ContainerTableDataRowsColVals, TableContainerOptions } from './internal'
+import { DataRows, TableContainerOptions } from './internal'
 
 //// MAIN CLASS ////
 
@@ -16,10 +16,10 @@ export class TableContainer extends Container
     DEFAULT_TABLE_WIDTH = '100mm'; 
     DEFAULT_TABLE_HEIGHT = '100mm';
 
-    _data:ContainerTableDataRowsColVals; // ContainerTableDataRowsColVals: Array of column-values
+    _data:DataRows; // DataRows: Array of column-values { [ {col1: val1, col2: val2 }, {...} ] }
     _options:TableContainerOptions = {}
 
-    constructor(data:ContainerTableDataRowsColVals, options:TableContainerOptions)
+    constructor(data:DataRows, options:TableContainerOptions)
     {
         super('table');
         this._type = 'table';

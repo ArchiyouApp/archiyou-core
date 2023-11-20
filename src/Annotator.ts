@@ -42,8 +42,8 @@ export class DimensionLine extends BaseAnnotation
     DIMENSION_TEXTSIZE_DEFAULT = 10;
     DIMENSION_ROUND_DEFAULT = true;
 
-    start:Point; // on Shape
-    end:Point; // on Shape
+    start:Point; // point on Shape
+    end:Point; // point on Shape
     shape:AnyShape = null; // the Shape the dimension is linked to - needed to know if we need to export dimension lines in toSvg()
     value:number; // the value of the dimension line, can be static
     static:boolean = false;
@@ -90,6 +90,11 @@ export class DimensionLine extends BaseAnnotation
     middle():Point
     {
         return new Edge(this.start, this.end).middle()
+    }
+
+    offset():Vector
+    {
+        return this.offsetVec.scaled(this.offsetLength as Coord)
     }
 
     /** Link to Shape so we can export DimensionLine with the shapes */
@@ -192,10 +197,17 @@ export class DimensionLine extends BaseAnnotation
         this.interactive = true;
     }
 
-    /** Make a Line Edge out this DimensionLine */
-    toEdge():Edge
+    /** Generic Shape method (every Annotation class should have this!) */
+    toShape(offsetted:boolean=true):Edge 
     {
-        return new Edge(this.start, this.end);
+        return this.toEdge(offsetted);
+    }
+
+    /** Make a Line Edge out this DimensionLine */
+    toEdge(offsetted:boolean=false):Edge
+    {
+        const offset = (offsetted) ? this.offset() : new Vector(); 
+        return new Edge(this.start.moved(offset), this.end.moved(offset));
     }
 
     /** Output to data (to be send from Webworker to main app) */
@@ -209,7 +221,7 @@ export class DimensionLine extends BaseAnnotation
             static: this.static,
             units: this.units,
             dir: this.dir().toArray(),
-            offset: this.offsetVec.scaled(this.offsetLength as Coord).toArray(), // with length
+            offset: this.offset().toArray(), // with length
             interactive: this.interactive,
             round: this.round,
             roundDecimals: this.roundDecimals,
@@ -234,10 +246,10 @@ export class DimensionLine extends BaseAnnotation
         const offsetLength = this.offsetLength;
         const offsetVec = this.offsetVec.scaled(offsetLength as PointLike);
 
-        let lineStart = this.start.add(offsetVec).toArray();
+        let lineStart = this.start.added(offsetVec).toArray();
         lineStart[1] = -lineStart[1]; // flip to svg y-axis
         
-        let lineEnd = this.end.add(offsetVec).toArray();
+        let lineEnd = this.end.added(offsetVec).toArray();
         lineEnd[1] = -lineEnd[1];
 
         let lineMid = this.middle().toArray();
@@ -284,7 +296,9 @@ export class DimensionLine extends BaseAnnotation
        const rotation = (flip) ? this.getSVGRotation() - 90 + 180: this.getSVGRotation() - 90;
     
        return `
-          <g transform="translate(${atPoint.x} ${atPoint.y}) 
+          <g 
+                class="annotation arrow"
+                transform="translate(${atPoint.x} ${atPoint.y}) 
                             rotate(${rotation})
                             scale(1 1)
                             ">

@@ -65,7 +65,7 @@ export class Text extends Container
             ...this._toContainerData(),
             content: { 
                 data: this._text, 
-                settings: this._options 
+                settings: this._options as TextOptions // size, color
             } as ContainerContent,
         }
     }

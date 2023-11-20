@@ -232,6 +232,16 @@ export function convertValueFromToUnit(v:number, from:Units, to:Units):number
     return null;
 }
 
+export function pointsToMm(p:number):number
+{
+    return p*1/72*25.4;
+}
+
+export function mmToPoints(m:number):number
+{
+    return m/25.4*72
+}
+
 //// DATA ENCODING ////
 
 // taken from https://github.com/niklasvh/base64-arraybuffer/blob/master/src/index.ts

@@ -14,7 +14,9 @@
 
 import fs from 'fs'; // virtual pdfkit filesystem as replacement of node
 
-import { DocData, DocPathStyle } from './internal' // Doc
+import makePDFDocumentWithTables from '../libs/pdfkit-table'
+
+import { Container, DataRows, DocData, DocPathStyle, SVGtoPDFtransform, TableContainerOptions } from './internal' // Doc
 import { PDFLinePath } from './internal' // types
 import { convertValueFromToUnit } from './internal'
 import { PageData, ContainerData, Page } from './internal'
@@ -24,7 +26,7 @@ import { DocViewSVGEdit } from './DocViewSVGEdit'
 // import type { PDFDocument, PDFPage } from '@types/pdfkit' // disabled because it does not work
 import BlobStream from 'blob-stream' // BlobStream for Web - TODO: disable for node
 
-import { arrayBufferToBase64 } from './utils'
+import { arrayBufferToBase64, mmToPoints, pointsToMm } from './utils'
 
 
 // IMPORTANT: pdfkit needs fontkit ^2.0.0. Please add that requirement in package.json:
@@ -36,7 +38,8 @@ import { arrayBufferToBase64 } from './utils'
 // Load font file for pdfkit (special loader in webpack). See raw-loader nuxt.config.js
 // All fonts: Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
 // TODO: check on Node
-import Helvetica from 'pdfkit/js/data/Helvetica.afm';
+import Helvetica from 'pdfkit/js/data/Helvetica.afm'
+import HelveticaBold from 'pdfkit/js/data/Helvetica-Bold.afm'
 
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
 
@@ -45,6 +48,8 @@ export class DocPDFExporter
     //// SETTINGS ////
 
     DEBUG = false; // test raw PDFkit output
+    TABLE_BORDER_THICKNESS_MM = 0.1;
+    TABLE_PADDING_MM = 3;
 
     //// END SETTINGS
 
@@ -100,6 +105,12 @@ export class DocPDFExporter
         {
             this._PDFDocument = await import('pdfkit');
             this._SVGtoPDF = await import('svg-to-pdfkit');
+
+            this._PDFDocument = this._PDFDocument.default; // we need the default
+            this._SVGtoPDF = this._SVGtoPDF.default;
+
+            // some black magic to make pdfkit-table work
+            this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
             
             // load fonts in virtual fs
             // all fonts in pdfkit: 
@@ -108,6 +119,7 @@ export class DocPDFExporter
                 //const helveticaPath = '/node_modules/pdfkit/js/data/Helvetica.afm';
                 //const helveticaFont = await import(helveticaPath); // This does not work now because afm is not a js file
                 fs.writeFileSync('data/Helvetica.afm', Helvetica); // see import on top of this page
+                fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold);
             }
             catch (e)
             {
@@ -119,10 +131,12 @@ export class DocPDFExporter
             this._PDFDocument = await import(nodePDFKitPath)
             const svgToPDFPath = 'svg-to-pdfkit'
             this._SVGtoPDF = await import(svgToPDFPath);
-        }
+            this._PDFDocument = this._PDFDocument.default; // we need the default
+            this._SVGtoPDF = this._SVGtoPDF.default;
 
-        this._PDFDocument = this._PDFDocument.default; // we need the default
-        this._SVGtoPDF = this._SVGtoPDF.default;
+            // some black magic to make pdfkit-table work
+            this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
+        }
 
         return this._PDFDocument;
     }
@@ -288,7 +302,7 @@ export class DocPDFExporter
                 break;
 
             case 'table':
-                // TODO
+                await this._placeTable(c, p);
                 break;
 
             default:
@@ -307,27 +321,32 @@ export class DocPDFExporter
         const x = this.coordRelWidthToPoints(t.position[0], p) 
                     - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
 
+        this.activePDFDoc.fontSize(t?.content?.settings?.size), // in points already
         this.activePDFDoc.text(
-            t?.content?.main, 
+            t?.content?.data, 
             x, // from relative page coords to absolute PDF points
             this.coordRelHeightToPoints(t.position[1], p),
-            { 
-                // PDF text options
-                ...this._parseTextOptions(t)
+            { // PDF text options
+                ...this._parseTextOptions(t, p)
             }
         );
+
+        // reset text cursor (not needed because we only use absolute coordinates)
+        this.activePDFDoc.x = 0;
+        this.activePDFDoc.y = 0;
     }
 
     /** Parse TextOptions to PDF text options */
-    _parseTextOptions(t:ContainerData):Object
+    _parseTextOptions(t:ContainerData, p:PageData):Object
     {
         const pdfTextOptions = {
-            width: t?.width, // from Container
-            height: t?.height, 
-            size: this.mmToPoints(t?.content?.settings?.size),
-            fillColor: t?.content?.settings?.color
+            width: this.relWidthToPoints(t.width, p), // from Container
+            height: this.relHeightToPoints(t.height, p),
+            fill: t?.content?.settings?.color,
+            ...t?.content?.settings, // just plugin TextOptions directly into pdfkit
         };
 
+        // NOTE: pdfkit is brittle for null values
         return this.removeEmptyValueKeysObj(pdfTextOptions); 
     }
 
@@ -353,7 +372,7 @@ export class DocPDFExporter
             // if SVG image
             if (imgExt === 'svg')
             {
-                const { x, y } = this.containerToPositionPoints(img, p);
+                const { x, y } = this.containerToPositionInPnts(img, p);
         
                 this._SVGtoPDF(
                     this.activePDFDoc, 
@@ -371,7 +390,7 @@ export class DocPDFExporter
             else 
             {
                 // if a bitmap (jpg or png)
-                const { x, y } = this.containerToPositionPoints(img, p);
+                const { x, y } = this.containerToPositionInPnts(img, p);
             
                 this.activePDFDoc.image(
                     img.content.data, // already saved in base64 format
@@ -416,7 +435,7 @@ export class DocPDFExporter
 
     /** Place View SVG on page 
      *     
-     *      - view.content.main contains raw SVG string (<svg _bbox="..." _worldUnits='mm'><path .. >... )
+     *      - view.content.data contains raw SVG string (<svg _bbox="..." _worldUnits='mm'><path .. >... )
      *      - TODO: Implement view.zoomLevel, view.zoomRelativeTo etc. - NOW: only automatic filling of viewport/container
      * 
      *      see svg-to-pdfkit: https://github.com/alafr/SVG-to-PDFKit
@@ -424,8 +443,9 @@ export class DocPDFExporter
     _placeViewSVG(view:ContainerData, p:PageData)
     {
         const svgEdit = new DocViewSVGEdit(view);
-        // Transform incoming SVG paths (in model space) into PDF paths in the space defined by the View Container
-        const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocPaths(this,view,p);
+
+        // Transform incoming SVG Shape paths (in model space) into PDF paths in the space defined by the View Container
+        const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocShapePaths(this,view,p);
 
         if(pdfLinePaths)
         {
@@ -436,8 +456,12 @@ export class DocPDFExporter
                 d = this._applyPathStyle(d, path.style);
             })
         }
+
+        // Draw annotations
+        svgEdit.drawDimLinesToPDF(this);
+
         // draw border around container
-        const viewPositionPnts = this.containerToPositionPoints(view, p);
+        const viewPositionPnts = this.containerToPositionInPnts(view, p);
         if (view.border)
         {
             let d = this.activePDFDoc.rect(
@@ -448,6 +472,12 @@ export class DocPDFExporter
             ).stroke();
             this._applyPathStyle(d, view?.borderStyle)
         }
+    }
+
+    /** Draw dimension lines in SVG data */
+    _drawDimLines(view:ContainerData, p:PageData, svgToPDFTransform:SVGtoPDFtransform)
+    {
+
     }
 
     _applyPathStyle(doc:any, style?:DocPathStyle) // doc: PDFDocument
@@ -468,24 +498,89 @@ export class DocPDFExporter
         return doc;
     }
 
+    
+    //// TABLE ////
+
+    _placeTable(t:ContainerData, p:PageData)
+    {
+        if(!Array.isArray(t?.content?.data) || t?.content?.data.length === 0)
+        {
+            console.error(`DocPDFExporter::_placeTable: Skipped Table "${t.name}" without data!`)
+            return;
+        }
+
+        this.activePDFDoc.table(
+            { 
+                title: '', // HTML rendered has no label yet! So omit here too.
+                headers: Object.keys((t?.content?.data as DataRows)[0]).map(v => { return { label: v, headerColor: 'white'}}),
+                rows: t?.content?.data.map( r => Object.values(r)),
+            },
+            this._parseTableSettings(t, p)
+        )
+    }
+
+    _parseTableSettings(t:ContainerData, p:PageData): Object
+    {
+        const settings = t?.content?.settings as TableContainerOptions
+
+        this.activePDFDoc.fontSize(settings?.fontsize);
+
+        const x = this.coordRelWidthToPoints(t.position[0], p) 
+                    - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
+        const y = this.coordRelHeightToPoints(t.position[1], p)
+
+        const pdfTableSettings =  
+        {
+            x: x,
+            y: y,
+            width: this.relWidthToPoints(t.width, p), // from Container
+            // height: this.relHeightToPoints(t.height, p),
+            // some basic settings to sync with html rendering of Docs
+            padding: mmToPoints(this.TABLE_PADDING_MM),
+            divider: {
+                // Dividers are disabled. See custom rectangle in prepareHeader en prepareRow
+                header: { disabled: true, width: mmToPoints(this.TABLE_BORDER_THICKNESS_MM), color: 'black', opacity: 1 },
+                horizontal: { disabled: true, width: mmToPoints(this.TABLE_BORDER_THICKNESS_MM), color: 'black', opacity: 1 },
+            },
+            prepareHeader: (row, indexColumn, indexRow, rectRow, rectCell) => 
+            {
+                // NOTE: this uses a somewhat hacked version of this prepareHeader plug-in function
+                this.activePDFDoc.font("Helvetica-Bold").fontSize(settings?.fontsize);
+                this._drawTableCellRect(rectCell); // Here we draw special per cell styling
+            },
+            prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
+                this.activePDFDoc.font("Helvetica").fontSize(settings?.fontsize);
+                this._drawTableCellRect(rectCell); // Here we draw special per cell styling
+            }
+                ,
+        }
+
+        // NOTE: pdfkit is brittle for null values
+        return this.removeEmptyValueKeysObj(pdfTableSettings); 
+    }
+
+    _drawTableCellRect(rectCell:any) // { x, y , width, height }
+    {
+        if(rectCell)
+        {
+            const lw = mmToPoints(this.TABLE_BORDER_THICKNESS_MM);
+            // NOTE: we move up the rectangle lw to have them overlap fully
+            this.activePDFDoc.rect(
+                    rectCell.x, rectCell.y+lw, rectCell.width, rectCell.height+lw*2)
+            .lineWidth(lw)
+            .strokeColor('#000000')
+            .stroke();
+        }
+    }
+
     //// UTILS ////
-
-    pointsToMm(p:number):number
-    {
-        return p*1/72*25.4;
-    }
-
-    mmToPoints(m:number):number
-    {
-        return m/25.4*72
-    }
 
     /** Convert relative page coordinate width to absolute PDF point coord of PDFKit system, also taking horizontal padding into account  */
     coordRelWidthToPoints(a:number, page:PageData, transformWithPadding:boolean=true):number
     {
         const pageHorizontalPadding = (transformWithPadding) ? ( (page.padding[0]||0) * page.width) : 0; // in page.DocUnits
         const pageContentWidth = convertValueFromToUnit(page.width - 2*pageHorizontalPadding, page.docUnits, 'mm'); // always to mm
-        return this.mmToPoints(a*pageContentWidth + convertValueFromToUnit(pageHorizontalPadding, page.docUnits, 'mm'));
+        return mmToPoints(a*pageContentWidth + convertValueFromToUnit(pageHorizontalPadding, page.docUnits, 'mm'));
     }
 
     /** Convert relative page coordinate height to absolute PDF point coord of PDFKit system,  also taking vertical padding into account */
@@ -495,8 +590,8 @@ export class DocPDFExporter
         const pageContentHeight = convertValueFromToUnit(page.height - 2*pageVerticalPadding, page.docUnits, 'mm'); // in mm
 
         const coordInPoints = this.pageHeightPoints()
-                    - this.mmToPoints(a*pageContentHeight) 
-                    - this.mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in pdfkit space for padding
+                    - mmToPoints(a*pageContentHeight) 
+                    - mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in pdfkit space for padding
 
         return coordInPoints;
     }
@@ -506,7 +601,7 @@ export class DocPDFExporter
     {
         const pageHorizontalPadding = (withPadding) ? ( (page.padding[0]||0) * page.width) : 0; // in page.DocUnits
         const pageContentWidth = convertValueFromToUnit(page.width - 2*pageHorizontalPadding, page.docUnits, 'mm'); // always to mm
-        return this.mmToPoints(a*pageContentWidth);
+        return mmToPoints(a*pageContentWidth);
     }
 
     /** Convert relative height (to page size or page-content) to points */
@@ -514,19 +609,19 @@ export class DocPDFExporter
     {
         const pageVerticalPadding = (withPadding) ? ( (page.padding[1]||0) * page.height) : 0; // in page.docUnits
         const pageContentHeight = convertValueFromToUnit(page.height - 2*pageVerticalPadding, page.docUnits, 'mm'); // in mm
-        return this.mmToPoints(a*pageContentHeight);
+        return mmToPoints(a*pageContentHeight);
     }
 
     pageHeightPoints():number
     {
-        return this.mmToPoints(convertValueFromToUnit(this.activePage.height, this.activePage.docUnits, 'mm'));
+        return mmToPoints(convertValueFromToUnit(this.activePage.height, this.activePage.docUnits, 'mm'));
     }
 
     /** Convert Container position data to x,y in PDF points, including taking take of pivot position and Page.padding. In PDFkit coord system
      *      NOTES: 
      *          - All incoming ContainerData data (position, width, height) is relative to page size
     */
-    containerToPositionPoints(c:ContainerData, p:PageData):Record<string, number>
+    containerToPositionInPnts(c:ContainerData, p:PageData):Record<string, number>
     {
         const x = this.coordRelWidthToPoints(
                     c.position[0] - ((c?.width) ? c.pivot[0] * c.width : 0),

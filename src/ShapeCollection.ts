@@ -15,7 +15,7 @@
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { ObjStyle } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, ObjStyle } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
  import { LayoutOrderType, LayoutOptions } from './internal'
 
@@ -941,13 +941,13 @@
       }
 
       /** Shape API - get combined bbox of all Shapes in Collection */
-      bbox():Bbox
+      bbox(withAnnotations:boolean=false):Bbox
       {
          let combinedBbox = this.first().bbox();
          this.shapes.forEach((shape,i) => {
             if(i > 0)
             {
-               let bbox = shape.bbox();
+               let bbox = shape.bbox(withAnnotations);
                if(bbox)
                {
                   combinedBbox = combinedBbox.added(bbox);
@@ -2298,6 +2298,19 @@
          return shapeEdges;
       }
 
+      getAnnotations(onlyVisibleShapes:boolean=false):Array<Annotation>
+      {
+         let annotations:Array<Annotation> = [];
+         this.forEach(shape => 
+         {
+            if(onlyVisibleShapes === false || (onlyVisibleShapes && shape.visible && shape.is2DXY())) // For now only 2D dimension lines
+            {
+               annotations = annotations.concat(shape.annotations)
+            }
+         })
+         return annotations;
+      }
+
       /** Export Shapes that are 2D and on XY plane to SVG 
        *    All shapes will be converted to Edges
       */
@@ -2307,18 +2320,26 @@
          
          if (shapeEdges.length == 0){ return null;}
 
-         // to deal with flipped y-axis: mirror collection for now 
-         const flippedEdgeCollection = shapeEdges._mirroredX(0); // NOTE: mirroring in x-axis
-
+         // NOTE: SVG has reversed y-axis
          let svgPaths:Array<string> = [];
-
-         flippedEdgeCollection.forEach( edge => 
+         shapeEdges.forEach( edge => 
          {
-            svgPaths.push(edge.toSvg());
+            svgPaths.push(edge._mirroredX(0).toSvg());
          })
 
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
-         const bbox = flippedEdgeCollection.bbox();
+         let bbox = shapeEdges.bbox(withAnnotations)
+         
+         if (withAnnotations)
+         {
+            const annotations = this.getAnnotations();
+            if(annotations.length > 0)
+            {
+               bbox = bbox.added(new ShapeCollection(this.getAnnotations().map(a => a.toShape())).bbox());
+            } 
+         }
+         bbox = bbox.flippedY(); // flip for SVG coordinate system
+
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
          // TODO: bbox is not including dimension lines
 
@@ -2327,6 +2348,9 @@
                         ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
+
+         console.log('**** SVG');
+         console.log(svg)
 
          return svg;
       }
