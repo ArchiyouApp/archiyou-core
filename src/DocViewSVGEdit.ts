@@ -21,6 +21,11 @@ export class DocViewSVGEdit
 {
     //// SETTINGS ////
     DIMLINE_LINE_THICKNESS_MM = 0.05;
+    DIMLINE_ARROW_SVG_WIDTH = 10; // incoming arrow width in svg units (see also svg::_worldUnits )
+    DIMLINE_ARROW_PDF_WIDTH_MM = 5;
+    DIMLINE_TEXT_WIDTH_MM = 5;
+    DIMLINE_TEXT_BACKGROUND_COLOR = 'white';
+    DIMLINE_TEXT_SIZE_MM = 3; 
 
     //// END SETTINGS ////
 
@@ -240,13 +245,16 @@ export class DocViewSVGEdit
         {
             this._drawDimLineLine(dimLineNode, pdfExporter);
             this._drawDimLineArrows(dimLineNode, pdfExporter);
+            this._drawDimLineText(dimLineNode, pdfExporter);
         })
         
         
     }
 
-    /** Draw the line element of a dimLineNode to PDFdocument */
-    _drawDimLineLine(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
+    /** Draw the line element of a dimLineNode to PDFdocument 
+     *  Returns the coordinates of the line in PDF coordinates
+    */
+    _drawDimLineLine(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter):Array<number>
     {
         const lineNode = txml.filter(dimLineNode.children, node => node.tagName === 'line')[0];
         const lineX1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x1, 'x');
@@ -258,29 +266,81 @@ export class DocViewSVGEdit
             .stroke()
             .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
             .fillColor('black')
+
+        return [lineX1, lineY1, lineX2, lineY2]
     }
 
     /** Draw the line nodes of a dimeLineNode to PDFDocument */
     _drawDimLineArrows(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
     {
         const arrowNodes = txml.filter(dimLineNode.children, node => node.tagName === 'g' && node.attributes?.class?.includes('arrow'));
+
         arrowNodes.forEach(a => 
         {
+            // Transform contains the coord of the arrow pointer - we also use PDF document transforms to place arrow
             const tm = a.attributes?.transform.match(/translate\(([\-\d]+) ([\-\d]+)\)/);
             const translateCoords = (tm) ? 
-                        [parseFloat(tm[1])*this._svgToPDFTransform.scale,parseFloat(tm[2])*this._svgToPDFTransform.scale
+                        [
+                            this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(tm[1]), 'x'),
+                            this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(tm[2]), 'y')
                         ] : 
                     [0,0]
-
+            
+            // Rotation of arrow
             const rm = a.attributes?.transform.match(/rotate\(([\-\d]+)\)/);
             const rotateAngle = (rm) ? parseFloat(rm[1]) : 0;
+            
+            // Scaling of arrow to achieve arrow width set by DIMLINE_ARROW_PDF_WIDTH_MM
+            const arrowScale = this.DIMLINE_ARROW_PDF_WIDTH_MM / convertValueFromToUnit(
+                this.DIMLINE_ARROW_SVG_WIDTH,  
+                this._svgXML.attributes['worldUnits'] || 'mm', 
+                'mm');
 
             this._drawSVGPathToPDF(a.children[0].attributes?.d, pdfExporter, 
                 {
                     translate: translateCoords,
                     rotate: rotateAngle,
+                    scale: arrowScale,
                 }); // path
         })
+    }
+
+    /** Draw text label of Dimension line */
+    _drawDimLineText(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
+    {
+        console.log('DRAW DIOME LIME');
+        console.log(dimLineNode.children);
+        const textNode = txml.filter(dimLineNode.children, node => node.tagName === 'text')[0];
+        const x = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.x), 'x');
+        const y = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.y), 'y');
+        const textValue = textNode.children[0];
+    
+        // Background rectangle
+        if (this.DIMLINE_TEXT_BACKGROUND_COLOR)
+        {
+            const bgWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
+            const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.2;
+            pdfExporter?.activePDFDoc?.rect(
+                    x - bgWidth/2,
+                    y - bgHeight/2, 
+                    bgWidth, 
+                    bgHeight // slightly higher then text
+                ).fill(this.DIMLINE_TEXT_BACKGROUND_COLOR); 
+        }
+        
+        // Text
+        pdfExporter?.activePDFDoc?.fontSize(mmToPoints(this.DIMLINE_TEXT_SIZE_MM))
+        pdfExporter?.activePDFDoc?.fill('black').stroke();
+        pdfExporter?.activePDFDoc?.text(
+            textValue,
+            x - mmToPoints(this.DIMLINE_TEXT_WIDTH_MM)/2,
+            y - mmToPoints(this.DIMLINE_TEXT_SIZE_MM)/2,
+            {
+                width: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
+                align: 'center',
+            })
+        
+        
     }
 
     /** Draw a raw SVG path d datastring to PDF after transforming 
@@ -296,27 +356,35 @@ export class DocViewSVGEdit
         const pathCommands = parseSVG(d);
         let doc = pdfExporter?.activePDFDoc;
 
-        // transforms
+        // transforms. NOTE: order is important!
         if(localTransforms)
-        {
-            if(localTransforms.translate){ 
+        {   
+            /** Translate contains the coordinate (offset from origin) of the end/start of dimension line */
+            if(localTransforms?.translate)
+            { 
                 doc = doc.translate(localTransforms.translate[0], localTransforms.translate[1])
             }
-            /*
-            /* TODO: need origin
-            if(localTransforms.rotate){ 
-                doc = doc.rotate(localTransforms.rotate);
+            /* An SVG path arrow is originally located at [0,0], then transformed into position */
+            if(localTransforms?.rotate)
+            { 
+                doc = doc.rotate(localTransforms.rotate, 
+                        { origin: [0,0] }); // coordinate system origin is already translated
             }
-            */
+            if(localTransforms?.scale !== undefined)
+            { 
+                doc = doc.scale(localTransforms.scale, { origin: [0,0] }) // coordinate system origin is already translated
+            }
+            
         }
 
-        pathCommands.forEach(cmd => {
+        pathCommands.forEach(cmd => 
+        {
             if(doc[PATH_CMD_TO_PDFKIT[cmd.code]]) // basic protection
             {
                 doc = doc[PATH_CMD_TO_PDFKIT[cmd.code]](
                     // basically moveTo or lineTo with coordinate pair
-                    this._svgCoordToPDFcoord(this._svgToPDFTransform, cmd.x, 'x'),
-                    this._svgCoordToPDFcoord(this._svgToPDFTransform, cmd.y, 'y')
+                    cmd.x,
+                    cmd.y
                 )
             }
             else {
@@ -329,18 +397,21 @@ export class DocViewSVGEdit
             .fillColor('black')
             .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
 
-        // reset transforms
+        // reset transforms (reverse order than applied earlier!)
         if(localTransforms)
         {
-            if(localTransforms.translate){ 
-                doc = doc.translate(-localTransforms.translate[0], -localTransforms.translate[1])
+            if(localTransforms?.scale !== undefined)
+            { 
+                doc = doc.scale(1.0/localTransforms.scale, { origin: [0,0] })
             }
-            /* TODO: need origin
             if(localTransforms.rotate)
             { 
-                doc = doc.rotate(-localTransforms.rotate);
+                doc = doc.rotate(-localTransforms.rotate,  { origin: [0,0 ] });
             }
-            */
+            if(localTransforms.translate)
+            { 
+                doc = doc.translate(-localTransforms.translate[0], -localTransforms.translate[1])
+            }
         }
     }
 

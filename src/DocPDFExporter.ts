@@ -474,12 +474,6 @@ export class DocPDFExporter
         }
     }
 
-    /** Draw dimension lines in SVG data */
-    _drawDimLines(view:ContainerData, p:PageData, svgToPDFTransform:SVGtoPDFtransform)
-    {
-
-    }
-
     _applyPathStyle(doc:any, style?:DocPathStyle) // doc: PDFDocument
     {
         if (!style || typeof style !== 'object') return doc;

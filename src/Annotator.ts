@@ -252,7 +252,7 @@ export class DimensionLine extends BaseAnnotation
         let lineEnd = this.end.added(offsetVec).toArray();
         lineEnd[1] = -lineEnd[1];
 
-        let lineMid = this.middle().toArray();
+        let lineMid = this.middle().added(offsetVec).toArray();
         lineMid[1] = -lineMid[1];
 
         let dimText = ((this.round) ? roundTo(this.value, this.roundDecimals) : this.value).toString();
@@ -297,7 +297,7 @@ export class DimensionLine extends BaseAnnotation
     
        return `
           <g 
-                class="annotation arrow"
+                class="annotation arrow ${(flip) ? 'end' : 'start'}"
                 transform="translate(${atPoint.x} ${atPoint.y}) 
                             rotate(${rotation})
                             scale(1 1)

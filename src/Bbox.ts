@@ -386,6 +386,38 @@ export class Bbox
         }
     }
 
+    /** Axis on which the bbox has a size */
+    hasAxes():Array<MainAxis>
+    {
+        const axes:Array<MainAxis> = [];
+        if(this.width() <= this._oc.SHAPE_TOLERANCE)
+        { 
+            axes.push('x');
+        }
+        if(this.height() <= this._oc.SHAPE_TOLERANCE)
+        { 
+            axes.push('y');
+        }
+        if(this.height() <= this._oc.SHAPE_TOLERANCE)
+        { 
+            axes.push('z');
+        }
+        return axes;
+    }
+
+    /** Get size of current Bbox along given axis */
+    @checkInput([['MainAxis', 'x']], ['auto'])
+    sizeAlongAxis(axis:MainAxis):number
+    {
+        const AXIS_TO_SIDE = { 
+            x : 'width',
+            y : 'depth',
+            z : 'height',
+        }
+
+        return this[AXIS_TO_SIDE[axis]]();
+    }   
+
     /** Create 2D Rectangle Face from Bbox */
     rect():Face
     {

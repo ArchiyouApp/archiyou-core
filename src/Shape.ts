@@ -14,6 +14,8 @@
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
             SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT} from './internal'
+
+ import { AXIS_TO_VECS } from './internal'
 import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
 import { PointLike,PointLikeOrAnyShape,Coord,AnyShape,AnyShapeOrCollection,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
 import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection } from './internal'
@@ -2434,6 +2436,30 @@ export class Shape
 
         return sortedShapes[0]; // return the first
 
+    }
+
+    /** Cut off Shapes orthogonally by a plane with normal parallel to axis and at level */
+    @checkInput([['MainAxis', 'x'],['Number', 0]], ['auto', 'auto'])
+    cutoff(axisNormal?:MainAxis, level?:number)
+    {
+        const bb = this.bbox();
+        if(!bb.hasAxes().includes(axisNormal)){ throw new Error(`Shape::cutoff: Shape can not be cut off: It has no size on axis "${axis}"!`);}
+
+        const minLevel = bb.min()[axisNormal];
+        const maxLevel = bb.max()[axisNormal];
+
+        if(level <= minLevel || level >= maxLevel){ 
+            console.error(`Shape::cutoff: Shape can not be cut off: level "${level}" not between "${minLevel}" and "${maxLevel}". Returned copy of original`);
+            return this._copy();
+        }
+
+        const cutDirection = ((maxLevel - level) < (level - minLevel)) ? 1 : -1;
+        const planeSizes = ['x','y','z'].filter(a => a !== axisNormal);
+        console.log(planeSizes)
+        const pw = bb.sizeAlongAxis(planeSizes[0] as MainAxis) || 100;
+        const pd = bb.sizeAlongAxis(planeSizes[1] as MainAxis) || 100;
+        const cutPlane = new Face().makePlane(pw,pd,bb.center(), new Vector(AXIS_TO_VECS[axisNormal]).scaled(cutDirection))
+        cutPlane.addToScene()
     }
 
 
