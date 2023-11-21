@@ -2438,28 +2438,39 @@ export class Shape
 
     }
 
-    /** Cut off Shapes orthogonally by a plane with normal parallel to axis and at level */
+    /** Cut off Shapes orthogonally by a plane with normal parallel to axis and at level and keep the largest piece */
     @checkInput([['MainAxis', 'x'],['Number', 0]], ['auto', 'auto'])
     cutoff(axisNormal?:MainAxis, level?:number)
     {
         const bb = this.bbox();
-        if(!bb.hasAxes().includes(axisNormal)){ throw new Error(`Shape::cutoff: Shape can not be cut off: It has no size on axis "${axis}"!`);}
+        if(!bb.hasAxes().includes(axisNormal)){ throw new Error(`Shape::cutoff: Shape can not be cut off: It has no size on axis "${axisNormal}"!`);}
 
         const minLevel = bb.min()[axisNormal];
         const maxLevel = bb.max()[axisNormal];
 
         if(level <= minLevel || level >= maxLevel){ 
-            console.error(`Shape::cutoff: Shape can not be cut off: level "${level}" not between "${minLevel}" and "${maxLevel}". Returned copy of original`);
-            return this._copy();
+            console.error(`Shape::cutoff: Shape can not be cut off: level "${level}" not between "${minLevel}" and "${maxLevel}". Returned original`);
+            return this
         }
 
-        const cutDirection = ((maxLevel - level) < (level - minLevel)) ? 1 : -1;
-        const planeSizes = ['x','y','z'].filter(a => a !== axisNormal);
-        console.log(planeSizes)
-        const pw = bb.sizeAlongAxis(planeSizes[0] as MainAxis) || 100;
+        const cutDirection = ((maxLevel - level) < (level - minLevel)) ? 1 : -1; // NOTE: take off part of Shape with least size
+        const planeSizes = ['x','z','y'].filter(a => a !== axisNormal); // NOTE: order is important
+
+        console.log(cutDirection)
+        console.log(planeSizes);
+
+        const pw = bb.sizeAlongAxis(planeSizes[0] as MainAxis) || 100; // make sure cutplane has size on both axis
         const pd = bb.sizeAlongAxis(planeSizes[1] as MainAxis) || 100;
-        const cutPlane = new Face().makePlane(pw,pd,bb.center(), new Vector(AXIS_TO_VECS[axisNormal]).scaled(cutDirection))
-        cutPlane.addToScene()
+        const cutPlaneNormal = new Vector(AXIS_TO_VECS[axisNormal]).scaled(cutDirection)
+        const cutPlane = new Face().makePlane(
+            pw,
+            pd,
+            bb.center()['set'+ axisNormal.toUpperCase()](level), // a bit ugly - setting the {axisNormal} coordinate to level using Point.setX/Y/Z() methods
+            cutPlaneNormal
+            )
+        const extrudeAmount = Math.abs(level - this.bbox()[((cutDirection === 1) ? 'max' : 'min') + axisNormal.toUpperCase()]());
+        const cutSolid = cutPlane._extruded(extrudeAmount + 1, cutPlaneNormal); // NOTE: make cutSolid a bit bigger
+        return this.subtract(cutSolid);
     }
 
 

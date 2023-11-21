@@ -390,18 +390,9 @@ export class Bbox
     hasAxes():Array<MainAxis>
     {
         const axes:Array<MainAxis> = [];
-        if(this.width() <= this._oc.SHAPE_TOLERANCE)
-        { 
-            axes.push('x');
-        }
-        if(this.height() <= this._oc.SHAPE_TOLERANCE)
-        { 
-            axes.push('y');
-        }
-        if(this.height() <= this._oc.SHAPE_TOLERANCE)
-        { 
-            axes.push('z');
-        }
+        if(this.width() >= this._oc.SHAPE_TOLERANCE){ axes.push('x'); }
+        if(this.depth() >= this._oc.SHAPE_TOLERANCE){  axes.push('y'); }
+        if(this.height() >= this._oc.SHAPE_TOLERANCE){ axes.push('z'); }
         return axes;
     }
 
