@@ -21,7 +21,7 @@ import { PDFLinePath } from './internal' // types
 import { convertValueFromToUnit } from './internal'
 import { PageData, ContainerData, Page } from './internal'
 
-import { DocViewSVGEdit } from './DocViewSVGEdit'
+import { DocViewSVGManager } from './DocViewSVGManager'
 
 // import type { PDFDocument, PDFPage } from '@types/pdfkit' // disabled because it does not work
 import BlobStream from 'blob-stream' // BlobStream for Web - TODO: disable for node
@@ -330,7 +330,6 @@ export class DocPDFExporter
                 ...this._parseTextOptions(t, p)
             }
         );
-
         // reset text cursor (not needed because we only use absolute coordinates)
         this.activePDFDoc.x = 0;
         this.activePDFDoc.y = 0;
@@ -442,7 +441,7 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
-        const svgEdit = new DocViewSVGEdit(view);
+        const svgEdit = new DocViewSVGManager(view);
 
         // Transform incoming SVG Shape paths (in model space) into PDF paths in the space defined by the View Container
         const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocShapePaths(this,view,p);

@@ -286,18 +286,21 @@ export class DimensionLine extends BaseAnnotation
             - use style for fill/stroke, so we can override it later (not tags fill="..")
             - TODO: different arrow styles
         */
+       const SIZE = '10 5'; // Size of non-rotated graphic, use this for scaling
        const ARROWS_SVG  = {
-            default: '<path class="annotation arrow" style="fill:none;stroke-width:0.5" d="M-5 5 L 0 0 L 5 5" />'
+            default: '<path class="arrow-path" style="fill:none;stroke-width:0.5" d="M-5 5 L 0 0 L 5 5" />'
        }
        const DEFAULT_ARROW_SVG = 'default'
 
        const atPoint = at as Point;
         
        const rotation = (flip) ? this.getSVGRotation() - 90 + 180: this.getSVGRotation() - 90;
-    
+       
+       // NOTE: underscores _ in attributes are omitted (_worldSize => worldSize)
        return `
           <g 
                 class="annotation arrow ${(flip) ? 'end' : 'start'}"
+                worldSize="${SIZE}"
                 transform="translate(${atPoint.x} ${atPoint.y}) 
                             rotate(${rotation})
                             scale(1 1)
