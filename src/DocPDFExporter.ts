@@ -118,7 +118,13 @@ export class DocPDFExporter
             // all fonts in pdfkit: 
             // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
             try {
-                // NOTE: put these run-time imports as variables to avoid TS errors (that seem to check existance of paths, but can't because their are files)
+                /** IMPORTANT: Dynamically importing the .afm assets in webpack/brower, but not in Node 
+                 *  1. For the browser: pdfkit needs the .afm assets in the virtual file system 
+                 *  2. For node pdfkit has those already set up
+                 *  3. Webpack has a file loader and handles the font files correctly. On node, TS tries to revolve the dynamic import of files and give an error
+                 *  4. Solution here uses the capability of Webpack to parse these variable imports and loads the files
+                 *      But TS doesnt bother interpreting the variable bits and skips over these imports
+                */
                 const HelveticaFile = 'Helvetica.afm';
                 const HelveticaBoldFile = 'Helvetica-Bold.afm';
                 const Helvetica = await import(`pdfkit/js/data/${HelveticaFile}` /* webpackPreload: true */);
