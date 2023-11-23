@@ -38,8 +38,6 @@ import { arrayBufferToBase64, mmToPoints, pointsToMm } from './utils'
 // Load font file for pdfkit (special loader in webpack). See raw-loader nuxt.config.js
 // All fonts: Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
 // TODO: check on Node
-import Helvetica from 'pdfkit/js/data/Helvetica.afm'
-import HelveticaBold from 'pdfkit/js/data/Helvetica-Bold.afm'
 
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
 
@@ -118,8 +116,12 @@ export class DocPDFExporter
             try {
                 //const helveticaPath = '/node_modules/pdfkit/js/data/Helvetica.afm';
                 //const helveticaFont = await import(helveticaPath); // This does not work now because afm is not a js file
-                fs.writeFileSync('data/Helvetica.afm', Helvetica); // see import on top of this page
-                fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold);
+                const HelveticaPath = 'pdfkit/js/data/Helvetica.afm';
+                const HelveticaBoldPath = 'pdfkit/js/data/Helvetica-Bold.afm';
+                const Helvetica = await import(/* webpackMode: "eager" */HelveticaPath);
+                const HelveticaBold = await import(/* webpackMode: "eager" */HelveticaBoldPath);
+                fs.writeFileSync('data/Helvetica.afm', Helvetica.default); // see import on top of this page
+                fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold.default);
             }
             catch (e)
             {

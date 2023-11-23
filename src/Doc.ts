@@ -81,7 +81,7 @@ export class Doc
         this._settings = settings; 
         if(!settings)
         {
-            throw new Error(`Doc::Please supply settings with proxy as first parameter!`)
+            throw new Error(`Doc::Please supply settings with proxy URL as first parameter!`)
         }
         else {
             console.info(`Doc::constructor(settings, ay): Init Doc module with settings: "${JSON.stringify(settings)};`)

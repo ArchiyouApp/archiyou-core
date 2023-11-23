@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData, PipelineType, ContainerTableDataRowsColVal  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData, PipelineType  } from './internal'
 import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
           AnyShapeOrCollection, AnyShapeOrSequence, PointLikeOrAnyShapeOrCollection, ColorInput,
@@ -7,8 +7,9 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           PointLikeOrAnyShapeOrCollectionOrSelectionString,
           LayoutOptions,
           PointLikeOrVertexCollection,
-          ModelUnits,
-          ShapeAttributes
+          ModelUnits, 
+          ShapeAttributes, 
+          DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput
         } from './internal' // types
 
 import { BaseStyle, ContainerAlignment, Position, ScaleInput, DataRows,
@@ -320,6 +321,30 @@ export function isPipelineType(o:any) : o is PipelineType
 }
 
 //// CALC ////
+
+export function isDataRowColumnValue(o:any): o is DataRowColumnValue
+{
+    return typeof o === 'object'
+        && Object.keys(o).every(k => typeof k === 'string')
+        && Object.values(o).every(v => !v || (typeof v === 'string') || typeof v === 'number')
+}
+
+export function isDataRowValues(o:any): o is DataRowsValues
+{
+    return (Array.isArray(o)) && o.every(v => (typeof v === 'string') || (typeof v === 'number'))
+}
+
+export function isDataRowsColumnValue(o:any): o is DataRowsColumnValue
+{
+    return Array.isArray(o) 
+        && o.every(rcv => isDataRowColumnValue(rcv))
+}
+
+export function isDataRowsValues(o:any): o is DataRowsValues
+{
+    return Array.isArray(o) 
+        && o.every(rcv => isDataRowValues(rcv))
+}
 
 export function isMetricName(o:any): o is MetricName
 {

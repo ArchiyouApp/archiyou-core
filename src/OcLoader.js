@@ -109,8 +109,6 @@ export default class OcLoader
     this._oc = oc;
     this._oc.SHAPE_TOLERANCE = this.SHAPE_TOLERANCE; // set tolerance
     Geom.prototype._oc = this._oc; // Geom sets it for all other OC based Classes!
-    
-    //console.log(this.searchMethod('TopAbs_ShapeEnum'));
 
     if (this.RUN_TEST)
     {

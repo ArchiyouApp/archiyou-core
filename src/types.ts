@@ -462,7 +462,7 @@ export interface TextOptions
     underline?:boolean
     strike?:boolean    
     oblique?:boolean
-    align?:'left'|'justify'|'right'
+    align?:TextAreaAlign
 }
 
 //// DOCS:PAGE:CONTAINER:VIEW ////
@@ -709,33 +709,3 @@ export interface CalcData
     metrics: Object // { name : Metric, name2: Metric }
 }
 
-//// CALC TYPEGUARDS ////
-
-export function isDataRowColumnValue(o:any): o is DataRowColumnValue
-{
-    return typeof o === 'object'
-        && Object.keys(o).every(k => typeof k === 'string')
-        && Object.values(o).every(v => !v || (typeof v === 'string') || typeof v === 'number')
-}
-
-export function isDataRowValues(o:any): o is DataRowsValues
-{
-    return (Array.isArray(o)) && o.every(v => (typeof v === 'string') || (typeof v === 'number'))
-}
-
-export function isDataRowsColumnValue(o:any): o is DataRowsColumnValue
-{
-    return Array.isArray(o) 
-        && o.every(rcv => isDataRowColumnValue(rcv))
-}
-
-export function isDataRowsValues(o:any): o is DataRowsValues
-{
-    return Array.isArray(o) 
-        && o.every(rcv => isDataRowValues(rcv))
-}
-
-export function isDataRows(o:any): o is DataRows
-{
-    return isDataRowsColumnValue(o) || isDataRowsValues(o);
-}
