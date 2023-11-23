@@ -67,12 +67,13 @@ export class DocPDFExporter
     _SVGtoPDF:any; // 
     _hasPDFKit:boolean = false;
 
-    constructor(data:DocData|Record<string, DocData>)
+    constructor(data:DocData|Record<string, DocData>, onDone?:(blobs: Record<string,Blob>) => any)
     {
-        this.init(data)
+        if(typeof onDone !== 'function'){ console.warn(`DocPDFExporter:constructor(). No onDone function given! If you want to do something with the result supply one! Returns the blobs by doc name!`) };
+        this.init(data, onDone);
     }  
 
-    init(data:DocData|Record<string,DocData>, onDone?:() => void)
+    init(data:DocData|Record<string,DocData>, onDone?:(blobs: Record<string,Blob>) => any)
     {
         this.loadPDFKit()
             .catch(this.handleFailedImport)
@@ -84,6 +85,9 @@ export class DocPDFExporter
                 {
                     await this.run(data);
                     await this._export(null);
+                    if(typeof onDone === 'function'){ 
+                        onDone(this.blobs);
+                    }
                 }
                 else {
                     this.generateTestDoc();
@@ -95,7 +99,7 @@ export class DocPDFExporter
     async loadPDFKit():Promise<any> // TODO: PDFKit typing
     {
         // detect context of JS
-        const isBrowser = typeof window === 'object'
+        const isBrowser = typeof window === 'object';
         let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
         const isNode = !isWorker && !isBrowser;
 
@@ -114,8 +118,7 @@ export class DocPDFExporter
             // all fonts in pdfkit: 
             // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
             try {
-                //const helveticaPath = '/node_modules/pdfkit/js/data/Helvetica.afm';
-                //const helveticaFont = await import(helveticaPath); // This does not work now because afm is not a js file
+                // NOTE: put these run-time imports as variables to avoid TS errors (that seem to check existance of paths, but can't because their are files)
                 const HelveticaPath = 'pdfkit/js/data/Helvetica.afm';
                 const HelveticaBoldPath = 'pdfkit/js/data/Helvetica-Bold.afm';
                 const Helvetica = await import(/* webpackMode: "eager" */HelveticaPath);
@@ -206,15 +209,27 @@ export class DocPDFExporter
         });
     }
 
-    async _export(docName:string)
+    async _export(docName:string): Promise<Blob>
     {
         docName = docName || Object.keys(this.docs)[0];
         const blob = this.blobs[docName];
-        const fileHandle = await this._getNewFileHandle("PDF", "application/pdf", "pdf");
-        this._writeFile(fileHandle, blob).then(() => 
+
+        const isBrowser = typeof window === 'object'
+
+        if(isBrowser)
         {
-          console.info("Saved PDF to " + fileHandle.name);
-        });
+            const fileHandle = await this._getNewFileHandle("PDF", "application/pdf", "pdf");
+            this._writeFile(fileHandle, blob).then(() => 
+            {
+                console.info("Saved PDF to " + fileHandle.name);
+            });
+        }
+        else {
+            // Node output
+            // just handle the blob
+        }
+
+        return blob;
     }
 
     /** Parse Doc data into PDFDocument */
@@ -258,6 +273,12 @@ export class DocPDFExporter
                 )
             }
         )
+    }
+
+    /** Get first Blob */
+    getBlob():Blob|null
+    {
+        return (Object.values(this.blobs).length) ? Object.values(this.blobs)[0] : null;
     }
 
     async _makePage(p:PageData):Promise<any> // PDFPage
@@ -365,7 +386,7 @@ export class DocPDFExporter
             - We use a reference to PageData here to avoid this.activePage while working with async methods
             
         */
-        
+
         if(img?.content?.data && img?.content?.source)
         {
             const imgExt = this._getImageExt(img.content.source);    
@@ -496,15 +517,14 @@ export class DocPDFExporter
     
     //// TABLE ////
 
-    _placeTable(t:ContainerData, p:PageData)
+    async _placeTable(t:ContainerData, p:PageData)
     {
         if(!Array.isArray(t?.content?.data) || t?.content?.data.length === 0)
         {
             console.error(`DocPDFExporter::_placeTable: Skipped Table "${t.name}" without data!`)
             return;
         }
-
-        this.activePDFDoc.table(
+        await this.activePDFDoc.table(
             { 
                 title: '', // HTML rendered has no label yet! So omit here too.
                 headers: Object.keys((t?.content?.data as DataRows)[0]).map(v => { return { label: v, headerColor: 'white'}}),

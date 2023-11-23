@@ -101,12 +101,19 @@ export class Image extends Container
                             body: JSON.stringify({ url : this._url })       
                         }
                     );
-                    data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer()); 
-                    cache[this._url] = data;
+                    if(r.status !== 200) 
+                    {
+                        console.error(`DocPageContainerImage::loadImageData(): Could not get image. Check if it exists or proxy address: "${proxyUrl}"`)
+                    }
+                    else {
+                        data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer());                     
+                        console.log(`DocPageContainerImage::loadImageData: Got data for image "${this._url}" with size ${data.length}`)
+                        cache[this._url] = data;
+                    }
                 }
                 catch(e)
                 {
-                    console.warn('DocPageContainerImage::loadImageData: Could not load image. Check if proxy if configured correctly or image exists!')
+                    console.warn(`DocPageContainerImage::loadImageData(): Could not load image. "${e}`)
                 }
             }
 

@@ -27,7 +27,7 @@
  */
 
 import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, Page, PageSize, AnyPageContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
-            ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment } from './internal' // classes
+            ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection } from './internal' // classes
 import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
@@ -311,7 +311,7 @@ export class Doc
 
     /** Add View Container to active Page */
     // TODO: auto name based on shapes
-    view(name:string, shapes:ShapeCollection):Doc
+    view(name:string, shapes?:ShapeCollection):Doc
     {
         if(typeof name !== 'string'){ throw new Error(`Doc::view: Please supply a name to the view!`);}
         this._checkPageIsActive();
@@ -523,7 +523,7 @@ export class Doc
     //// FORWARD TO SPECIFIC CONTAINER TYPES ////
 
     /** Bind ShapeCollection to View: either a real reference or the name of a ShapeCollection after running the doc pipeline */
-    shapes(shapes:ShapeCollection|string):Doc
+    shapes(shapes:AnyShapeOrCollection|string):Doc
     {
         if(!this._activeContainer){ throw new Error(`Doc::shapes(): Cannot add Shapes because no View Container is active! Make a View first with view("myView")!`)};
         if(this._activeContainer._type !== 'view'){ { throw new Error(`Doc::shapes(): Cannot add Shapes because no active container is a not a View. Check the order of your statements!`)};}

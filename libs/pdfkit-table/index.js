@@ -578,9 +578,9 @@ export default function makePDFDocumentWithTables(PDFDocument) // PDFDocument
                     });
                   }
                   else{
-          
                     // Print all headers
-                    table.headers.forEach( (dataHeader, i) => {
+                    table.headers.forEach( (dataHeader, i) => 
+                    {
           
                       let {label, width, renderer, align, headerColor, headerOpacity, headerAlign, padding} = dataHeader;
                       // check defination
@@ -628,7 +628,7 @@ export default function makePDFDocumentWithTables(PDFDocument) // PDFDocument
 
                       // Archiyou extension
                       // Allow the user to override style for headers
-                      prepareHeader(header, i, 0, null, rectCell);
+                      prepareHeader(dataHeader, i, 0, null, rectCell);
           
                       // write
                       this.text(label, 

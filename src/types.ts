@@ -76,16 +76,16 @@ export type PipelineType = 'docs' | '3dprint' | 'cnc' | 'techdraw' | 'laser'
 /** A group of all modules of Archiyou for easy access  */
 export interface ArchiyouApp
 {
-    worker: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
+    worker?: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
     geom: Geom,
-    doc: Doc,
+    doc?: Doc,
     console?: Console,
-    executor: CodeParser,
-    exporter: Exporter,
-    calc: Calc,
+    executor?: CodeParser,
+    exporter?: Exporter,
+    calc?: Calc,
     make?: Make,
     // TODO: importer?
-    gizmos: Array<Gizmo>, // TODO: move this to Geom?
+    gizmos?: Array<Gizmo>, // TODO: move this to Geom?
 }
 
 export interface ArchiyouAppInfoBbox
@@ -453,7 +453,7 @@ export interface TableContainerOptions
 
 export interface TextOptions
 {
-    size?:number // saved in 'points' (like in Word) - units are also allowed but converted in options
+    size?:number|string // saved in 'points' (like in Word) - units are also allowed but converted in options
     color?:string // always converted to hex
     // above parameters are directly plugged into pdfkit. see: https://pdfkit.org/docs/text.html#text_styling
     // TODO: other interesting options: font type (now only Helvetica), columns
@@ -487,7 +487,7 @@ export type TextAreaAlign = 'left'|'right'|'center'|'fill';
 
 export interface TextAreaOptions
 {
-    size?:number // saved in 'point' (like in Word) - units are also allowed but converted in options
+    size?:number|string // saved in 'point' (like in Word) - units are also allowed but converted in options
     color?:string // always converted to hex
     align?:TextAreaAlign
 }
