@@ -119,10 +119,10 @@ export class DocPDFExporter
             // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
             try {
                 // NOTE: put these run-time imports as variables to avoid TS errors (that seem to check existance of paths, but can't because their are files)
-                //const HelveticaPath = 'pdfkit/js/data/Helvetica.afm';
-                //const HelveticaBoldPath = 'pdfkit/js/data/Helvetica-Bold.afm';
-                const Helvetica = await import('pdfkit/js/data/Helvetica.afm' /* webpackPreload: true */);
-                const HelveticaBold = await import('pdfkit/js/data/Helvetica-Bold.afm' /* webpackPreload: true */);
+                const HelveticaFile = 'Helvetica.afm';
+                const HelveticaBoldFile = 'Helvetica-Bold.afm';
+                const Helvetica = await import(`pdfkit/js/data/${HelveticaFile}` /* webpackPreload: true */);
+                const HelveticaBold = await import(`pdfkit/js/data/${HelveticaBoldFile}` /* webpackPreload: true */);
                 fs.writeFileSync('data/Helvetica.afm', Helvetica.default); // see import on top of this page
                 fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold.default);
             }

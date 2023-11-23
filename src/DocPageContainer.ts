@@ -88,7 +88,6 @@ export class Container
         if(isContainerAlignment(p))
         {
             this._position = this._containerAlignmentToPosition(p);
-            console.log(this._position)
             return this;
         }
         else {

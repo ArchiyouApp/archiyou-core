@@ -107,7 +107,7 @@ export class Image extends Container
                     }
                     else {
                         data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer());                     
-                        console.log(`DocPageContainerImage::loadImageData: Got data for image "${this._url}" with size ${data.length}`)
+                        console.info(`DocPageContainerImage::loadImageData: Got data for image "${this._url}" with size ${data.length}`)
                         cache[this._url] = data;
                     }
                 }
