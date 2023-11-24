@@ -177,7 +177,7 @@ export class DocPDFExporter
                 }
             }
             else {
-                const nodePDFKitPath = 'pdfkit'; // To keep warnings out
+                const nodePDFKitPath = 'pdfkit'; // To keep TS warnings out
                 this._PDFDocument = await import(nodePDFKitPath)
                 const svgToPDFPath = 'svg-to-pdfkit'
                 this._SVGtoPDF = await import(svgToPDFPath);
