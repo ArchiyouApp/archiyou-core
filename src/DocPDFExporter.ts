@@ -67,89 +67,131 @@ export class DocPDFExporter
     _SVGtoPDF:any; // 
     _hasPDFKit:boolean = false;
 
-    constructor(data:DocData|Record<string, DocData>, onDone?:(blobs: Record<string,Blob>) => any)
+    /** Make DocPDFExporter instance either empty or with data and onDone function */
+    constructor(data?:DocData|Record<string, DocData>, onDone?:(blobs:Record<string,Blob>) => any)
     {
-        if(typeof onDone !== 'function'){ console.warn(`DocPDFExporter:constructor(). No onDone function given! If you want to do something with the result supply one! Returns the blobs by doc name!`) };
-        this.init(data, onDone);
-    }  
+        if(!data)
+        { 
+            console.warn(`DocPDFExporter:constructor(). No data given yet. Use myDocPDFExporter.export(data,onDone) in the next step to start export!`)
+        }
+        else if(typeof onDone !== 'function')
+        { 
+            console.warn(`DocPDFExporter:constructor(). No onDone function given! If you want to do something with the result supply one! Returns the blobs by doc name!`) 
+        }
+        else {
+            this.export(data)
+                .catch((e) => console.error(e))
+                .then((blobs) => 
+                    {
+                        if(typeof onDone === 'function' && blobs)
+                        {
+                            onDone(blobs);
+                        }
+                    })
+        }
+    }
 
-    init(data:DocData|Record<string,DocData>, onDone?:(blobs: Record<string,Blob>) => any)
+    reset()
     {
-        this.loadPDFKit()
-            .catch(this.handleFailedImport)
-            .then(async () => 
-            {
-                this.handleSuccesImport();
+        this.inDocs = {};
+        this.docs = {};
+        this.activeDoc = undefined;
+        this.activePage = undefined;
+        this.activePDFDoc = undefined;
+        this.activePDFPage = undefined;
+        this.activeStream = undefined;
+    }
 
-                if(!this.DEBUG)
-                {
-                    await this.run(data);
-                    await this._export(null);
-                    if(typeof onDone === 'function'){ 
-                        onDone(this.blobs);
-                    }
-                }
-                else {
-                    this.generateTestDoc();
-                }
-            }) // To be in instance scope
+    async export(data:DocData|Record<string,DocData>): Promise<Record<string, Blob>>
+    {
+        this.reset();
+        try {  
+            await this.loadPDFKit(); 
+        }
+        catch(e)
+        { 
+            this.handleFailedImport(e);
+            return new Promise((resolve) => resolve(null))
+        }
+        this.handleSuccesImport();
+   
+        if(!this.DEBUG)
+        {
+            const blobs = this.run(data);
+            if (this.isBrowser()) await this._saveBlob(); // Start file save in browser
+            return blobs;
+        }
+        else {
+            this.generateTestDoc();
+        }
+         
     }
 
     /** Load PdfKit as module dynamically */
     async loadPDFKit():Promise<any> // TODO: PDFKit typing
     {
-        // detect context of JS
-        const isBrowser = typeof window === 'object';
-        let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
-        const isNode = !isWorker && !isBrowser;
-
-        if(isWorker || isBrowser)
+        // If PDFKit already loaded
+        if(this.hasPDFKit())
         {
-            this._PDFDocument = await import('pdfkit');
-            this._SVGtoPDF = await import('svg-to-pdfkit');
-
-            this._PDFDocument = this._PDFDocument.default; // we need the default
-            this._SVGtoPDF = this._SVGtoPDF.default;
-
-            // some black magic to make pdfkit-table work
-            this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
-            
-            // load fonts in virtual fs
-            // all fonts in pdfkit: 
-            // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
-            try {
-                /** IMPORTANT: Dynamically importing the .afm assets in webpack/brower, but not in Node 
-                 *  1. For the browser: pdfkit needs the .afm assets in the virtual file system 
-                 *  2. For node pdfkit has those already set up
-                 *  3. Webpack has a file loader and handles the font files correctly. On node, TS tries to revolve the dynamic import of files and give an error
-                 *  4. Solution here uses the capability of Webpack to parse these variable imports and loads the files
-                 *      But TS doesnt bother interpreting the variable bits and skips over these imports
-                */
-                const HelveticaFile = 'Helvetica.afm';
-                const HelveticaBoldFile = 'Helvetica-Bold.afm';
-                const Helvetica = await import(`pdfkit/js/data/${HelveticaFile}` /* webpackPreload: true */);
-                const HelveticaBold = await import(`pdfkit/js/data/${HelveticaBoldFile}` /* webpackPreload: true */);
-                fs.writeFileSync('data/Helvetica.afm', Helvetica.default); // see import on top of this page
-                fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold.default);
-            }
-            catch (e)
-            {
-                console.error(`DocPDFExporter::loadPDFKit(): Could not find Helvetica font. "${e}"`)
-            }
+            return new Promise((resolve) => resolve(this._PDFDocument))
         }
         else {
-            const nodePDFKitPath = 'pdfkit'; // To keep warnings out
-            this._PDFDocument = await import(nodePDFKitPath)
-            const svgToPDFPath = 'svg-to-pdfkit'
-            this._SVGtoPDF = await import(svgToPDFPath);
-            this._PDFDocument = this._PDFDocument.default; // we need the default
-            this._SVGtoPDF = this._SVGtoPDF.default;
+            // Load PDFKit
+            // detect context of JS
+            const isBrowser = this.isBrowser();
+            let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
+            const isNode = !isWorker && !isBrowser;
 
-            // some black magic to make pdfkit-table work
-            this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
+            if(isWorker || isBrowser)
+            {
+                this._PDFDocument = await import('pdfkit');
+                this._SVGtoPDF = await import('svg-to-pdfkit');
+
+                this._PDFDocument = this._PDFDocument.default; // we need the default
+                this._SVGtoPDF = this._SVGtoPDF.default;
+
+                // some black magic to make pdfkit-table work
+                this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
+                
+                // load fonts in virtual fs
+                // all fonts in pdfkit: 
+                // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
+                try {
+                    /** IMPORTANT: Dynamically importing the .afm assets in webpack/brower, but not in Node 
+                     *  1. For the browser: pdfkit needs the .afm assets in the virtual file system 
+                     *  2. For node pdfkit has those already set up
+                     *  3. Webpack has a file loader and handles the font files correctly. On node, TS tries to revolve the dynamic import of files and give an error
+                     *  4. Solution here uses the capability of Webpack to parse these variable imports and loads the files
+                     *      But TS doesnt bother interpreting the variable bits and skips over these imports
+                    */
+                    const HelveticaFile = 'Helvetica.afm';
+                    const HelveticaBoldFile = 'Helvetica-Bold.afm';
+                    const Helvetica = await import(`pdfkit/js/data/${HelveticaFile}` /* webpackPreload: true */);
+                    const HelveticaBold = await import(`pdfkit/js/data/${HelveticaBoldFile}` /* webpackPreload: true */);
+                    fs.writeFileSync('data/Helvetica.afm', Helvetica.default); // see import on top of this page
+                    fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold.default);
+                }
+                catch (e)
+                {
+                    console.error(`DocPDFExporter::loadPDFKit(): Could not find Helvetica font. "${e}"`)
+                }
+            }
+            else {
+                const nodePDFKitPath = 'pdfkit'; // To keep warnings out
+                this._PDFDocument = await import(nodePDFKitPath)
+                const svgToPDFPath = 'svg-to-pdfkit'
+                this._SVGtoPDF = await import(svgToPDFPath);
+                this._PDFDocument = this._PDFDocument.default; // we need the default
+                this._SVGtoPDF = this._SVGtoPDF.default;
+
+                // some black magic to make pdfkit-table work
+                this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
+            }
+
+            return this._PDFDocument;
         }
 
-        return this._PDFDocument;
+        
     }
 
     handleFailedImport(e)
@@ -168,13 +210,13 @@ export class DocPDFExporter
         return this._hasPDFKit;
     }
 
-    async run(data:DocData|Record<string,DocData>)
+    async run(data:DocData|Record<string,DocData>) : Promise<Record<string,Blob>>
     {
-        await this.parse(data);
+        return await this.parse(data);
     }
 
     /** Parse raw Doc data, either DocData or a set of documents in Record<string, DocData> */
-    async parse(data?:DocData|Record<string, DocData>)
+    async parse(data?:DocData|Record<string, DocData>): Promise<Record<string,Blob>>
     {
         if(!this.hasPDFKit())
         { 
@@ -192,11 +234,12 @@ export class DocPDFExporter
         }
 
         // parse docs sequentially
-        
         for( const docData of Object.values(this.inDocs))
         {
             await this._parseDoc(docData);
         }
+
+        return this.blobs; // { docname: blob }
 
     }
 
@@ -215,7 +258,8 @@ export class DocPDFExporter
         });
     }
 
-    async _export(docName:string): Promise<Blob>
+    /** Save the given doc (or the first) to file  */
+    async _saveBlob(docName?:string): Promise<Blob>
     {
         docName = docName || Object.keys(this.docs)[0];
         const blob = this.blobs[docName];
@@ -229,10 +273,6 @@ export class DocPDFExporter
             {
                 console.info("Saved PDF to " + fileHandle.name);
             });
-        }
-        else {
-            // Node output
-            // just handle the blob
         }
 
         return blob;
@@ -595,6 +635,11 @@ export class DocPDFExporter
     }
 
     //// UTILS ////
+
+    isBrowser():boolean
+    {
+        return typeof window === 'object';
+    }
 
     /** Convert relative page coordinate width to absolute PDF point coord of PDFKit system, also taking horizontal padding into account  */
     coordRelWidthToPoints(a:number, page:PageData, transformWithPadding:boolean=true):number
