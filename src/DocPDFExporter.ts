@@ -117,8 +117,8 @@ export class DocPDFExporter
    
         if(!this.DEBUG)
         {
-            const blobs = this.run(data);
-            if (this.isBrowser()) await this._saveBlob(); // Start file save in browser
+            const blobs = await this.run(data);
+            if (this.isBrowser()) this._saveBlob(); // Start file save in browser
             return blobs;
         }
         else {
@@ -139,8 +139,7 @@ export class DocPDFExporter
             // Load PDFKit
             // detect context of JS
             const isBrowser = this.isBrowser();
-            let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
-            const isNode = !isWorker && !isBrowser;
+            const isWorker = this.isWorker();
 
             if(isWorker || isBrowser)
             {
@@ -259,14 +258,12 @@ export class DocPDFExporter
     }
 
     /** Save the given doc (or the first) to file  */
-    async _saveBlob(docName?:string): Promise<Blob>
+    async _saveBlob(docName?:string)
     {
         docName = docName || Object.keys(this.docs)[0];
         const blob = this.blobs[docName];
 
-        const isBrowser = typeof window === 'object'
-
-        if(isBrowser)
+        if(this.isBrowser() || this.isWorker())
         {
             const fileHandle = await this._getNewFileHandle("PDF", "application/pdf", "pdf");
             this._writeFile(fileHandle, blob).then(() => 
@@ -275,7 +272,6 @@ export class DocPDFExporter
             });
         }
 
-        return blob;
     }
 
     /** Parse Doc data into PDFDocument */
@@ -639,6 +635,11 @@ export class DocPDFExporter
     isBrowser():boolean
     {
         return typeof window === 'object';
+    }
+
+    isWorker():boolean
+    {
+        return (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
     }
 
     /** Convert relative page coordinate width to absolute PDF point coord of PDFKit system, also taking horizontal padding into account  */

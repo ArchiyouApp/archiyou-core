@@ -2349,9 +2349,6 @@
                      </svg>`
          // TODO: remove block so we can enable subshape styling
 
-         console.log('**** SVG');
-         console.log(svg)
-
          return svg;
       }
 
