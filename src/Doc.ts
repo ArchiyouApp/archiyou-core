@@ -116,7 +116,6 @@ export class Doc
     _setDefaults():Doc
     {   
         this.reset();
-
         return this;
     }
 
@@ -173,6 +172,9 @@ export class Doc
         if( typeof n !== 'string' || n.length === 0 ){ throw new Error(`doc::name: Please supply a valid string as document name!`);}
         if (this._docs.includes(n)){ throw new Error(`doc::name: Document with name "${n}" already exists!`);}
         
+        // Check if there is a doc made!
+        this.checkAndMakeDefaultDoc();
+        
         // replace name of current document in _docs and other byDoc attributes
         // TODO: improve by using id per document that stays the same?
         this._docs = this._docs.map( d => (d === this._activeDoc) ? n : d);
@@ -183,8 +185,13 @@ export class Doc
         this._pageOrientationByDoc[n] = this._pageOrientationByDoc[this._activeDoc];
         delete this._pageOrientationByDoc[this._activeDoc];
 
-        this._pagesByDoc[n] = this._pagesByDoc[this._activeDoc];
+        this._pagesByDoc[n] = this._pagesByDoc[this._activeDoc] || [];
+        console.log('HIERO');
+        this._pagesByDoc;
+        console.log('DAN NIE')
         delete this._pagesByDoc[this._activeDoc];
+        
+        
         
         this._unitsByDoc[n] = this._unitsByDoc[this._activeDoc];
         delete this._unitsByDoc[this._activeDoc];
@@ -197,7 +204,6 @@ export class Doc
     /** Reset state of Doc instance */
     reset()
     {
-        this._pagesByDoc = {};
         this._docs = [];
         this._pageSizeByDoc = {};
         this._pageOrientationByDoc = {};
@@ -639,7 +645,7 @@ export class Doc
         return page
     }
 
-    /** Check if page name exists for active document */
+    /** Check if page name exists in active document */
     _pageExists(name:string):boolean
     {
         return this._pagesByDoc[this._activeDoc].some( page => page.name === name);
