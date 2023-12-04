@@ -656,7 +656,7 @@ export type DataRowColumnValue = {[key:string]:any} // DataRow in column-value f
 export type DataRowValues = Array<any> // DataRow with values only
 export type DataRowsColumnValue = Array<DataRowColumnValue> // Array of DataRow as column-value
 export type DataRowsValues = Array<DataRowValues> // Array of DataRow as values only
-export type DataRows = DataRowsColumnValue // DataRows
+export type DataRows = DataRowsColumnValue | DataRowsValues 
 
 export type MetricName = 'cost_material' | 'cost_labor' | 'production_time' | 'price_est' | 'price' | 'weight' | 'volume' | 'size' | 'r-value' // TODO: more
 

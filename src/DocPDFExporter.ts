@@ -16,7 +16,7 @@ import fs from 'fs'; // virtual pdfkit filesystem as replacement of node
 
 import makePDFDocumentWithTables from '../libs/pdfkit-table'
 
-import { Container, DataRows, DocData, DocPathStyle, SVGtoPDFtransform, TableContainerOptions } from './internal' // Doc
+import { Container, DataRows, DataRowsColumnValue, DocData, DocPathStyle, SVGtoPDFtransform, TableContainerOptions } from './internal' // Doc
 import { PDFLinePath } from './internal' // types
 import { convertValueFromToUnit } from './internal'
 import { PageData, ContainerData, Page } from './internal'
@@ -569,7 +569,7 @@ export class DocPDFExporter
         await this.activePDFDoc.table(
             { 
                 title: '', // HTML rendered has no label yet! So omit here too.
-                headers: Object.keys((t?.content?.data as DataRows)[0]).map(v => { return { label: v, headerColor: 'white'}}),
+                headers: Object.keys((t?.content?.data as DataRowsColumnValue)[0]).map(v => { return { label: v, headerColor: 'white'}}),
                 rows: t?.content?.data.map( r => Object.values(r)),
             },
             this._parseTableSettings(t, p)

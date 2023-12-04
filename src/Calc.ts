@@ -11,6 +11,10 @@
 
  export class Calc
  {
+    //// SETTINGS ////
+    ENABLE_DANFO = false;
+    //// END SETTINGS ////
+
     _danfo;
     _geom;
     db:Db // TMP DISABLED: Db; // the virtual database with table in there
@@ -20,9 +24,16 @@
     constructor(geom:Geom = null)
     {
         this._geom = geom; // needed to get data from the model
-        this.loadDanfo()
-            .catch(this.handleFailedDanfoImport)
-            .then(() => this.init())
+
+        if(this.ENABLE_DANFO)
+        {
+            this.loadDanfo()
+                .catch(this.handleFailedDanfoImport)
+                .then(() => this.init());
+        }
+        else {
+            this.init();
+        }
 
     }
 
@@ -88,7 +99,8 @@
         this._metrics = {};
     }
 
-    tables()
+    /** Get names of tables */
+    tables():Array<string>
     {
         return this?.db?.tables();
     }
@@ -120,26 +132,15 @@
         if(this.tables().includes(name)){ throw new Error(`Calc::table: Table name "${name}" already exists! Please use an unique name`); }
         if(!isDataRows(data)){ throw new Error(`Calc::table: Please supply data in format [{ col1: val1, col2: val2}] or [val1,val2] and supply column names as third parameter!`); }
         
-        const df = (columns) ? new this._danfo.DataFrame(data, { columns: columns }) : new this._danfo.DataFrame(data);
-        const newTable = new Table(df)
+        const newTable = new Table(data)
         newTable.name(name);
+        if(Array.isArray(columns))
+        {
+            newTable.setColumns(columns)
+        }
         this.db.saveTable(newTable);
         
-        return this;
-    }
-
-    /** Output all table data
-     *    returns: { table_name: [{Row { columnName, value, ... }},{Row}]}
-     *    NOTE: outputting all data is async. Thats why we have a callback function here!
-     */
-    exportDb(onDone: (data:Object) => void)
-    {
-        this.autoInit();
-        this?.db?.requestData( (data) => 
-        { 
-            this.dbData = data;
-            onDone(this.dbData);
-        });
+        return newTable;
     }
 
     /** Output raw data */

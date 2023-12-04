@@ -50,20 +50,20 @@ export class Db
     {
         // add reference to the parent database in every Table instance
         Table.prototype._db = this;
-        Table.prototype._danfo = this._danfo;
+        Table.prototype._danfo = this._danfo; // if available
     
         let shapesDataRows = this.generateShapesData();
         
         if(shapesDataRows.length > 0)
         {
-            this.shapes = new Table(new this._danfo.DataFrame(shapesDataRows));
+            this.shapes = new Table(shapesDataRows);
             this.shapes.save("shapes");
         }
 
         let objDataRows = this.generateObjsData();
         if(objDataRows.length > 0)
         {
-            this.objects = new Table(new this._danfo.DataFrame(objDataRows));
+            this.objects = new Table(objDataRows);
             // register shapes and object table
             this.objects.save("objects");
         }
@@ -113,8 +113,6 @@ export class Db
     toTableData():{[key:string]:Object}
     {
         let data = {}; // key: data
-
-        if(!this._danfo){ return data }; // protect against unavailable Danfo module
 
         for (const [key,tableObj] of Object.entries(this._tables))
         {
