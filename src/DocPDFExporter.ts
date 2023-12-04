@@ -279,7 +279,7 @@ export class DocPDFExporter
     {
         // TODO: fix fonts. See: https://github.com/foliojs/pdfkit/blob/master/examples/webpack/webpack.config.js#L19
         // or: https://github.com/foliojs/pdfkit/issues/623#issuecomment-284625259
-        const newPDFDoc = new this._PDFDocument({  autoFirstPage: false, font: 'Helvetica' });
+        const newPDFDoc = new this._PDFDocument({  autoFirstPage: false, font: 'Helvetica', margin: 0 });
         this.docs[d.name] = newPDFDoc;
         this.activePDFDoc = newPDFDoc;
         this.activeDoc = d;
@@ -332,7 +332,7 @@ export class DocPDFExporter
             { 
                 size: p.size,
                 layout: p.orientation,
-                // NOTE: omit margins because they don't really do anything
+                margin: 0,
             }
         )
         this.activePDFPage = newPDFPage;
