@@ -8,7 +8,7 @@ export class View extends Container
     _style:any; // general style (TODO)
     _styles:{[key:string]:any}; // style overrides (TODO)
     _dimension:any; // TODO
-    _forceAll:boolean = true;
+    _forceAll:boolean = false;
 
     constructor(name:string)
     {
@@ -59,7 +59,7 @@ export class View extends Container
     }
 
     /** Bind ShapeCollection to View */
-    shapes(shapes:AnyShapeOrCollection|string, all:boolean=true)
+    shapes(shapes:AnyShapeOrCollection|string, all:boolean=false)
     {
         this._forceAll = all;
         // a reference to a ShapeCollection from main script

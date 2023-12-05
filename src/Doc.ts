@@ -527,7 +527,7 @@ export class Doc
     //// FORWARD TO SPECIFIC CONTAINER TYPES ////
 
     /** Bind ShapeCollection to View: either a real reference or the name of a ShapeCollection after running the doc pipeline */
-    shapes(shapes:AnyShapeOrCollection|string, all:boolean=true):Doc
+    shapes(shapes:AnyShapeOrCollection|string, all:boolean=false):Doc
     {
         if(!this._activeContainer){ throw new Error(`Doc::shapes(): Cannot add Shapes because no View Container is active! Make a View first with view("myView")!`)};
         if(this._activeContainer._type !== 'view'){ { throw new Error(`Doc::shapes(): Cannot add Shapes because no active container is a not a View. Check the order of your statements!`)};}
