@@ -324,6 +324,22 @@ export interface DimensionOptions
     roundDecimals?:number // round to number decimals. Default is 0
 }
 
+export interface AutoDimLevel
+{
+    axis:MainAxis
+    at: number // relative or absolute
+    coordType?: 'relative' | 'absolute' // auto determine
+    align?: 'min'|'auto'|'max' // align dimension lines to Shape/Collection
+    minDistance?: number
+    offset?:number // offset from outside of bbox of Shape/Collection
+    showLine?:boolean // DEBUG line
+}
+
+export interface AutoDimSettings
+{
+    levels: Array<AutoDimLevel>
+}
+
 //// DOC ////
 
 export type DocUnits = 'mm'|'cm'|'inch'|'pnt'; 
@@ -466,6 +482,12 @@ export interface TextOptions
 }
 
 //// DOCS:PAGE:CONTAINER:VIEW ////
+
+export interface toSVGOptions
+{
+    annotations?:boolean
+    all?:boolean // also visible
+}
 
 export interface SVGtoPDFtransform
 {

@@ -13,7 +13,7 @@
 
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
-            SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT} from './internal'
+            SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
 
  import { AXIS_TO_VECS } from './internal'
 import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
@@ -1413,9 +1413,9 @@ export class Shape
      *   For example: Extrude a straight Line along a the z-axis to create a Rectangular Face    
      *   TODO: solid flag
      */
-    @addResultShapesToScene
+    
     @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', [0,0,1] ]], [Number, 'Vector'])
-    extruded(amount?:number, direction?:PointLike):IEdge|Face|Shell|Solid
+    _extruded(amount?:number, direction?:PointLike):IEdge|Face|Shell|Solid
     {
         /* OC docs:
             - MakePrism: https://dev.opencascade.org/doc/refman/html/class_b_rep_prim_a_p_i___make_prism.html
@@ -1433,6 +1433,12 @@ export class Shape
         return newShape as Edge|Face|Shell|Solid;
     }
 
+    @addResultShapesToScene
+    @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', [0,0,1] ]], [Number, 'Vector'])
+    extruded(amount?:number, direction?:PointLike):IEdge|Face|Shell|Solid
+    {
+        return this._extruded(amount, direction);
+    }
 
     /** Extrude this Shape towards a given Point or other Shape - we do keep the normal of the Shape if available */
     // TODO: Add ShapeCollection as input
@@ -4593,11 +4599,11 @@ export class Shape
     }
 
     /** Export 2D Shape to SVG */
-    toSvg(withAnnotations:boolean=true):string
+    toSvg(options?:toSVGOptions):string
     {
         // for now use ShapeCollection.toSvg()
         // NOTE: this method will be overwriten in Edge
-        return new ShapeCollection(this).toSvg(withAnnotations);
+        return new ShapeCollection(this).toSvg(options);
     }
 
 }

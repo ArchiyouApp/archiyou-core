@@ -8,6 +8,7 @@ export class View extends Container
     _style:any; // general style (TODO)
     _styles:{[key:string]:any}; // style overrides (TODO)
     _dimension:any; // TODO
+    _forceAll:boolean = true;
 
     constructor(name:string)
     {
@@ -23,7 +24,7 @@ export class View extends Container
             ...this._toContainerData(),
             content: { 
                 data: (ShapeCollection.isShapeCollection(this._shapes)) ? 
-                                (this._shapes as ShapeCollection)?.toSvg() : 
+                                (this._shapes as ShapeCollection)?.toSvg({ all: this._forceAll }) : 
                                 this.resolveShapeNameToSVG(this._shapes as string), 
                 settings: {} 
             } as ContainerContent,
@@ -49,7 +50,7 @@ export class View extends Container
             } 
             
             const s = new ShapeCollection(realShapes); // make sure we got a ShapeCollection
-            return s.toSvg();
+            return s.toSvg({ all: this._forceAll });
         }
         else {
             console.warn('DocPageContainerView:resolveShapenameToSVG(): Could not determine worker scope: Could not resolve shapes variable. No shapes were outputted!');
@@ -58,8 +59,9 @@ export class View extends Container
     }
 
     /** Bind ShapeCollection to View */
-    shapes(shapes:AnyShapeOrCollection|string)
+    shapes(shapes:AnyShapeOrCollection|string, all:boolean=true)
     {
+        this._forceAll = all;
         // a reference to a ShapeCollection from main script
         if (ShapeCollection.isShapeCollection(shapes) || Shape.isShape(shapes))
         {

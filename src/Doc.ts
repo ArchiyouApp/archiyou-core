@@ -186,9 +186,7 @@ export class Doc
         delete this._pageOrientationByDoc[this._activeDoc];
 
         this._pagesByDoc[n] = this._pagesByDoc[this._activeDoc] || [];
-        console.log('HIERO');
         this._pagesByDoc;
-        console.log('DAN NIE')
         delete this._pagesByDoc[this._activeDoc];
         
         
@@ -529,11 +527,11 @@ export class Doc
     //// FORWARD TO SPECIFIC CONTAINER TYPES ////
 
     /** Bind ShapeCollection to View: either a real reference or the name of a ShapeCollection after running the doc pipeline */
-    shapes(shapes:AnyShapeOrCollection|string):Doc
+    shapes(shapes:AnyShapeOrCollection|string, all:boolean=true):Doc
     {
         if(!this._activeContainer){ throw new Error(`Doc::shapes(): Cannot add Shapes because no View Container is active! Make a View first with view("myView")!`)};
         if(this._activeContainer._type !== 'view'){ { throw new Error(`Doc::shapes(): Cannot add Shapes because no active container is a not a View. Check the order of your statements!`)};}
-        (this._activeContainer as View).shapes(shapes);
+        (this._activeContainer as View).shapes(shapes, all);
 
         return this;
     }

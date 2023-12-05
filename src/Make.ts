@@ -419,8 +419,10 @@ export class Make
         // Openings: Validate openings and give feedback for user when needed
         const checkedOpenings = new ShapeCollection();
         const removedStuds = new ShapeCollection(); // primary studs that were removed
-        const crippleStuds = new ShapeCollection(); // cut studs
-        const openingFrames = new ShapeCollection(); // add resulting frames here
+        const crippleStudsTop = new ShapeCollection(); // cut studs
+        const crippleStudsBottom = new ShapeCollection();
+        const openingFramesHorizontals = new ShapeCollection(); // add resulting frames here
+        const openingFramesVerticals = new ShapeCollection(); // add resulting frames here
         const openingKingStuds = new ShapeCollection();
         const openingJackStuds = new ShapeCollection();
 
@@ -521,7 +523,10 @@ export class Make
                         const splitStuds = new ShapeCollection(stud._splitted(openingTestBuffer, true)); // force ShapeCollection
                         if (splitStuds.length >= 1)
                         { 
-                            crippleStuds.add(splitStuds);
+                            splitStuds.sort((a,b) => b.center().z - a.center().z); // order in z-axis
+                            crippleStudsBottom.add(splitStuds[1]);
+                            crippleStudsTop.add(splitStuds[0]);
+
                             removedStuds.add(stud);
                         }
                         else {
@@ -552,7 +557,8 @@ export class Make
                     openingFrame = new ShapeCollection(openingFrame.filter(s => s.name !== 'frameTop'));
                 }
 
-                openingFrames.add(openingFrame)
+                openingFramesHorizontals.add(openingFrame.filter(s => s.name === 'frameTop' || s.name === 'frameBottom'))
+                openingFramesVerticals.add(openingFrame.filter(s => s.name === 'frameLeft' || s.name === 'frameRight'))
 
                 // make king and jack studs for current opening
                 const openingFrameBbox = openingFrame.bbox(); // avoid recalculating
@@ -598,8 +604,10 @@ export class Make
                 .addGroup('grid', gridLines.color('blue').dashed())
                 .addGroup('studs', primaryStuds.color('green'))
                 .addGroup('plates', plates.color('green'))
-                .addGroup('cripples', crippleStuds.color('green'))
-                .addGroup('openingFrames', openingFrames.color('red'))
+                .addGroup('cripplesTop', crippleStudsTop.color('green'))
+                .addGroup('cripplesBottom', crippleStudsBottom.color('green'))
+                .addGroup('openingFramesHorizontals', openingFramesHorizontals.color('red'))
+                .addGroup('openingFramesVerticals', openingFramesVerticals.color('red'))
                 .addGroup('openingKingStuds', openingKingStuds.color('brown'))
                 .addGroup('openingJackStuds', openingJackStuds.color('brown'))
                 .addGroup('openingDiagrams', checkedOpenings.color('grey'))

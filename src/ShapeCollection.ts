@@ -15,9 +15,9 @@
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, ObjStyle } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
- import { LayoutOrderType, LayoutOptions } from './internal'
+ import { LayoutOrderType, LayoutOptions, AutoDimSettings, MainAxis } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
@@ -2126,6 +2126,129 @@
          return (whSkew > hwSkew) ? whSkew : hwSkew;
       }
 
+      //// ANNOTATIONS ////
+
+      /** Make (semi) automatic dimension lines through the Shapes of this collection at levels (in percentage of total size) along MainAxis within bbox
+       *    @param options:AutoDimSettings
+       *    {
+       *       levels: Array< Record<MainAxis,number>
+       *       minDistance: number (0-1)
+       *    }
+       * 
+      */
+      autoDim(settings?:AutoDimSettings):ShapeCollection
+      {
+         const BBOX_MARGIN = 10;
+         const SECTION_PLANE_DEPTH = 2;
+         const DIMENSION_LINE_OFFSET_FROM_BBOX = 30;
+         const DEFAULT_MIN_DISTANCE = 0;
+
+         if(!settings || !Array.isArray(settings?.levels)){ throw new Error('ShapeCollection.autoDim(options): No autoDim settings given. Please supply levels ({ axis:x|y|z, at:number }]). Level options are minDistance, coordType, and offset')}
+
+         const collectionBbox = this.bbox();
+
+         // For every level make a section shape, gather intersection points and draw dimension lines
+         settings.levels.forEach((lvl,i) => 
+         {
+            lvl = lvl as AutoDimLevel;
+            const levelAxis = lvl?.axis
+            let levelCoord = lvl?.at; // percentage of size along levelAxis
+            // NOTE: if coordType not given, We take it that if the level is given < 1.0 it is meant relative
+            const levelCoordType = lvl?.coordType || ((levelCoord < 1 || levelCoord > -1 ) ? 'relative' : 'absolute');
+            if(levelCoordType === 'relative')
+            {
+               levelCoord = (levelCoord > 1.0) ? 1.0 : levelCoord; 
+               levelCoord = (levelCoord < 0) ? 0 : levelCoord;
+            }
+            
+            const bboxSize = collectionBbox.sizeAlongAxis(levelAxis);
+            const rangeAxis = (['x','y','z'] as Array<MainAxis>).find((a) => a !== levelAxis && collectionBbox.axisMissingIn2D() !== a);
+            const sectionLineDepthAxis = (['x','y','z'] as Array<MainAxis>).find(a => a !== levelAxis && a !== rangeAxis);
+            const sectionLineRangeStart = collectionBbox.min()[rangeAxis] - BBOX_MARGIN;
+            const sectionLineRangeEnd = collectionBbox.max()[rangeAxis] + BBOX_MARGIN;
+            const sectionLineStart = new Point(0,0,0)['set'+rangeAxis.toUpperCase()](sectionLineRangeStart);
+            const sectionLineEnd = new Point(0,0,0)['set'+rangeAxis.toUpperCase()](sectionLineRangeEnd);
+            const sectionLineLevelCoord = (levelCoordType === 'relative') ? collectionBbox.minAtAxis(levelAxis) + levelCoord*bboxSize : levelCoord;
+            const sectionLine = new Edge().makeLine(sectionLineStart,sectionLineEnd)
+                                          ['move'+levelAxis.toUpperCase()](sectionLineLevelCoord)
+
+            if(lvl?.showLine){ sectionLine.color('red').addToScene() };
+            // to deal with accurary issues we use a section plane
+            const sectionPlaneNormal = new Vector(0,0,0)['set'+sectionLineDepthAxis.toUpperCase()](1);
+            const sectionPlane = sectionLine._extruded(SECTION_PLANE_DEPTH, sectionPlaneNormal)
+                                    ['move'+sectionLineDepthAxis.toUpperCase()](-SECTION_PLANE_DEPTH/2);
+            // now get unique intersection points of all shapes
+            const intersectionPointsAlongRangeAxis = []
+            const intersections = this._intersections(sectionPlane);
+
+            if(!intersections.length)
+            {
+               console.warn(`ShapeCollection::autoDim(): level "${levelAxis}=${levelCoord}" [${levelCoordType}] Did not cut any Shapes!`)
+            }
+
+            intersections.forEach((int) => 
+            {
+               // NOTE: we can get intersections of Shapes: points, lines, planes
+               // We just check all their points
+               int.vertices().forEach(v => {
+                  const coordAlongRangeAxis = v[rangeAxis];
+                  if(!intersectionPointsAlongRangeAxis.includes(coordAlongRangeAxis))
+                  {
+                     intersectionPointsAlongRangeAxis.push(coordAlongRangeAxis)
+                  }
+               })
+            });
+            intersectionPointsAlongRangeAxis.sort((a,b) => a - b ); // min first
+            
+            // Now make the dimension lines at a given coord (parallel to section line) based on align ('min','max,'auto') and offset
+            let dimLinesLevelCoord = sectionLineLevelCoord;
+            if (lvl?.align === 'auto')
+            {
+               dimLinesLevelCoord = (levelCoord <= 0.5) ? collectionBbox['min'+levelAxis.toUpperCase()]() : collectionBbox['max'+levelAxis.toUpperCase()]()
+            }
+            if(['min','max'].includes(lvl?.align))
+            {
+               dimLinesLevelCoord = collectionBbox[lvl.align+levelAxis.toUpperCase()]() 
+            }
+            const minDistance = lvl?.minDistance || DEFAULT_MIN_DISTANCE;
+            let dimLineOffset = lvl?.offset || DIMENSION_LINE_OFFSET_FROM_BBOX;
+            dimLineOffset = (lvl?.align === 'min' || levelCoord <= 0.5) ? dimLineOffset : dimLineOffset *-1; // flip offset direction
+
+            intersectionPointsAlongRangeAxis.forEach((v,i,arr) => 
+            {
+               if(i < arr.length -1 )
+               {
+                  const lineStartCoord = v;
+                  const lineEndCoord = arr[i+1];
+                  const distance = lineEndCoord - lineStartCoord;
+                  if(distance > minDistance)
+                  {
+                     const dimLineStartPoint = new Point(0,0,0)
+                                                   ['set'+rangeAxis.toUpperCase()](lineStartCoord)
+                                                   ['set'+levelAxis.toLocaleUpperCase()](dimLinesLevelCoord);
+
+                     const dimLineEndPoint = new Point(0,0,0)
+                                                ['set'+rangeAxis.toUpperCase()](lineEndCoord)
+                                                ['set'+levelAxis.toLocaleUpperCase()](dimLinesLevelCoord);
+
+                     // NOTE: for now we still need a dimension line to be attached to a Shape - TODO: better
+                     const dimLine = new Edge().makeLine(dimLineStartPoint,dimLineEndPoint)
+                                       .color('blue').hide()
+                                       .dimension({  
+                                          offset: dimLineOffset, 
+                                          roundDecimals: 0,
+                                       });
+
+                     this.add(dimLine.shape);
+                  }
+               }
+            })
+         })
+
+         return this;
+      }
+
+
       //// OUTPUT DATA ////
 
       /** Shape API - Turn Edges (Line, Arc, Spline etc) into discreet (straight) edges for use in THREE JS
@@ -2282,14 +2405,19 @@
          return `ShapeCollection<${this.shapes.map(s => s.toString())}>`;
       }
 
-      /** Get all edges of 2D XY Shapes in this collection */
-      _get2DXYShapeEdges():ShapeCollection
+      /** Get all edges of 2D XY Shapes in this collection 
+       *    Supply true to force all Shapes, even invisible ones!
+      */
+      _get2DXYShapeEdges(all:boolean=false):ShapeCollection
       {
+         console.log('*** _get2DXYShapeEdges');
+         console.log(all);
+
          const shapeEdges = new ShapeCollection();
 
          this.forEach(shape => 
          {
-            if (shape.is2DXY() && shape.visible())
+            if (shape.is2DXY() && (all || shape.visible()))
             {
                shapeEdges.add(shape.edges()); // NOTE: this._parent refers to main Shape of subshapes
             }
@@ -2314,9 +2442,9 @@
       /** Export Shapes that are 2D and on XY plane to SVG 
        *    All shapes will be converted to Edges
       */
-      toSvg(withAnnotations:boolean=true):string
+      toSvg(options?:toSVGOptions):string
       {
-         const shapeEdges = this._get2DXYShapeEdges();
+         const shapeEdges = this._get2DXYShapeEdges(options?.all);
          
          if (shapeEdges.length == 0){ return null;}
 
@@ -2328,9 +2456,10 @@
          })
 
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
+         const withAnnotations = (options?.annotations === false ) ? false : true; // true is default
          let bbox = shapeEdges.bbox(withAnnotations)
          
-         if (withAnnotations)
+         if (withAnnotations) // default is show annoations
          {
             const annotations = this.getAnnotations();
             if(annotations.length > 0)

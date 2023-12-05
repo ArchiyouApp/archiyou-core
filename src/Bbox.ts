@@ -129,6 +129,18 @@ export class Bbox
         return new Point(this.bounds[0], this.bounds[2], this.bounds[4]);
     }
 
+    @checkInput('MainAxis', 'auto')
+    minAtAxis(a:MainAxis)
+    {
+        return this['min'+a.toUpperCase()]();
+    }
+
+    @checkInput('MainAxis', 'auto')
+    maxAtAxis(a:MainAxis)
+    {
+        return this['max'+a.toUpperCase()]();
+    }
+
     /** Get maximum point (right,top,back) */
     max():Point
     {
