@@ -556,13 +556,12 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         if (cacheResult)
         {
             // IMPORTANT: There could be a situation where a function can return null|undefined
-            return (ShapeCollection.isShapeCollection(cacheResult) || Shape.isShape(cacheResult)) ?
-                cacheResult._copy() : // return copy of cached version to avoid changing cache version
-                cacheResult; // just return value if not a Shape or ShapeCollection (for example null)
+            // return the nullish version if so
+            return cacheResult?._copy() || cacheResult; 
         }       
         else {
             let calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
-            _setCache(cache,hash,calculatedOutput._copy()); // place a copy of the output in the cache
+            _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
             return calculatedOutput; // return real output - no cached version!
         }
         

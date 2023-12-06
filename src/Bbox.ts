@@ -427,8 +427,8 @@ export class Bbox
         return new Face().makePlaneBetween(this.min(), this.max()); // Just a simple 2D Plane on XY plane ( normal parallel in Z)
     }
 
-    /** returns a Box Shape for this Bbox */
-    box():Solid
+    /** returns a Box Shape for this Bbox if not 2D, otherwise null */
+    box():Solid|null
     {
         let boxShape = new Solid().makeBoxBetween(this.min(), this.max());
         return boxShape;

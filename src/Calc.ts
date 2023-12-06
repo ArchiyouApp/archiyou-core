@@ -17,7 +17,7 @@
 
     _danfo;
     _geom;
-    db:Db // TMP DISABLED: Db; // the virtual database with table in there
+    db:Db // the virtual database with table in there
     dbData:Object // raw outputted data 
     _metrics:{[key:string]:Metric} = {};
 
