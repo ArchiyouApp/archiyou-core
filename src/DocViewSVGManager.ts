@@ -33,20 +33,28 @@ export class DocViewSVGManager
     _svgXML:TXmlNode
     _svgToPDFTransform:SVGtoPDFtransform // save important svg to pdf information for later use
 
-    constructor(view:ContainerData)
+    constructor(view?:ContainerData)
     {
-        this._svg = view?.content?.data
-
-        if (!this._svg){ throw new Error(`DocViewSVGManager: No valid SVG data found in view with name "${view.name}"!`) }
-        else {
-            this.parse();
+        if(view)
+        {
+            const r = this.parse(view);
+            if(!r)
+            {
+                console.error(`DocViewSVGManager: No valid SVG data found in view with name "${view.name}"!`)
+            }
         }
     }
 
-    parse()
+    parse(view?:ContainerData):boolean
     {
         this.reset();
+        this._svg = (!this._svg) ? view?.content?.data : this._svg;
+        if(!this._svg)
+        {
+            return false;
+        }
         this._svgXML = txml.parse(this._svg)[0] as TXmlNode; 
+        return true;
     }
 
     reset()
@@ -154,7 +162,7 @@ export class DocViewSVGManager
 
             pathNodes.forEach( node => 
             {
-                // There are only single lines in the commands: 'M275,35 L325,35'
+                // There are only single lines in the commands: 'M4231,-1011 L4231,-1188'
                 const line = this._pathCmdToLineData(node.attributes.d);  // [x1,y1,x2,y2]
                 if(line)
                 {
@@ -176,7 +184,8 @@ export class DocViewSVGManager
         
         return linePaths;
     }
-
+    
+    /** Given a SVG path (in format M4193,-1011 L4231,-1011) for a line extract start and end coordinates  */
     _pathCmdToLineData(d:string):Array<number|number|number|number>
     {
         const m = d.match(/M([^,]+),([^,]+) L([^,]+),([^$]+)/);
@@ -387,6 +396,7 @@ export class DocViewSVGManager
             }
             else {
                 console.error(`DocViewSVGManager::_drawSVGPathToPDF: Unknown/unmapped SVG path command: "${cmd.code}"`)
+                return null;
             }
         })    
 

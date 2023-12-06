@@ -2410,9 +2410,6 @@
       */
       _get2DXYShapeEdges(all:boolean=false):ShapeCollection
       {
-         console.log('*** _get2DXYShapeEdges');
-         console.log(all);
-
          const shapeEdges = new ShapeCollection();
 
          this.forEach(shape => 

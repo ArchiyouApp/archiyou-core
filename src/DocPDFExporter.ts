@@ -506,7 +506,12 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
-        const svgEdit = new DocViewSVGManager(view);
+        const svgEdit = new DocViewSVGManager();
+        if (!svgEdit.parse(view))
+        { 
+            console.warn(`DocPDFExporter::_placeViewSVG(): No SVG data in view "${view.name}". Skipped placing that view!`);
+            return;
+        }
 
         // Transform incoming SVG Shape paths (in model space) into PDF paths in the space defined by the View Container
         const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocShapePaths(this,view,p);
