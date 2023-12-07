@@ -559,6 +559,12 @@ export class Doc
 
     //// OUTPUT ////
 
+    /** Returnd names of docs present */
+    docs():Array<string>
+    {
+        return this._docs;
+    }
+
     async toData(only:Array<string>|any=[]):Promise<{[key:string]:DocData} | undefined>
     {
         // checks
