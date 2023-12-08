@@ -102,15 +102,8 @@ export class Doc
         {
             this._ay = ay;
             this._geom = ay?.geom;
-            // TODO: calc
+            this._calc = ay?.calc;
         }
-    }
-
-    /** Set reference to Calc module */
-    // NOTE: this can not be typed because we don't allow reference from core to app scope
-    setCalc(calc:any)
-    {
-        this._calc = calc;
     }
 
     _setDefaults():Doc
