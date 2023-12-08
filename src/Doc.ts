@@ -552,7 +552,7 @@ export class Doc
 
     //// OUTPUT ////
 
-    /** Returnd names of docs present */
+    /** Return names of docs present */
     docs():Array<string>
     {
         return this._docs;
