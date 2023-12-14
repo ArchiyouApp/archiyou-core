@@ -941,8 +941,10 @@
       }
 
       /** Shape API - get combined bbox of all Shapes in Collection */
-      bbox(withAnnotations:boolean=false):Bbox
+      bbox(withAnnotations:boolean=false):Bbox|null
       {
+         if(this.length == 0) return null;
+
          let combinedBbox = this.first().bbox();
          this.shapes.forEach((shape,i) => {
             if(i > 0)

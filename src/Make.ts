@@ -204,6 +204,13 @@ export class Make
     _layout2DBoxes(o?:Layout2DOptions):ShapeCollection
     {
         this.resetStats();
+
+        if(!o?.width || !o?.height)
+        {
+            console.warn(`Make::_layout2DBoxes(Layout2DOptions): Zero or nullish width and height given: Returned empty ShapeCollection`);
+            return new ShapeCollection();
+        }
+
         o = this._checkLayoutOptions(o);
 
         let createdElems = new ShapeCollection().setName('boards'); 
@@ -344,30 +351,104 @@ export class Make
      *  starting from origin with centerline along x-axis
      *  returns ShapeCollection and puts messages inside console
     */
-    wallFrame(width:number, height: number, depth: number, studThickness: number, grid:number, openings: Array<WallOpening> ): ShapeCollection
+    wallFrame(width:number, height: number, depth: number, studThickness: number, grid:number, openings: Array<WallOpening> = [] ): ShapeCollection
     {
         const DEFAULT_GRID_DISTANCE = 610;
         const DEFAULT_STUD_THICKNESS = 38;
         const ENDING_STUDS_INSIDE = true;
+        const OPENING_WIDTH_MIN = 100;
+        const OPENING_HEIGHT_MIN = 100;
     
         grid = grid || DEFAULT_GRID_DISTANCE;
         studThickness = studThickness || DEFAULT_STUD_THICKNESS;
-        openings = openings || new Array();
 
-        const OPENING_SNAP_POSITION_DISTANCE = studThickness*2;
+        const OPENING_SNAP_POSITION_WITHIN_DISTANCE = studThickness*2; // kingstud + frame
 
         const wallDiagram = new Face().makePlaneBetween([0,0,0],[width,0,height]);
 
         const openingDiagrams = new ShapeCollection();
+        const openingFlags = []; // flags per opening - register a snap of opening to wall frame (leaving out the window frame)
+
         
-        openings.forEach( o => {
-            openingDiagrams.add( new Face().makePlaneBetween(
-                                    [o.left, 0, o.sill],
-                                    [o.left+o.width, 0, o.sill+o.height]))
-        })
+        // Openings: basic input checks
+        // NOTE: We only support one opening now
+        openings.forEach( (o,i) => 
+            {
+                const curOpeningFlags = { snapTop: false, snapBottom: false, snapLeft: false, snapRight: false };
+                openingFlags.push(curOpeningFlags);
+
+                if(typeof o.left === 'number' && o.left >= 0 && typeof o.sill === 'number' && typeof o.height === 'number' 
+                    && o.height >= OPENING_HEIGHT_MIN && typeof o.width === 'number' && o.width >= OPENING_WIDTH_MIN)
+                {
+                    // Basic horizontal tests
+                    if(o.left < studThickness)
+                    {
+                        this._ay.console.user(`Opening #${i} snapped left to start stud at ${studThickness}`);
+                        // NOTE: keep width the same
+                        o.left = studThickness;
+                        curOpeningFlags.snapLeft = true;
+                    }
+                    // total width
+                    if( o.left + o.width > width - 2*studThickness)
+                    {
+                        // First try to decrease left
+                        o.left = width - studThickness - o.width;
+                        curOpeningFlags.snapRight = true; 
+                        if(o.left < studThickness)
+                        {
+                            o.left = studThickness;
+                            curOpeningFlags.snapLeft = true;
+                            o.width = width - 2*studThickness;
+                            this._ay.console.user(`Opening #${i} width decreased to ${o.width} to fit inside wall`);
+                        }
+                        else {
+                            this._ay.console.user(`Opening #${i} left decreased to ${o.left} to fit width of ${o.width} inside wall`);
+                        }
+                    }
+                    
+                    // Basic vertical tests
+                    if(o.sill < studThickness)
+                    { 
+                        o.sill = studThickness; 
+                        this._ay.console.user(`Opening #${i} Snapped sill to minimum of ${studThickness}`);
+                        curOpeningFlags.snapBottom = true;
+                    }
+                    // Vertical checks: combined height and sill - try to keep height over sill
+                    if(o.sill + o.height > height - 2*studThickness)
+                    {
+                        let newSill = height - studThickness - o.height; // first lower sill if possible
+                        curOpeningFlags.snapTop = true;
+                        if (newSill < studThickness )
+                        { 
+                            curOpeningFlags.snapBottom = true;
+                            let newHeight = o.height - newSill + studThickness;
+                            if(newHeight >  height - studThickness)
+                            { 
+                                newHeight = height - studThickness; // height starting from sill
+                                this._ay.console.user(`Opening #${i} Snapped height to minimum of ${height - 2*studThickness}`);
+                            };
+                            o.height = newHeight;
+                            newSill = studThickness;
+                        }; 
+
+                        o.sill = newSill;
+                        this._ay.console.user(`Opening #${i} Snapped sill to ${newSill} to fit opening in height`);
+                    }
+
+                    // Now make diagram Shape for opening
+                    openingDiagrams.add( new Face().makePlaneBetween(
+                        [o.left, 0, o.sill],
+                        [o.left+o.width, 0, o.sill+o.height]))
+                    
+                }
+                else {
+                    this._ay.console.user(`Opening #${i} (width=${o.width} height=${o.height} left=${o.left} sill=${o.sill}) is not well defined! Skipped.`);
+                }
+
+            }
+        )
 
         // vertical grid
-
         const gridLines= new ShapeCollection();
         const numGridLines = Math.floor(width/grid) + 1;
         const remainingWallWidth = width - (numGridLines -1) * grid;
@@ -428,47 +509,41 @@ export class Make
 
         openingDiagrams.forEach( (o,i) => 
         {
-            
-            let checkedOpening = null;
-            // some flags
-            let openingAlignedToBottom = false;
-            let openingAlignedToTop = false;
-
+            // some flags in openingFlags[i]
+            const curOpeningFlags = openingFlags[i];
             const openingStart = o.bbox().min()._toVertex();
 
-            if(wallDiagram.contains(o)) // validate opening first
-            {
-                checkedOpening = o;
-            }
-            else {
-                this._ay.console.user(`Opening #${i} is not within the wall: Skipped!`);
-            }
+            // Modify openingDiagrams (flat faces) in place if needed
+            let checkedOpening = o;
 
             // continue if opening is valid
             if(checkedOpening)
-            {
-                // openings need to fit in basic outer frame
-                if(checkedOpening.min().z < studThickness*2)
-                { 
-                    checkedOpening.move(0,0,studThickness-checkedOpening.min().z)
-                    this._ay.console.user(`Snapped bottom Opening #${i} to minimum height of ${studThickness}`);
-                    openingAlignedToBottom = true;
-                }
-                if(checkedOpening.max().z > height-studThickness*2)
-                {
-                    checkedOpening.move(0,0,height-studThickness-checkedOpening.max().z)
-                    this._ay.console.user(`Snapped top of Opening #${i} to maxium height of ${studThickness}`);
-                    openingAlignedToTop = true;
-                }
-
+            {   
+                // Horizontal checks: check position versus studs
                 // snap start position to match with nearest stud
-                const nearestStartGridLine = gridLines.nearest(openingStart);
-                const d1 =  nearestStartGridLine.distance(openingStart)
-                if(d1 < OPENING_SNAP_POSITION_DISTANCE)
+                if (curOpeningFlags.snapLeft)
                 {
-                    this._ay.console.user(`Snapped Opening #${i} on a stud at distance ${d1}`);
-                    checkedOpening.moveToX(nearestStartGridLine.center().x, 'left')
-                        .move(studThickness * 1.5); // margin for opening specific frame
+                    // no left frame for opening - keep it like this
+                }
+                else {
+                    const nearestStartGridLine = gridLines.nearest(openingStart);
+                    const d1 =  nearestStartGridLine.distance(openingStart)
+                    const snapTestWithinDistance = (nearestStartGridLine === gridLines.first()) ? OPENING_SNAP_POSITION_WITHIN_DISTANCE+studThickness : OPENING_SNAP_POSITION_WITHIN_DISTANCE
+                    if(d1 < snapTestWithinDistance) // If within distance snap to given offset aligned to primary stud centerline
+                    {
+                        const xOffset = (nearestStartGridLine === gridLines.first()) ? 2 : 1.5;
+                        const moveToX = nearestStartGridLine.center().x + studThickness * xOffset;
+                        checkedOpening.moveToX(moveToX, 'left')
+                        this._ay.console.user(`Snapped Opening #${i} on a stud at centerline ${nearestStartGridLine.center().x} at distance ${d1}`);
+                        // Check if the opening still fits
+                        if (checkedOpening.bbox().maxX() > width - studThickness)
+                        {
+                            // Make it smaller to have it fit and snap to end of wall
+                            checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().setX(width - studThickness))
+                            curOpeningFlags.snapRight = true;
+                            this._ay.console.user(`Opening #${i} was decreased in width to ${checkedOpening.bbox().width()} to fit the end of the wall!`);
+                        }   
+                    }
                 }
                 // Snapping the width of an opening to maintain grid and avoid weird positioning
                 // But width of opening can not change from specified by parameters
@@ -476,35 +551,53 @@ export class Make
 
                 if(nextGridLine)
                 {
-                    // opening is too close to next primary stud to fit in king stud 
-                    // (but is not at same position for king stud to overlap primary one)
-                    // we enlarge the opening to have king stud at position of primary stud
-                    const distanceToNextStud = checkedOpening.distance(nextGridLine) - 0.5 * studThickness
-                    if (distanceToNextStud > studThickness && distanceToNextStud < 2*studThickness  )
+                    if(curOpeningFlags.snapRight)
                     {
-                        checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().move(distanceToNextStud-studThickness))
-                        this._ay.console.user(`Enlarged opening #${i} by ${distanceToNextStud-studThickness}mm to fit to grid studs!`);
+                        // snapped to right of wall. Do nothing
                     }
-                    // opening is too close to next primary stud to fit jack and king stud in
-                    // enlarge opening so jack studs align to grid line of next primary stud
-                    // king stud of opening is then placed off-grid
-                    else if (distanceToNextStud > 0 && distanceToNextStud < studThickness  )
+                    else
                     {
-                        checkedOpening = new Face().makePlaneBetween(
-                                        checkedOpening.min(), 
-                                        checkedOpening.max().move(distanceToNextStud))
-                        this._ay.console.user(`Enlarged opening #${i} by ${distanceToNextStud}mm. Now end jack stud aligns to grid`);
-                    }
-                    else {
-                        // when opening is overlapping with primary stud (so no space for jack stud)
-                        // enlarge opening so last cripple can be fitted in and aligns with grid
-                        const closeGridLine = gridLines.find( l => Math.abs(l.center().x - checkedOpening.max().x) < studThickness*0.5);
-                        //closeGridLine.moved(0,0,100).color('red')
-                        if(closeGridLine)
+                        // opening is too close to next primary stud to fit in king stud 
+                        // (but is not at same position for king stud to overlap primary one)
+                        // we enlarge the opening to have king stud at position of primary stud
+                        const distanceToNextStud = checkedOpening.distance(nextGridLine) - 0.5 * studThickness;
+                        const checkDistance = (gridLines.last() === nextGridLine) ? 2.5*studThickness : 2*studThickness;
+                        if (distanceToNextStud > studThickness && distanceToNextStud < checkDistance )
                         {
-                            const dx = Math.abs((closeGridLine.center().x + studThickness * 0.5) - checkedOpening.max().x);
-                            checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().move(dx))
-                            this._ay.console.user(`Enlarged opening #${i} by ${dx}mm. Now last cripple aligns with grid`);
+                            const newOpeningMax = checkedOpening.max().move(distanceToNextStud-studThickness);
+                            if (newOpeningMax.x > width - 2*studThickness) // enlarge is limited to right side of wall
+                            {   
+                                newOpeningMax.x = width - 2*studThickness;
+                                curOpeningFlags.snapRight = true; // right snap mode drops frame
+                                this._ay.console.user(`Enlarged opening #${i} to fit to end of wall`);
+                            }
+                            else {
+                                this._ay.console.user(`Enlarged opening #${i} by ${distanceToNextStud-studThickness} units to fit to grid studs!`);
+                            }
+                            checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().move(distanceToNextStud-studThickness))
+                            
+                        }
+                        // opening is too close to next primary stud to fit jack and king stud in
+                        // enlarge opening so jack studs align to grid line of next primary stud
+                        // king stud of opening is then placed off-grid
+                        else if (distanceToNextStud > 0 && distanceToNextStud < studThickness  )
+                        {
+                            checkedOpening = new Face().makePlaneBetween(
+                                            checkedOpening.min(), 
+                                            checkedOpening.max().move(distanceToNextStud))
+                            this._ay.console.user(`Enlarged opening #${i} by ${distanceToNextStud}mm. Now end jack stud aligns to grid`);
+                        }
+                        else {
+                            // when opening is overlapping with primary stud (so no space for jack stud)
+                            // enlarge opening so last cripple can be fitted in and aligns with grid
+                            const closeGridLine = gridLines.find( l => Math.abs(l.center().x - checkedOpening.max().x) < studThickness*0.5);
+                            //closeGridLine.moved(0,0,100).color('red')
+                            if(closeGridLine)
+                            {
+                                const dx = Math.abs((closeGridLine.center().x + studThickness * 0.5) - checkedOpening.max().x);
+                                checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().move(dx))
+                                this._ay.console.user(`Enlarged opening #${i} by ${dx} units Now last cripple aligns with grid`);
+                            }
                         }
                     }
                 }
@@ -516,17 +609,22 @@ export class Make
                                             ._offsetted(studThickness-1) // a bit smaller to avoid accuracy problems
                                             ._thickened(depth*2)
 
-                primaryStuds.forEach( (stud,s) => {
+                primaryStuds.forEach( (stud,studIndex) => 
+                {
                     // evaluate overlapping studs to make cripples top and bottom
-                    if(stud.overlapPerc(openingTestBuffer) > 0.02) // use overlapPerc for robustness
+                    // don't cut first or last stud
+                    if(studIndex !== 0 && studIndex !== primaryStuds.length - 1 && stud.overlapPerc(openingTestBuffer) > 0.02) // use overlapPerc for robustness
                     {
                         const splitStuds = new ShapeCollection(stud._splitted(openingTestBuffer, true)); // force ShapeCollection
                         if (splitStuds.length >= 1)
                         { 
-                            splitStuds.sort((a,b) => b.center().z - a.center().z); // order in z-axis
-                            crippleStudsBottom.add(splitStuds[1]);
-                            crippleStudsTop.add(splitStuds[0]);
-
+                            // check if cripples top and bottom are made
+                            const bottomCripple = splitStuds.filter(s => s.center().z < checkedOpening.center().z)
+                            const topCripple = splitStuds.filter(s => s.center().z > checkedOpening.center().z)
+                            
+                            if(bottomCripple){ crippleStudsBottom.add(bottomCripple); }
+                            if(topCripple){ crippleStudsTop.add(topCripple); }
+                            
                             removedStuds.add(stud);
                         }
                         else {
@@ -547,47 +645,86 @@ export class Make
                             )
                             .moveTo(openingTestBuffer.center())
 
-                // Don't add frame top and bottom if they align (for example with doors)
-                if(openingAlignedToBottom)
+                // Don't add frame left, top and bottom or right if opening was snapped
+                const includeFrameParts = [];
+                for (const [flag,val] of Object.entries(curOpeningFlags))
                 {
-                    openingFrame = new ShapeCollection(openingFrame.filter(s => s.name !== 'frameBottom'))
+                    const FLAG_FALSE_TO_PART = { snapLeft: 'frameLeft', snapRight: 'frameRight', snapBottom: 'frameBottom', snapTop: 'frameTop' }
+                    if( FLAG_FALSE_TO_PART[flag] && val === false)
+                    {
+                        includeFrameParts.push(FLAG_FALSE_TO_PART[flag]);
+                    }
                 }
-                if(openingAlignedToTop)
-                {
-                    openingFrame = new ShapeCollection(openingFrame.filter(s => s.name !== 'frameTop'));
-                }
+
+                openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name)));
 
                 openingFramesHorizontals.add(openingFrame.filter(s => s.name === 'frameTop' || s.name === 'frameBottom'))
                 openingFramesVerticals.add(openingFrame.filter(s => s.name === 'frameLeft' || s.name === 'frameRight'))
 
                 // make king and jack studs for current opening
                 const openingFrameBbox = openingFrame.bbox(); // avoid recalculating
+                const leftSnapOffset = (curOpeningFlags.snapLeft) ? studThickness : 0;
+                const rightSnapOffset = (curOpeningFlags.snapRight) ? studThickness : 0;
 
-                const openingJackLeftBottom = new Solid().makeBoxBetween(
+                if(!curOpeningFlags.snapBottom)
+                {
+                    const openingJackLeftBottom = new Solid().makeBoxBetween(
                                             openingFrameBbox.min(), 
                                             [openingFrameBbox.min().x + studThickness,depth/2, studThickness]) 
-                const openingJackRightBottom = openingJackLeftBottom._copy().move(
-                                            openingBufferBbox.width()-studThickness)
-                const openingJackLeftTop = new Solid().makeBoxBetween(openingFrameBbox.min().moveZ(openingFrameBbox.height()), 
-                                            [openingFrameBbox.min().x+studThickness,
-                                                depth/2, height - studThickness]) 
-                const openingJackRightTop = openingJackLeftTop._copy().move(
-                                            openingBufferBbox.width()-studThickness)
-                const openingKingStudLeft = stud._copy().align(
-                                            openingJackLeftTop,
-                                            'toprightfront',
-                                            'topleftfront'
-                                        )
-                // remove primary stud that overlaps king stud (when snapping is on this is cleanup automatically)
-                const overlappingPrimaryStud = primaryStuds.filter(s => s.overlapPerc(openingKingStudLeft) > 0.02)
-                if(overlappingPrimaryStud){ removedStuds.add(overlappingPrimaryStud); }
+                                            .moveX(leftSnapOffset);
 
-                const openingKingStudRight = openingKingStudLeft._copy().move(openingBufferBbox.width()+studThickness);
-                const overlappingPrimaryStudRight = primaryStuds.filter(s => s.overlapPerc(openingKingStudRight) > 0.02)
-                if(overlappingPrimaryStudRight){ removedStuds.add(overlappingPrimaryStudRight); }
+                    const openingJackRightBottom = openingJackLeftBottom._copy().move(
+                                    openingBufferBbox.width()-studThickness-leftSnapOffset-rightSnapOffset)
+                    openingJackStuds.add(openingJackLeftBottom,openingJackRightBottom)
+                }
 
-                openingKingStuds.add(openingKingStudLeft, openingKingStudRight);
-                openingJackStuds.add(openingJackLeftBottom,openingJackRightBottom, openingJackLeftTop, openingJackRightTop );
+                if(!curOpeningFlags.snapTop)
+                {
+                    const openingJackLeftTop = new Solid().makeBoxBetween(openingFrameBbox.min().moveZ(openingFrameBbox.height()), 
+                                                [openingFrameBbox.min().x+studThickness,
+                                                    depth/2, height - studThickness]) 
+                                                .moveX(leftSnapOffset);
+
+                    const openingJackRightTop = openingJackLeftTop._copy()
+                                                .move(openingBufferBbox.width()-studThickness-leftSnapOffset-rightSnapOffset)
+
+                    openingJackStuds.add(openingJackLeftTop, openingJackRightTop);
+                }
+
+                if(!curOpeningFlags.snapLeft)
+                {
+                    const openingKingStudLeft = stud._copy().align(
+                                                new Vertex(openingFrameBbox.minX(), 0, studThickness),
+                                                'bottomrightcenter',
+                                                'center'
+                                            )
+                     // remove primary stud that overlaps king stud (when snapping is on this is cleanup automatically)
+                    const overlappingPrimaryStud = primaryStuds.filter(s => s.overlapPerc(openingKingStudLeft) > 0.02)
+                    if(overlappingPrimaryStud){ removedStuds.add(overlappingPrimaryStud); }
+                    openingKingStuds.add(openingKingStudLeft);
+                }
+                else {
+                    // subtract horizontals with primary left stud
+                    openingFramesHorizontals.forEach(s => s.subtract(primaryStuds.first()))
+                }
+                
+                if(!curOpeningFlags.snapRight)
+                {
+                    const openingKingStudRight = stud._copy().align(
+                            new Vertex(openingFrameBbox.maxX(), 0, studThickness),
+                            'bottomleftcenter',
+                            'center'
+                        )
+                    const overlappingPrimaryStudRight = primaryStuds.filter(s => s.overlapPerc(openingKingStudRight) > 0.02)
+                    if(overlappingPrimaryStudRight){ removedStuds.add(overlappingPrimaryStudRight); }
+                    openingKingStuds.add(openingKingStudRight);
+                }
+                else {
+                    // subtract horizontals with primary right stud
+                    openingFramesHorizontals.forEach(s => s.subtract(primaryStuds.last()))
+                }
+
+                
                     
             }
             
