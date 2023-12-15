@@ -1833,9 +1833,7 @@ export class Shape
             for (let c = 0; c < vertices.length; c++)
             {
                 let v1 = vertices[c];
-                
                 let vertexIsPresent = otherVertices.find( v => v1.equals(v as Vertex)) != null
-
                 if (!vertexIsPresent)
                 {
                     return false;
@@ -2100,8 +2098,9 @@ export class Shape
     /* Private Subtract Shapes from this Shape and return a new Shape */
     @protectOC('')
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    _subtracted(others:AnyShapeOrCollection):AnyShape
+    _subtracted(others:AnyShapeOrCollection):AnyShapeOrCollection
     {
+        // IMPORTANT: subtract can yield multiple Shapes in a ShapeCollection
         let cutShapesCollection:AnyShapeCollection = others as ShapeCollection; // auto converted
 
         // Hack a little height for operant Faces
@@ -2109,7 +2108,8 @@ export class Shape
         
         let result = this._ocShape;
         // subtract every Shape from the main and update the result
-        cutShapesCollection.forEach(shape => {
+        cutShapesCollection.forEach(shape => 
+        {
 
             // protect against weird crashed of OC under heavy load
             let ocCutter = new this._oc.BRepAlgoAPI_Cut_3(result, shape._ocShape,  new this._oc.Message_ProgressRange_1());
@@ -2138,14 +2138,14 @@ export class Shape
     /* Subtract Shapes from this Shape and return a new Shape */
     @addResultShapesToScene
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    subtracted(others:AnyShapeOrCollection):AnyShape
+    subtracted(others:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._subtracted(others);
     }
 
     /* Subtract Shapes from this Shape and update current Shape */
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    subtract(others:AnyShapeOrCollection, removeOthers=false):AnyShape
+    subtract(others:AnyShapeOrCollection, removeOthers=false):AnyShapeOrCollection
     {
         let newShape = this._subtracted(others);
         

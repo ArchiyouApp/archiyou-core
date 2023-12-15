@@ -1454,6 +1454,12 @@
          }
       }
 
+      /** Array API */
+      includes(s:AnyShapeOrCollection):boolean
+      {
+         return this.has(s);
+      }
+
       /** Check if this Collection has a Shape of a given type */
       @checkInput('ShapeType', 'auto')
       hasType(type:ShapeType):boolean
@@ -1737,10 +1743,16 @@
          return newColl;
       }
 
-      /** Test is the collections are the same */
-      @checkInput('AnyShapeCollection', 'auto')
-      equals(other:ShapeCollection):boolean
+      /** Test if the collections are the same */
+      @checkInput('AnyShapeOrCollection', 'auto')
+      equals(other:AnyShapeOrCollection):boolean
       {
+         if(!ShapeCollection.isShapeCollection(other))
+         {
+            console.warn(`ShapeCollection::equals(): Other operant is a Shape. Returned false`)
+            return false;
+         }
+
          if (this.count() != other.count())
          {
             return false;
@@ -1748,7 +1760,7 @@
          else 
          {
             return this.every( shape => {
-               return other.find(otherShape => otherShape.equals(shape))
+               return new ShapeCollection(other).find(otherShape => otherShape.equals(shape))
             })
          }
       }
@@ -1792,7 +1804,11 @@
       @checkInput('AnyShapeOrCollection', 'auto')
       _subtracted(other:AnyShapeOrCollection):ShapeCollection
       {
-         let newShapes = new ShapeCollection();
+         const newShapes = new ShapeCollection();
+         /* When other is ShapeCollection we need to keep track of what Shapes 
+            were subtracted by any operant Shape : These will not be part resulting collection
+         */
+         const subtractedShapes = new ShapeCollection();  
          this.shapes.forEach( shape =>
             {
                if (isAnyShape(other))
@@ -1802,12 +1818,22 @@
                else { // iterate Shape collection
                   other.forEach(otherShape =>
                   {
-                     newShapes.add(shape._subtracted(otherShape));
+                     const subtractedShape = shape._subtracted(otherShape)
+                     // There was an alteration to a Shape in Collection - either generating a ShapeCollection or a other Shape
+                     if(ShapeCollection.isShapeCollection(subtractedShape) || !shape.equals(subtractedShape as Shape)) // second term will not be evaluated when ShapeCollection
+                     {
+                        newShapes.add(subtractedShape);
+                        subtractedShapes.add(shape); // keep track of it, to exclude it from the results
+                     }
+                     else {
+                        // add original shape (to keep data like names)
+                        newShapes.add(shape);
+                     }
                   })
                }
             })
 
-         return newShapes;
+         return new ShapeCollection(newShapes.filter(s => !subtractedShapes.includes(s)));
       }
 
       /** Subtract Shape or ShapeCollection from current ShapeCollection and return new ShapeCollection */

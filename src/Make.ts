@@ -5,7 +5,7 @@
  * 
  */
 
-import { ConsoleMessage, ArchiyouApp, Point, Vector, Vertex, Edge, Face, Solid, ShapeCollection, LayoutOptions } from './internal' // classes
+import { ConsoleMessage, ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, ShapeCollection, LayoutOptions } from './internal' // classes
 import { Table } from './internal'; 
 import { PointLike } from './internal' // types
 
@@ -495,6 +495,22 @@ export class Make
             ENDING_STUDS_INSIDE ? endStud.move(-studThickness/2) : endStud;
             primaryStuds.add(endStud)
         }
+
+        // Insulation
+        let insulation = new ShapeCollection();
+        primaryStuds.forEach((stud,i) => 
+        {
+            if(i < primaryStuds.length - 1)
+            {
+                const nextStud = primaryStuds.at(i+1);
+                insulation.add(
+                    new Solid().makeBoxBetween(
+                        stud.max(),
+                        nextStud.min())
+                )
+            }
+        })
+
         
 
         // Openings: Validate openings and give feedback for user when needed
@@ -503,7 +519,7 @@ export class Make
         const crippleStudsTop = new ShapeCollection(); // cut studs
         const crippleStudsBottom = new ShapeCollection();
         const openingFramesHorizontals = new ShapeCollection(); // add resulting frames here
-        const openingFramesVerticals = new ShapeCollection(); // add resulting frames here
+        let openingFramesVerticals = new ShapeCollection(); // add resulting frames here
         const openingKingStuds = new ShapeCollection();
         const openingJackStuds = new ShapeCollection();
 
@@ -657,9 +673,11 @@ export class Make
                 }
 
                 openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name)));
-
+                
                 openingFramesHorizontals.add(openingFrame.filter(s => s.name === 'frameTop' || s.name === 'frameBottom'))
                 openingFramesVerticals.add(openingFrame.filter(s => s.name === 'frameLeft' || s.name === 'frameRight'))
+                // NOTE: _subtract does not take over data in original ShapeCollection like groups or names
+                openingFramesVerticals = openingFramesVerticals._subtracted(plates); // correct vertical frames by topplates to be sure
 
                 // make king and jack studs for current opening
                 const openingFrameBbox = openingFrame.bbox(); // avoid recalculating
@@ -691,6 +709,7 @@ export class Make
                     openingJackStuds.add(openingJackLeftTop, openingJackRightTop);
                 }
 
+                // King studs left
                 if(!curOpeningFlags.snapLeft)
                 {
                     const openingKingStudLeft = stud._copy().align(
@@ -708,15 +727,17 @@ export class Make
                     openingFramesHorizontals.forEach(s => s.subtract(primaryStuds.first()))
                 }
                 
+                // King stud right
                 if(!curOpeningFlags.snapRight)
                 {
-                    const openingKingStudRight = stud._copy().align(
+                    let openingKingStudRight = stud._copy().align(
                             new Vertex(openingFrameBbox.maxX(), 0, studThickness),
                             'bottomleftcenter',
                             'center'
                         )
                     const overlappingPrimaryStudRight = primaryStuds.filter(s => s.overlapPerc(openingKingStudRight) > 0.02)
                     if(overlappingPrimaryStudRight){ removedStuds.add(overlappingPrimaryStudRight); }
+
                     openingKingStuds.add(openingKingStudRight);
                 }
                 else {
@@ -724,8 +745,25 @@ export class Make
                     openingFramesHorizontals.forEach(s => s.subtract(primaryStuds.last()))
                 }
 
-                
-                    
+                // Clean insulation around frame
+                insulation = insulation._subtracted(openingTestBuffer);
+
+                const leftSnapOffet = (curOpeningFlags.snapLeft) ? studThickness : 0;
+                const rightSnapOffet = (curOpeningFlags.snapRight) ? -studThickness : 0;
+
+                insulation = insulation._subtracted(
+                        new ShapeCollection(
+                            // king/jack studs combination: left
+                            new Solid().makeBoxBetween(
+                                [checkedOpening.min().x, depth/2*1.1, 0], // make it bigger along wall frame (there is no insulation there anyway)
+                                [checkedOpening.min().x - 2*studThickness, -depth/2*1.1, height]
+                                ).moveX(leftSnapOffet),
+                            // right
+                            new Solid().makeBoxBetween(
+                                [checkedOpening.max().x, depth/2*1.1, 0], 
+                                [checkedOpening.max().x + 2*studThickness, -depth/2*1.1, height]
+                            ).moveX(rightSnapOffet)
+                        ))
             }
             
         })
@@ -748,6 +786,7 @@ export class Make
                 .addGroup('openingKingStuds', openingKingStuds.color('brown'))
                 .addGroup('openingJackStuds', openingJackStuds.color('brown'))
                 .addGroup('openingDiagrams', checkedOpenings.color('grey'))
+                .addGroup('insulation', insulation.color('#222'))
                 .addToScene(); // NOTE: add to scene by default? 
                 // Shall we introduce some kind of reasoning here (for example makeFrame is not added)
     }
