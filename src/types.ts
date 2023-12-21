@@ -145,6 +145,58 @@ export interface ArchiyouAppInfo
     hasDocs?:boolean // if there are docs part of the script
 }
 
+//// PARAMS ////
+
+// NOTE: We put these in the core library because of the ParamManager 
+
+export type ParamType = 'number'|'text'|'options'|'boolean'|'list'|'object' 
+
+export interface Param
+{ 
+    id?: string
+    type : ParamType
+    name : string
+    visible:boolean // Param is visible or not
+    label: string // publically visible name
+    default : any // Default value: can be string or number
+    value? : any // Can be string or number
+    values? : Array<any> // active values in list
+    start? : number // for ParamInputNumber
+    end? : number // for ParamInputNumber
+    step? : number // for ParamInputNumber
+    elemType?: ParamType|string // either basic ParamType or object (and supply schema)
+    schema?: ParamObjectSchema // object definition
+    options?: Array<string> // for ParamInputOptions
+    length?: number // for ParamInputText
+    _behaviour?: (curParam:Param, params:Array<Param>) => any // logic attached to param, triggerend anytime any param changes
+    units?:ModelUnits
+}
+
+/** Extentions of Param for Publishing */
+export interface PublishParam extends Omit<Param, '_behaviour'>
+{
+    // NOTE: need to nullify private attributes (for example behavious)
+    enabled:boolean // enabled or not
+    order?:number // integer, lower is in front
+    iterable:boolean // for determine param variants
+    description?:string // added for the user
+    _behaviour?:string // stringified function for save to db etc
+}
+
+export interface ParamBehaviour
+{
+    target: 'params' // TODO
+    args: Array<any>
+    targetParam: string // self or name
+    targetParamProperty: string
+    targetParamPropertyValue: any
+}
+
+/** A way to define nested ParamObjects, either user in a single entry or list
+ *  NOTE: For now we don't allow nested structures (so no ParamObj containing other ParamObj field)
+*/
+export type ParamObjectSchema = Record<string,Param> // TODO: use something like base Param here
+
 /** All possible attributes for Shapes */
 // TODO: Can we allow user attributes??
 export interface ShapeAttributes

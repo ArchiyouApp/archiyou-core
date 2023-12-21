@@ -1815,19 +1815,27 @@
                {
                   newShapes.add(shape._subtracted(other));
                }
-               else { // iterate Shape collection
+               else if (ShapeCollection.isShapeCollection(other)) { // iterate Shape collection
                   other.forEach(otherShape =>
                   {
-                     const subtractedShape = shape._subtracted(otherShape)
-                     // There was an alteration to a Shape in Collection - either generating a ShapeCollection or a other Shape
-                     if(ShapeCollection.isShapeCollection(subtractedShape) || !shape.equals(subtractedShape as Shape)) // second term will not be evaluated when ShapeCollection
+                     if(Shape.isShape(otherShape))
                      {
-                        newShapes.add(subtractedShape);
-                        subtractedShapes.add(shape); // keep track of it, to exclude it from the results
-                     }
-                     else {
-                        // add original shape (to keep data like names)
-                        newShapes.add(shape);
+                        const subtractedShape = shape._subtracted(otherShape);
+
+                        if(!subtractedShape)
+                        {
+                           // No resulting Shape, just skip
+                        }
+                        // There was an alteration to a Shape in Collection - either generating a ShapeCollection or a other Shape
+                        else if(ShapeCollection.isShapeCollection(subtractedShape) || !shape.equals(subtractedShape as Shape)) // second term will not be evaluated when ShapeCollection
+                        {
+                           newShapes.add(subtractedShape);
+                           subtractedShapes.add(shape); // keep track of it, to exclude it from the results
+                        }
+                        else {
+                           // add original shape (to keep data like names)
+                           newShapes.add(shape);
+                        }
                      }
                   })
                }

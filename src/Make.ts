@@ -678,6 +678,7 @@ export class Make
                 openingFramesVerticals.add(openingFrame.filter(s => s.name === 'frameLeft' || s.name === 'frameRight'))
                 // NOTE: _subtract does not take over data in original ShapeCollection like groups or names
                 openingFramesVerticals = openingFramesVerticals._subtracted(plates); // correct vertical frames by topplates to be sure
+                
 
                 // make king and jack studs for current opening
                 const openingFrameBbox = openingFrame.bbox(); // avoid recalculating
@@ -747,7 +748,6 @@ export class Make
 
                 // Clean insulation around frame
                 insulation = insulation._subtracted(openingTestBuffer);
-
                 const leftSnapOffet = (curOpeningFlags.snapLeft) ? studThickness : 0;
                 const rightSnapOffet = (curOpeningFlags.snapRight) ? -studThickness : 0;
 
