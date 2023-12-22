@@ -154,8 +154,8 @@ export type ParamType = 'number'|'text'|'options'|'boolean'|'list'|'object'
 export interface Param
 { 
     id?: string
-    type : ParamType
-    name : string
+    type: ParamType
+    name: string
     visible:boolean // Param is visible or not
     label: string // publically visible name
     default : any // Default value: can be string or number
@@ -168,19 +168,19 @@ export interface Param
     schema?: ParamObjectSchema // object definition
     options?: Array<string> // for ParamInputOptions
     length?: number // for ParamInputText
-    _behaviour?: (curParam:Param, params:Array<Param>) => any // logic attached to param, triggerend anytime any param changes
+    _behaviours?: Record<string, (curParam:Param, params:Record<string,Param>) => any> // logic attached to param, triggerend anytime any param changes
     units?:ModelUnits
 }
 
 /** Extentions of Param for Publishing */
-export interface PublishParam extends Omit<Param, '_behaviour'>
+export interface PublishParam extends Omit<Param, '_behaviours'>
 {
     // NOTE: need to nullify private attributes (for example behavious)
-    enabled:boolean // enabled or not
+    enabled?:boolean // enabled or not
     order?:number // integer, lower is in front
-    iterable:boolean // for determine param variants
+    iterable?:boolean // for determine param variants
     description?:string // added for the user
-    _behaviour?:string // stringified function for save to db etc
+    _behaviours?: Record<string,string> // stringified function for save to db etc
 }
 
 export interface ParamBehaviour
