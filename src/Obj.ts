@@ -15,7 +15,7 @@ import { checkInput } from './decorators'; // decorators - use direct import to 
 import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
 import { MeshShape, MeshShapeBuffer } from './internal' // ExportModels.MeshShape
 import { SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle } from './internal' // InternalModels
-import { isNumeric, ColorHexToInt } from './internal'
+import { isNumeric, colorHexToInt } from './internal'
 import { PointLike, isPointLike, AnyShapeOrCollection, MeshingQualitySettings } from './internal';
 
 
@@ -142,7 +142,7 @@ export class Obj
             }
             else {
                 // convert string hex to number
-                return ColorHexToInt(foundColor);
+                return colorHexToInt(foundColor);
             }
             
         }

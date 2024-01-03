@@ -107,11 +107,16 @@ export function rangeArray(min:number,max:number):Array<number>
     return Array.from(Array(max + 1).keys()).slice(min, max + 1)
 }
 
-export function ColorHexToInt(rrggbb):number
+export function colorHexToInt(rrggbb:string):number
 {
     rrggbb = rrggbb.replace('#', ''); // remove # if present
     let bbggrr = rrggbb.substr(4, 2) + rrggbb.substr(2, 2) + rrggbb.substr(0, 2);
     return parseInt(bbggrr, 16);
+}
+
+export function colorIntToHex(c?:number):string
+{
+    return (c ?? true ) ? null : "#" + c.toString(16).padStart(6, '0');
 }
 
 //// working with Coordinates and Points ////
