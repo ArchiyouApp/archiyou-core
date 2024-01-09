@@ -107,6 +107,9 @@ export function rangeArray(min:number,max:number):Array<number>
     return Array.from(Array(max + 1).keys()).slice(min, max + 1)
 }
 
+/** String hex (#FF0000) to int 
+ *  WARNING: This seems to generate wrong numbers
+*/
 export function colorHexToInt(rrggbb:string):number
 {
     rrggbb = rrggbb.replace('#', ''); // remove # if present
