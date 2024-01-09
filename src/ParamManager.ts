@@ -86,7 +86,7 @@ export class ParamManagerEntryController
     */
 
     /** Set visibility to true */
-    show(test:(curParam:Param, params?:Array<Param>) => any )
+    show(test:(curParam:Param, params?:Record<string, Param>) => any )
     {
         this.target._behaviours = this.target._behaviours ?? {};
         this.target._behaviours['visible'] = test;

@@ -258,7 +258,7 @@ export interface StatementError
 
 export interface BaseStyle 
 {
-    color?: number, 
+    color?: number|string,  // color int or string
     opacity? : number,
     size?: number,
     dashed?: boolean

@@ -142,7 +142,7 @@ export class Obj
             }
             else {
                 // convert string hex to number
-                return colorHexToInt(foundColor);
+                return colorHexToInt(foundColor as string);
             }
             
         }
