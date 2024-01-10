@@ -280,7 +280,7 @@ export class Shape
         return this.center();
     }
 
-    /** Return this Shape wrapped with a Obj instance for adding it to the scene */
+    /** Attach obj to Shape for adding it to the scene and styling */
     object(forceNew:boolean=false):Obj
     {
         // don't make Obj if already exists
@@ -288,9 +288,8 @@ export class Shape
         {
             return this._obj;
         }
-        // wrap in Obj and return
         let obj = new Obj(this);
-        this._obj = obj;
+        this._obj = obj; // set Obj on Shape
         return this._obj;
     }
 
@@ -313,6 +312,7 @@ export class Shape
     @checkInput(Number, 'auto')
     strokeWidth(n:number):this
     {
+        console.log('STROKE WIDTH');
         this.object().strokeWidth(n);
         return this;
     }

@@ -82,41 +82,29 @@ export class Obj
     /** Get or set style
      *  NOTE: We don't use get/setters because we want to be able to return Obj for setter
      */
-    style(newStyle:any, extend:boolean=false):Obj
+    style(newStyle:BaseStyle|ObjStyle):Obj
     {
-        // We can either completely renew or extend
-        if(this._style && extend) // extend existing style
-        {
-            const appendStyle = { ...this._style }; // set base as current
-            // then override from incoming newStyle
-            for (const [elemType, style] of Object.entries(newStyle))
-            {
-                appendStyle[elemType] = { ...appendStyle[elemType], ...newStyle[elemType] }
-            }
-            newStyle = appendStyle
-        }
+        console.log('**** STYLE ****')
         this._style  = this._compileStyle(newStyle);
         return this;
     }
 
-    /** set Color for Obj/Layer. Shortcut of style
-     *  Append style by default. Use style() to reset
-     */
-    color(newColor:string|number|Array<number>, extend:boolean = true):Obj
+    /** set Color for Obj/Layer. Shortcut of style */
+    color(newColor:string|number|Array<number>):Obj
     {
-        return this.style( { color: newColor }, true);
+        return this.style( { color: newColor } as BaseStyle);
     }
 
     /** set Lines to dashed (keeps existing styling) */
     dashed():Obj
     {
-        return this.style({ line: { dashed: true }}, true);
+        return this.style({ line: { dashed: true }} as ObjStyle );
     }
 
     /** set strokeWidth (keeps existing styling) */
     strokeWidth(n:number):Obj
     {
-        return this.style({ line: { width: n }}, true);
+        return this.style({ line: { width: n }} as ObjStyle );
     }
 
     /** Get current Obj color or the one that is defined by one of the parents up the hierarchy */
@@ -164,7 +152,7 @@ export class Obj
     {
         let newObjStyle = { ...this.DEFAULT_OBJ_STYLE, ...(this._style || {}) };
      
-        // given newStyle is a full/fragmented config ObjStyle in format { line: { BaseStyle }, point : ..., fill: ... }
+        // given newStyle is a config ObjStyle in format { line: { BaseStyle }, point : ..., fill: ... }
         if( isObjStyle(newStyle))
         {
             // newStyle can have fragmented form: { line : dashed }: Make sure we keep original structure

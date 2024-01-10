@@ -261,7 +261,8 @@ export interface BaseStyle
     color?: number|string,  // color int or string
     opacity? : number,
     size?: number,
-    dashed?: boolean
+    dashed?: boolean // line dashed
+    width?: number // line width
 }
 
 export interface ObjStyle 
