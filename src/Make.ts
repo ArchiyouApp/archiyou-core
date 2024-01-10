@@ -674,8 +674,8 @@ export class Make
 
                 openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name)));
                 
-                openingFramesHorizontals.add(openingFrame.filter(s => s.name === 'frameTop' || s.name === 'frameBottom'))
-                openingFramesVerticals.add(openingFrame.filter(s => s.name === 'frameLeft' || s.name === 'frameRight'))
+                openingFramesHorizontals.add(openingFrame.filter(s => s.name() === 'frameTop' || s.name() === 'frameBottom'))
+                openingFramesVerticals.add(openingFrame.filter(s => s.name() === 'frameLeft' || s.name() === 'frameRight'))
                 // NOTE: _subtract does not take over data in original ShapeCollection like groups or names
                 openingFramesVerticals = openingFramesVerticals._subtracted(plates); // correct vertical frames by topplates to be sure
                 

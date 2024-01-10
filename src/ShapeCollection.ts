@@ -1958,19 +1958,14 @@
           return this._obj;
       }
 
-      set name(newName:string)
+      /** NOTE: We don't use set/get here, because it doesnt play well with chaining */
+      name(n?:string):this|string
       {
-         if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };         
-         this.setName(newName)
-      }
-
-      get name()
-      {
-         return this.getName();
+         return (n) ? this.setName(n) : this.getName();
       }
 
       /** Set name */
-      setName(newName:string):ShapeCollection
+      setName(newName:string):this
       {
          this.checkObj().name(newName);
          return this;

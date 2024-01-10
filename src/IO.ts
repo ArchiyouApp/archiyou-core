@@ -235,7 +235,7 @@ export class IO
         }
 
         let svgShapeCollection = new ShapeCollection();
-        svgShapeCollection.name = 'importedSVG';
+        svgShapeCollection.name('importedSVG');
 
         // parse SVG nodes
         svgNodesWithTransform.forEach( nodeAndTransform => 

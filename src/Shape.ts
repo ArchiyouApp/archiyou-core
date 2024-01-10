@@ -4004,29 +4004,18 @@ export class Shape
         return this;
     }
 
-    set name(newName:string)
-      {
-         if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };   
-         this.setName(newName)
-      }
-
-    get name()
+    /** NOTE: We don't use set/get here, because it doesnt play well with chaining */
+    name(n?:string):this|string
     {
-        return this.getName();
+        return (n) ? this.setName(n) : this.getName();
     }
 
     /** Get name of container Obj */
-    setName(newName?:string):Shape
+    setName(newName?:string):this
     {   
         if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };
         this.checkObj().name(newName);  
         return this;
-    }
-
-    /** Get name of container Obj */
-    getId():string
-    {
-        return this?._obj?._id;
     }
 
     /** Get name of container Obj */
@@ -4036,13 +4025,19 @@ export class Shape
         return (typeof r === 'string') ? r : undefined;
     }
 
-    hide():Shape
+    /** Get name of container Obj */
+    getId():string
+    {
+        return this?._obj?._id;
+    }
+
+    hide():this
     {
         this.checkObj().hide();
         return this;
     }
 
-    show():Shape
+    show():this
     {
         this.checkObj().show();
         return this;

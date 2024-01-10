@@ -33,8 +33,8 @@ test("Obj", () =>
     b.color('blue')
     expect(b.object()._style.point.color).toEqual(255);
     // Box naming
-    b.name = 'mybox'
-    expect(b.name).toEqual('mybox');
+    b.name('mybox')
+    expect(b.name()).toEqual('mybox');
 })
 
 
