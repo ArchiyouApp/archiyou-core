@@ -12,6 +12,8 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput
         } from './internal' // types
 
+import { ParamType, Param, PublishParam } from './internal'
+
 import { BaseStyle, ContainerAlignment, Position, ScaleInput, DataRows,
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
             ContainerHAlignment, ContainerVAlignment, MetricName,
@@ -31,6 +33,28 @@ import { isNumeric, isRelativeCoordString } from './internal'
         We need to focus on conversing different values into a consistent input type
 
 */
+
+export function isParamType(o:any): o is ParamType
+{
+    return ['number','text','options','boolean','list','object'].includes(o)
+}
+
+export function isParam(o:any): o is Param
+{
+    return (typeof o === 'object') &&
+        isParamType(o?.type) &&
+        typeof o?.name  === 'string' &&
+        (o?.value ?? false) && 
+        (o?.default ?? false)
+        // TODO: add _behaviours?
+}
+
+export function isPublishParam(o:any): o is PublishParam
+{
+    return isParam(o) && 
+        typeof o?._behaviours === 'object' &&
+        Object.values(o).every(v => typeof v === 'string') // function stringified
+}
 
 export function isModelUnits(o:any): o is ModelUnits
 {

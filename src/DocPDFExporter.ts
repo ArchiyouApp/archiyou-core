@@ -2,14 +2,33 @@
  *  DocPdfExporter
  * 
  *  Takes data from Doc module and exports the documents to PDF using PDFkit
+ * 
+ *  IMPORTANT:
+ *      Please add the following modules to use PDFExporter:
+ *      - pdfkit@0.14.0
+ *      - svg-to-pdfkit@0.1.8
+ *      - pdfkit-table@0.1.99
+ *     
  *  
  *  NOTES:  
  *      - Doc module coordinate system origin is bottom-left
  *      - PDFKit origin of coordinate system is at top-left
  * 
+ *  INFO:
+ *      - see example loading of fonts for pdfkit: https://github.com/foliojs/pdfkit/tree/master/examples/webpack
+ * 
  */
 
-// see example loading of fonts for pdfkit: https://github.com/foliojs/pdfkit/tree/master/examples/webpack
+// IMPORTANT: If problems with fontkit
+//      Add this to your package.json
+//      
+//        "resolutions": {
+//              "pdfkit/**/fontkit": "2.0.2"
+//      }
+//
+//      to pin version of fontkit
+
+
 
 
 import fs from 'fs'; // virtual pdfkit filesystem as replacement of node

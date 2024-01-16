@@ -11,9 +11,208 @@
  *  ParamManager exists on both the script execution worker and the app
  *  It sends through changed Param to the ParamManager where it has effect
  * 
+ *  Architecture:
+ *      ParamManager has a set of ParamManagerEntryController instances 
+ *      that each control a specific 'target' Param instance. 
+ *      
+ *      Behaviours managed by the ParamManager are placed on the Param instance Param._behaviours 
+ * 
+ *      ParamManager maintains a history across multiple runs of the script, so updates happen only once
+ *      
+ *      
+ * 
  */
 
-import { ParamType, Param, PublishParam } from './internal'
+import { ParamType, Param, PublishParam, isParam, isPublishParam } from './internal'
+
+import deepEqual from 'deep-is'
+
+/** Main ParamManager
+ *  Maintains all ParamManagerEntryControllers 
+ */
+export class ParamManager
+{
+    parent: any; // worker or app scope
+    paramControllers:Array<ParamManagerEntryController> = [];
+
+    /** Set up ParamManager with current params */
+    constructor(params?:Array<PublishParam>)
+    {
+        if(Array.isArray(params) && params.length > 0)
+        {
+            this.paramControllers = params.map(p => new ParamManagerEntryController(this, this.publishParamToParam(p)))
+            this.paramControllers.forEach( p => this[p.name] = p) // set param access
+        }
+    }
+
+    setParent(scope:any):this
+    {
+        this.parent = scope;
+        return this
+    }
+
+    addParam(p:Param):this
+    {
+        const newParamController = new ParamManagerEntryController(this, p);
+        this.paramControllers.push( newParamController)
+        return this;
+    }
+
+    //// BASIC MANAGEMENT ////
+
+    getParamController(name:string):ParamManagerEntryController
+    {
+        return this.paramControllers.find(pc => pc.name === name)
+    }
+
+    //// EVALUATE AFTER CHANGE ////
+
+    /** After Param instances are changed, they is broadcast through the app where it will be synced 
+     *  NOTE: We use PublishParam because messages need data-only (they are converted in ParamEntryController)
+     *  NOTE: We use a Array here, to be able to broadcast multiple params at the same time if needed
+    */
+    handleManaged(changedParams:Array<PublishParam>)
+    {
+        if(this.inWorker())
+        {
+            this.sendChangedParamsFromWorkerToApp(this.parent, changedParams);
+        }
+        else {
+            // Main thread App scope
+            // TODO: this might not be needed - App handles differently
+            console.log('**** PARAMMANAGER.handleManaged');
+            console.log(changedParams)
+            console.log(this.parent);
+        }
+    }
+
+    /** Check and update params from managed params */
+    update(params:Array<PublishParam>, evaluateBehaviours:boolean=true):this
+    {
+        const curParamsMap = this.getParamsMap();
+        params.forEach((updateParam) => 
+        {
+            // It does not exist
+            if(!Object.keys(curParamsMap).includes(updateParam.name))
+            {
+                // Just add
+                this.addParam(this.publishParamToParam(updateParam))
+            }
+            else {
+                // It does exist but if different: then update
+                const paramController = this.getParamController(updateParam.name);
+                if(!paramController.sameParam(updateParam))
+                {
+                    console.info(`ParamManager::updateParams: Updated param "${updateParam.name}"`);
+                    paramController.updateTargetParam(this.publishParamToParam(updateParam));
+                }
+                else 
+                {
+                    console.info(`ParamManager::updateParams: Incoming param "${updateParam.name}" is the same. Update skipped!`);
+                }
+
+            }
+        })
+
+        if(evaluateBehaviours)
+        {
+            this.evaluateBehaviours(); // sets attributes based on behaviours
+        }
+
+        return this;
+    }
+    
+    /** This triggers after a param change and evaluates any changes 
+     *  to other Params corresponding to behaviours
+     *  @returns Array of Params that changed
+     *  */
+    evaluateBehaviours():Array<Param>
+    {
+        return this.paramControllers.map( pc => pc.evaluateBehaviours(this.getParamsMap()))
+                                    .filter(p => p !== null)
+    }
+
+    //// IO ////
+
+    sendChangedParamsFromWorkerToApp(worker:any, changedParams:Array<PublishParam>) // TODO: TS typing
+    {
+        if(!worker?.postMessage){ throw new Error(`ParamManager::sendChangedParamFromWorkerToApp: Can't send message from worker scope: no parent set. Please use setParent(workerScope)`); }
+
+        worker.postMessage(
+            {
+                type: 'managed-param',
+                payload: changedParams as Array<PublishParam>,
+            }
+        )
+    }
+
+    /** Utility to easily get target Params */
+    getParams():Array<Param>
+    {
+        return this.paramControllers.map(pc => pc.target)
+    }
+
+    /** Utility to easily get target Params in a map */
+    getParamsMap():Record<string, Param>
+    {
+        const map = {};
+        this.paramControllers.forEach(pc => { map[pc.name] = pc.target })
+        return map;
+    }
+
+    //// UTILS ////
+
+    /** If this ParamManager is in a worker scope */
+    inWorker():boolean
+    {
+        return typeof this?.parent?.postMessage === 'function';
+    }
+
+    /** Turn data PublishParam into Param by recreating functions */
+    publishParamToParam(publishParam:PublishParam):Param
+    {
+        const funcBehaviours = {};
+        if(publishParam?._behaviours)
+        {
+            for( const [propName, funcStr] of Object.entries(publishParam?._behaviours))
+            {
+                funcBehaviours[propName] = new Function('return ' + funcStr)()
+            }
+        }
+
+        const param = { 
+            ...publishParam, 
+            _behaviours : funcBehaviours, 
+        } as Param
+
+        return param;
+    }
+
+    /** Turn param into PublishParam */
+    paramToPublishParam(param:Param|PublishParam):PublishParam
+    {
+        if(!isParam(param)){ throw new Error(`ParamManager:paramToPublishParam. Please supply a valid Param. Given: "${param}"`)}
+        if(isPublishParam(param)){ return param }; // alraedy PublishParam
+
+        const behaviourData = {};
+        param._behaviours = param._behaviours || {}; // avoid undefined/nulls
+        for(const [k,v] of Object.entries(param._behaviours)){ behaviourData[k] = v.toString(); }
+        return { ...param, _behaviours: behaviourData }
+    }
+
+    //// UTILS ////
+
+    /** Compare two params (either Param or PublishParam) */
+    equalParams(param1:Param|PublishParam, param2:Param|PublishParam):boolean
+    {
+        const publishParam1 = JSON.parse(JSON.stringify(this.paramToPublishParam(param1)));
+        const publishParam2 = JSON.parse(JSON.stringify(this.paramToPublishParam(param2)));
+        return deepEqual(publishParam1,publishParam2);
+    }
+
+}
+
+
 
 /** Controller for a specific parameter */
 export class ParamManagerEntryController
@@ -42,12 +241,33 @@ export class ParamManagerEntryController
         return this.target;
     }
 
+    /** Check if incoming PublishParam is same as target Param */
+    sameParam(param:PublishParam):boolean
+    {
+        // IMPORTANT: make sure we loose any observability from vue 
+        param = JSON.parse(JSON.stringify(param)); 
+        
+        console.log('**** sameParam ');
+        console.log(param);
+        console.log(this.toData())
+
+
+        const isSame = deepEqual(this.toData(), param );
+
+        console.log(isSame);
+
+        return isSame
+    }
+
     //// HANDLING CHANGES ////
 
+    /** Handle this Param being changed
+     *  NOTE: here we turn Param instances (with _behaviour functions to data with ParamEntryController.toData())
+     */
     handleManaged()
     {
         if(!this?.manager){ throw new Error(`ParamManagerEntryController::handleManaged: No parent ParamManager set. Set it in new ParamManagerEntryController(<<ParamManager>>, param)`)}
-        this.manager.handleManaged(this.toData() as PublishParam);
+        this.manager.handleManaged([this.toData() as PublishParam]);
     }
 
     //// ADVANCED PARAM CREATION ////
@@ -57,7 +277,7 @@ export class ParamManagerEntryController
 
     }
 
-    //// TEST BEHAVIOUR BASED ON PROGRAMMATIC CONTROLS ////
+    //// BEHAVIOURS BASED ON PROGRAMMATIC CONTROLS ////
 
     /** Evaluate behaviour and return changed param 
      *  @params a map for easy access: params.TEST.value
@@ -85,12 +305,19 @@ export class ParamManagerEntryController
         It facilitates more advanced states of the menu for a nicer user experience
     */
 
-    /** Set visibility to true */
-    show(test:(curParam:Param, params?:Record<string, Param>) => any )
+    /** Set visibility to true 
+     *  
+     *  @example 
+     *      $PARAMS.SOMEPARAM.visible((param, all) => all.OTHERPARAM.value === true )
+    */
+    visible(test:(curParam:Param, params?:Record<string, Param>) => any )
     {
-        this.target._behaviours = this.target._behaviours ?? {};
-        this.target._behaviours['visible'] = test;
-        this.handleManaged();
+        if(this._needsUpdate('visible', test))
+        {
+            this.target._behaviours = this.target._behaviours ?? {};
+            this.target._behaviours['visible'] = test;
+            this.handleManaged(); // trigger update
+        }
     }
     
     /** Set value of Param */
@@ -169,6 +396,16 @@ export class ParamManagerEntryController
     }
 
     //// UTILS ////
+
+    /** Test if a change to a ParamEntryController is new and it needs to be updated */
+    _needsUpdate(attr:string, value:any): boolean
+    {   
+        const oldValue = this.target[attr];
+        const flatOldValue = (typeof oldValue === 'function') ? oldValue.toString() : oldValue; 
+        const flatNewValue = (typeof value === 'function') ? value.toString() : value;
+        
+        return !deepEqual(flatOldValue,flatNewValue);
+    }
 
     /** Forward properties on this controller to target Param obj */
     _setParamPropsOnController()
@@ -249,159 +486,5 @@ export class ParamManagerEntryController
 
     }
     
-
-}
-
-/** Main ParamManager
- *  Maintains all ParamManagerEntryControllers 
- */
-export class ParamManager
-{
-    parent: any; // worker or app scope
-    paramControllers:Array<ParamManagerEntryController> = [];
-
-    /** Set up ParamManager with current params */
-    constructor(params?:Array<Param>)
-    {
-        if(Array.isArray(params) && params.length > 0)
-        {
-            this.paramControllers = params.map(p => new ParamManagerEntryController(this, p))
-            this.paramControllers.forEach( p => this[p.name] = p) // set param access
-        }
-    }
-
-    setParent(scope:any):this
-    {
-        this.parent = scope;
-        return this
-    }
-
-    addParam(p:Param):this
-    {
-        const newParamController = new ParamManagerEntryController(this, p);
-        this.paramControllers.push( newParamController)
-        return this;
-    }
-
-    //// BASIC MANAGEMENT ////
-
-    getParamController(name:string):ParamManagerEntryController
-    {
-        return this.paramControllers.find(pc => pc.name === name)
-    }
-
-    //// EVALUATE AFTER CHANGE ////
-
-    handleManaged(changedParam:PublishParam)
-    {
-
-        if(this.inWorker())
-        {
-            this.sendChangedParamFromWorkerToApp(this.parent, changedParam);
-        }
-        else {
-            // Main thread App scope
-            console.log('**** PARAMMANAGER.handleManaged');
-            console.log(this.parent);
-        }
-    }
-
-    /** Check and update params from managed params */
-    update(managedParams:Array<PublishParam>):this
-    {
-        const inParams = managedParams.map(mp => this.publishParamToParam(mp))
-
-        // TODO: use these?
-        const updatedParams = [];
-        const newParams = [];
-
-        inParams.forEach(p => 
-        {
-            const updatedParam = this.getParamController(p.name)?.updateTargetParam(p);
-            // Updated existing param
-            if(updatedParam)
-            { 
-                updatedParams.push(updatedParam);
-                console.info(`ParamManager:update: Updated param "${p.name}"`);
-                console.info(updatedParam)
-            }
-            else {
-                // New param
-                this.addParam(p);
-                newParams.push(p);
-                console.info(`ParamManager:update: Added new param ${p.name}: ${JSON.stringify(updatedParam)}`);
-            }
-        })
-
-        return this;
-    }
-    
-    /** This triggers after a param change and evaluates any changes 
-     *  to other Params corresponding to behaviours
-     *  @returns Array of Params that changed
-     *  */
-    evaluateBehaviours():Array<Param>
-    {
-        console.log(this.getParams());
-        return this.paramControllers.map( pc => pc.evaluateBehaviours(this.getParamsMap()))
-            .filter(p => p !== null)
-    }
-
-    //// IO ////
-
-    sendChangedParamFromWorkerToApp(worker:any, changedParam:PublishParam) // TODO: TS typing
-    {
-        if(!worker?.postMessage){ throw new Error(`ParamManager::sendChangedParamFromWorkerToApp: Can't send message from worker scope: no parent set. Please use setParent(workerScope)`); }
-
-        worker.postMessage(
-            {
-                type: 'managed-param',
-                payload: changedParam as PublishParam,
-            }
-        )
-    }
-
-    getParams():Array<Param>
-    {
-        return this.paramControllers.map(pc => pc.target)
-    }
-
-    getParamsMap():Record<string, Param>
-    {
-        const map = {};
-        this.paramControllers.forEach(pc => { map[pc.name] = pc.target })
-        return map;
-    }
-
-    //// UTILS ////
-
-    /** If this ParamManager is in a worker scope */
-    inWorker():boolean
-    {
-        return typeof this?.parent?.postMessage === 'function';
-    }
-
-    publishParamToParam(publishParam:PublishParam):Param
-    {
-        const funcBehaviours = {};
-        if(publishParam?._behaviours)
-        {
-            for( const [propName, funcStr] of Object.entries(publishParam?._behaviours))
-            {
-                funcBehaviours[propName] = new Function('return ' + funcStr)()
-            }
-        }
-
-        const param = { 
-            ...publishParam, 
-            _behaviours : funcBehaviours, 
-        } as Param
-
-        console.log('**** publishParamToParam ');
-        console.log(publishParam?._behaviours)
-
-        return param;
-    }
-
 
 }

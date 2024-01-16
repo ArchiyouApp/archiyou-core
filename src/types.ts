@@ -151,6 +151,9 @@ export interface ArchiyouAppInfo
 
 export type ParamType = 'number'|'text'|'options'|'boolean'|'list'|'object' 
 
+/** Target of a Param behaviour  */
+export type ParamBehaviourTarget = 'visible' | 'enable' | 'value' | 'values' | 'start' | 'end' | 'options'
+
 export interface Param
 { 
     id?: string
@@ -168,7 +171,8 @@ export interface Param
     schema?: ParamObjectSchema // object definition
     options?: Array<string> // for ParamInputOptions
     length?: number // for ParamInputText
-    _behaviours?: Record<string, (curParam:Param, params:Record<string,Param>) => any> // logic attached to param, triggerend anytime any param changes
+    // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
+    _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
     units?:ModelUnits
 }
 
@@ -183,14 +187,7 @@ export interface PublishParam extends Omit<Param, '_behaviours'>
     _behaviours?: Record<string,string> // stringified function for save to db etc
 }
 
-export interface ParamBehaviour
-{
-    target: 'params' // TODO
-    args: Array<any>
-    targetParam: string // self or name
-    targetParamProperty: string
-    targetParamPropertyValue: any
-}
+
 
 /** A way to define nested ParamObjects, either user in a single entry or list
  *  NOTE: For now we don't allow nested structures (so no ParamObj containing other ParamObj field)
