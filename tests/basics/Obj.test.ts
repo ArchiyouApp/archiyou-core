@@ -32,7 +32,7 @@ test("Obj", () =>
     // Override
     b.color('blue')
     expect(b.object()._style.point.color).toEqual(255);
-    // Box naming
+    // Obj naming
     b.name('mybox')
     expect(b.name()).toEqual('mybox');
 })
