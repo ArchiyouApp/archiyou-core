@@ -52,8 +52,9 @@ export function isParam(o:any): o is Param
 export function isPublishParam(o:any): o is PublishParam
 {
     return isParam(o) && 
+        o?._behaviours &&
         typeof o?._behaviours === 'object' &&
-        Object.values(o).every(v => typeof v === 'string') // function stringified
+        Object.values(o._behaviours).every(v => typeof v === 'string') // function stringified
 }
 
 export function isModelUnits(o:any): o is ModelUnits

@@ -23,7 +23,8 @@
  * 
  */
 
-import { ParamType, Param, PublishParam, isParam, isPublishParam } from './internal'
+import { ParamType, Param, PublishParam, isParam, isPublishParam, ParamBehaviourTarget } from './internal'
+import { publishParamToParam, paramToPublishParam } from './internal' // utils
 
 import deepEqual from 'deep-is'
 
@@ -40,7 +41,7 @@ export class ParamManager
     {
         if(Array.isArray(params) && params.length > 0)
         {
-            this.paramControllers = params.map(p => new ParamManagerEntryController(this, this.publishParamToParam(p)))
+            this.paramControllers = params.map(p => new ParamManagerEntryController(this, publishParamToParam(p)))
             this.paramControllers.forEach( p => this[p.name] = p) // set param access
         }
     }
@@ -68,10 +69,9 @@ export class ParamManager
     //// EVALUATE AFTER CHANGE ////
 
     /** After Param instances are changed, they is broadcast through the app where it will be synced 
-     *  NOTE: We use PublishParam because messages need data-only (they are converted in ParamEntryController)
      *  NOTE: We use a Array here, to be able to broadcast multiple params at the same time if needed
     */
-    handleManaged(changedParams:Array<PublishParam>)
+    handleManaged(changedParams:Array<Param>)
     {
         if(this.inWorker())
         {
@@ -87,7 +87,7 @@ export class ParamManager
     }
 
     /** Check and update params from managed params */
-    update(params:Array<PublishParam>, evaluateBehaviours:boolean=true):this
+    update(params:Array<Param>, evaluateBehaviours:boolean=true):this
     {
         const curParamsMap = this.getParamsMap();
         params.forEach((updateParam) => 
@@ -96,19 +96,19 @@ export class ParamManager
             if(!Object.keys(curParamsMap).includes(updateParam.name))
             {
                 // Just add
-                this.addParam(this.publishParamToParam(updateParam))
+                this.addParam(updateParam)
             }
             else {
-                // It does exist but if different: then update
+                // It does exist but if different then update
                 const paramController = this.getParamController(updateParam.name);
                 if(!paramController.sameParam(updateParam))
                 {
-                    console.info(`ParamManager::updateParams: Updated param "${updateParam.name}"`);
-                    paramController.updateTargetParam(this.publishParamToParam(updateParam));
+                    console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Updated param "${updateParam.name}" : ${JSON.stringify(updateParam)}`);
+                    paramController.updateTargetParam(updateParam);
                 }
                 else 
                 {
-                    console.info(`ParamManager::updateParams: Incoming param "${updateParam.name}" is the same. Update skipped!`);
+                    console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Incoming param "${updateParam.name}" is the same. Update skipped! Current: ${JSON.stringify(updateParam)}`);
                 }
 
             }
@@ -134,14 +134,14 @@ export class ParamManager
 
     //// IO ////
 
-    sendChangedParamsFromWorkerToApp(worker:any, changedParams:Array<PublishParam>) // TODO: TS typing
+    sendChangedParamsFromWorkerToApp(worker:any, changedParams:Array<Param>) // TODO: TS typing
     {
         if(!worker?.postMessage){ throw new Error(`ParamManager::sendChangedParamFromWorkerToApp: Can't send message from worker scope: no parent set. Please use setParent(workerScope)`); }
 
         worker.postMessage(
             {
                 type: 'managed-param',
-                payload: changedParams as Array<PublishParam>,
+                payload: changedParams.map(p => paramToPublishParam(p)) as Array<PublishParam>,
             }
         )
     }
@@ -168,50 +168,17 @@ export class ParamManager
         return typeof this?.parent?.postMessage === 'function';
     }
 
-    /** Turn data PublishParam into Param by recreating functions */
-    publishParamToParam(publishParam:PublishParam):Param
-    {
-        const funcBehaviours = {};
-        if(publishParam?._behaviours)
-        {
-            for( const [propName, funcStr] of Object.entries(publishParam?._behaviours))
-            {
-                funcBehaviours[propName] = new Function('return ' + funcStr)()
-            }
-        }
-
-        const param = { 
-            ...publishParam, 
-            _behaviours : funcBehaviours, 
-        } as Param
-
-        return param;
-    }
-
-    /** Turn param into PublishParam */
-    paramToPublishParam(param:Param|PublishParam):PublishParam
-    {
-        if(!isParam(param)){ throw new Error(`ParamManager:paramToPublishParam. Please supply a valid Param. Given: "${param}"`)}
-        if(isPublishParam(param)){ return param }; // alraedy PublishParam
-
-        const behaviourData = {};
-        param._behaviours = param._behaviours || {}; // avoid undefined/nulls
-        for(const [k,v] of Object.entries(param._behaviours)){ behaviourData[k] = v.toString(); }
-        return { ...param, _behaviours: behaviourData }
-    }
-
     //// UTILS ////
 
     /** Compare two params (either Param or PublishParam) */
     equalParams(param1:Param|PublishParam, param2:Param|PublishParam):boolean
     {
-        const publishParam1 = JSON.parse(JSON.stringify(this.paramToPublishParam(param1)));
-        const publishParam2 = JSON.parse(JSON.stringify(this.paramToPublishParam(param2)));
+        const publishParam1 = JSON.parse(JSON.stringify(paramToPublishParam(param1)));
+        const publishParam2 = JSON.parse(JSON.stringify(paramToPublishParam(param2)));
         return deepEqual(publishParam1,publishParam2);
     }
 
 }
-
 
 
 /** Controller for a specific parameter */
@@ -242,21 +209,11 @@ export class ParamManagerEntryController
     }
 
     /** Check if incoming PublishParam is same as target Param */
-    sameParam(param:PublishParam):boolean
+    sameParam(param:Param):boolean
     {
         // IMPORTANT: make sure we loose any observability from vue 
-        param = JSON.parse(JSON.stringify(param)); 
-        
-        console.log('**** sameParam ');
-        console.log(param);
-        console.log(this.toData())
-
-
-        const isSame = deepEqual(this.toData(), param );
-
-        console.log(isSame);
-
-        return isSame
+        param = JSON.parse(JSON.stringify(paramToPublishParam(param))); 
+        return deepEqual(this.toData(), param );
     }
 
     //// HANDLING CHANGES ////
@@ -282,16 +239,30 @@ export class ParamManagerEntryController
     /** Evaluate behaviour and return changed param 
      *  @params a map for easy access: params.TEST.value
     */
-    evaluateBehaviours(params:Record<string,Param>):null|Param
+    evaluateBehaviours(params:Record<ParamBehaviourTarget,Param>):null|Param
     {
         let changedParam = null;
         if(this?.target?._behaviours)
         {
             for (const [propName, fn] of Object.entries(this?.target?._behaviours))
             {
-                // TODO: some validation
-                this.target[propName] = fn(this.target, params); // directly plug in the test result to target param
-                changedParam = this.target;
+                // IMPORTANT: We used some black magic to convert string to Function, typeof does not work 
+                if( (typeof fn === 'function') || (fn as any)?.constructor?.name === 'Function')
+                {
+                    const newValue = fn(this.target, params);
+                    this.target[propName] = newValue; // directly plug in the test result to target param
+                    changedParam = this.target;
+                    console.info(`ParamEntryController::evaluateBehaviours: Updated Param attribute "${propName}" = "${newValue}"`);
+                }
+                else {
+                    // TODO: fix bug here: why does this happen?
+                    // LOOKS LIKE AFTER A UPDATE OF PARAMS IN WORKER  
+                    // visible : {} 
+                    console.error(`ParamEntryController::evaluateBehaviours [${this.getScope()}]: Given behaviour for property "${propName}" is not a function, but a "${typeof fn}"`);
+                    console.error(fn);
+                    console.error(this?.target?._behaviours);
+                }
+                
             }
         }
 
@@ -387,7 +358,7 @@ export class ParamManagerEntryController
     toData():PublishParam
     {
         const behaviourData = {};
-        for(const [k,v] of Object.entries(this.target._behaviours)){ behaviourData[k] = v.toString(); }
+        for(const [k,v] of Object.entries(this.target?._behaviours || {})){ behaviourData[k] = v.toString(); }
 
         return {
             ...this.target,
@@ -484,6 +455,11 @@ export class ParamManagerEntryController
         return p;
 
 
+    }
+
+    getScope():string
+    {
+        return (this?.manager.inWorker()) ? 'worker' : 'app'
     }
     
 

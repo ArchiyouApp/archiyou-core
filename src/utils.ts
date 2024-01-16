@@ -5,9 +5,50 @@
  */
 
 
-import {isCoordArray, isAnyShape, isPointLike, PolarCoord, DocUnits, isDocUnits, ModelUnits} from './internal'
+import {isCoordArray, isAnyShape, isPointLike, PolarCoord, DocUnits, isDocUnits, ModelUnits, Param, PublishParam, isPublishParam, isParam} from './internal'
 
 type Units = DocUnits | ModelUnits
+
+//// PARAMS ////
+
+/** Turn data PublishParam into Param by recreating functions 
+ *  NOTE: PublishParam is used as data - internally make sure to use Param
+*/
+export function publishParamToParam(param:Param|PublishParam):Param
+{
+    if(!isPublishParam(param))
+    {
+        console.warn(`ParamManager::publishParamToParam: param "${param.name}" already a Param!`)
+        return { ...param };
+    }
+
+    const funcBehaviours = {};
+    if(param?._behaviours && typeof param?._behaviours === 'object')
+    {
+        for( const [propName, funcStr] of Object.entries(param?._behaviours))
+        {   
+            funcBehaviours[propName] = new Function('return ' + funcStr)();
+        }
+    }
+
+    const newParam = { 
+        ...param, 
+        _behaviours : funcBehaviours, 
+    } as Param
+
+    return newParam;
+}
+
+/** Turn param into PublishParam */
+export function paramToPublishParam(param:Param|PublishParam):PublishParam
+{
+    if(!isParam(param)){ console.error(`ParamManager:paramToPublishParam. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
+    if(isPublishParam(param)){ return param }; // already PublishParam
+
+    const behaviourData = {};
+    for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
+    return { ...param, _behaviours: behaviourData }
+}
 
 //// Working with types ////
 

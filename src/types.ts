@@ -154,6 +154,7 @@ export type ParamType = 'number'|'text'|'options'|'boolean'|'list'|'object'
 /** Target of a Param behaviour  */
 export type ParamBehaviourTarget = 'visible' | 'enable' | 'value' | 'values' | 'start' | 'end' | 'options'
 
+/** Param inside the application */
 export interface Param
 { 
     id?: string
@@ -176,7 +177,7 @@ export interface Param
     units?:ModelUnits
 }
 
-/** Extentions of Param for Publishing */
+/** Extentions of Param for Publishing - Data only */
 export interface PublishParam extends Omit<Param, '_behaviours'>
 {
     // NOTE: need to nullify private attributes (for example behavious)
