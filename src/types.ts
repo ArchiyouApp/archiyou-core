@@ -160,6 +160,7 @@ export interface Param
     id?: string
     type: ParamType
     name: string
+    enabled?:boolean // enabled or not
     visible:boolean // Param is visible or not
     label: string // publically visible name
     default : any // Default value: can be string or number
@@ -177,11 +178,10 @@ export interface Param
     units?:ModelUnits
 }
 
-/** Extentions of Param for Publishing - Data only */
+/** Extentions of Param for Publishing - data only! */
 export interface PublishParam extends Omit<Param, '_behaviours'>
 {
     // NOTE: need to nullify private attributes (for example behavious)
-    enabled?:boolean // enabled or not
     order?:number // integer, lower is in front
     iterable?:boolean // for determine param variants
     description?:string // added for the user

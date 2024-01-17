@@ -37,11 +37,11 @@ export class ParamManager
     paramControllers:Array<ParamManagerEntryController> = [];
 
     /** Set up ParamManager with current params */
-    constructor(params?:Array<PublishParam>)
+    constructor(params?:Array<PublishParam|Param>)
     {
         if(Array.isArray(params) && params.length > 0)
         {
-            this.paramControllers = params.map(p => new ParamManagerEntryController(this, publishParamToParam(p)))
+            this.paramControllers = params.map(p => new ParamManagerEntryController(this, publishParamToParam(p))); // always make sure we use Param internally
             this.paramControllers.forEach( p => this[p.name] = p) // set param access
         }
     }
@@ -78,25 +78,27 @@ export class ParamManager
             this.sendChangedParamsFromWorkerToApp(this.parent, changedParams);
         }
         else {
-            // Main thread App scope
-            // TODO: this might not be needed - App handles differently
-            console.log('**** PARAMMANAGER.handleManaged');
-            console.log(changedParams)
-            console.log(this.parent);
+            // Main thread App scope: handled differently
         }
     }
 
-    /** Check and update params from managed params */
-    update(params:Array<Param>, evaluateBehaviours:boolean=true):this
+    /** Check and update params */
+    update(params:Array<Param|PublishParam>, evaluateBehaviours:boolean=true):this
     {
+        // Make sure we have Params
+        params = params.map(p => publishParamToParam(p)) as Array<Param>
+
         const curParamsMap = this.getParamsMap();
+        let paramsWereChanged = false;
+
         params.forEach((updateParam) => 
         {
             // It does not exist
             if(!Object.keys(curParamsMap).includes(updateParam.name))
             {
                 // Just add
-                this.addParam(updateParam)
+                this.addParam(updateParam);
+                paramsWereChanged = true;
             }
             else {
                 // It does exist but if different then update
@@ -105,6 +107,7 @@ export class ParamManager
                 {
                     console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Updated param "${updateParam.name}" : ${JSON.stringify(updateParam)}`);
                     paramController.updateTargetParam(updateParam);
+                    paramsWereChanged = true;
                 }
                 else 
                 {
@@ -114,7 +117,8 @@ export class ParamManager
             }
         })
 
-        if(evaluateBehaviours)
+        // Only evaluate behaviours if any param changed
+        if(paramsWereChanged && evaluateBehaviours)
         {
             this.evaluateBehaviours(); // sets attributes based on behaviours
         }
@@ -252,15 +256,10 @@ export class ParamManagerEntryController
                     const newValue = fn(this.target, params);
                     this.target[propName] = newValue; // directly plug in the test result to target param
                     changedParam = this.target;
-                    console.info(`ParamEntryController::evaluateBehaviours: Updated Param attribute "${propName}" = "${newValue}"`);
+                    console.info(`ParamEntryController::evaluateBehaviours: Updated Param "${this.target.name}" attribute "${propName}" = "${newValue}"`);
                 }
                 else {
-                    // TODO: fix bug here: why does this happen?
-                    // LOOKS LIKE AFTER A UPDATE OF PARAMS IN WORKER  
-                    // visible : {} 
                     console.error(`ParamEntryController::evaluateBehaviours [${this.getScope()}]: Given behaviour for property "${propName}" is not a function, but a "${typeof fn}"`);
-                    console.error(fn);
-                    console.error(this?.target?._behaviours);
                 }
                 
             }
@@ -276,79 +275,48 @@ export class ParamManagerEntryController
         It facilitates more advanced states of the menu for a nicer user experience
     */
 
-    /** Set visibility to true 
-     *  
-     *  @example 
-     *      $PARAMS.SOMEPARAM.visible((param, all) => all.OTHERPARAM.value === true )
+    /** Add behaviour that controls visible attribute of this Param
+    *      @example $PARAMS.SOMEPARAM.visible((param, all) => all.OTHERPARAM.value === true )
     */
-    visible(test:(curParam:Param, params?:Record<string, Param>) => any )
+    visibleIf(test:(curParam:Param, params?:Record<string, Param>) => boolean )
     {
-        if(this._needsUpdate('visible', test))
+        if(this._needsUpdate('_behaviours.visible', test))
         {
             this.target._behaviours = this.target._behaviours ?? {};
             this.target._behaviours['visible'] = test;
             this.handleManaged(); // trigger update
         }
     }
+
+    /** Set behaviour that controls enable flag of this Param */
+    enableIf(test:(curParam:Param, params?:Record<string, Param>) => boolean )
+    {
+        if(this._needsUpdate('_behaviours.enable', test))
+        {
+            this.target._behaviours = this.target._behaviours ?? {};
+            this.target._behaviours['enable'] = test;
+            this.handleManaged(); // trigger update
+        }
+    }
     
-    /** Set value of Param */
-    /*
-    value(func:(curParam:Param, params?:Array<Param>) => any)
+    /** Set behaviour that controls value attribute of this Param */
+    // TODO: TEST
+    valueOn(fn:(curParam:Param, params?:Record<string, Param>) => boolean)
     {
-        this.target._behaviours = this.target._behaviours ?? [];
-        this.target._behaviours.push((curParam:Param, params?:Array<Param>) => {
-            const r = func(curParam,params); 
-            if(typeof r === 'boolean'){
-                this.target.value ;
-            }
-        })
-        this.handleManaged();
+        if(this._needsUpdate('value', fn))
+        {
+            this.target._behaviours = this.target._behaviours ?? {};
+            this.target._behaviours['value '] = fn;
+            this.handleManaged(); // trigger update
+        }
     }
+    
+    /** TODO: more behaviours 
+     *   - values
+     *   - start
+     *   - end
+     *   - options   
     */
-
-    /** Set start of range on number Param */
-    /*
-    start(func:(curParam:Param, params?:Array<Param>) => any)
-    {
-        // TODO: test if number param
-        this.target._behaviours = this.target._behaviours ?? [];
-        this.target._behaviours.push((curParam:Param, params?:Array<Param>) => {
-            const r = func(curParam,params); 
-            if(typeof r === 'number')
-            {
-                this.target.start = r;
-                return this.target;
-            }
-            return null;
-        })
-        this.handleManaged();
-    }
-    */
-
-    /** Set end range on number Param */
-    /*
-    end(func:(curParam:Param, params?:Array<Param>) => any)
-    {
-        // TODO: test if number param
-        this.target._behaviours = this.target._behaviours ?? [];
-        this.target._behaviours.push((curParam:Param, params?:Array<Param>) => {
-            const r = func(curParam,params); 
-            if(typeof r === 'number')
-            {
-                this.target.end = r;
-                return this.target;
-            }
-            return null;
-        })
-        this.handleManaged();
-    }
-    */
-
-    /** Set values for options Param */
-    options(v:Array<string>)
-    {
-        // TODO
-    }
 
     //// IO ////
 
@@ -368,14 +336,34 @@ export class ParamManagerEntryController
 
     //// UTILS ////
 
-    /** Test if a change to a ParamEntryController is new and it needs to be updated */
+    /** Test if a attribute value (or behaviour) of target Param is different than given value
+     *  NOTE: attr can be a path
+     *  @example: _needsUpdate('_behaviours.visible', testfunc)
+    */
     _needsUpdate(attr:string, value:any): boolean
     {   
-        const oldValue = this.target[attr];
-        const flatOldValue = (typeof oldValue === 'function') ? oldValue.toString() : oldValue; 
-        const flatNewValue = (typeof value === 'function') ? value.toString() : value;
-        
-        return !deepEqual(flatOldValue,flatNewValue);
+        // compare behaviour definition in Param._behaviours
+        if (attr.includes('_behaviours'))
+        {
+            const oldValue = this._getObjValueByPath(attr, this.target);
+            const flatOldValue = (typeof oldValue === 'function') ? oldValue.toString() : oldValue; 
+            const flatNewValue = (typeof value === 'function') ? value.toString() : value;
+            
+            return !deepEqual(flatOldValue,flatNewValue);
+
+        }
+        // Or static attribute value (TODO: TEST)
+        else {
+            const oldValue = this._getObjValueByPath(attr, this.target);
+            // execute if function and compare to current value of Param attribute
+            const newValue = (typeof value === 'function') ? value(this.target as Param, this.manager.getParams()) : value;
+            return !deepEqual(oldValue,newValue);
+        }
+    }
+
+    _getObjValueByPath(path:string, obj:Object):any
+    {
+        return path.split('.').reduce((acc, c) => acc && acc[c], obj);
     }
 
     /** Forward properties on this controller to target Param obj */
