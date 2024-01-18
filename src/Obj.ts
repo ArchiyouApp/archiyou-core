@@ -84,7 +84,6 @@ export class Obj
      */
     style(newStyle:BaseStyle|ObjStyle):Obj
     {
-        console.log('**** STYLE ****')
         this._style  = this._compileStyle(newStyle);
         return this;
     }

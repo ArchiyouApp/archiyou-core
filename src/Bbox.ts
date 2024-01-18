@@ -87,7 +87,7 @@ export class Bbox
         }
         else {
             this.updateFromOcBbox();
-            console.info(`Bbox::constructor: Successfully created ${(is2D) ? '2D' : '3D'} Bbox with size [${this.width()},${this.depth()},${this.height()}] `);
+            //console.info(`Bbox::constructor: Successfully created ${(is2D) ? '2D' : '3D'} Bbox with size [${this.width()},${this.depth()},${this.height()}] `);
         }
 
     }

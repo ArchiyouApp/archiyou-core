@@ -312,7 +312,6 @@ export class Shape
     @checkInput(Number, 'auto')
     strokeWidth(n:number):this
     {
-        console.log('STROKE WIDTH');
         this.object().strokeWidth(n);
         return this;
     }
@@ -2461,9 +2460,6 @@ export class Shape
 
         const cutDirection = ((maxLevel - level) < (level - minLevel)) ? 1 : -1; // NOTE: take off part of Shape with least size
         const planeSizes = ['x','z','y'].filter(a => a !== axisNormal); // NOTE: order is important
-
-        console.log(cutDirection)
-        console.log(planeSizes);
 
         const pw = bb.sizeAlongAxis(planeSizes[0] as MainAxis) || 100; // make sure cutplane has size on both axis
         const pd = bb.sizeAlongAxis(planeSizes[1] as MainAxis) || 100;

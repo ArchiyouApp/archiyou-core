@@ -193,7 +193,6 @@ export class Table
         }
         else 
         {
-            console.log(`${startIndex}:${endIndex}`);
             return new Table(this._dataframe.iloc({ rows: [ `${startIndex}:${endIndex}`]}));
         }
         
@@ -555,7 +554,6 @@ export class Table
         // get conditional expressions
         // NOTE: polyfilled for String.matchAll
         let expressions:Array<DbCompareStatement> = Array.from(StringMatchAll(input, EXPRESSION_RE)).map( m => { 
-            console.log(m);
             return { 
                 // avoiding some TS errors: TODO: Get Match Interface?
                 column : (m as any).groups.column.trim(), 

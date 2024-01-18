@@ -70,7 +70,7 @@ export class Container
     {
         if(!isWidthHeightInput(n)){ throw new Error(`Container::height: Invalid input "${n}": Use a number, number with units ("30mm") or string like "40%"!`)};
         [this._width, this._widthRelativeTo] = this._page._doc._resolveWidthHeightInput(n, this._page, 'width');
-        console.info(`Container::width(): Set container width to ${this._width}`);
+        //console.info(`Container::width(): Set container width to ${this._width}`);
     }
 
     /** Set height of this Container. Either in percentage ([0-1]) of width or in % or units */
@@ -78,7 +78,7 @@ export class Container
     {
         if(!isWidthHeightInput(n)){ throw new Error(`Container::height: Invalid input "${n}": Use a number, number with units ("30mm") or string like "40%"!`)};
         [this._height, this._heightRelativeTo] = this._page._doc._resolveWidthHeightInput(n, this._page, 'height');
-        console.info(`Container::width(): Set container height to :${this._height}`);
+        //console.info(`Container::width(): Set container height to :${this._height}`);
     }
 
     /** Set position with a ContainerAlignment or percentage of width and height [x,y]  */
