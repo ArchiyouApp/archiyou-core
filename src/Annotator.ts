@@ -316,9 +316,14 @@ export class DimensionLine extends BaseAnnotation
         /* IMPORTANT: 
             This font-size is temporary: 
             We need to make the text (and background rect) scale according to page size and view scale 
-             so they are almost the same
+             so they are always the same
         */
-        const FONT_SIZE = '10'; 
+       
+        /* IMPORTANT: because SVG are mostly in mm the difference between font size 
+            and the sizes of these drawings must not be too great the text boundingbox might 
+            be so small that we loose accuracy. FONT_SIZE 100 mostly works well!
+        */
+        const FONT_SIZE = '100.0';  
         const atPoint = at as Point;
 
         return `<text 

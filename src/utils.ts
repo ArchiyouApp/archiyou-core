@@ -5,9 +5,7 @@
  */
 
 
-import {isCoordArray, isAnyShape, isPointLike, PolarCoord, DocUnits, isDocUnits, ModelUnits, Param, PublishParam, isPublishParam, isParam} from './internal'
-
-type Units = DocUnits | ModelUnits
+import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, Param, PublishParam, isPublishParam, isParam} from './internal'
 
 //// PARAMS ////
 

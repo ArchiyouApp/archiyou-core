@@ -31,6 +31,7 @@ export const ALIGNMENTS_ADD_TO_SIDES = ['center','start','end'];
 //// UNION TYPES ////
 
 export type ModelUnits = 'mm'|'cm'|'dm'|'m'|'km'|'inch'|'feet'|'yd'|'mi'; // For now they are for administration only
+export type Units = DocUnits | ModelUnits
 export type Coord = number|string
 export type MainAxis = 'x'|'y'|'z'
 export type Plane = 'xy' | 'xz' | 'yz'

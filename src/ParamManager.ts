@@ -105,13 +105,13 @@ export class ParamManager
                 const paramController = this.getParamController(updateParam.name);
                 if(!paramController.sameParam(updateParam))
                 {
-                    console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Updated param "${updateParam.name}" : ${JSON.stringify(updateParam)}`);
+                    //console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Updated param "${updateParam.name}" : ${JSON.stringify(updateParam)}`);
                     paramController.updateTargetParam(updateParam);
                     paramsWereChanged = true;
                 }
                 else 
                 {
-                    console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Incoming param "${updateParam.name}" is the same. Update skipped! Current: ${JSON.stringify(updateParam)}`);
+                    //console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Incoming param "${updateParam.name}" is the same. Update skipped! Current: ${JSON.stringify(updateParam)}`);
                 }
 
             }
