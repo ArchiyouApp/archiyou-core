@@ -43,9 +43,8 @@ export function isParam(o:any): o is Param
 {
     return (typeof o === 'object') &&
         isParamType(o?.type) &&
-        typeof o?.name  === 'string' &&
-        (o?.value ?? false) && 
-        (o?.default ?? false)
+        typeof o?.name  === 'string'
+        // NOTE: value and default are optional
         // TODO: add _behaviours?
 }
 

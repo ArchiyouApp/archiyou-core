@@ -54,9 +54,132 @@ export class ParamManager
 
     addParam(p:Param):this
     {
-        const newParamController = new ParamManagerEntryController(this, p);
-        this.paramControllers.push( newParamController)
+        if(this._paramNameExists(p))
+        { 
+            // NOTE: Because Params persist between executions, once a Param is programmatically defined we don't want to define it again
+            console.warn(`ParamManager::addParam: Param with name "${p.name}" already exists. No need to create it again.`);
+        }
+        else {
+            p.name = p.name.toUpperCase(); // names are always uppercase
+            const newParamController = new ParamManagerEntryController(this, p);
+            this.paramControllers.push(newParamController)
+        }
+        
         return this;
+    }
+
+    deleteParam(name:string):this
+    {
+        this.paramControllers = this.paramControllers.filter( pc => pc.name !== name);
+        return this;
+    }
+
+    _paramNameExists(p:Param):boolean
+    {
+        return Object.keys(this.getParamsMap()).includes(p.name.toUpperCase()) 
+    }
+
+    //// PROGRAMMATIC PARAM CREATION ////
+    
+    /** Programmatically define a param: from simple to advanced 
+     *  This can be used to define complex Parameters that can't be defined by the menu
+     * 
+     *  @example myParamManager.define({ name: 'testnum', type: 'number'})
+     *  @example myParamManager.define({ name: 'mylist', type: 'list', elemType: 
+     *      { 
+     *      type: 'object', 
+     *      schema: { w: { type: 'number', default: 100 },
+     *                h: { type: 'number', default: 200, start: 50, end: 300 } 
+     *   }})
+    */
+    define(p:Param)
+    {
+        if(!p){ throw new Error(`ParamManager::define(p:Param): Please supply valid Param object!`); }
+        if(!p?.name){ throw new Error(`ParamManager::define(): Please supply at least a name for this Param!`); }
+
+        const checkedParam = this._validateParam(p);
+        if(!checkedParam){ return this }; //  Error already thrown in checkParam if any
+
+        // Add Param to Manager by making ParamController
+        this.addParam(checkedParam);
+
+        console.log('ADD PARAM');
+        console.log(checkedParam);
+
+        this.handleManaged([checkedParam]); // Send new definition to App
+
+        return this;
+
+    }
+
+    /** Check Param input and fill in defaults
+     *  We try to make anything work here, except if nothing is given
+     *  See also checkParam in ParamEntryController
+     */
+    _validateParam(p:Param):Param
+    {
+        if(!p)
+        {
+            console.error(`ParamManager::define(p:Param): Please supply valid Param object!`);
+            return null;
+        }
+
+        const paramType = p?.type || 'number'; // Default Param type is number
+        let checkedParam;
+
+        switch(paramType)
+        {
+            case 'number':
+                checkedParam = {
+                    ...p, // copy all for convenience 
+                    type: paramType,
+                    default: p?.default ?? 50,
+                    start: p?.start ?? 0,
+                    end: p?.start ?? 100,
+                    step: p?.step ?? 1,
+                } as Param;
+                break;
+            case 'boolean': 
+                checkedParam = {
+                    ...p, // copy all for convenience 
+                    type: paramType,
+                } as Param;
+                break;
+            case 'text':
+                checkedParam = {
+                    ...p,
+                    type: paramType,
+                    length: p.length ?? 100,
+                } as Param;
+                break;
+            case 'options':
+                checkedParam = {
+                    ...p,
+                    type: paramType,
+                    options: p.options ?? [],
+                } as Param;
+                break;
+            case 'list': 
+                checkedParam = {
+                    ...p,
+                    type: paramType,
+                    elemType: p.elemType ?? this._validateParam({ type: 'number' }), // a Number is the default for a List
+                    
+                } as Param;
+                break;
+            case 'object':
+                checkedParam = {
+                    ...p,
+                    type: paramType,
+                    schema: p.schema ?? {},
+                } as Param;
+                break;
+        }
+
+        // basic checks and defaults
+        checkedParam.name = checkedParam.name ?? null;
+        
+        return checkedParam;
     }
 
     //// BASIC MANAGEMENT ////
@@ -91,6 +214,7 @@ export class ParamManager
         const curParamsMap = this.getParamsMap();
         let paramsWereChanged = false;
 
+        // Check from incoming Params
         params.forEach((updateParam) => 
         {
             // It does not exist
@@ -113,7 +237,6 @@ export class ParamManager
                 {
                     //console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Incoming param "${updateParam.name}" is the same. Update skipped! Current: ${JSON.stringify(updateParam)}`);
                 }
-
             }
         })
 
@@ -125,6 +248,7 @@ export class ParamManager
 
         return this;
     }
+
     
     /** This triggers after a param change and evaluates any changes 
      *  to other Params corresponding to behaviours
@@ -231,13 +355,6 @@ export class ParamManagerEntryController
         this.manager.handleManaged([this.toData() as PublishParam]);
     }
 
-    //// ADVANCED PARAM CREATION ////
-
-    define(p:Param)
-    {
-
-    }
-
     //// BEHAVIOURS BASED ON PROGRAMMATIC CONTROLS ////
 
     /** Evaluate behaviour and return changed param 
@@ -276,7 +393,7 @@ export class ParamManagerEntryController
     */
 
     /** Add behaviour that controls visible attribute of this Param
-    *      @example $PARAMS.SOMEPARAM.visible((param, all) => all.OTHERPARAM.value === true )
+    *      @example $PARAMS.SOMEPARAM.visibleIf((param, all) => all.OTHERPARAM.value === true )
     */
     visibleIf(test:(curParam:Param, params?:Record<string, Param>) => boolean )
     {
@@ -414,16 +531,9 @@ export class ParamManagerEntryController
         }
         else if(p.type === 'list')
         {
-            if(!this.PARAM_TYPES.includes(p?.elemType))
+            if(typeof p?.listElem === 'object' && p?.listElem?.type)
             {
-                throw new Error(`ParamManagerEntryController:_checkParam: If you want to make a list supply at least the elemType (${this.PARAM_TYPES.join(',')}) or object (with the schema)`);
-            }
-            else 
-            {
-                if(p.elemType === 'object' && (p?.schema ?? true) )
-                {
-                    throw new Error(`ParamManagerEntryController:_checkParam: If you want to make a list with a nested object supply a schema!`)
-                }
+                throw new Error(`ParamManagerEntryController:_checkParam: If you want to make a list supply at least the listElem Param definition!`);
             }
         }
         else if(p.type === 'object')
@@ -431,12 +541,6 @@ export class ParamManagerEntryController
             if(typeof p?.schema !== 'object')
             {
                 throw new Error(`ParamManagerEntryController:_checkParam: If you want to object Parameter please supply a schema in format { prop1: { Param }, prop2 : { Param }}`)
-            }
-            else {
-                if(p?.elemType === 'object' && (p?.schema ?? true))
-                {
-                    throw new Error(`ParamManagerEntryController:_checkParam: If you want to object Parameter please supply a schema in format { prop1: { Param }, prop2 : { Param }}`)
-                }
             }
         }
 

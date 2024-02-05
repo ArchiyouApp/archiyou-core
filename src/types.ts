@@ -160,20 +160,20 @@ export interface Param
 { 
     id?: string
     type: ParamType
-    name: string
+    listElem: Param, // definition of list content (also a Param)
+    name?: string
     enabled?:boolean // enabled or not
     visible:boolean // Param is visible or not
     label: string // publically visible name
-    default : any // Default value: can be string or number
-    value? : any // Can be string or number
-    values? : Array<any> // active values in list
-    start? : number // for ParamInputNumber
-    end? : number // for ParamInputNumber
-    step? : number // for ParamInputNumber
-    elemType?: ParamType|string // either basic ParamType or object (and supply schema)
+    default?: any // Default value: can be string or number
+    value?: any // Can be string or number
+    values?: Array<any> // active values in list
+    start?: number // for ParamInputNumber
+    end?: number // for ParamInputNumber
+    step?: number // for ParamInputNumber
     schema?: ParamObjectSchema // object definition
     options?: Array<string> // for ParamInputOptions
-    length?: number // for ParamInputText
+    length?: number // for ParamInputText, ParamInputList
     // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
     _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
     units?:ModelUnits
@@ -783,3 +783,5 @@ export interface CalcData
     metrics: Object // { name : Metric, name2: Metric }
 }
 
+//// PARAM MANAGER ////
+// NOTE: See above for general types around Params
