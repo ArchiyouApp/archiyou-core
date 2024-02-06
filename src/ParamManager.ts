@@ -36,7 +36,6 @@ export class ParamManager
 {
     parent: any; // worker or app scope
     paramControllers:Array<ParamManagerEntryController> = [];
-    /* IMPORTANT: setParamValueRefs() sets direct reference to values of params on this scope ! */
 
     /** Set up ParamManager with current params */
     constructor(params?:Array<PublishParam|Param>)
@@ -60,13 +59,11 @@ export class ParamManager
         if(this._paramNameExists(p))
         { 
             const updated = this.updateParam(p);
-            if(updated){ this.setParamValueRefs();}
             return (updated) ? 'updated' : 'same';
         }
         else {
             const newParamController = new ParamManagerEntryController(this, this._validateParam(p));
             this.paramControllers.push(newParamController)
-            this.setParamValueRefs();
             return 'new'
         }
 
@@ -75,7 +72,6 @@ export class ParamManager
     deleteParam(name:string):this
     {
         this.paramControllers = this.paramControllers.filter( pc => pc.name !== name);
-        this.deleteParamValueRef(name)
         
         return this;
     }
@@ -288,8 +284,6 @@ export class ParamManager
             this.evaluateBehaviours(); // sets attributes based on behaviours
         }
 
-        this.setParamValueRefs();
-
         return this;
     }
 
@@ -352,6 +346,7 @@ export class ParamManager
 
     /** Set quick references from this instance to the values of params 
      *  For easy access to these values from script
+     *  NOTE: This is currently not used. Just use direct params
     */
     setParamValueRefs()
     {
