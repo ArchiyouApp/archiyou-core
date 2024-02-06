@@ -27,6 +27,7 @@ import { ParamType, Param, PublishParam, isParam, isPublishParam, ParamBehaviour
 import { publishParamToParam, paramToPublishParam } from './internal' // utils
 
 import deepEqual from 'deep-is'
+import deepClone from 'deep-clone'
 
 /** Main ParamManager
  *  Maintains all ParamManagerEntryControllers 
@@ -35,6 +36,7 @@ export class ParamManager
 {
     parent: any; // worker or app scope
     paramControllers:Array<ParamManagerEntryController> = [];
+    /* IMPORTANT: setParamValueRefs() sets direct reference to values of params on this scope ! */
 
     /** Set up ParamManager with current params */
     constructor(params?:Array<PublishParam|Param>)
@@ -56,14 +58,14 @@ export class ParamManager
     {
         if(this._paramNameExists(p))
         { 
-            // NOTE: Because Params persist between executions, once a Param is programmatically defined we don't want to define it again
-            console.warn(`ParamManager::addParam: Param with name "${p.name}" already exists. No need to create it again.`);
+            this.updateParam(p);
         }
         else {
-            p.name = p.name.toUpperCase(); // names are always uppercase
-            const newParamController = new ParamManagerEntryController(this, p);
+            const newParamController = new ParamManagerEntryController(this, this._validateParam(p));
             this.paramControllers.push(newParamController)
         }
+
+        this.setParamValueRefs();
         
         return this;
     }
@@ -71,6 +73,8 @@ export class ParamManager
     deleteParam(name:string):this
     {
         this.paramControllers = this.paramControllers.filter( pc => pc.name !== name);
+        this.deleteParamValueRef(name)
+        
         return this;
     }
 
@@ -79,13 +83,38 @@ export class ParamManager
         return Object.keys(this.getParamsMap()).includes(p.name.toUpperCase()) 
     }
 
+    /* Update ParamEntryController if needed */
+    updateParam(p:Param):boolean
+    {
+        if(this._paramNameExists(p))
+        {
+            const existingParamController = this.paramControllers.find(pc => pc.name === p.name );
+
+            if(this.equalParams(p,existingParamController.target))
+            {
+                p.name = p.name.toUpperCase(); // names are always uppercase
+                const index = this.paramControllers.indexOf(existingParamController);
+                this.paramControllers[index] =  new ParamManagerEntryController(this, p);
+                return true;
+            }
+            else {
+                console.info(`ParamManager::updateParam: No update needed. Same params!"`);
+            }
+        }
+        else {
+            console.warn(`ParamManager::updateParam: Can't update: No param with name ${p.name}"`);
+        }
+
+        return false;
+    }
+
     //// PROGRAMMATIC PARAM CREATION ////
     
     /** Programmatically define a param: from simple to advanced 
      *  This can be used to define complex Parameters that can't be defined by the menu
      * 
      *  @example myParamManager.define({ name: 'testnum', type: 'number'})
-     *  @example myParamManager.define({ name: 'mylist', type: 'list', elemType: 
+     *  @example myParamManager.define({ name: 'mylist', type: 'list', listElem: 
      *      { 
      *      type: 'object', 
      *      schema: { w: { type: 'number', default: 100 },
@@ -94,7 +123,7 @@ export class ParamManager
     */
     define(p:Param)
     {
-        if(!p){ throw new Error(`ParamManager::define(p:Param): Please supply valid Param object!`); }
+        if(!p){ throw new Error(`ParamManager::define(p:Param): Please supply valid Param object! Got ${JSON.stringify(p)}`); }
         if(!p?.name){ throw new Error(`ParamManager::define(): Please supply at least a name for this Param!`); }
 
         const checkedParam = this._validateParam(p);
@@ -102,11 +131,8 @@ export class ParamManager
 
         // Add Param to Manager by making ParamController
         this.addParam(checkedParam);
-
-        console.log('ADD PARAM');
-        console.log(checkedParam);
-
         this.handleManaged([checkedParam]); // Send new definition to App
+
 
         return this;
 
@@ -120,7 +146,7 @@ export class ParamManager
     {
         if(!p)
         {
-            console.error(`ParamManager::define(p:Param): Please supply valid Param object!`);
+            console.error(`ParamManager::_validateParam(p:Param): Please supply valid Param object! Got null/undefined!`);
             return null;
         }
 
@@ -135,7 +161,7 @@ export class ParamManager
                     type: paramType,
                     default: p?.default ?? 50,
                     start: p?.start ?? 0,
-                    end: p?.start ?? 100,
+                    end: p?.end ?? 100,
                     step: p?.step ?? 1,
                 } as Param;
                 break;
@@ -160,24 +186,33 @@ export class ParamManager
                 } as Param;
                 break;
             case 'list': 
+                // NOTE: listElem is also a Param, which we need to check!
                 checkedParam = {
                     ...p,
                     type: paramType,
-                    elemType: p.elemType ?? this._validateParam({ type: 'number' }), // a Number is the default for a List
-                    
+                    listElem: this._validateParam(p.listElem) ?? this._validateParam({ type: 'number' } as Param), // a Number is the default for a List
                 } as Param;
                 break;
             case 'object':
+                // Object schema is also a set of Params
+                const s = p.schema ?? {};
+                const schema = {};
+                
+                for (const [name, param] of Object.entries(s))
+                {
+                    schema[name.toUpperCase()] = this._validateParam(param); // param names are always uppercase!
+                }
+
                 checkedParam = {
                     ...p,
                     type: paramType,
-                    schema: p.schema ?? {},
+                    schema: schema,
                 } as Param;
                 break;
         }
 
         // basic checks and defaults
-        checkedParam.name = checkedParam.name ?? null;
+        checkedParam.name = checkedParam?.name?.toUpperCase() ?? null; // make sure names are always uppercase
         
         return checkedParam;
     }
@@ -246,6 +281,8 @@ export class ParamManager
             this.evaluateBehaviours(); // sets attributes based on behaviours
         }
 
+        this.setParamValueRefs();
+
         return this;
     }
 
@@ -304,6 +341,28 @@ export class ParamManager
         const publishParam1 = JSON.parse(JSON.stringify(paramToPublishParam(param1)));
         const publishParam2 = JSON.parse(JSON.stringify(paramToPublishParam(param2)));
         return deepEqual(publishParam1,publishParam2);
+    }
+
+    /** Set quick references from this instance to the values of params 
+     *  For easy access to these values from script
+    */
+    setParamValueRefs()
+    {
+        for (const [name, param] of Object.entries(this.getParamsMap()))
+        {
+            if(param?.value) // !!!! BUG: For some reason there might be params without values
+            {
+                this[name] = deepClone(param.value);
+            }
+        }
+    }
+
+    deleteParamValueRef(name:string)
+    {
+        if (typeof name === 'string')
+        {
+            delete this[name];
+        }
     }
 
 }
@@ -531,9 +590,9 @@ export class ParamManagerEntryController
         }
         else if(p.type === 'list')
         {
-            if(typeof p?.listElem === 'object' && p?.listElem?.type)
+            if(p?.listElem ?? true)
             {
-                throw new Error(`ParamManagerEntryController:_checkParam: If you want to make a list supply at least the listElem Param definition!`);
+                //throw new Error(`ParamManagerEntryController:_checkParam: If you want to make a list supply at least the listElem Param definition!`);
             }
         }
         else if(p.type === 'object')

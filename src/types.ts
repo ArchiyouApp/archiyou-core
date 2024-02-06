@@ -160,10 +160,10 @@ export interface Param
 { 
     id?: string
     type: ParamType
-    listElem: Param, // definition of list content (also a Param)
+    listElem?: Param, // definition of list content (also a Param)
     name?: string
     enabled?:boolean // enabled or not
-    visible:boolean // Param is visible or not
+    visible?:boolean // Param is visible or not
     label: string // publically visible name
     default?: any // Default value: can be string or number
     value?: any // Can be string or number
