@@ -785,3 +785,5 @@ export interface CalcData
 
 //// PARAM MANAGER ////
 // NOTE: See above for general types around Params
+
+export type ParamOperation = 'new'|'updated'|'same'

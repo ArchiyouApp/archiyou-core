@@ -23,7 +23,7 @@
  * 
  */
 
-import { ParamType, Param, PublishParam, isParam, isPublishParam, ParamBehaviourTarget } from './internal'
+import { Param, PublishParam, ParamOperation, isParam, isPublishParam, ParamBehaviourTarget } from './internal'
 import { publishParamToParam, paramToPublishParam } from './internal' // utils
 
 import deepEqual from 'deep-is'
@@ -54,20 +54,22 @@ export class ParamManager
         return this
     }
 
-    addParam(p:Param):this
+    /** add or update Param and return what was done ('update', 'same', 'new)  */
+    addParam(p:Param):ParamOperation
     {
         if(this._paramNameExists(p))
         { 
-            this.updateParam(p);
+            const updated = this.updateParam(p);
+            if(updated){ this.setParamValueRefs();}
+            return (updated) ? 'updated' : 'same';
         }
         else {
             const newParamController = new ParamManagerEntryController(this, this._validateParam(p));
             this.paramControllers.push(newParamController)
+            this.setParamValueRefs();
+            return 'new'
         }
 
-        this.setParamValueRefs();
-        
-        return this;
     }
 
     deleteParam(name:string):this
@@ -83,14 +85,14 @@ export class ParamManager
         return Object.keys(this.getParamsMap()).includes(p.name.toUpperCase()) 
     }
 
-    /* Update ParamEntryController if needed */
+    /** Update ParamEntryController if needed and return updated or not */
     updateParam(p:Param):boolean
     {
         if(this._paramNameExists(p))
         {
             const existingParamController = this.paramControllers.find(pc => pc.name === p.name );
 
-            if(this.equalParams(p,existingParamController.target))
+            if(!this.equalParams(p,existingParamController.target))
             {
                 p.name = p.name.toUpperCase(); // names are always uppercase
                 const index = this.paramControllers.indexOf(existingParamController);
@@ -99,13 +101,13 @@ export class ParamManager
             }
             else {
                 console.info(`ParamManager::updateParam: No update needed. Same params!"`);
+                return false;
             }
         }
         else {
             console.warn(`ParamManager::updateParam: Can't update: No param with name ${p.name}"`);
+            return false;
         }
-
-        return false;
     }
 
     //// PROGRAMMATIC PARAM CREATION ////
@@ -130,8 +132,13 @@ export class ParamManager
         if(!checkedParam){ return this }; //  Error already thrown in checkParam if any
 
         // Add Param to Manager by making ParamController
-        this.addParam(checkedParam);
-        this.handleManaged([checkedParam]); // Send new definition to App
+        const r = this.addParam(checkedParam);
+
+        // Only send managed Param to App if anything changed
+        if (['new','update'].includes(r))
+        {
+            this.handleManaged([checkedParam]); // Send new definition to App
+        }
 
 
         return this;
