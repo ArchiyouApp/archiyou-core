@@ -452,9 +452,6 @@ class PDFDocumentWithTables extends PDFDocument
       
             this.logg('columnSizes', h);
             this.logg('columnPositions', p);
-
-            console.log('****** HEADER: calcColumnSizes');
-            console.log(h);
       
           };
       
@@ -534,17 +531,11 @@ class PDFDocumentWithTables extends PDFDocument
             // Check to have enough room for header and first rows. default 3
             // if (startY + 2 * this.headerHeight >= maxY) this.emitter.emit('addPage'); //this.addPage();
 
-            console.log('==== DRAW HEADER ====');
-            console.log(options.hideHeader)
-            console.log(table.headers.length)
-      
             if(!options.hideHeader && table.headers.length > 0) 
             {
-              console.log('==== DRAW HEADER ====');
               // simple header
               if(typeof table.headers[0] === 'string')
               {
-                console.log('==== DRAW SIMPLE HEADER ====');
                 // // background header
                 // const rectRow = {
                 //   x: startX, 
@@ -593,10 +584,7 @@ class PDFDocumentWithTables extends PDFDocument
               else
               {
                 //  Print all headers
-                console.log('==== DRAW ADV HEADER ====');
-                console.log('==== TABLE HEADERS ====');
-                console.log(table.headers);
-
+                
                 table.headers.forEach( (dataHeader, i) => 
                 {
       
