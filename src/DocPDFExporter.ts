@@ -10,8 +10,8 @@
  *      - pdfkit-table@0.1.99
  *     
  *  
- *  NOTES:  
- *      - Doc module coordinate system origin is bottom-left
+ *  IMPORTANT NOTES:  
+ *      - Doc module coordinate system origin is bottom-left (This is in line with PDF itself!)
  *      - PDFKit origin of coordinate system is at top-left
  * 
  *  INFO:
@@ -627,27 +627,29 @@ export class DocPDFExporter
             {
                 // NOTE: this uses a somewhat hacked version of this prepareHeader plug-in function
                 this.activePDFDoc.font("Helvetica-Bold").fontSize(settings?.fontsize);
-                this._drawTableCellRect(rectCell); // Here we draw special per cell styling
+                this._drawTableCellRect(rectCell, true); // Here we draw special per cell styling - fix for header
             },
             prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
                 this.activePDFDoc.font("Helvetica").fontSize(settings?.fontsize);
                 this._drawTableCellRect(rectCell); // Here we draw special per cell styling
             }
-                ,
         }
 
         // NOTE: pdfkit is brittle for null values
         return this.removeEmptyValueKeysObj(pdfTableSettings); 
     }
 
-    _drawTableCellRect(rectCell:any) // { x, y , width, height }
+    _drawTableCellRect(rectCell:any, header:boolean=false) // { x, y , width, height }
     {
+        // !!!! IMPORTANT: Don't modify rectCell directly, because it affects all cells
         if(rectCell)
         {
+            
             const lw = mmToPoints(this.TABLE_BORDER_THICKNESS_MM);
-            // NOTE: we move up the rectangle lw to have them overlap fully
+            // NOTE: We move up the rectangle lw to have them overlap fully
+            // NOTE: We need to correct for header, it needs to be set lower of amount lw
             this.activePDFDoc.rect(
-                    rectCell.x, rectCell.y+lw, rectCell.width, rectCell.height+lw*2)
+                    rectCell.x, rectCell.y + ((header) ? 2*lw : 0), rectCell.width, rectCell.height+lw)
             .lineWidth(lw)
             .strokeColor('#000000')
             .stroke();

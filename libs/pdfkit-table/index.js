@@ -74,7 +74,7 @@ class PDFDocumentWithTables extends PDFDocument
           table || (table = {});
           options || (options = {});
       
-          table.headers || (table.headers = []);
+          table.headers || (table.headers = []); // AY: containing data on header cells { label: <<data>>, ?headerColor, ?width } etc
           table.datas || (table.datas = []);
           table.rows || (table.rows = []);
           table.options && (options = {...options, ...table.options});
@@ -398,28 +398,35 @@ class PDFDocumentWithTables extends PDFDocument
           
           const calcColumnSizes = () => {
       
-            let h = []; // header width
+            let h = []; // header widths
             let p = []; // position
             let w = 0;  // table width
       
             // (table width) 1o - Max size table
             w = this.page.width - this.page.margins.right - ( options.x || this.page.margins.left );
             // (table width) 2o - Size defined
+            // AY NOTE: assign w from options when present
             options.width && ( w = parseInt(options.width) || String(options.width).replace(/[^0-9]/g,'') >> 0 );
       
             // (table width) if table is percent of page 
             // ...
-      
+            
+            // AY NOTE: h = header width!
             // (size columns) 1o
-            table.headers.forEach( el => {
+            table.headers.forEach( el => 
+            {
               el.width && h.push(el.width); // - columnSpacing
             });
             // (size columns) 2o
-            if(h.length === 0) {
+            if(h.length === 0)
+            {
+              // AY: given columnSize
               h = options.columnsSize;
             } 
             // (size columns) 3o
-            if(h.length === 0) {
+            // AY: Evenly column size
+            if(h.length === 0)
+            {
               columnWidth = ( w / table.headers.length ); // - columnSpacing // define column width
               table.headers.forEach( () => h.push(columnWidth) );
             }
@@ -445,6 +452,9 @@ class PDFDocumentWithTables extends PDFDocument
       
             this.logg('columnSizes', h);
             this.logg('columnPositions', p);
+
+            console.log('****** HEADER: calcColumnSizes');
+            console.log(h);
       
           };
       
@@ -455,7 +465,7 @@ class PDFDocumentWithTables extends PDFDocument
           const addHeader = () => { 
       
             // Allow the user to override style for headers
-            //prepareHeader();
+            // prepareHeader();
       
             // calc header height
             if(this.headerHeight === 0){
@@ -512,23 +522,29 @@ class PDFDocumentWithTables extends PDFDocument
             lockAddTitles = true;
   
             // this options is trial
-            if(options.absolutePosition === true){
+            if(options.absolutePosition === true)
+            {
               lastPositionX = options.x || startX || this.x; // x position head
               startY = options.y || startY || this.y; // x position head  
-            } else {
+            } 
+            else {
               lastPositionX = startX; // x position head  
             }
             
             // Check to have enough room for header and first rows. default 3
             // if (startY + 2 * this.headerHeight >= maxY) this.emitter.emit('addPage'); //this.addPage();
 
+            console.log('==== DRAW HEADER ====');
+            console.log(options.hideHeader)
+            console.log(table.headers.length)
       
             if(!options.hideHeader && table.headers.length > 0) 
             {
-      
+              console.log('==== DRAW HEADER ====');
               // simple header
-              if(typeof table.headers[0] === 'string') {
-      
+              if(typeof table.headers[0] === 'string')
+              {
+                console.log('==== DRAW SIMPLE HEADER ====');
                 // // background header
                 // const rectRow = {
                 //   x: startX, 
@@ -574,8 +590,13 @@ class PDFDocumentWithTables extends PDFDocument
       
                 });
               }
-              else{
-                // Print all headers
+              else
+              {
+                //  Print all headers
+                console.log('==== DRAW ADV HEADER ====');
+                console.log('==== TABLE HEADERS ====');
+                console.log(table.headers);
+
                 table.headers.forEach( (dataHeader, i) => 
                 {
       
@@ -584,7 +605,7 @@ class PDFDocumentWithTables extends PDFDocument
                   width = width || columnSizes[i];
                   align = headerAlign || align || 'left';
                   // force number
-                  width = width >> 0;
+                  // width = width >> 0; // AY: disabled rounding because it causes shifting
           
                   // register renderer function
                   if(renderer && typeof renderer === 'string') {
