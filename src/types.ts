@@ -379,12 +379,12 @@ export interface DimensionOptions
 export interface AutoDimLevel
 {
     axis:MainAxis
-    at: number // relative or absolute
+    at: number // coordinate on given axis, relative or absolute
     coordType?: 'relative' | 'absolute' // auto determine
     align?: 'min'|'auto'|'max' // align dimension lines to Shape/Collection
-    minDistance?: number
+    minDistance?: number // skip when distance is less then minDistance
     offset?:number // offset from outside of bbox of Shape/Collection
-    showLine?:boolean // DEBUG line
+    showLine?:boolean // show DEBUG line
 }
 
 export interface AutoDimSettings

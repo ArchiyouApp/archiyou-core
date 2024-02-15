@@ -618,6 +618,24 @@ export class Vector extends Point
         return v;
     }
 
+    @checkInput(Number,'auto')
+    rotateX(angle:number):Vector
+    {
+        return this.rotate(angle, [0,0,0], [1,0,0])
+    }
+
+    @checkInput(Number,'auto')
+    rotateY(angle:number):Vector
+    {
+        return this.rotate(angle, [0,0,0], [0,1,0])
+    }
+
+    @checkInput(Number,'auto')
+    rotateZ(angle:number):Vector
+    {
+        return this.rotate(angle, [0,0,0], [0,0,1])
+    }
+
     /** Swap x,y coordinates for some 2D applications */
     swappedXY():Vector
     {

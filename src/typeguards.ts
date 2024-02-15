@@ -445,7 +445,7 @@ export function isPositionLike(o:any): o is Position
 export function isDocUnits(o:any): o is DocUnits
 {
     if(typeof o !== 'string'){ return false };
-    return ['mm','cm','inch'].includes(o as string);
+    return ['mm','cm','inch','pnt'].includes(o as string);
 }
 
 export function isPercentageString(o:any): o is PercentageString 

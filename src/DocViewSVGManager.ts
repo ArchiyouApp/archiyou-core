@@ -1,7 +1,12 @@
 /*
-    ViewSVGEdit.ts
+    DocViewSVGManager.ts
 
     Edit SVGs for use in Doc View Containers
+
+    NOTES:
+    - Dimension Line Arrows are generated in th Annotator
+    - SVG Arrows are originally defined as pointing upwards (in SVG space) with arrow at [0,0]
+        default arrow: M-5 5 L 0 0 L 5 5
 
 */
 
@@ -21,11 +26,13 @@ export class DocViewSVGManager
 {
     //// SETTINGS ////
     DIMLINE_LINE_THICKNESS_MM = 0.05;
-    DIMLINE_ARROW_SVG_WIDTH = 10; // incoming arrow width in svg units (see also svg::_worldUnits )
-    DIMLINE_ARROW_PDF_WIDTH_MM = 5;
-    DIMLINE_TEXT_WIDTH_MM = 10;
+    DIMLINE_ARROW_SVG_WIDTH = 10; // incoming arrow width in svg units (see also svg::_worldUnits ) - width is always relative to arrow pointing up
+    DIMLINE_ARROW_PDF_WIDTH_MM = 5; 
+    DIMLINE_IS_SMALL_FACTOR_TIMES_TEXT_WIDTH = 3; // what is considered a small dimension line (in WIDTH) - different rendering than activated
+    DIMLINE_TEXT_WIDTH_MM = 8; // max text width
     DIMLINE_TEXT_BACKGROUND_COLOR = 'white';
-    DIMLINE_TEXT_SIZE_MM = 3; 
+    DIMLINE_TEXT_SIZE_MM = 3; // height of character
+    DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE = 2;
 
     //// END SETTINGS ////
 
@@ -260,26 +267,80 @@ export class DocViewSVGManager
         
     }
 
+    /** 
+     *  if a SVG Dimension is considered small
+     *  Utility used by Dimension Line drawing functions 
+    */
+    _svgDimLineIsSmall(dimLineNode:TXmlNode):boolean
+    {
+        const dimLineCoords = this._svgDimLineParseLine(dimLineNode)
+        // line length in PDF coords (pts!)
+        const lineLengthPdf = Math.sqrt(Math.pow(dimLineCoords[2] - dimLineCoords[0],2) + Math.pow(dimLineCoords[3] - dimLineCoords[1],2)); 
+        
+        return lineLengthPdf < convertValueFromToUnit(this.DIMLINE_TEXT_SIZE_MM*this.DIMLINE_IS_SMALL_FACTOR_TIMES_TEXT_WIDTH, 'mm', 'pnt')
+    }
+
+    /** Parse SVG dimension node and return line coordines in PDF system  */
+    _svgDimLineParseLine(dimLineNode:TXmlNode):[number,number,number,number]|null
+    {
+        const lineNode = txml.filter(dimLineNode.children, node => node.tagName === 'line')[0];
+
+        if(!lineNode) return null;
+
+        const lineX1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x1, 'x');
+        const lineX2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x2, 'x');
+        const lineY1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y1, 'y');
+        const lineY2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y2, 'y');
+
+        return [lineX1, lineY1, lineX2, lineY2];
+    }
+
+    /** Get normalized offset vector from dimension line 
+     *  TODO: This does not take into account the original offset direction!
+     *  NOTE: We can't use archiyou-core because we are probably in the main app!
+    */
+    _svgDimLineOffsetVec(dimLineNode:TXmlNode, length:number=1):[number,number]|null
+    {
+        const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
+
+        if(!dimLineCoords) return null;
+
+        const vec = [dimLineCoords[2]-dimLineCoords[0], dimLineCoords[3]-dimLineCoords[1]] as [number,number];
+        
+        return this._rotateVec(vec, 90, length)
+    }
+
+    /** Rotate a Vector a given angle around the origin and give it a certain length */
+    _rotateVec(v:[number,number], angle:number, length:number=1):[number,number]
+    {
+        const r = Math.sqrt(Math.pow(v[0],2) + Math.pow(v[1],2)); 
+        const angleRad = angle * Math.PI / 180;
+        return [
+            r * Math.cos(angleRad) / r * length, // normalize and then scale 
+            r * Math.sin(angleRad) / r * length 
+        ] as [number,number]
+    }
+
     /** Draw the line element of a dimLineNode to PDFdocument 
      *  Returns the coordinates of the line in PDF coordinates
     */
     _drawDimLineLine(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter):Array<number>
     {
-        const lineNode = txml.filter(dimLineNode.children, node => node.tagName === 'line')[0];
-        const lineX1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x1, 'x');
-        const lineX2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.x2, 'x');
-        const lineY1 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y1, 'y');
-        const lineY2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y2, 'y');
-        
-        pdfExporter?.activePDFDoc?.moveTo(lineX1, lineY1).lineTo(lineX2, lineY2)
+        const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
+
+        pdfExporter?.activePDFDoc?.moveTo(dimLineCoords[0], dimLineCoords[1])
+            .lineTo(dimLineCoords[2], dimLineCoords[3])
             .stroke()
             .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
             .fillColor('black')
 
-        return [lineX1, lineY1, lineX2, lineY2]
+        return dimLineCoords;
     }
 
-    /** Draw the line nodes of a dimeLineNode to PDFDocument */
+    /** Draw the line nodes of a dimeLineNode to PDFDocument 
+     * 
+     *  When dimension line is small, the arrows are flipped ( <--> to >--< )
+    */
     _drawDimLineArrows(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
     {
         const arrowNodes = txml.filter(dimLineNode.children, node => node.tagName === 'g' && node.attributes?.class?.includes('arrow'));
@@ -287,7 +348,8 @@ export class DocViewSVGManager
         arrowNodes.forEach(a => 
         {
             // Transform contains the coord of the arrow pointer - we also use PDF document transforms to place arrow
-            const tm = a.attributes?.transform.match(/translate\(([\-\d]+) ([\-\d]+)\)/);
+            const tm = a.attributes?.transform.match(/translate\(([\-\d\.]+) ([\-\d\.]+)\)/);
+
             const translateCoords = (tm) ? 
                         [
                             this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(tm[1]), 'x'),
@@ -297,13 +359,18 @@ export class DocViewSVGManager
             
             // Rotation of arrow
             const rm = a.attributes?.transform.match(/rotate\(([\-\d]+)\)/);
-            const rotateAngle = (rm) ? parseFloat(rm[1]) : 0;
+            let rotateAngle = (rm) ? parseFloat(rm[1]) : 0;
+            
+            if(this._svgDimLineIsSmall(dimLineNode))
+            {
+                // flip 180 degrees when line is too small
+                rotateAngle += 180;
+            }
             
             // Scaling of arrow to achieve arrow width set by DIMLINE_ARROW_PDF_WIDTH_MM
             const arrowScale = this.DIMLINE_ARROW_PDF_WIDTH_MM / convertValueFromToUnit(
-                this.DIMLINE_ARROW_SVG_WIDTH,  
-                this._svgXML.attributes['worldUnits'] || 'mm', 
-                'mm');
+                    this.DIMLINE_ARROW_SVG_WIDTH, this._svgXML.attributes['worldUnits'] || 'mm', 'mm');
+
 
             this._drawSVGPathToPDF(a.children[0].attributes?.d, pdfExporter, 
                 {
@@ -318,15 +385,44 @@ export class DocViewSVGManager
     _drawDimLineText(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
     {
         const textNode = txml.filter(dimLineNode.children, node => node.tagName === 'text')[0];
-        const x = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.x), 'x');
-        const y = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.y), 'y');
+        let x = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.x), 'x');
+        let y = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.y), 'y');
         const textValue = textNode.children[0];
+
+        // If dimension line is very small we place text away from it
+        if (this._svgDimLineIsSmall(dimLineNode))
+        {
+            const offsetAmount = convertValueFromToUnit(this.DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE * this.DIMLINE_TEXT_SIZE_MM, 'mm', 'pnt');
+            const offsetVec = this._svgDimLineOffsetVec(dimLineNode, offsetAmount)
+
+            if(!offsetVec)
+            { 
+                console.warn(`DocViewSVGManager::_drawDimLineText(): Can't get offset vector. Skipped offsetting small dimension line`); 
+            }
+            else 
+            {
+                const offsettedX = x + offsetVec[0];
+                const offsettedY = y + offsetVec[1]; 
+
+                // Draw offset line
+                pdfExporter?.activePDFDoc?.moveTo(x, y)
+                    .lineTo(offsettedX, offsettedY)
+                    .stroke()
+                    .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
+                    .fillColor('black')
+                
+                // update text position
+                x = offsettedX;
+                y = offsettedY;
+            }
+        }
     
         // Background rectangle
         if (this.DIMLINE_TEXT_BACKGROUND_COLOR)
         {
-            const bgWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
-            const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.3;
+            //const bgMaxWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
+            const bgWidth = mmToPoints(textValue.length * this.DIMLINE_TEXT_SIZE_MM) * 0.6; // Factor to make smaller, because width of letter is not 
+            const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.3; // Some factor to extend background a bit
             pdfExporter?.activePDFDoc?.rect(
                     x - bgWidth/2,
                     y - bgHeight/2, 
@@ -345,9 +441,7 @@ export class DocViewSVGManager
             {
                 width: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
                 align: 'center',
-            })
-        
-        
+            })   
     }
 
     /** Draw a raw SVG path d datastring to PDF after transforming 
