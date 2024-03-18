@@ -122,6 +122,7 @@ export class Image extends Container
         return data;
     }
 
+    /** Export image data as DataUrl base64 string */
     _exportImageDataBase64(data:ArrayBuffer):string
     {
         return `data:image/${this.getImageFormat()};base64,${arrayBufferToBase64(data)}`

@@ -10,7 +10,7 @@
 
 */
 
-import { CLASS_TO_STYLE, SVGtoPDFtransform } from './internal' // constants.s
+import { CLASS_TO_STYLE, Container, SVGtoPDFtransform } from './internal' // constants.s
 
 import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
 import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
@@ -39,6 +39,7 @@ export class DocViewSVGManager
     _svg:string
     _svgXML:TXmlNode
     _svgToPDFTransform:SVGtoPDFtransform // save important svg to pdf information for later use
+    
 
     constructor(view?:ContainerData)
     {
@@ -52,16 +53,31 @@ export class DocViewSVGManager
         }
     }
 
-    parse(view?:ContainerData):boolean
+    parse(view?:ContainerData):TXmlNode|null
     {
         this.reset();
-        this._svg = (!this._svg) ? view?.content?.data : this._svg;
+        this._setCleanSvg(view)
+
         if(!this._svg)
         {
-            return false;
+            return null;
         }
         this._svgXML = txml.parse(this._svg)[0] as TXmlNode; 
-        return true;
+        return this._svgXML;
+    }
+
+    _setCleanSvg(view?:ContainerData)
+    {
+        const svg = (!this._svg) ? view?.content?.data : this._svg;
+        this._svg = svg.replace(/\<\?xml [^>]+>/, ''); // clean potential <?xml tag
+        return this._svg
+    }
+
+    /** Used for JsPDF */
+    parseToElement(view?:ContainerData):Element
+    {
+        this._setCleanSvg(view)
+        return new JSDOM(this._svg)
     }
 
     reset()
@@ -328,11 +344,11 @@ export class DocViewSVGManager
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
-        pdfExporter?.activePDFDoc?.moveTo(dimLineCoords[0], dimLineCoords[1])
+        pdfExporter?.activePDFDoc?.stroke()
+            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
+            .setFillColor('black')
+            .moveTo(dimLineCoords[0], dimLineCoords[1])
             .lineTo(dimLineCoords[2], dimLineCoords[3])
-            .stroke()
-            .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
-            .fillColor('black')
 
         return dimLineCoords;
     }
@@ -375,7 +391,7 @@ export class DocViewSVGManager
             this._drawSVGPathToPDF(a.children[0].attributes?.d, pdfExporter, 
                 {
                     translate: translateCoords,
-                    rotate: rotateAngle,
+                    rotate: rotateAngle,  
                     scale: arrowScale,
                 }); // path
         })
@@ -405,11 +421,12 @@ export class DocViewSVGManager
                 const offsettedY = y + offsetVec[1]; 
 
                 // Draw offset line
-                pdfExporter?.activePDFDoc?.moveTo(x, y)
+                pdfExporter?.activePDFDoc?.stroke()
+                    .setFillColor('black')
+                    .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
+                    .moveTo(x, y)
                     .lineTo(offsettedX, offsettedY)
-                    .stroke()
-                    .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
-                    .fillColor('black')
+                    
                 
                 // update text position
                 x = offsettedX;
@@ -423,23 +440,26 @@ export class DocViewSVGManager
             //const bgMaxWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
             const bgWidth = mmToPoints(textValue.length * this.DIMLINE_TEXT_SIZE_MM) * 0.6; // Factor to make smaller, because width of letter is not 
             const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.3; // Some factor to extend background a bit
-            pdfExporter?.activePDFDoc?.rect(
+            pdfExporter?.activePDFDoc
+                    .fill()
+                    .setFillColor(this.DIMLINE_TEXT_BACKGROUND_COLOR)
+                    .rect(
                     x - bgWidth/2,
                     y - bgHeight/2, 
                     bgWidth, 
                     bgHeight // slightly higher then text
-                ).fill(this.DIMLINE_TEXT_BACKGROUND_COLOR); 
+                )
         }
         
         // Text
-        pdfExporter?.activePDFDoc?.fontSize(mmToPoints(this.DIMLINE_TEXT_SIZE_MM))
-        pdfExporter?.activePDFDoc?.fill('black').stroke();
+        pdfExporter?.activePDFDoc?.setFontSize(mmToPoints(this.DIMLINE_TEXT_SIZE_MM))
+        pdfExporter?.activePDFDoc?.fill().stroke().setFillColor('#000000');
         pdfExporter?.activePDFDoc?.text(
             textValue,
             x - mmToPoints(this.DIMLINE_TEXT_WIDTH_MM)/2,
             y - mmToPoints(this.DIMLINE_TEXT_SIZE_MM)/2,
             {
-                width: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
+                maxWidth: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
                 align: 'center',
             })   
     }
@@ -449,7 +469,7 @@ export class DocViewSVGManager
     */
     _drawSVGPathToPDF(d:string, pdfExporter:DocPDFExporter, localTransforms?:Record<string, any>, styles?:Record<string, any>)
     {
-        const PATH_CMD_TO_PDFKIT = {
+        const PATH_CMD_TO_JSPDF = {
             'M' : 'moveTo',
             'L' : 'lineTo',
         }
@@ -457,32 +477,40 @@ export class DocViewSVGManager
         const pathCommands = parseSVG(d);
         let doc = pdfExporter?.activePDFDoc;
 
+        if(!doc){
+            throw new Error(`DocViewSVGManager::_drawSVGPathToPDF: Please supply activePDFDoc (jsPDF) instance`)
+        }
+
         // transforms. NOTE: order is important!
         if(localTransforms)
         {   
             /** Translate contains the coordinate (offset from origin) of the end/start of dimension line */
             if(localTransforms?.translate)
             { 
-                doc = doc.translate(localTransforms.translate[0], localTransforms.translate[1])
+                doc.context2d.translate(localTransforms.translate[0], localTransforms.translate[1])
             }
             /* An SVG path arrow is originally located at [0,0], then transformed into position */
             if(localTransforms?.rotate)
             { 
-                doc = doc.rotate(localTransforms.rotate, 
-                        { origin: [0,0] }); // coordinate system origin is already translated
+                doc.context2d.rotate(localTransforms.rotate*Math.PI/180); // coordinate system origin is already translated. JsPDF needs radians
             }
             if(localTransforms?.scale !== undefined)
             { 
-                doc = doc.scale(localTransforms.scale, { origin: [0,0] }) // coordinate system origin is already translated
+                doc.context2d.scale(localTransforms.scale,localTransforms.scale) // coordinate system origin is already translated
             }
             
         }
 
+        // Set style
+        doc.stroke()
+            .setFillColor('black')
+            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
+
         pathCommands.forEach(cmd => 
         {
-            if(doc[PATH_CMD_TO_PDFKIT[cmd.code]]) // basic protection
+            if(doc[PATH_CMD_TO_JSPDF[cmd.code]]) // basic protection
             {
-                doc = doc[PATH_CMD_TO_PDFKIT[cmd.code]](
+                doc[PATH_CMD_TO_JSPDF[cmd.code]](
                     // basically moveTo or lineTo with coordinate pair
                     cmd.x,
                     cmd.y
@@ -494,25 +522,20 @@ export class DocViewSVGManager
             }
         })    
 
-        // wrap up
-        doc.stroke()
-            .fillColor('black')
-            .lineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
-
         // reset transforms (reverse order than applied earlier!)
         if(localTransforms)
         {
             if(localTransforms?.scale !== undefined)
             { 
-                doc = doc.scale(1.0/localTransforms.scale, { origin: [0,0] })
+                doc.context2d.scale(1.0/localTransforms.scale, 1.0/localTransforms.scale)
             }
             if(localTransforms.rotate)
             { 
-                doc = doc.rotate(-localTransforms.rotate,  { origin: [0,0 ] });
+                doc.context2d.rotate(-localTransforms.rotate);
             }
             if(localTransforms.translate)
             { 
-                doc = doc.translate(-localTransforms.translate[0], -localTransforms.translate[1])
+                doc.context2d.translate(-localTransforms.translate[0], -localTransforms.translate[1])
             }
         }
     }

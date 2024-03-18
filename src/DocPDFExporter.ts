@@ -1,62 +1,36 @@
 /**
  *  DocPdfExporter
  * 
- *  Takes data from Doc module and exports the documents to PDF using PDFkit
+ *  Takes data from Doc module and exports the documents to PDF using JsPDF
  * 
  *  IMPORTANT:
- *      Please add the following modules to use PDFExporter:
- *      - pdfkit@0.14.0
- *      - svg-to-pdfkit@0.1.8
- *      - pdfkit-table@0.1.99
- *     
+ *      Loading is dynamic. If your want to use PDF exporting add the following dependencies:
+ *      - jspdf
+ *      - svg2pdf.js
+ *      - jspdf-autotable    
  *  
  *  IMPORTANT NOTES:  
  *      - Doc module coordinate system origin is bottom-left (This is in line with PDF itself!)
- *      - PDFKit origin of coordinate system is at top-left
+ *      - JsPDF origin of coordinate system is at top-left
  * 
  *  INFO:
- *      - see example loading of fonts for pdfkit: https://github.com/foliojs/pdfkit/tree/master/examples/webpack
- * 
+ *      - see example loading of fonts for jspdf: https://raw.githack.com/MrRio/jsPDF/master/docs/index.html
+ *          
  */
 
-// IMPORTANT: If problems with fontkit
-//      Add this to your package.json
-//      
-//        "resolutions": {
-//              "pdfkit/**/fontkit": "2.0.2"
-//      }
-//
-//      to pin version of fontkit
-
-
-
-
-import fs from 'fs'; // virtual pdfkit filesystem as replacement of node
-
-import makePDFDocumentWithTables from '../libs/pdfkit-table'
-
-import { Container, DataRows, DataRowsColumnValue, DocData, DocPathStyle, SVGtoPDFtransform, TableContainerOptions } from './internal' // Doc
-import { PDFLinePath } from './internal' // types
-import { convertValueFromToUnit } from './internal'
+import { PageSize, convertValueFromToUnit } from './internal'
 import { PageData, ContainerData, Page } from './internal'
-
 import { DocViewSVGManager } from './DocViewSVGManager'
-
-// import type { PDFDocument, PDFPage } from '@types/pdfkit' // disabled because it does not work
-import BlobStream from 'blob-stream' // BlobStream for Web - TODO: disable for node
 
 import { arrayBufferToBase64, mmToPoints, pointsToMm } from './utils'
 
+import { Container, DataRows, DataRowsColumnValue, DocData, DocPathStyle, SVGtoPDFtransform, TableContainerOptions } from './internal' // Doc
+import { PDFLinePath } from './internal' // types
 
-// IMPORTANT: pdfkit needs fontkit ^2.0.0. Please add that requirement in package.json:
-//     "resolutions": {
-//    "pdfkit/**/fontkit": "2.0.2"
-//  }
-// 
+import { jsPDF, GState } from 'jspdf'
+import 'svg2pdf.js' // TODO: load dynamically?
+import autoTable from 'jspdf-autotable' // TODO: load dynamically?
 
-// Load font file for pdfkit (special loader in webpack). See raw-loader nuxt.config.js
-// All fonts: Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
-// TODO: check on Node
 
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
 
@@ -72,19 +46,17 @@ export class DocPDFExporter
 
     inDocs:Record<string, DocData> = {}; // incoming DocData by name
     
-    docs:Record<string,any> = {}; // Holds internal PDFkit documents
-    blobs:Record<string,Blob> = {};
+    docs:Record<string,jsPDF> = {}; // Holds internal jspdf documents
+    blobs:Record<string,Blob> = {}; // Documents as blobs
     
-    activeDoc:DocData
+    activeDoc:DocData 
     activePage:PageData
 
-    activePDFDoc:any // PDFDocument
-    activePDFPage:any // PDFPage
-    activeStream:any // TODO TS typing
+    activePDFDoc:jsPDF // NOTE: active page is not needed, part of activePDFDoc in JsPDF
 
-    _PDFDocument:any; // PDFDocument
-    _SVGtoPDF:any; // 
-    _hasPDFKit:boolean = false;
+    _jsPDF:any // the module
+    _jsPDFDoc:any // doc constructor - TODO: TS typing fix
+    _hasJsPDF:boolean = false;
 
     /** Make DocPDFExporter instance either empty or with data and onDone function */
     constructor(data?:DocData|Record<string, DocData>, onDone?:(blobs:Record<string,Blob>) => any)
@@ -117,15 +89,13 @@ export class DocPDFExporter
         this.activeDoc = undefined;
         this.activePage = undefined;
         this.activePDFDoc = undefined;
-        this.activePDFPage = undefined;
-        this.activeStream = undefined;
     }
 
     async export(data:DocData|Record<string,DocData>): Promise<Record<string, Blob>>
     {
         this.reset();
         try {  
-            await this.loadPDFKit(); 
+            await this.loadJsPDF(); 
         }
         catch(e)
         { 
@@ -137,76 +107,39 @@ export class DocPDFExporter
         if(!this.DEBUG)
         {
             const blobs = await this.run(data);
-            if (this.isBrowser()) this._saveBlob(); // Start file save in browser
+            if (this.isBrowser()) this._saveBlobToBrowserFile(); // Start file save in browser
             return blobs;
         }
         else {
             this.generateTestDoc();
         }
-         
     }
 
     /** Load PdfKit as module dynamically */
-    async loadPDFKit():Promise<any> // TODO: PDFKit typing
+    async loadJsPDF():Promise<DocPDFExporter> 
     {
-        // If PDFKit already loaded
-        if(this.hasPDFKit())
+        // If jsPDF already loaded
+        if(this.hasJsPDF())
         {
-            return new Promise((resolve) => resolve(this._PDFDocument))
+            return new Promise((resolve) => resolve(this._jsPDF))
         }
         else {
-            // Load PDFKit
-            // detect context of JS
+            // Dynamically load JsPDF
             const isBrowser = this.isBrowser();
             const isWorker = this.isWorker();
 
             if(isWorker || isBrowser)
             {
-                this._PDFDocument = await import('pdfkit');
-                this._SVGtoPDF = await import('svg-to-pdfkit');
-
-                this._PDFDocument = this._PDFDocument.default; // we need the default
-                this._SVGtoPDF = this._SVGtoPDF.default;
-
-                // some black magic to make pdfkit-table work
-                this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
-                
-                // load fonts in virtual fs
-                // all fonts in pdfkit: 
-                // Courier-Bold.afm Courier-BoldOblique.afm Courier-Oblique.afm Courier.afm Helvetica-Bold.afm Helvetica-BoldOblique.afm Helvetica-Oblique.afm Helvetica.afm Symbol.afm Times-Bold.afm Times-BoldItalic.afm Times-Italic.afm Times-Roman.afm ZapfDingbats.afm
-                try {
-                    /** IMPORTANT: Dynamically importing the .afm assets in webpack/brower, but not in Node 
-                     *  1. For the browser: pdfkit needs the .afm assets in the virtual file system 
-                     *  2. For node pdfkit has those already set up
-                     *  3. Webpack has a file loader and handles the font files correctly. On node, TS tries to revolve the dynamic import of files and give an error
-                     *  4. Solution here uses the capability of Webpack to parse these variable imports and loads the files
-                     *      But TS doesnt bother interpreting the variable bits and skips over these imports
-                    */
-                    const HelveticaFile = 'Helvetica.afm';
-                    const HelveticaBoldFile = 'Helvetica-Bold.afm';
-                    const Helvetica = await import(`pdfkit/js/data/${HelveticaFile}` /* webpackPreload: true */);
-                    const HelveticaBold = await import(`pdfkit/js/data/${HelveticaBoldFile}` /* webpackPreload: true */);
-                    fs.writeFileSync('data/Helvetica.afm', Helvetica.default); // see import on top of this page
-                    fs.writeFileSync('data/Helvetica-Bold.afm', HelveticaBold.default);
-                }
-                catch (e)
-                {
-                    console.error(`DocPDFExporter::loadPDFKit(): Could not find Helvetica font. "${e}"`)
-                }
+                this._jsPDF = await import('jspdf'); // this is the module entry
+                this._jsPDFDoc = this._jsPDF.jsPDF; // this is the make document function
             }
             else {
-                const nodePDFKitPath = 'pdfkit'; // To keep TS warnings out
-                this._PDFDocument = await import(nodePDFKitPath)
-                const svgToPDFPath = 'svg-to-pdfkit'
-                this._SVGtoPDF = await import(svgToPDFPath);
-                this._PDFDocument = this._PDFDocument.default; // we need the default
-                this._SVGtoPDF = this._SVGtoPDF.default;
-
-                // some black magic to make pdfkit-table work
-                this._PDFDocument = makePDFDocumentWithTables(this._PDFDocument);
+                const nodejsPDFPath = 'jspdf'; // To keep TS warnings out
+                this._jsPDF = await import(nodejsPDFPath)
+                this._jsPDFDoc = this._jsPDF.jsPDF; 
             }
 
-            return this._PDFDocument;
+            return this
         }
 
         
@@ -220,12 +153,12 @@ export class DocPDFExporter
     handleSuccesImport()
     {
         console.info(`DocPDFExporter:loadPDFKit: PDFKit loaded!`)
-        this._hasPDFKit = true;
+        this._hasJsPDF = true;
     }
 
-    hasPDFKit():boolean
+    hasJsPDF():boolean
     {
-        return this._hasPDFKit;
+        return this._hasJsPDF;
     }
 
     async run(data:DocData|Record<string,DocData>) : Promise<Record<string,Blob>>
@@ -236,48 +169,45 @@ export class DocPDFExporter
     /** Parse raw Doc data, either DocData or a set of documents in Record<string, DocData> */
     async parse(data?:DocData|Record<string, DocData>): Promise<Record<string,Blob>>
     {
-        if(!this.hasPDFKit())
+        if(!this.hasJsPDF())
         { 
-            console.error(`DocPDFExporter::parse(): Cannot generate PDF. Please add 'pdfkit' to your project package.json!`)
+            console.error(`DocPDFExporter::parse(): Cannot generate PDF. Please add 'jspdf' to your project dependencies!`)
+            return new Promise((resolve) => resolve(null))
         }
-
-        // set incoming inDocs by name
-        if (data?.name)
-        {
-            this.inDocs[(data as DocData).name] = data as DocData;            
-        } 
         else 
         {
-            this.inDocs = data as Record<string,DocData>;
+            // set incoming inDocs by name
+            if (data?.name)
+            {
+                this.inDocs[(data as DocData).name] = data as DocData;            
+            } 
+            else 
+            {
+                this.inDocs = data as Record<string,DocData>;
+            }
+
+            // parse docs sequentially
+            for( const docData of Object.values(this.inDocs))
+            {
+                await this._parseDoc(docData);
+            }
+            // JSPDF TODO
+            return this.blobs; // { docname: blob }
         }
-
-        // parse docs sequentially
-        for( const docData of Object.values(this.inDocs))
-        {
-            await this._parseDoc(docData);
-        }
-
-        return this.blobs; // { docname: blob }
-
     }
 
-    /** Make a simple PDF test document directly with pdfkit */
+    /** Make a simple PDF test document directly with jspdf */
     async generateTestDoc()
     {
-        // see: https://github.com/blikblum/pdfkit-webpack-example/blob/master/src/index.js
-        const doc = new this._PDFDocument();
-        const blobStream = BlobStream();
-        const docStream = doc.pipe(blobStream);
-        doc.fontSize(25).text('Test text', 100, 80);
-        doc.end();
-        docStream.on('finish', function() {
-          console.info('DocPDFExporter::generateTestDoc: Exporting Blob:')
-          console.info(docStream.toBlob('application/pdf'));
-        });
+        const doc = new this._jsPDFDoc() as jsPDF; // TODO: Fix TS typing
+        doc.setFontSize(25).text('Test text', 0, 0);
+        // NOTE: TS is weird with function jsPDF.output()
+        this.blobs['test'] = doc.output('blob' as any, { filename: `test.pdf` } ) as any as Blob; // see: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#output
+        this._saveBlobToBrowserFile('test'); // output to browser (if present)
     }
 
     /** Save the given doc (or the first) to file  */
-    async _saveBlob(docName?:string)
+    async _saveBlobToBrowserFile(docName?:string)
     {
         docName = docName || Object.keys(this.docs)[0];
         const blob = this.blobs[docName];
@@ -296,44 +226,31 @@ export class DocPDFExporter
     /** Parse Doc data into PDFDocument */
     async _parseDoc(d:DocData)
     {
-        // TODO: fix fonts. See: https://github.com/foliojs/pdfkit/blob/master/examples/webpack/webpack.config.js#L19
-        // or: https://github.com/foliojs/pdfkit/issues/623#issuecomment-284625259
-        const newPDFDoc = new this._PDFDocument({  autoFirstPage: false, font: 'Helvetica', margin: 0 });
+        const newPDFDoc = new this._jsPDFDoc({ 
+                                                orientation: 'landscape', 
+                                                unit: 'pt',  // we use points as unit for the pdfs
+                                                format: 'a4',  // TODO: make dynamic
+                                                putOnlyUsedFonts: true,  }); // see: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html
         this.docs[d.name] = newPDFDoc;
         this.activePDFDoc = newPDFDoc;
         this.activeDoc = d;
-
-        const stream = BlobStream();
-        this.activeStream = this.activePDFDoc.pipe(stream)
 
         // NOTE: cannot use forEach because it is not sequentially!
         for (const p of this.activeDoc.pages)
         {
             await this._makePage(p)
         }
-        await this._endActiveDoc();
+        this._endActiveDoc();
 
     }
     
     /** Wait until the active Doc stream is finished and place resulting Blob inside cache for later export */
-    _endActiveDoc():Promise<Blob>
+    _endActiveDoc():Blob
     {
-        const doc = this.activeDoc; 
-        const pdfDoc = this.activePDFDoc;
-        const docStream = this.activeStream;
-        pdfDoc.end();
-
-        return new Promise(resolve => 
-            {
-                docStream.on('finish', () => 
-                    {
-                        console.info(`DocPDFExporter::_endDoc: Finished Doc stream of ${doc.name}`)
-                        this.blobs[doc.name] = docStream.toBlob('application/pdf');
-                        resolve(this.blobs[doc.name]);
-                    }                
-                )
-            }
-        )
+        const doc = this.activeDoc; // Data
+        const pdfDoc = this.activePDFDoc; // JsPDF Doc instance
+        this.blobs[doc.name] = pdfDoc.output('blob' as any, { filename: `test.pdf` } ) as any as Blob; // NOTE: TS hack
+        return this.blobs[doc.name];
     }
 
     /** Get first Blob */
@@ -342,19 +259,14 @@ export class DocPDFExporter
         return (Object.values(this.blobs).length) ? Object.values(this.blobs)[0] : null;
     }
 
-    async _makePage(p:PageData):Promise<any> // PDFPage
+    async _makePage(p:PageData):Promise<any>
     {
-        // PDFKit Page docs: https://github.com/foliojs/pdfkit/blob/master/lib/page.js
-
+        // JsPDF Page docs: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#addPage
+        if(this.activePage) // first page is already made: so skip making a new one if activePage is not yet set
+        {
+            this.activePDFDoc.addPage(this.pageSizeToLowercase(p.size), p.orientation); // TODO: jsPDF uses 'a4', Archiyou A4 - need to convert?
+        }
         this.activePage = p;
-        const newPDFPage = this.activePDFDoc.addPage(
-            { 
-                size: p.size,
-                layout: p.orientation,
-                margin: 0,
-            }
-        )
-        this.activePDFPage = newPDFPage;
         
         // place containers of types like text, textarea, image, view (svg), table 
         for (const c of this.activePage.containers) // NOTE: cannot use forEach: not sequentially!
@@ -395,42 +307,46 @@ export class DocPDFExporter
         }
     }
 
-    //// TEXT ////
+    
 
+    //// TEXT ////
+    
+    /** Place text on activePDFDoc and active page */
     _placeText(t:ContainerData, p:PageData)
     {
-        // PDFKit Text: https://github.com/foliojs/pdfkit/blob/master/lib/mixins/text.js
-        // More: http://pdfkit.org/docs/text.html#the_basics
+        this.activePDFDoc.setFontSize(t?.content?.settings?.size); // in points already
 
+        // TODO: Make this calculation more elegant and clear
         const x = this.coordRelWidthToPoints(t.position[0], p) 
                     - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
 
-        this.activePDFDoc.fontSize(t?.content?.settings?.size), // in points already
+
         this.activePDFDoc.text(
             t?.content?.data, 
             x, // from relative page coords to absolute PDF points
             this.coordRelHeightToPoints(t.position[1], p),
-            { // PDF text options
-                ...this._parseTextOptions(t, p)
+            { // jsPDF text options
+                ...this._setTextOptions(t, p)
             }
         );
-        // reset text cursor (not needed because we only use absolute coordinates)
-        this.activePDFDoc.x = 0;
-        this.activePDFDoc.y = 0;
     }
 
-    /** Parse TextOptions to PDF text options */
-    _parseTextOptions(t:ContainerData, p:PageData):Object
+    /** Parse TextOptions to PDF text options, set basic styling directly on activePDFDoc and return parameters for specific creation function */
+    _setTextOptions(t:ContainerData, p:PageData):Record<string,any>
     {
-        const pdfTextOptions = {
-            width: this.relWidthToPoints(t.width, p), // from Container
-            height: this.relHeightToPoints(t.height, p),
-            fill: t?.content?.settings?.color,
-            ...t?.content?.settings, // just plugin TextOptions directly into pdfkit
+        // Set basics directly on document
+        this.activePDFDoc.setTextColor(t?.content?.settings?.color);
+        this.activePDFDoc.setFontSize(t?.content?.settings?.size); // see: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#setFontSize
+
+        // Text creation params in jsPDF: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#text
+        const createTextOptions = {
+            maxWidth: this.relWidthToPoints(t.width, p), // from Container
+            align: t?.content?.settings?.align,
+            baseline: t?.content?.settings?.baseline,
+            angle: t?.content?.settings?.angle,
         };
 
-        // NOTE: pdfkit is brittle for null values
-        return this.removeEmptyValueKeysObj(pdfTextOptions); 
+        return this.removeEmptyValueKeysObj(createTextOptions); 
     }
 
     //// IMAGE ////
@@ -441,7 +357,7 @@ export class DocPDFExporter
         // see docs: http://pdfkit.org/docs/images.html
         /* 
             NOTES:
-            - PDFkit places images with [left,top] as pivot and y-axis in [left,top]    
+            - jsPDF places images with [left,top] as pivot and y-axis in [left,top]    
             - container width and height are relative to page width/height (if widthRelativeTo = 'page')
             - heightAbs/widthAbs are in docUnits
             - We use a reference to PageData here to avoid this.activePage while working with async methods
@@ -451,38 +367,57 @@ export class DocPDFExporter
         if(img?.content?.data && img?.content?.source)
         {
             const imgExt = this._getImageExt(img.content.source);    
+            const { x, y } = this.containerToPositionInPnts(img, p);
 
             // if SVG image
             if (imgExt === 'svg')
             {
-                const { x, y } = this.containerToPositionInPnts(img, p);
+                let svgRootElem;
+                if (this.isBrowser())
+                {
+                    svgRootElem = new DOMParser().parseFromString(img.content.data, 'image/svg+xml').rootElement; // TODO: replace rootElement
+                }
+                else {
+                    // TODO: node js solution replacing DOMParser
+                }
+
+                if(!svgRootElem)
+                {
+                    console.error(`DocPdfExporter: Can not place SVG image ${img.name}`);
+                    return;
+                }
+
+                console.log(x);
+                console.log(y);
+                console.log(this.relWidthToPoints(img.width, p));
+                console.log(this.relHeightToPoints(img.height, p));
+
         
-                this._SVGtoPDF(
-                    this.activePDFDoc, 
-                    img.content.data, 
-                    x,
-                    y,
+                await this.activePDFDoc.svg(
+                    svgRootElem as any, // TS: TXmlNode -> Element
                     {
                         // options
+                        x,
+                        y,
                         width: this.relWidthToPoints(img.width, p),
                         height: this.relHeightToPoints(img.height, p),
-                        preserveAspectRatio : this.getSVGPreserveAspectRatioOption(img)
+                        //preserveAspectRatio : this.getSVGPreserveAspectRatioOption(img)
                     }
                 );
             }
             else 
             {
                 // if a bitmap (jpg or png)
-                const { x, y } = this.containerToPositionInPnts(img, p);
+                const { width, height } = this._getImageOptions(img, p)
             
-                this.activePDFDoc.image(
+                // see: https://raw.githack.com/MrRio/jsPDF/master/docs/module-addImage.html
+                this.activePDFDoc.addImage(
                     img.content.data, // already saved in base64 format
-                    x,
-                    y,
-                    {
-                        // options            
-                        ...this._parseImageOptions(img, p)
-                    }
+                    'JPEG', // format of file if filetype-recognition fails
+                    x, // in pnts
+                    y, // in pnts
+                    width,
+                    height
                 )    
             }
         }
@@ -490,6 +425,7 @@ export class DocPDFExporter
             console.error(`DocPDFExporter:_placeImage: Error placing image from url "${img.content.source}"!`);
         }
 
+        
     }
 
     /** Returns extension (without .) from url */
@@ -502,16 +438,35 @@ export class DocPDFExporter
     }
     
 
-    _parseImageOptions(img:ContainerData, p:PageData):Object
+    _getImageOptions(img:ContainerData, p:PageData):Record<string,any>
     {
-        const w = this.relWidthToPoints(img.width, p);
-        const h = this.relHeightToPoints(img.height, p);
-        const pdfImgOptions = {
-            fit: (w && h && img?.content?.settings?.fit === 'contain') ? [w,h] : null,
-            cover : (w && h && img?.content?.settings?.fit === 'cover') ? [w,h] : null,
+        // calculate width/height based on fit settings
+        // cover: fill entire container with image
+        // fit: fit image inside container
+        let w = this.relWidthToPoints(img.width, p);
+        let h = this.relHeightToPoints(img.height, p);
+
+        const origImageProps = this.activePDFDoc.getImageProperties(img.content.data)
+        const origImageRatio = origImageProps.height/origImageProps.width;
+        const containerImageRatio = img.height/img.width;
+        
+        const fit = img?.content?.settings?.fit || 'contain'; // default is contain, co
+
+        if(origImageRatio < containerImageRatio) // width determines fitting
+        {
+            if(fit === 'contain'){ h = w * origImageRatio; }
+            else { w = h / origImageRatio;} // cover
+        }
+        else {
+            // fit to height
+            if(fit === 'contain'){ w = h / origImageRatio; }
+            else { h = w * origImageRatio; } // cover
         }
 
-        return this.removeEmptyValueKeysObj(pdfImgOptions)
+        return { 
+            width: w,
+            height: h
+        }
     }
     
     //// SVG VIEW ////
@@ -525,6 +480,7 @@ export class DocPDFExporter
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
+        
         const svgEdit = new DocViewSVGManager();
         if (!svgEdit.parse(view))
         { 
@@ -537,11 +493,12 @@ export class DocPDFExporter
 
         if(pdfLinePaths)
         {
+            this.activePDFDoc.stroke();
             pdfLinePaths.forEach( path => {
                 // draw line onto PDF document
-                let d = this.activePDFDoc.path(path.path)
-                        .stroke();
-                d = this._applyPathStyle(d, path.style);
+                this._setPathStyle(d, path.style);
+                this.activePDFDoc.path([path.path])                        
+                
             })
         }
 
@@ -558,31 +515,57 @@ export class DocPDFExporter
                 this.relWidthToPoints(view.width, p),
                 this.relHeightToPoints(view.height, p),
             ).stroke();
-            this._applyPathStyle(d, view?.borderStyle)
+            this._setPathStyle(d, view?.borderStyle)
         }
+
     }
 
-    _applyPathStyle(doc:any, style?:DocPathStyle) // doc: PDFDocument
+    _setPathStyle(style?:DocPathStyle):jsPDF // doc: PDFDocument
     {
-        if (!style || typeof style !== 'object') return doc;
+        const STYLE_PROPS_TO_GSTATE = {
+            strokeOpacity : 'stroke-opacity',
+            fillOpacity: 'opacity',
+        }
 
-        // style attributes translate directly into methods on doc:PDFDocument
-        // for example: lineWidth(...), fillOpacity(...)
-        // See: https://pdfkit.org/docs/vector.html#fill_and_stroke_styles
-        for (const [fn,val] of Object.entries(style))
+        if (!style || typeof style !== 'object') return this.activePDFDoc;
+
+
+        // style attributes translate directly into methods on doc:jsPDF or for GState
+        // for example: lineWidth(...) => setLineWidth, fillOpacity(...) => setFillOpacity
+        // or strokeOpacity => GState.stroke-opacity
+        // https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#setFillColor
+
+        this.activePDFDoc.saveGraphicsState(); // backup GState
+
+        for (const [styleProp,val] of Object.entries(style))
         {
-            if(typeof doc[fn] === 'function')
+            // We have to a Gstate property (strokeOpacity and fillOpacity)
+            if(Object.keys(STYLE_PROPS_TO_GSTATE).includes(styleProp))
             {
-                doc = doc[fn](val); // execute style function
+                const gState = {};
+                gState[STYLE_PROPS_TO_GSTATE[fn]] = val;
+                this.activePDFDoc.setGState(new GState(gState));
+            }
+            else {
+                const setFnName = `set${styleProp.charAt(0).toUpperCase() + styleProp.slice(1)}`
+                if(typeof this.activePDFDoc[setFnName] === 'function')
+                {
+                    this.activePDFDoc[setFnName](val); // execute style function
+                }
             }
         }
 
-        return doc;
+        this.activePDFDoc.restoreGraphicsState(); // restore Gstate
+
+        return this.activePDFDoc;
     }
 
     
     //// TABLE ////
 
+    /** Place table using jsPDF AutoTable 
+     *  See: https://github.com/simonbengtsson/jsPDF-AutoTable
+    */
     async _placeTable(t:ContainerData, p:PageData)
     {
         if(!Array.isArray(t?.content?.data) || t?.content?.data.length === 0)
@@ -590,18 +573,19 @@ export class DocPDFExporter
             console.error(`DocPDFExporter::_placeTable: Skipped Table "${t.name}" without data!`)
             return;
         }
-        await this.activePDFDoc.table(
+
+        autoTable(this.activePDFDoc,
             { 
-                title: '', // HTML rendered has no label yet! So omit here too.
-                headers: Object.keys((t?.content?.data as DataRowsColumnValue)[0]).map(v => { return { label: v, headerColor: 'white'}}),
-                rows: t?.content?.data.map( r => Object.values(r)),
-            },
-            this._parseTableSettings(t, p)
+                head: Object.values((t?.content?.data as DataRowsColumnValue)[0]), 
+                body: t?.content?.data.map( r => Object.values(r))
+            }
         )
+        
     }
 
     _parseTableSettings(t:ContainerData, p:PageData): Object
     {
+        /*
         const settings = t?.content?.settings as TableContainerOptions
 
         this.activePDFDoc.fontSize(settings?.fontsize);
@@ -637,10 +621,12 @@ export class DocPDFExporter
 
         // NOTE: pdfkit is brittle for null values
         return this.removeEmptyValueKeysObj(pdfTableSettings); 
+        */
     }
 
     _drawTableCellRect(rectCell:any, header:boolean=false) // { x, y , width, height }
     {
+        /*
         // !!!! IMPORTANT: Don't modify rectCell directly, because it affects all cells
         if(rectCell)
         {
@@ -654,6 +640,7 @@ export class DocPDFExporter
             .strokeColor('#000000')
             .stroke();
         }
+        */
     }
 
     //// UTILS ////
@@ -772,6 +759,13 @@ export class DocPDFExporter
         await writable.write(contents);
         // Close the file and write the contents to disk.
         await writable.close();
+    }
+
+    //// MISC UTILS ////
+
+    pageSizeToLowercase(s:PageSize):string
+    {
+        return (typeof(s) !== 'string') ? s : s.toLowerCase();
     }
 
     //// SVG UTILS ////

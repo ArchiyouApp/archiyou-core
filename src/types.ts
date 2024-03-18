@@ -519,18 +519,23 @@ export interface TableContainerOptions
 
 //// DOCS:PAGE:CONTAINER:TEXT ////
 
+export type TextAreaAlign = 'left'|'right'|'center'|'fill';
+export type TextBaseline = 'alphabetic'|'ideographic'|'bottom'|'top'|'middle'|'hanging'
+
+// see: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#text
 export interface TextOptions
 {
     size?:number|string // saved in 'points' (like in Word) - units are also allowed but converted in options
     color?:string // always converted to hex
-    // above parameters are directly plugged into pdfkit. see: https://pdfkit.org/docs/text.html#text_styling
-    // TODO: other interesting options: font type (now only Helvetica), columns
-    width?:number
-    height?:number
-    underline?:boolean
-    strike?:boolean    
-    oblique?:boolean
+    width?:number // TODO: needed?
+    height?:number // TODO: needed?
+    underline?:boolean // TODO implement in renderer
+    strike?:boolean // TODO implement in renderer   
+    oblique?:boolean // TODO implement in renderer
     align?:TextAreaAlign
+    baseline?:TextBaseline
+    angle?:number // in degrees
+    // NOTE: some of these parameters are plugged directly into jsPDF.text()
 }
 
 //// DOCS:PAGE:CONTAINER:VIEW ////
@@ -557,7 +562,7 @@ export interface SVGtoPDFtransform
 
 //// DOCS:PAGE:CONTAINER:TEXTAREA ////
 
-export type TextAreaAlign = 'left'|'right'|'center'|'fill';
+
 
 export interface TextAreaOptions
 {
@@ -682,10 +687,10 @@ export interface BeamLikeDims
 /** Configurator on how to draw shapes on documents (HTML or PDF) */
 export interface DocPathStyle {
     // see: https://pdfkit.org/docs/vector.html
-    lineWidth?:number
-    lineCap?:'butt'|'round'|'square'
+    lineWidth?:number // in pnts
+    lineCap?:'miter'|'bevel'|'round' // same as join. See: https://raw.githack.com/MrRio/jsPDF/master/docs/jspdf.js.html#line5364
     lineJoin?:'miter'|'bevel'|'round'
-    dash?:Array<number|number> // size, space
+    lineDashPattern?:Array<number|number> // size, space
     strokeColor?:string // 'red', '#FF0000'
     strokeOpacity?:number // [0.0-1.0]
     fillColor?:string
