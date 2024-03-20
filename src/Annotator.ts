@@ -288,7 +288,7 @@ export class DimensionLine extends BaseAnnotation
         */
        const SIZE = '10 5'; // Size of non-rotated graphic, use this for scaling
        const ARROWS_SVG  = {
-            default: '<path class="arrow-path" style="fill:none;stroke-width:0.5" d="M-5 5 L 0 0 L 5 5" />'
+            default: '<path class="arrow-path" style="fill:none;stroke-width:0.5" d="M -5 5 L 0 0 L 5 5" />'
        }
        const DEFAULT_ARROW_SVG = 'default'
 

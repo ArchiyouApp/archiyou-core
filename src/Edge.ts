@@ -1068,9 +1068,10 @@ export class Edge extends Shape
     }
 
     /** Export (segmentized) Edge (only X,Y coords) to SVG string 
-     *  <path d="M 10,10 L 100,200">
+     *  <path d="M 10 10 L 100 200">
+     *  IMPORTANT: official SVG path (without comma!)
+     *  code inspired from CadQuery: https://github.com/CadQuery/cadquery/blob/917d918e34690c101a50a233a11026974b87574b/cadquery/occ_impl/exporters/svg.py#L84
     */
-    // code inspired from CQ: https://github.com/CadQuery/cadquery/blob/917d918e34690c101a50a233a11026974b87574b/cadquery/occ_impl/exporters/svg.py#L84
     toSvg():string
     {
         /* OC docs: 
@@ -1094,11 +1095,11 @@ export class Edge extends Shape
                 // NOTE: We just omit the x coordinate. TODO: Warn about exporting a non-flat Edge
                 if(p == 0) // first point of Edge, move command
                 {
-                    svgPathD += `M${point.x},${point.y}`;
+                    svgPathD += `M ${point.x} ${point.y}`;
                 }
                 else {
                     // all others: lineTo command
-                    svgPathD += ` L${point.x},${point.y}`;
+                    svgPathD += ` L ${point.x} ${point.y}`;
                 }
             }
         }

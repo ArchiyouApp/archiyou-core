@@ -39,8 +39,15 @@ export class DocPDFExporter
     //// SETTINGS ////
 
     DEBUG = false; // test raw PDFkit output
+    
+    TEXT_ALIGN_DEFAULT = 'left';
+    TEXT_BASELINE_DEFAULT = 'top';
+    
+    TABLE_FONTSIZE_DEFAULT = 8;
     TABLE_BORDER_THICKNESS_MM = 0.1;
-    TABLE_PADDING_MM = 3;
+    TABLE_PADDING_MM = 2;
+
+    
 
     //// END SETTINGS
 
@@ -341,9 +348,9 @@ export class DocPDFExporter
         // Text creation params in jsPDF: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#text
         const createTextOptions = {
             maxWidth: this.relWidthToPoints(t.width, p), // from Container
-            align: t?.content?.settings?.align,
-            baseline: t?.content?.settings?.baseline,
-            angle: t?.content?.settings?.angle,
+            align: t?.content?.settings?.align || this.TEXT_ALIGN_DEFAULT, // left is default
+            baseline: t?.content?.settings?.baseline ?? this.TEXT_BASELINE_DEFAULT,
+            angle: t?.content?.settings?.angle || 0,
         };
 
         return this.removeEmptyValueKeysObj(createTextOptions); 
@@ -574,10 +581,24 @@ export class DocPDFExporter
             return;
         }
 
+        const settings = t?.content?.settings as TableContainerOptions;
+        const x = this.coordRelWidthToPoints(t.position[0], p) 
+                    - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
+        const y = this.coordRelHeightToPoints(t.position[1], p)
+
         autoTable(this.activePDFDoc,
             { 
-                head: Object.values((t?.content?.data as DataRowsColumnValue)[0]), 
-                body: t?.content?.data.map( r => Object.values(r))
+                theme: 'plain',
+                head: [Object.keys((t?.content?.data as DataRowsColumnValue)[0])],  // [[]]
+                body: t?.content?.data.map( r => Object.values(r)),
+                margin: x, 
+                startY: y, 
+                tableWidth: this.relWidthToPoints(t.width, p), 
+                styles: {
+                    fontSize:  settings?.fontsize ?? this.TABLE_FONTSIZE_DEFAULT, 
+                    cellPadding: mmToPoints(this.TABLE_PADDING_MM),
+                    lineWidth: mmToPoints(this.TABLE_BORDER_THICKNESS_MM)
+                }
             }
         )
         

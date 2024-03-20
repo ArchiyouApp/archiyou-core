@@ -30,7 +30,7 @@ export class DocViewSVGManager
     DIMLINE_ARROW_PDF_WIDTH_MM = 5; 
     DIMLINE_IS_SMALL_FACTOR_TIMES_TEXT_WIDTH = 3; // what is considered a small dimension line (in WIDTH) - different rendering than activated
     DIMLINE_TEXT_WIDTH_MM = 8; // max text width
-    DIMLINE_TEXT_BACKGROUND_COLOR = 'white';
+    DIMLINE_TEXT_BACKGROUND_COLOR = '#FFFFFF';
     DIMLINE_TEXT_SIZE_MM = 3; // height of character
     DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE = 2;
 
@@ -208,17 +208,20 @@ export class DocViewSVGManager
         return linePaths;
     }
     
-    /** Given a SVG path (in format M4193,-1011 L4231,-1011) for a line extract start and end coordinates  */
+    /** Given a SVG path for a Line (in format M 10 10 L 10 10), extract start and end coordinates  */
     _pathCmdToLineData(d:string):Array<number|number|number|number>
     {
-        const m = d.match(/M([^,]+),([^,]+) L([^,]+),([^$]+)/);
+        const m = d.match(/M *([^ ]+) ([^ ]+) L *([^ ]+) ([\d\-]+)/); // some robustness for no spacing: M5 5 L10
+
+        console.log(m);
+
         if(Array.isArray(m))
         {
             m.shift();
             return m.map(c => parseFloat(c))
         }
         else {
-            console.error(`DocViewSVGManager::_pathCmdToLineData: Failed to parse path: "${d}"`);
+            console.error(`DocViewSVGManager::_pathCmdToLineData: Failed to parse path as a Line: "${d}"`);
         }
     }
 
@@ -387,7 +390,6 @@ export class DocViewSVGManager
             const arrowScale = this.DIMLINE_ARROW_PDF_WIDTH_MM / convertValueFromToUnit(
                     this.DIMLINE_ARROW_SVG_WIDTH, this._svgXML.attributes['worldUnits'] || 'mm', 'mm');
 
-
             this._drawSVGPathToPDF(a.children[0].attributes?.d, pdfExporter, 
                 {
                     translate: translateCoords,
@@ -438,17 +440,18 @@ export class DocViewSVGManager
         if (this.DIMLINE_TEXT_BACKGROUND_COLOR)
         {
             //const bgMaxWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
-            const bgWidth = mmToPoints(textValue.length * this.DIMLINE_TEXT_SIZE_MM) * 0.6; // Factor to make smaller, because width of letter is not 
+            const bgWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM); // Factor to make smaller, because width of letter is not 
             const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.3; // Some factor to extend background a bit
             pdfExporter?.activePDFDoc
                     .fill()
-                    .setFillColor(this.DIMLINE_TEXT_BACKGROUND_COLOR)
-                    .rect(
-                    x - bgWidth/2,
-                    y - bgHeight/2, 
-                    bgWidth, 
-                    bgHeight // slightly higher then text
-                )
+                    .setFillColor(this.DIMLINE_TEXT_BACKGROUND_COLOR) // DEBUGGING 
+                    .rect(  // see: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#rect
+                        x - bgWidth/2,
+                        y - bgHeight/2, 
+                        bgWidth, 
+                        bgHeight,
+                        'F' // set fill instead of stroke (default)
+                    )
         }
         
         // Text
@@ -456,16 +459,17 @@ export class DocViewSVGManager
         pdfExporter?.activePDFDoc?.fill().stroke().setFillColor('#000000');
         pdfExporter?.activePDFDoc?.text(
             textValue,
-            x - mmToPoints(this.DIMLINE_TEXT_WIDTH_MM)/2,
-            y - mmToPoints(this.DIMLINE_TEXT_SIZE_MM)/2,
+            x, // baseline and align take care of centering
+            y,
             {
                 maxWidth: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
-                align: 'center',
+                align: 'center', // horizontal align
+                baseline: 'middle'
             })   
     }
 
     /** Draw a raw SVG path d datastring to PDF after transforming 
-     *  styles record needs to correspond with those of pdfkit: https://pdfkit.org/docs/vector.html
+     *  TODO: styles for jsPDF
     */
     _drawSVGPathToPDF(d:string, pdfExporter:DocPDFExporter, localTransforms?:Record<string, any>, styles?:Record<string, any>)
     {
@@ -481,8 +485,9 @@ export class DocViewSVGManager
             throw new Error(`DocViewSVGManager::_drawSVGPathToPDF: Please supply activePDFDoc (jsPDF) instance`)
         }
 
-        // transforms. NOTE: order is important!
-        if(localTransforms)
+        // Using jsPDF.context2d for transformations. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html
+
+        if(localTransforms) // Start transforming
         {   
             /** Translate contains the coordinate (offset from origin) of the end/start of dimension line */
             if(localTransforms?.translate)
@@ -500,21 +505,18 @@ export class DocViewSVGManager
             }
             
         }
-
-        // Set style
-        doc.stroke()
-            .setFillColor('black')
-            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
-
+        
+        const drawContext = doc.context2d;
+        drawContext.beginPath();
+        drawContext.lineWidth = mmToPoints(this.DIMLINE_LINE_THICKNESS_MM);
+        // TODO: other styling here. Where is Stroke color?
+    
+        // Draw path by issuing SVG commands
         pathCommands.forEach(cmd => 
         {
-            if(doc[PATH_CMD_TO_JSPDF[cmd.code]]) // basic protection
+            if(drawContext[PATH_CMD_TO_JSPDF[cmd.code]]) // basic protection
             {
-                doc[PATH_CMD_TO_JSPDF[cmd.code]](
-                    // basically moveTo or lineTo with coordinate pair
-                    cmd.x,
-                    cmd.y
-                )
+                drawContext[PATH_CMD_TO_JSPDF[cmd.code]]( cmd.x, cmd.y);
             }
             else {
                 console.error(`DocViewSVGManager::_drawSVGPathToPDF: Unknown/unmapped SVG path command: "${cmd.code}"`)
@@ -522,6 +524,13 @@ export class DocViewSVGManager
             }
         })    
 
+        drawContext.stroke(); // finalize path. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html#~stroke
+
+
+        // reset transformations
+        drawContext.setTransform(1, 0, 0, 1, 0 ,0); // reset
+
+        /*
         // reset transforms (reverse order than applied earlier!)
         if(localTransforms)
         {
@@ -531,13 +540,14 @@ export class DocViewSVGManager
             }
             if(localTransforms.rotate)
             { 
-                doc.context2d.rotate(-localTransforms.rotate);
+                //doc.context2d.rotate(-localTransforms.rotate);
             }
             if(localTransforms.translate)
             { 
-                doc.context2d.translate(-localTransforms.translate[0], -localTransforms.translate[1])
+                //doc.context2d.translate(-localTransforms.translate[0], -localTransforms.translate[1])
             }
         }
+        */
     }
 
     //// UTILS ////
