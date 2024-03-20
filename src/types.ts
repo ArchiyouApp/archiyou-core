@@ -684,7 +684,9 @@ export interface BeamLikeDims
 //// DOC STYLING ////
 
 
-/** Configurator on how to draw shapes on documents (HTML or PDF) */
+/** Configurator on how to draw shapes on documents (HTML or PDF) 
+ *  These settings correspond to the style functions of jsPDF (with some exceptions!)
+*/
 export interface DocPathStyle {
     // see: https://pdfkit.org/docs/vector.html
     lineWidth?:number // in pnts
@@ -692,14 +694,14 @@ export interface DocPathStyle {
     lineJoin?:'miter'|'bevel'|'round'
     lineDashPattern?:Array<number|number> // size, space
     strokeColor?:string // 'red', '#FF0000'
-    strokeOpacity?:number // [0.0-1.0]
+    strokeOpacity?:number // [0.0-1.0] - NOTE: on jsPDF this is (set)drawColor 
     fillColor?:string
     fillOpacity?:number
 }
 
 export interface PDFLinePath 
 {
-    path: string // the d of SVG paths in PDF coords
+    path: string // the d of SVG paths in PDF coords: M 10 10 L 200 200 ...
     style: DocPathStyle
 }
 

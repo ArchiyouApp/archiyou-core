@@ -394,12 +394,6 @@ export class DocPDFExporter
                     return;
                 }
 
-                console.log(x);
-                console.log(y);
-                console.log(this.relWidthToPoints(img.width, p));
-                console.log(this.relHeightToPoints(img.height, p));
-
-        
                 await this.activePDFDoc.svg(
                     svgRootElem as any, // TS: TXmlNode -> Element
                     {
@@ -498,21 +492,26 @@ export class DocPDFExporter
         // Transform incoming SVG Shape paths (in model space) into PDF paths in the space defined by the View Container
         const pdfLinePaths:Array<PDFLinePath> = svgEdit.toPDFDocShapePaths(this,view,p);
 
+        // NOTE: activePDFDoc.saveGraphicsState() / activePDFDoc.restoreGraphicsState() are malfunctioning here
         if(pdfLinePaths)
         {
             this.activePDFDoc.stroke();
             pdfLinePaths.forEach( path => {
                 // draw line onto PDF document
-                this._setPathStyle(d, path.style);
-                this.activePDFDoc.path([path.path])                        
-                
+                this._setPathStyle(path.style);
+                // jsPDF needs Line paths as [{op: m|l, c: [x,y] }]
+                const pathLines = svgEdit._pdfLinePathToJsPDFPathLines(path);
+                this.activePDFDoc.path(pathLines)                        
             })
         }
+        
+        //this.activePDFDoc.restoreGraphicsState(); // restore Gstate
 
         // Draw annotations
         svgEdit.drawDimLinesToPDF(this);
 
         // draw border around container
+        // TODO: check!
         const viewPositionPnts = this.containerToPositionInPnts(view, p);
         if (view.border)
         {
@@ -522,27 +521,36 @@ export class DocPDFExporter
                 this.relWidthToPoints(view.width, p),
                 this.relHeightToPoints(view.height, p),
             ).stroke();
-            this._setPathStyle(d, view?.borderStyle)
+            this._setPathStyle(view?.borderStyle)
         }
 
     }
 
+    /** Set styling before drawing anything
+     *  IMPORTANT: Please backup and restore these settings if needed 
+     *      with 
+     *          this.activePDFDoc.saveGraphicsState(); // backup GState
+     *          this.activePDFDoc.restoreGraphicsState()
+     */
     _setPathStyle(style?:DocPathStyle):jsPDF // doc: PDFDocument
     {
+        // Convert special props that need to be get in GState instead directly on jsPDF doc in activePDFDoc
         const STYLE_PROPS_TO_GSTATE = {
             strokeOpacity : 'stroke-opacity',
             fillOpacity: 'opacity',
         }
 
-        if (!style || typeof style !== 'object') return this.activePDFDoc;
+        // Some exceptions to direct mapping from DocPathStyle to jsPDF
+        const STYLE_PROPS_TRANSFORM_FOR_JSPDF = {
+            strokeColor: 'drawColor', 
+        }
 
+        if (!style || typeof style !== 'object') return this.activePDFDoc;
 
         // style attributes translate directly into methods on doc:jsPDF or for GState
         // for example: lineWidth(...) => setLineWidth, fillOpacity(...) => setFillOpacity
         // or strokeOpacity => GState.stroke-opacity
         // https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#setFillColor
-
-        this.activePDFDoc.saveGraphicsState(); // backup GState
 
         for (const [styleProp,val] of Object.entries(style))
         {
@@ -550,19 +558,21 @@ export class DocPDFExporter
             if(Object.keys(STYLE_PROPS_TO_GSTATE).includes(styleProp))
             {
                 const gState = {};
-                gState[STYLE_PROPS_TO_GSTATE[fn]] = val;
+                gState[STYLE_PROPS_TO_GSTATE[styleProp]] = val;
                 this.activePDFDoc.setGState(new GState(gState));
             }
             else {
-                const setFnName = `set${styleProp.charAt(0).toUpperCase() + styleProp.slice(1)}`
+                const stylePropJsPDF = STYLE_PROPS_TRANSFORM_FOR_JSPDF[styleProp] ?? styleProp;
+                const setFnName = `set${stylePropJsPDF.charAt(0).toUpperCase() + stylePropJsPDF.slice(1)}`; // transform from prop to set{Prop}() function
                 if(typeof this.activePDFDoc[setFnName] === 'function')
                 {
                     this.activePDFDoc[setFnName](val); // execute style function
                 }
+                else {
+                    console.warn(`DocPDFExporter::_setPathStyle(): Trying to set style property "${styleProp}" with unknown jsPDF function: jsPDF.${setFnName}(). Check config!`)
+                }
             }
         }
-
-        this.activePDFDoc.restoreGraphicsState(); // restore Gstate
 
         return this.activePDFDoc;
     }
@@ -602,66 +612,6 @@ export class DocPDFExporter
             }
         )
         
-    }
-
-    _parseTableSettings(t:ContainerData, p:PageData): Object
-    {
-        /*
-        const settings = t?.content?.settings as TableContainerOptions
-
-        this.activePDFDoc.fontSize(settings?.fontsize);
-
-        const x = this.coordRelWidthToPoints(t.position[0], p) 
-                    - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
-        const y = this.coordRelHeightToPoints(t.position[1], p)
-
-        const pdfTableSettings =  
-        {
-            x: x,
-            y: y,
-            width: this.relWidthToPoints(t.width, p), // from Container
-            // height: this.relHeightToPoints(t.height, p),
-            // some basic settings to sync with html rendering of Docs
-            padding: mmToPoints(this.TABLE_PADDING_MM),
-            divider: {
-                // Dividers are disabled. See custom rectangle in prepareHeader en prepareRow
-                header: { disabled: true, width: mmToPoints(this.TABLE_BORDER_THICKNESS_MM), color: 'black', opacity: 1 },
-                horizontal: { disabled: true, width: mmToPoints(this.TABLE_BORDER_THICKNESS_MM), color: 'black', opacity: 1 },
-            },
-            prepareHeader: (row, indexColumn, indexRow, rectRow, rectCell) => 
-            {
-                // NOTE: this uses a somewhat hacked version of this prepareHeader plug-in function
-                this.activePDFDoc.font("Helvetica-Bold").fontSize(settings?.fontsize);
-                this._drawTableCellRect(rectCell, true); // Here we draw special per cell styling - fix for header
-            },
-            prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
-                this.activePDFDoc.font("Helvetica").fontSize(settings?.fontsize);
-                this._drawTableCellRect(rectCell); // Here we draw special per cell styling
-            }
-        }
-
-        // NOTE: pdfkit is brittle for null values
-        return this.removeEmptyValueKeysObj(pdfTableSettings); 
-        */
-    }
-
-    _drawTableCellRect(rectCell:any, header:boolean=false) // { x, y , width, height }
-    {
-        /*
-        // !!!! IMPORTANT: Don't modify rectCell directly, because it affects all cells
-        if(rectCell)
-        {
-            
-            const lw = mmToPoints(this.TABLE_BORDER_THICKNESS_MM);
-            // NOTE: We move up the rectangle lw to have them overlap fully
-            // NOTE: We need to correct for header, it needs to be set lower of amount lw
-            this.activePDFDoc.rect(
-                    rectCell.x, rectCell.y + ((header) ? 2*lw : 0), rectCell.width, rectCell.height+lw)
-            .lineWidth(lw)
-            .strokeColor('#000000')
-            .stroke();
-        }
-        */
     }
 
     //// UTILS ////

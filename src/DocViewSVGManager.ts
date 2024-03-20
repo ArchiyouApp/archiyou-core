@@ -25,6 +25,10 @@ import parseSVG from "svg-path-parser"; // https://github.com/hughsk/svg-path-pa
 export class DocViewSVGManager
 {
     //// SETTINGS ////
+    PATH_BASE_STYLE = {
+            lineWidth: 0.15
+        } as DocPathStyle
+
     DIMLINE_LINE_THICKNESS_MM = 0.05;
     DIMLINE_ARROW_SVG_WIDTH = 10; // incoming arrow width in svg units (see also svg::_worldUnits ) - width is always relative to arrow pointing up
     DIMLINE_ARROW_PDF_WIDTH_MM = 5; 
@@ -170,9 +174,12 @@ export class DocViewSVGManager
     */
     toPDFDocShapePaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
     {
-        // gather paths in such a way that we can directly apply them with pdfkit in native PDF coordinate space
+        // gather paths in such a way that we can directly apply them with jsPDF in native PDF coordinate space
         const linePaths:Array<PDFLinePath> = new Array(); 
-        const pathNodes = txml.filter(this._svgXML.children, (node) => node.tagName === 'path')
+        const pathNodes = txml.filter(this._svgXML.children, (node) => 
+                                    // NOTE: we can have other paths (for example for arrows)
+                                    node.tagName === 'path' && node.attributes?.class.split(' ').includes('line')
+                                    ) 
 
         if(!pathNodes || pathNodes.length === 0)
         {
@@ -185,7 +192,7 @@ export class DocViewSVGManager
 
             pathNodes.forEach( node => 
             {
-                // There are only single lines in the commands: 'M4231,-1011 L4231,-1188'
+                // There are only single lines in the commands: 'M4231 -1011 L 4231 -1188'
                 const line = this._pathCmdToLineData(node.attributes.d);  // [x1,y1,x2,y2]
                 if(line)
                 {
@@ -196,35 +203,54 @@ export class DocViewSVGManager
 
                     linePaths.push(
                         {
-                            path: `M${x1},${y1} L${x2},${y2}`,
-                            style: this._pathClassesToPDFPathStyle(node.attributes?.class)
+                            path: `M ${x1} ${y1} L${x2} ${y2}`,
+                            style: this.gatherPDFPathStyle(node), // this._pathClassesToPDFPathStyle(node.attributes?.class)
                         });
-                }
-                
+                }  
             })
-            
         }
         
         return linePaths;
     }
-    
-    /** Given a SVG path for a Line (in format M 10 10 L 10 10), extract start and end coordinates  */
-    _pathCmdToLineData(d:string):Array<number|number|number|number>
+
+    /** Within SVG path (<path d="..">) we have multiple ways to set style
+     *      1. on object itself as attribute: stroke="#0000FF" (see Edge._getSvgPathAttributes )
+     *      2. by classes
+     *  
+     *  Classes have priority over object styling because it allowes the user to quickly override 
+     *  styling without going into the script
+     */
+    gatherPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
     {
-        const m = d.match(/M *([^ ]+) ([^ ]+) L *([^ ]+) ([\d\-]+)/); // some robustness for no spacing: M5 5 L10
-
-        console.log(m);
-
-        if(Array.isArray(m))
-        {
-            m.shift();
-            return m.map(c => parseFloat(c))
-        }
-        else {
-            console.error(`DocViewSVGManager::_pathCmdToLineData: Failed to parse path as a Line: "${d}"`);
+        return {
+            ...this.PATH_BASE_STYLE, // start with minimum styling
+            ...this._pathAttributesToPDFPathStyle(svgPathNode),
+            ...this._pathClassesToPDFPathStyle(svgPathNode),
         }
     }
 
+    _pathAttributesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
+    {
+        const PATH_STYLE_ATTR_TO_PDF = {
+            stroke : 'strokeColor',
+            'stroke-dasharray' : 'lineDashPattern',
+            'stroke-width' : 'strokeWidth',
+            'stroke-opacity' : 'strokeOpacity'
+        }
+
+        const style = {} as DocPathStyle;
+
+        Object.keys(PATH_STYLE_ATTR_TO_PDF).forEach( pathAttr => {
+            if(svgPathNode?.attributes[pathAttr])
+            {
+                const pdfStylePropName = PATH_STYLE_ATTR_TO_PDF[pathAttr];
+                style[pdfStylePropName] = svgPathNode?.attributes[pathAttr];
+            }
+        })
+
+        return style;
+    }
+    
     /** Translate the classes applied to svg path to a PDF style map 
      *  
      *   Settings are in constants.ts: CLASS_TO_STYLE
@@ -238,13 +264,13 @@ export class DocViewSVGManager
      * 
      *  Classes are applied in order (last has priority)
     */
-    _pathClassesToPDFPathStyle(classesStr?:string):DocPathStyle
+    _pathClassesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
     {
-        const FALLBACK_STYLE:DocPathStyle = { lineWidth: 0.15  };
+        const classesStr = svgPathNode?.attributes['class'];
 
         if(!classesStr || (typeof classesStr) !== 'string' || classesStr === '')
         {
-            return FALLBACK_STYLE;
+            return {};
         }
 
         const classes = classesStr.split(' '); // for example: classesStr = 'line dashed'
@@ -264,6 +290,52 @@ export class DocViewSVGManager
         })
 
         return docStyle;
+    }
+
+    /** jsPDF needs Line paths as [{op: m|l, c: [x,y] }] */
+    _pdfLinePathToJsPDFPathLines(pdfPath: PDFLinePath):Array<Record<string, any>>
+    {   
+        // parseSVG see: https://github.com/hughsk/svg-path-parser
+        const pathCmds = parseSVG(pdfPath.path); // returns [{ code, command, x1,y1,x2,y2...xN,yN }
+        // NOTE: Here we expect only move and line commands
+        return pathCmds.map(pc => { 
+
+            const orderedCoords = { x: [], y: [] };
+            Object.keys(pc)
+                .filter(key => key.includes('x') || key.includes('y'))
+                .sort((a,b) => {
+                    // NOTE: if only 2 coords, we have x,y - just add 0 to it to pass regex below
+                    a += (!b.match(/\d+/)) ? 0 : '';
+                    b += (!b.match(/\d+/)) ? 0 : '';
+                    return parseInt(b.match(/\d+/)[0]) - parseInt(a.match(/\d+/)[0])
+                })
+                .forEach(key => {
+                    orderedCoords[key].push(pc[key]);
+                })
+
+            const pathLineCoords = orderedCoords.x.map((x,i) => [x,orderedCoords.y[i]])[0]
+
+            return {  
+                op: pc.code.toLowerCase(), // jsPDF.path() interpretes all al absolute coords
+                c: pathLineCoords
+            }
+        })
+    }
+
+    
+    /** Given a SVG path for a Line (in format M 10 10 L 10 10), extract start and end coordinates  */
+    _pathCmdToLineData(d:string):Array<number|number|number|number>
+    {
+        const m = d.match(/M *([^ ]+) ([^ ]+) L *([^ ]+) ([\d\-]+)/); // some robustness for no spacing: M5 5 L10
+
+        if(Array.isArray(m))
+        {
+            m.shift();
+            return m.map(c => parseFloat(c))
+        }
+        else {
+            console.error(`DocViewSVGManager::_pathCmdToLineData: Failed to parse path as a Line: "${d}"`);
+        }
     }
 
     // Parsing dimension lines and draw directly on active pdfExporter.activePDFDoc
@@ -349,7 +421,7 @@ export class DocViewSVGManager
 
         pdfExporter?.activePDFDoc?.stroke()
             .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
-            .setFillColor('black')
+            .setDrawColor('#000000')
             .moveTo(dimLineCoords[0], dimLineCoords[1])
             .lineTo(dimLineCoords[2], dimLineCoords[3])
 
@@ -486,7 +558,6 @@ export class DocViewSVGManager
         }
 
         // Using jsPDF.context2d for transformations. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html
-
         if(localTransforms) // Start transforming
         {   
             /** Translate contains the coordinate (offset from origin) of the end/start of dimension line */
@@ -525,29 +596,7 @@ export class DocViewSVGManager
         })    
 
         drawContext.stroke(); // finalize path. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html#~stroke
-
-
-        // reset transformations
-        drawContext.setTransform(1, 0, 0, 1, 0 ,0); // reset
-
-        /*
-        // reset transforms (reverse order than applied earlier!)
-        if(localTransforms)
-        {
-            if(localTransforms?.scale !== undefined)
-            { 
-                doc.context2d.scale(1.0/localTransforms.scale, 1.0/localTransforms.scale)
-            }
-            if(localTransforms.rotate)
-            { 
-                //doc.context2d.rotate(-localTransforms.rotate);
-            }
-            if(localTransforms.translate)
-            { 
-                //doc.context2d.translate(-localTransforms.translate[0], -localTransforms.translate[1])
-            }
-        }
-        */
+        drawContext.setTransform(1, 0, 0, 1, 0 ,0); // reset transformations
     }
 
     //// UTILS ////
