@@ -34,6 +34,11 @@ import deepClone from 'deep-clone'
  */
 export class ParamManager
 {
+    //// SETTINGS ////
+    PARAM_SIGNIFIER = '$';
+
+    //// END SETTINGS ////
+
     parent: any; // worker or app scope
     paramControllers:Array<ParamManagerEntryController> = [];
 
@@ -230,14 +235,14 @@ export class ParamManager
 
     //// EVALUATE AFTER CHANGE ////
 
-    /** After Param instances are changed, they is broadcast through the app where it will be synced 
+    /** After Param instances are changed, they are broadcast through the app where it will be synced 
      *  NOTE: We use a Array here, to be able to broadcast multiple params at the same time if needed
     */
     handleManaged(changedParams:Array<Param>)
     {
         if(this.inWorker())
         {
-            this.sendChangedParamsFromWorkerToApp(this.parent, changedParams);
+            this.sendChangedParamsFromWorkerToApp(changedParams);
         }
         else {
             // Main thread App scope: handled differently
@@ -285,6 +290,8 @@ export class ParamManager
             this.evaluateBehaviours(); // sets attributes based on behaviours
         }
 
+        this.setParamControlRefs();
+
         return this;
     }
 
@@ -301,10 +308,10 @@ export class ParamManager
 
     //// IO ////
 
-    sendChangedParamsFromWorkerToApp(worker:any, changedParams:Array<Param>) // TODO: TS typing
+    sendChangedParamsFromWorkerToApp(changedParams:Array<Param>) // TODO: TS typing
     {
+        const worker = this.parent;
         if(!worker?.postMessage){ throw new Error(`ParamManager::sendChangedParamFromWorkerToApp: Can't send message from worker scope: no parent set. Please use setParent(workerScope)`); }
-
         worker.postMessage(
             {
                 type: 'managed-param',
@@ -335,7 +342,22 @@ export class ParamManager
         return typeof this?.parent?.postMessage === 'function';
     }
 
-    //// UTILS ////
+    /** Set Param read and write as globals on worker scope (in this.parent) 
+     *  NOTE: We can not really work with Proxies here because we can not really set a Param global (ie. $TEST)
+     *      on this scope that is not a Proxy. Proxies can only target Objects
+            Use $PARAMS.$TEST.set() to set a value
+    */
+    setParamGlobalsOnWorker():boolean
+    {
+        const curParams = this.getParams();
+
+        if (!Array.isArray(curParams)){ return false; }
+
+        // Make Params with getter and setter with Proxy
+        curParams.forEach( p => {
+            this.parent[this.PARAM_SIGNIFIER + p.name] = p.value ?? p.default;
+        })
+    }
 
     /** Compare two params (either Param or PublishParam) */
     equalParams(param1:Param|PublishParam, param2:Param|PublishParam):boolean
@@ -346,20 +368,18 @@ export class ParamManager
     }
 
     /** Set quick references from this instance to the values of params 
-     *  For easy access to these values from script
-     *  NOTE: This is currently not used. Just use direct params
+        This is used to control Params directly (through ParamManagerEntryController)
+        The user can write values for example with $PARAMS.$TEST.set(50)
     */
-    setParamValueRefs()
+    setParamControlRefs()
     {
-        for (const [name, param] of Object.entries(this.getParamsMap()))
+        this.paramControllers.forEach( pc =>
         {
-            if(param?.value) // !!!! BUG: For some reason there might be params without values
-            {
-                this[name] = deepClone(param.value);
-            }
-        }
+            this[pc.name] = pc;
+        })
     }
 
+    /*
     deleteParamValueRef(name:string)
     {
         if (typeof name === 'string')
@@ -367,7 +387,7 @@ export class ParamManager
             delete this[name];
         }
     }
-
+    */
 }
 
 
@@ -377,6 +397,14 @@ export class ParamManagerEntryController
     //// SETTINGS ////
     PARAM_TYPES = ['number', 'text', 'options', 'boolean', 'list', 'object']
     PARAM_TYPE_DEFAULT_LENGTH = 16;
+    
+    BASE_TYPE_PARAM_CHECKS = {
+        number: '_checkNumParamInput',
+        boolean: '_checkBoolParamInput',
+        options: '_checkOptionsParamInput',
+        list: '_checkListParamInput',
+        object: '_checkObjParamInput',
+    }
 
     name:string
     target:Param
@@ -488,6 +516,136 @@ export class ParamManagerEntryController
             this.target._behaviours['value '] = fn;
             this.handleManaged(); // trigger update
         }
+    }
+
+    /** Set value of Parameter */
+    set(v:any):any
+    {
+        if(!this._checkParamInput(v))
+        {
+            throw new Error(`ParamManager: Your are trying to set a value that does not fit a Param of type ${this.target.type}! Check input type or range!`);
+        }
+        
+        this.target.value = v; // Set value of Param 
+        this.manager.setParamGlobalsOnWorker(); // set globals to new value
+        this.manager.sendChangedParamsFromWorkerToApp([this.target]); // Communicate value change to parent!
+
+        this.target.value = v; // Set value of Param 
+        this._afterSetParamValue();
+        return v;
+    }
+
+    /** Insert a value into List */
+    push(v:any):any
+    {
+        if(this.target.type !== 'list'){ throw new Error(`ParamManager: Your are trying to insert a value into Parameter value that is not a list!`);}
+        
+        if(!this._checkParamInput(v, this.target.listElem))
+        {
+            throw new Error(`ParamManager: Please supply valid input for list of type "${this.target.listElem.type}"!`);
+        }
+        if(!this._checkIfListElemExistsLast(v))
+        {
+            this.target.value = this.target.value.concat(v); // Insert new element into list
+            this._afterSetParamValue();
+        }
+
+        return v;
+    }
+
+    /** Adding to lists create unending loops 
+     *  We check if the last element is the same
+     *  TODO: Make a better solution
+    */
+    _checkIfListElemExistsLast(v:Record<string,any>):boolean
+    {
+        const exists = deepEqual(this.target.value[this.target.value.length-1], v)
+        if (exists)
+        {
+            console.warn(`ParamManager::_checkIfListElemExistsLast(): We blocked an element that already exists in the list!`)
+        }
+        return exists;
+    }
+
+    /** Set Value without checking */
+    _afterSetParamValue()
+    {
+        this.manager.setParamGlobalsOnWorker(); // set globals to new value
+        this.manager.sendChangedParamsFromWorkerToApp([this.target]); // Communicate value change to parent!    
+    }
+
+    /** Check Param input, if param is not set, the target Param is used */
+    _checkParamInput(v:any, p?:Param):boolean
+    {
+        p = p ?? this.target;
+        const checkFnName = this.BASE_TYPE_PARAM_CHECKS[p.type];
+        if(!checkFnName)
+        {
+            console.warn(`ParamManager::_checkParamInput: No check config for Param type ${p.type}. This might mess things up!`)
+        }
+
+        return this[checkFnName](v, p); // Bind to this instance of ParamManagerEntryController
+
+    }
+
+    _checkNumParamInput(v:any, p?:Param):boolean
+    {
+        p = p ?? this.target;
+        
+        return (typeof v === 'number' && isFinite(v)) && v >= p.start && v <= p.end;
+    }
+
+    _checkBoolParamInput(v:any, p?:Param):boolean
+    {
+        p = p ?? this.target;
+        return typeof v === 'boolean'
+    }
+
+    _checkOptionsParamInput(v:any, p?:Param):boolean
+    {
+        p = p ?? this.target;
+        return p.options.includes(v);
+    }
+
+    _checkListParamInput(v, p?:Param)
+    {
+        p = p ?? this.target;
+        return this._checkParamInput(v, p.listElem);
+    }
+
+    /** Check input against schema */
+    _checkObjParamInput(v:any, p?:Param):boolean
+    {
+        p = p ?? this.target;
+
+        if(typeof v !== 'object') return false;
+
+        // directly make all input keys uppercase
+        v = Object.keys(v).reduce((acc, k) => 
+            { 
+                acc[k.toUpperCase()] = v[k];
+                return acc;
+            }, {});
+
+        for (const [attr, elemParam] of Object.entries(p.schema))
+        {
+            // NOTE: Params attribute names are always caps!
+            if (!v[attr])
+            { 
+                console.error(`ParamManager::_checkObjParamInput(). Given attribute "${attr}" does not exist in schema with attributes: ${Object.keys(p.schema).join('')}`);
+                return false 
+            };
+            if (!this._checkParamInput(v[attr], elemParam))
+            {
+                console.error(`ParamManager::_checkObjParamInput(). Invalid input "${v}" for Object attribute "${attr}" which needs type "${elemParam.type}"`);
+                return false;
+            }
+        }
+
+        return true
+        
+
+        return false;
     }
     
     /** TODO: more behaviours 
