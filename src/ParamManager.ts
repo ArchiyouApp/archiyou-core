@@ -162,11 +162,12 @@ export class ParamManager
                 checkedParam = {
                     ...p, // copy all for convenience 
                     type: paramType,
-                    default: p?.default ?? 50,
                     start: p?.start ?? 0,
                     end: p?.end ?? 100,
                     step: p?.step ?? 1,
                 } as Param;
+                // if default not given choose start
+                checkedParam['default'] = p?.default ?? p.start;
                 break;
             case 'boolean': 
                 checkedParam = {

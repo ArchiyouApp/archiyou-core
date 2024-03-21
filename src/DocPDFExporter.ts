@@ -368,6 +368,8 @@ export class DocPDFExporter
             - container width and height are relative to page width/height (if widthRelativeTo = 'page')
             - heightAbs/widthAbs are in docUnits
             - We use a reference to PageData here to avoid this.activePage while working with async methods
+
+            TODO: Implement options.align[horizontal,vertical] - now default [left,top]
             
         */
 
