@@ -173,10 +173,14 @@ export interface Param
     step?: number // for ParamInputNumber
     schema?: ParamObjectSchema // object definition
     options?: Array<string> // for ParamInputOptions
-    length?: number // for ParamInputText, ParamInputList
+    length?: number // for ParamInputText, ParamInputList    
+    units?:ModelUnits
+    // internal data for ParamManager
+    _manageOperation?: ParamOperation
+    _definedProgrammatically?: boolean // this Param is defined programmatically in script
     // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
     _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
-    units?:ModelUnits
+    
 }
 
 /** Extentions of Param for Publishing - data only! */
@@ -793,4 +797,4 @@ export interface CalcData
 //// PARAM MANAGER ////
 // NOTE: See above for general types around Params
 
-export type ParamOperation = 'new'|'updated'|'same'
+export type ParamOperation = 'new'|'updated'|'same'|'deleted'

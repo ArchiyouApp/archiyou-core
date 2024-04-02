@@ -27,7 +27,6 @@ import { Param, PublishParam, ParamOperation, isParam, isPublishParam, ParamBeha
 import { publishParamToParam, paramToPublishParam } from './internal' // utils
 
 import deepEqual from 'deep-is'
-import deepClone from 'deep-clone'
 
 /** Main ParamManager
  *  Maintains all ParamManagerEntryControllers 
@@ -38,9 +37,10 @@ export class ParamManager
     PARAM_SIGNIFIER = '$';
 
     //// END SETTINGS ////
-
     parent: any; // worker or app scope
     paramControllers:Array<ParamManagerEntryController> = [];
+    
+    curRunManagedParams:Record<string,Array<Param>> = {}; // all programmatic operations that take place this run on Params
 
     /** Set up ParamManager with current params */
     constructor(params?:Array<PublishParam|Param>)
@@ -50,6 +50,42 @@ export class ParamManager
             this.paramControllers = params.map(p => new ParamManagerEntryController(this, publishParamToParam(p))); // always make sure we use Param internally
             this.paramControllers.forEach( p => this[p.name] = p) // set param access
         }
+
+        this.startRun();
+    }
+
+    /** Every script run we keep track of what Params we started with, 
+     *  those that are defined in script and others that are removed from it */
+    startRun()
+    {
+        this.curRunManagedParams = {  'new' : [], 'updated' : [], 'same' : [], 'deleted' : [] } 
+    }
+
+    /** After a run we need to check if defined Params are still present in the script
+     *  otherwise remove them internally and in parent
+     */
+    endRunCleanup()
+    {
+        if(!this.curRunManagedParams)
+        {
+            console.warn(`ParamManager::endRunCleanup(): run was not initiated with startRun()!`)
+        }
+        else {
+            const curDefinedParamNames = this.getParams().filter(p => p._definedProgrammatically).map(p => p.name);
+            const curRunDefinedParamNames = this.curRunManagedParams['new'].filter(p => p._definedProgrammatically).map( p => p.name );
+            const danglingParamNames = curDefinedParamNames.filter( pn => !curRunDefinedParamNames.includes(pn)); // the programmatically-defined Params that are still here, but are not in the script anymore 
+
+            if (danglingParamNames.length > 0)
+            {
+                console.info(`Remove dangling programmatically defined Params: ${danglingParamNames.join(',')}`);
+            
+                const danglingParams = danglingParamNames.map(paramName => this.getParamsMap()[paramName] || null ).filter(p => p !== null);    
+                danglingParams.forEach(p => p._manageOperation = 'deleted'); // set operation to delete so the parent knows what to do
+                this.handleManaged(danglingParams); // set to parent
+    
+                danglingParamNames.forEach( paramName => this.deleteParam(paramName)); // delete internally
+            }
+        }
     }
 
     setParent(scope:any):this
@@ -58,17 +94,30 @@ export class ParamManager
         return this
     }
 
+    /** Keep track of managed Params per run
+     *  results are in curRunManagedParams
+     *  @example curRunManagedParams['new'] = [Param, Param]
+      */
+    trackManagedParam(p:Param, operation:ParamOperation)
+    {
+        this.curRunManagedParams[operation].push(p)
+        p._manageOperation = operation; // keep track of operation in Param instance
+    }
+
     /** add or update Param and return what was done ('update', 'same', 'new)  */
     addParam(p:Param):ParamOperation
     {
         if(this._paramNameExists(p))
         { 
             const updated = this.updateParam(p);
-            return (updated) ? 'updated' : 'same';
+            const operation = (updated) ? 'updated' : 'same';
+            this.trackManagedParam(p, operation); // keep track of managed params
+            return operation
         }
         else {
             const newParamController = new ParamManagerEntryController(this, this._validateParam(p));
             this.paramControllers.push(newParamController)
+            this.trackManagedParam(p, 'new');
             return 'new'
         }
 
@@ -132,8 +181,11 @@ export class ParamManager
         const checkedParam = this._validateParam(p);
         if(!checkedParam){ return this }; //  Error already thrown in checkParam if any
 
+        checkedParam._definedProgrammatically = true; // flag this Param as programmaticallly defined
+        this.trackManagedParam(checkedParam, 'new')
+
         // Add Param to Manager by making ParamController
-        const r = this.addParam(checkedParam);
+        const r = this.addParam(checkedParam); // returns 'same' if we already have the Param definition
 
         // Only send managed Param to App if anything changed
         if (['new','update'].includes(r))
@@ -141,9 +193,7 @@ export class ParamManager
             this.handleManaged([checkedParam]); // Send new definition to App
         }
 
-
         return this;
-
     }
 
     /** Check Param input and fill in defaults
@@ -251,8 +301,9 @@ export class ParamManager
 
     /** Check and update params */
     update(params:Array<Param|PublishParam>, evaluateBehaviours:boolean=true):this
-    {
-        // Make sure we have Params
+    {   
+
+        // Make sure we have Params instances
         params = params.map(p => publishParamToParam(p)) as Array<Param>
 
         const curParamsMap = this.getParamsMap();
@@ -270,11 +321,11 @@ export class ParamManager
             }
             else {
                 // It does exist but if different then update
-                const paramController = this.getParamController(updateParam.name);
-                if(!paramController.sameParam(updateParam))
+                const curParamController = this.getParamController(updateParam.name);
+                if(!curParamController.sameParam(updateParam))
                 {
                     //console.info(`ParamManager::update [${this.inWorker() ? 'worker' : 'app'}]: Updated param "${updateParam.name}" : ${JSON.stringify(updateParam)}`);
-                    paramController.updateTargetParam(updateParam);
+                    curParamController.updateTargetParam(updateParam);
                     paramsWereChanged = true;
                 }
                 else 
@@ -290,6 +341,16 @@ export class ParamManager
             this.evaluateBehaviours(); // sets attributes based on behaviours
         }
 
+        // If we got internal Params that are not in the updateParams, remove these
+        this.getParams()
+            .forEach(p => {
+                if(!params.find(np => np.name === p.name))
+                {
+                    console.info(`ParamManager::update(): [${this.inWorker() ? 'worker' : 'app'}] Deleted internal Param "${p.name}" because it was deleted by the user`);
+                    this.deleteParam(p.name);
+                }
+            })
+            
         this.setParamControlRefs();
 
         return this;
@@ -312,10 +373,21 @@ export class ParamManager
     {
         const worker = this.parent;
         if(!worker?.postMessage){ throw new Error(`ParamManager::sendChangedParamFromWorkerToApp: Can't send message from worker scope: no parent set. Please use setParent(workerScope)`); }
+
+        const paramsByOperation = {} as Record<ParamOperation,Array<Param>>; // { new : [Param, Param], 'updated' : [], 'deleted': [Param] } etc
+        changedParams.forEach(p => 
+            {
+                if (p._manageOperation) // just to make sure that this param is managed here
+                {
+                    if(!Array.isArray(paramsByOperation[p._manageOperation])) paramsByOperation[p._manageOperation] = [];
+                    paramsByOperation[p._manageOperation].push(paramToPublishParam(p))
+                } 
+            });
+
         worker.postMessage(
             {
                 type: 'managed-param',
-                payload: changedParams.map(p => paramToPublishParam(p)) as Array<PublishParam>,
+                payload: paramsByOperation
             }
         )
     }
@@ -326,7 +398,7 @@ export class ParamManager
         return this.paramControllers.map(pc => pc.target)
     }
 
-    /** Utility to easily get target Params in a map */
+    /** Utility to easily get target Params by name */
     getParamsMap():Record<string, Param>
     {
         const map = {};
@@ -422,7 +494,23 @@ export class ParamManagerEntryController
 
     updateTargetParam(param:Param)
     {
-        this.target = { ...param }
+        const RESET_PROPS = {
+            _manageOperation: null, 
+        } as Record<string, any>
+
+        const newParam = { 
+            ...this.target, // IMPORTANT: we keep internals like _definedProgrammatically
+            ...param }
+        
+        // reset specific props
+        Object.keys(RESET_PROPS).forEach( propName => {
+            if(newParam.hasOwnProperty(propName)){
+                newParam[propName] = RESET_PROPS[propName]; // set value
+            }
+        })
+
+        this.target = newParam;
+
         return this.target;
     }
 

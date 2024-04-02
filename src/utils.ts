@@ -45,7 +45,15 @@ export function paramToPublishParam(param:Param|PublishParam):PublishParam
 
     const behaviourData = {};
     for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
-    return { ...param, _behaviours: behaviourData }
+    const publishParam = { ...param } as PublishParam; 
+    // remove all private fields (_{{prop}})
+    Object.keys(publishParam)
+        .filter(prop => prop[0] === '_')
+        .forEach((private_prop) => delete publishParam[private_prop]);
+
+    publishParam._behaviours = behaviourData; // TODO: remove _
+    
+    return publishParam
 }
 
 //// Working with types ////
