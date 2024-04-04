@@ -1,5 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
-import { Geom, Doc, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
+import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
 import { Console } from './Console'
 
 //// SETTINGS ////
@@ -87,6 +87,7 @@ export interface ArchiyouApp
     make?: Make,
     // TODO: importer?
     gizmos?: Array<Gizmo>, // TODO: move this to Geom?
+    beams?: Beams
 }
 
 export interface ArchiyouAppInfoBbox

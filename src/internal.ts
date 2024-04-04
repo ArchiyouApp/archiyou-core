@@ -65,6 +65,7 @@ export * from './ParamManager'
 
 
 export * from './Make'
+export * from './Beams'
 
 
  

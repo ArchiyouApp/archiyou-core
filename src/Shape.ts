@@ -1024,7 +1024,7 @@ export class Shape
         return this.rotateAround(deg, [0,0,1], pivot);
     }
 
-      /** Rotates a Shape a given angle along a axis (default: Z) */
+      /** Rotates a Shape a given angle in degrees along a axis (default: Z) */
     @checkInput([Number,['PointLike',[0,0,1]],['Pivot','center'] ], [Number, Vector, 'auto'])
     rotateAround(angle:number, axis?:PointLike, pivot?:Pivot):AnyShape
     {
