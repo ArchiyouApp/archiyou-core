@@ -811,7 +811,7 @@ export class Shape
     }
 
     /** Copy the Shape and add it to the Scene (private) */
-    _copy()
+    _copy(): this
     {
         const newShape = this.copy(false);
         return newShape;
@@ -819,7 +819,7 @@ export class Shape
 
     /** Copy the Shape and add it to the Scene */
     // @addResultShapesToScene
-    copy(addToScene:boolean=true):AnyShape
+    copy(addToScene:boolean=true):this
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_builder_a_p_i___copy.html
         // Copying does take 10-15ms for even simple geometries like Boxes!
@@ -841,7 +841,7 @@ export class Shape
     /** Move Shape to a position by offsetting all Geometry with a Vector */
     // This is a good candidate for variable class return
     @checkInput('PointLike','Vector') // this automatically transforms Types
-    move(vector:PointLike, ...args):AnyShape // also allows flattened input move(10,20,30)
+    move(vector:PointLike, ...args):this // also allows flattened input move(10,20,30)
     {
         this._ocShape.Move( (vector as Vector)._toOcLocation(), true );
 
@@ -891,7 +891,7 @@ export class Shape
     /** Move a copy of the Shape */
     @addResultShapesToScene
     @checkInput('PointLike','Vector')
-    moved(v:PointLike, ...args):AnyShape
+    moved(v:PointLike, ...args):this
     {
         // move a copy 
         return this._copy().move(v as Vector); // return specific Shape class
@@ -935,7 +935,7 @@ export class Shape
 
     /** Move copy of the Shape to a Point in space */
     @checkInput('PointLike','Vector')
-    movedTo(to:PointLike, ...args):AnyShape
+    movedTo(to:PointLike, ...args):this
     {
         let moveVec = (to as Vector).subtracted(this.center()); // auto convert to Vector
         let newShape = (this.copy() as AnyShape).move(moveVec);
@@ -943,7 +943,7 @@ export class Shape
     }
 
     /** Center Shape so that the center of the Shape is at the origin */
-    moveToOrigin():AnyShape
+    moveToOrigin():this
     {
         return this.moveTo(0,0,0);
     }
@@ -952,7 +952,7 @@ export class Shape
         TODO: different scaling factors per axis? scale(0.5,1,2)
     */
     @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number, 'Point'])
-    scale(factor?:number, pivot?:PointLike):AnyShape
+    scale(factor?:number, pivot?:PointLike):this
     {
         /* OC docs: 
             - gp_Trsf https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___trsf.html
@@ -968,9 +968,9 @@ export class Shape
 
     /** Same as scale but returning a copy of Shape */
     @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number, 'Point'])
-    scaled(factor?:number, pivot?:PointLike):AnyShape
+    scaled(factor?:number, pivot?:PointLike):this
     {
-        return (this.copy() as AnyShape).scale(factor,pivot);
+        return this.copy().scale(factor,pivot);
     }
 
     /** 
@@ -979,7 +979,7 @@ export class Shape
      *   Use rotateX, rotateY and rotateZ to rotate around the main axis
      */
     @checkInput([ [Number,0],[Number,0], [Number,0], ['Pivot', 'center']], [Number,Number,Number,'auto']) // IMPORTANT: not able to directly convert Pivot to Vector because pivot needs current Shape (can that be accessed in decorator?)
-    rotateEuler(degX:number, degY?:number, degZ?:number, pivot?:Pivot):AnyShape
+    rotateEuler(degX:number, degY?:number, degZ?:number, pivot?:Pivot):this
     {
         // Due to our algoritm in Vector.rotationTo we work with YZX Euler angles, so we apply the rotations in this order.
         return this.rotateY(degY, pivot).rotateZ(degZ,pivot).rotateX(degX,pivot);
@@ -987,7 +987,7 @@ export class Shape
 
     /** Same as rotateEuler but makes a copy */
     @checkInput([ [Number,0],[Number,0], [Number,0], ['Pivot', 'center']], [Number,Number,Number,'auto']) 
-    rotatedEuler(degX:number, degY:number = 0, degZ:number = 0, pivot:Pivot):AnyShape
+    rotatedEuler(degX:number, degY:number = 0, degZ:number = 0, pivot:Pivot):this
     {
         return this.copy().rotateEuler(degX, degY, degZ, pivot);
     }
@@ -1005,28 +1005,28 @@ export class Shape
 
     /** Rotate this Shape around the x-axis with a given angle and pivot (default: center) */
     @checkInput([Number,['Pivot','center']], [Number, 'auto'])
-    rotateX(deg:number, pivot?:Pivot):AnyShape
+    rotateX(deg:number, pivot?:Pivot):this
     {
         return this.rotateAround(deg, [1,0,0], pivot);
     }
 
     /** Rotate this Shape around the y-axis with a given angle and pivot (default: center) */
     @checkInput([Number,['Pivot','center']], [Number, 'auto'])
-    rotateY(deg:number, pivot?:Pivot):AnyShape
+    rotateY(deg:number, pivot?:Pivot):this
     {
         return this.rotateAround(deg, [0,1,0], pivot);
     }
 
     /** Rotate this Shape around the y-axis with a given angle and pivot (default: center) */
     @checkInput([Number,['Pivot','center']], [Number, 'auto'])
-    rotateZ(deg:number, pivot?:Pivot):AnyShape
+    rotateZ(deg:number, pivot?:Pivot):this
     {
         return this.rotateAround(deg, [0,0,1], pivot);
     }
 
       /** Rotates a Shape a given angle in degrees along a axis (default: Z) */
     @checkInput([Number,['PointLike',[0,0,1]],['Pivot','center'] ], [Number, Vector, 'auto'])
-    rotateAround(angle:number, axis?:PointLike, pivot?:Pivot):AnyShape
+    rotateAround(angle:number, axis?:PointLike, pivot?:Pivot):this
     {
         /* !!!! IMPORTANT: OC uses righthand rotation from given Vector 
 
@@ -1074,7 +1074,7 @@ export class Shape
     }
 
     /** Rotate Shape so that its orientated bounding box is aligned with the axes */
-    rotateToAxesBbox():AnyShape
+    rotateToAxesBbox():this
     { 
         // this.moveTo(0,0,0); // move to center
         let obbox = this._getOBbox();
@@ -1097,7 +1097,7 @@ export class Shape
 
     /** Rotate Shape to place flat on XY plane. Keeps x,y position */
     @checkInput([['String', 'vertical'],['Boolean',true]], ['auto', 'auto'])
-    rotateToLayFlat(direction?:'horizontal'|'vertical', autoRotate?:boolean):AnyShape
+    rotateToLayFlat(direction?:'horizontal'|'vertical', autoRotate?:boolean):this
     {
         // autoRotate to align shape with Axes
         if(autoRotate)
@@ -1148,7 +1148,7 @@ export class Shape
 
     /** Flatten a Solid into a Face */
     // !!!! TMP METHOD !!!! Needs a lot of work
-    _flattened():AnyShape
+    _flattened():this
     {
         if(this.type() !== 'Solid')
         {
@@ -1172,7 +1172,7 @@ export class Shape
      *   TODO: Add scaling
      */
     // TODO: @inputCheck - but its a bit tricky with the Alignment strings
-    alignByPoints(fromPoints:Array<Vector|Vertex|Point|Array<number>|string>, toPoints:Array<Vector|Vertex|Point|Array<number>>):Shape
+    alignByPoints(fromPoints:Array<Vector|Vertex|Point|Array<number>|string>, toPoints:Array<Vector|Vertex|Point|Array<number>>):this
     {
         // TODO: test if we can align - we have/can get 3 vertices?
 
@@ -1244,14 +1244,14 @@ export class Shape
 
     /** Same as alignByPoint but returns a copy and does not affect original */
     // TODO: @checkInput
-    alignedByPoints(fromPoints:Array<Vector|Vertex|Point|Array<number>>, toPoints:Array<Vector|Vertex|Point|Array<number>>):Shape
+    alignedByPoints(fromPoints:Array<Vector|Vertex|Point|Array<number>>, toPoints:Array<Vector|Vertex|Point|Array<number>>):this
     {
         return (this.copy() as Shape).alignByPoints(fromPoints, toPoints)
     }
 
     /** Rotate this Shape by a Quaternion made by two Vectors */
     @checkInput(['PointLike', 'PointLike', ['PointLike',[0,0,0]]], ['Vector', 'Vector', 'Vector']) // auto convert
-    rotateVecToVec(from:PointLike, to:PointLike, pivot?:PointLike):Shape
+    rotateVecToVec(from:PointLike, to:PointLike, pivot?:PointLike):this
     {
         let fromVec= from as Vector; // auto converted
         let toVec = to as Vector; 
@@ -1279,7 +1279,7 @@ export class Shape
      *   origin: Origin of mirror plane
      */
     @checkInput([ ['PointLike', [0,0,0]], ['PointLike', 'x']], ['Vector', 'Vector']) // the default mirror plane is the YZ plane with normal +X-axis at [0,0,0]
-    _mirrored(origin?:PointLike, normal?:PointLike):AnyShape
+    _mirrored(origin?:PointLike, normal?:PointLike):this
     {
         /* OC docs:
             - gp_Trsf https://dev.opencascade.org/doc/refman/html/classgp___trsf.html
@@ -1306,14 +1306,14 @@ export class Shape
 
     @addResultShapesToScene
     @checkInput([ ['PointLike', [0,0,0]], ['PointLike', 'x']], ['Vector', 'Vector']) // the default mirror plane is the YZ plane with normal +X-axis at [0,0,0]
-    mirrored(origin?:PointLike, normal?:PointLike):AnyShape
+    mirrored(origin?:PointLike, normal?:PointLike):this
     {
         return this._mirrored(origin,normal);
     }
     
     /** Mirror Shape relative to XZ plane with its center as pivot or given offset y-coord */
     @checkInput([[Number,null]], 'auto')
-    mirrorX(offset?:number):AnyShape
+    mirrorX(offset?:number):this
     {
         let mirroredShape = this._mirroredX(offset); 
         this.replaceShape(mirroredShape);
@@ -1322,21 +1322,21 @@ export class Shape
 
     /** Create mirrored copy relative to XZ plane with its center as pivot or given offset y-coord */
     @checkInput([[Number,null]], 'auto')
-    _mirroredX(offset?:number):AnyShape
+    _mirroredX(offset?:number):this
     {
         return this._mirrored( (offset !== null) ? [0,offset,0] : this.center(), [0,1,0]);
     }
 
     @addResultShapesToScene
     @checkInput([[Number,null]], 'auto')
-    mirroredX(offset?:number):AnyShape
+    mirroredX(offset?:number):this
     {
         return this._mirroredX(offset);
     }
     
     /** Mirror Shape relative to YZ plane with its center as pivot or given offset x-coord */
     @checkInput([[Number,null]], 'auto')
-    mirrorY(offset?:number):AnyShape
+    mirrorY(offset?:number):this
     {
         let mirroredShape = this._mirroredY(offset); 
         this.replaceShape(mirroredShape);
@@ -1345,21 +1345,21 @@ export class Shape
 
     /** Create mirrored copy relative to the YZ plane with its center as pivot or given offset x-coord  */
     @checkInput([[Number,null]], 'auto')
-    _mirroredY(offset?:number):AnyShape
+    _mirroredY(offset?:number):this
     {
         return this._mirrored( (offset !== null) ? [offset,0,0] : this.center(), [1,0,0]);
     }
 
     @addResultShapesToScene
     @checkInput([[Number,null]], 'auto')
-    mirroredY(offset?:number):AnyShape
+    mirroredY(offset?:number):this
     {
         return this._mirroredY(offset);
     }
 
     /** Mirror Shape relative to XY plane with its center as pivot or given offset z-coord */
     @checkInput([[Number,null]], 'auto')
-    mirrorZ(offset?:number):AnyShape
+    mirrorZ(offset?:number):this
     {
         let mirroredShape = this._mirroredZ(offset); 
         this.replaceShape(mirroredShape);
@@ -1368,7 +1368,7 @@ export class Shape
 
     /** Create mirrored copy relative to XY plane with its center as pivot */
     @checkInput([[Number,null]], 'auto')
-    _mirroredZ(offset?:number):AnyShape
+    _mirroredZ(offset?:number):this
     {
         return this._mirrored((offset !== null) ? [0,0,offset] : this.center(), [0,0,1]);
     }
@@ -1376,7 +1376,7 @@ export class Shape
     /** Create mirrored copy relative to XY plane with its center as pivot and add to Scene */
     @addResultShapesToScene
     @checkInput([[Number,null]], 'auto')
-    mirroredZ(offset?:number):AnyShape
+    mirroredZ(offset?:number):this
     {
         return this._mirroredZ(offset);
     }
@@ -1442,7 +1442,7 @@ export class Shape
     /** Extrude this Shape towards a given Point or other Shape - we do keep the normal of the Shape if available */
     // TODO: Add ShapeCollection as input
     @checkInput('PointLikeOrAnyShapeOrCollection', 'auto')
-    extrudedTo(other:PointLikeOrAnyShapeOrCollection, ...args):AnyShape
+    extrudedTo(other:PointLikeOrAnyShapeOrCollection, ...args):this
     {
         let distance:number;
         let toVertex:Vertex;
@@ -1484,7 +1484,7 @@ export class Shape
     // This is overriden in simpler topologies (Edge, Wire)
     @protectOC(['Offsetting to inside (-amount) is more robust'])
     @checkInput([[Number,null],[String,null],['PointLike', null]], ['auto', 'auto', 'Vector'])
-    _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike) // NOTE: type is used here are join type (not offset type)
+    _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):AnyShapeOrCollection // NOTE: type is used here are join type (not offset type)
     {
         const DIRECTION_TYPES = {
             skin : this._oc.BRepOffset_Mode.BRepOffset_Skin, // over the surface of the shell ( or inside with -amount)
@@ -1533,7 +1533,7 @@ export class Shape
     /** Offset Shape to create a new version parallel to original with a given distance and by corners of given type (arc, intersection)  */
     // This is overriden in simpler topologies (Edge, Wire)
     @checkInput([[Number,null],[String,null],['PointLike', null]], ['auto', 'auto', 'Vector'])
-    offset(amount?:number, type?:string, onPlaneNormal?:PointLike):AnyShape
+    offset(amount?:number, type?:string, onPlaneNormal?:PointLike):this
     {
         if(!['Face','Shell','Solid'].includes(this.type()))
         {
@@ -1547,7 +1547,7 @@ export class Shape
 
     @addResultShapesToScene
     @checkInput([[Number,null],[String,null],['PointLike', null]], ['auto', 'auto', 'Vector'])
-    offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):AnyShape
+    offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):this
     {
         if(!['Face','Shell','Solid'].includes(this.type()))
         {
@@ -1759,7 +1759,7 @@ export class Shape
     /** Make a new Shape by revolving a non-solid Shape around an axis given by two Points */
     @addResultShapesToScene
     @checkInput([['Number', 360],['PointLike',[0,0,0]],['PointLike',[0,0,1]]],['auto','Vector','Vector'])
-    revolved(angle?:number,axisStart?:PointLike,axisEnd?:PointLike)
+    revolved(angle?:number,axisStart?:PointLike,axisEnd?:PointLike):AnyShapeOrCollection
     {
         return this._revolved(angle,axisStart,axisEnd);
     }
@@ -2480,9 +2480,9 @@ export class Shape
 
     _alignPerc(a:Alignment='center'):Array<number>
     {
-        return (!Array.isArray(a)) ? 
+        return (!isPointLike(a)) ? 
                 this._alignStringToAlignPerc(a as string) : 
-                a as Array<number>;
+                new Point(a).toArray();
     }
 
     /** 
@@ -2492,7 +2492,7 @@ export class Shape
      *  and for linear Shapes (Edge,Wire) also start and end !!!! TODO !!!!
      */
     @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
-    align(other:AnyShape, pivot?:Pivot, alignment?:Alignment):AnyShape
+    align(other:AnyShape, pivot?:Pivot, alignment?:Alignment):this
     {
         const pivotAlignPerc:Array<number> = this._alignPerc(pivot);
         const alignmentPerc:Array<number> = this._alignPerc(alignment); // alignment inside other Shape
@@ -2507,7 +2507,7 @@ export class Shape
 
     /** Copy and then align */
     @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
-    aligned(other:AnyShape, pivot?:Pivot, alignment?:Alignment):AnyShape
+    aligned(other:AnyShape, pivot?:Pivot, alignment?:Alignment):this
     {
         return this.copy().align(other, pivot, alignment);
     }

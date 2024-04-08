@@ -67,7 +67,7 @@ export class Point
             // Array of at least one number or string with relative coord, the rest will be 0
             else if (Array.isArray(p) && isCoord(p[0]))
             {
-                let pointArr = [0,0,0].map( (v,i) =>  p[i] || v ); // default value (0) or value in given array p
+                let pointArr = [0,0,0].map( (v,i) =>  p[i] ?? v ); // default value (0) or value in given array p
                 let pointArrChecked = this._arrayResolveRelativeCoordinates(pointArr);
                 [this._x,this._y,this._z] = pointArrChecked;
                 return this;
@@ -77,7 +77,7 @@ export class Point
             {
                 // just one or more coords in arguments
                 let otherArgNums = args.filter(c => isCoord(c));
-                let pointArr = [p, otherArgNums[0] || 0, otherArgNums[1] || 0];
+                let pointArr = [p, otherArgNums[0] ?? 0, otherArgNums[1] ?? 0];
                 let pointArrChecked = this._arrayResolveRelativeCoordinates(pointArr);
                 [this._x,this._y,this._z] = pointArrChecked;
                 return this;

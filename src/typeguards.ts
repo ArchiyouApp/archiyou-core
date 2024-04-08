@@ -227,8 +227,8 @@ export function isAlignment(o:any): o is Alignment
     // alignment can be a combination of SIDES and extra terms or a direct percentage point in bbox
     let aligns = SIDES.concat(ALIGNMENTS_ADD_TO_SIDES);
     return (
-        (typeof(o) === 'string' && aligns.some( a => o.includes(a))) ||
-        isPointLike(o)
+        (typeof(o) === 'string' && aligns.some( a => o.includes(a))) 
+        || isPointLike(o)
         )
 }
 
