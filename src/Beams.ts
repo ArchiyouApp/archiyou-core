@@ -39,8 +39,8 @@ const BEAM_SECTION_HEIGHT_DEFAULT = 100;
 const BEAM_SECTION_LENGTH_DEFAULT = 2000;
 const BEAM_TYPE_PROPERTIES = {
     beam: { pitch: 0, rotation: 0, alignment: 'centerbottom'},
-    post: { pitch: 90, rotation: 0, alignment: 'center', placeOtherAt: 'end' },
-    stud: { pitch: 90, rotation: 0, alignment: 'center', placeOtherAt: 'end' },
+    post: { pitch: 90, rotation: 0, alignment: 'center', placeOtherAt: 'end', autoLength: false },
+    stud: { pitch: 90, rotation: 0, alignment: 'center', placeOtherAt: 'end', autoLength: false },
     brace: { pitch: 45, rotation: 0, alignment: 'centerbottom' },
     rafter : { pitch: 45, rotation: 0, alignment: 'centerbottom' },
     noggin : { pitch: 0, rotation: 90, alignment: 'centerbottom'},
@@ -145,10 +145,12 @@ export class Beams
 class Beam
 {
     _type?:BeamType = 'beam';
+    // Default flags. NOTE: overwriting on creation by BEAM_TYPE_PROPERTIES
     _flags?:BeamFlags = {
         autoLength: true,
         autoPitch: true,
         autoRotation: true,
+        placeOtherAt: 'center',
     };
     _section:BeamSection;
     _others:Array<Beam>; // all beams in the scene created with the Beams module (by reference)
@@ -175,9 +177,23 @@ class Beam
 
     //// BASE SHAPE AND POSITIONING ////
 
-    length(l:number)
+    @checkInput('Number','auto')
+    length(l:number):this
     {
-        if(l){ this._length = l };
+        if(l){ 
+            this._length = l;
+            this._setShape(); // regenerate shape with new length
+        }
+        return this;
+    }
+
+    @checkInput(['PointLike','PointLike'],['Point','Point'])
+    _setLengthFrom(start:PointLike, end:PointLike):this
+    {
+        const l = (start as Point).distance(end); // Point autoconverted
+        this.length(l);
+
+        return this;
     }
 
     /** Set position of the beam */
@@ -186,10 +202,31 @@ class Beam
     {
         const pv = (p as Vector); // auto converted
         const mv = pv.subtract(this._position);
+
         this._shape.move(mv);
         this._position = pv.toPoint();
-        this._updateBaseLine()
         
+        this._updateBaseLine();
+        
+        return this;
+    }
+
+    /** Place this Beam along a Line given by start and end position */
+    @checkInput(['PointLike','PointLike'], ['Vector','Vector'])
+    along(start:PointLike, end:PointLike, autoLength:boolean=false):this
+    {
+        const [s,e]  = this._checkStartEnd(start,end);
+
+        const dir = e.toVector().subtract(s.toVector())
+        this.at(s); // place at position
+
+        this.rotation(dir.angle2D()); // rotate to become parallel to rotation of line
+
+        if(autoLength)
+        { 
+            this._setLengthFrom(s,e)
+        }
+
         return this;
     }
 
@@ -206,6 +243,21 @@ class Beam
         return this;
     }
 
+    /** Set absolute rotation to given angle */
+    rotation(angle:number)
+    {
+        if(!this._shape){ this._setShape() };
+        this.rotate(angle - this._rotation);
+    }
+
+    /** Rotate around Z-axis in degrees */
+    rotate(d:number)
+    {
+        this._rotation += d;
+        this._shape.rotateZ(d, this._position);
+        this._updateBaseLine();
+    }
+
     /** Get start of base line of Beam 
      *  Start is always the lowest, most left position of the base line
     */
@@ -220,6 +272,24 @@ class Beam
         return this._setBaseLine().end().toPoint();
     }
 
+    /** Make sure of the given two Points start is the most bottom and left */
+    @checkInput(['PointLike','PointLike'],['Vector','Vector'])
+    _checkStartEnd(start:PointLike, end:PointLike):[Point,Point]
+    {
+        const line = new Edge().makeLine(start,end);
+
+        if (line.start().x > line.end().x)
+        {
+            line.reverse();
+        }
+        else if(line.start().z > line.end().z)
+        {
+            line.reverse();
+        }
+
+        return [line.start().toPoint(),line.end().toPoint()]
+    }
+
     /** Make Section Face with correct orientation for the Beam 
      *  NOTE: We anticipate more complex sections, like I-beams, cylinders etc.
     */
@@ -230,7 +300,11 @@ class Beam
         const alignmentPerc:Array<number> = sectionFace._alignPerc(this._alignment); // alignment inside Section from string or [px,py]
         const sectionPivot = sectionFace.bbox().getPositionAtPerc(alignmentPerc);
         const movePivotVec = new Vector().subtracted(sectionPivot.toVector());
-        this._position = new Point(0,0,0); // position always start at origin
+        
+        if(!this._position)
+        {
+            this._position = new Point(0,0,0); // position always start at origin
+        }
 
         sectionFace
             .move(movePivotVec)
@@ -239,20 +313,25 @@ class Beam
         return sectionFace;
     }
 
-    /** Set Beam solid Shape from base properties or replace if existing */
+    /** Set Beam solid Shape from base properties or replace if existing 
+     *  NOTE: base line has priority over the solid Shape!
+    */
     _setShape():this
     {
-        const sectionFace = this._getOrientatedSectionFace();
-        const line = this._setBaseLine();
-        const solid = sectionFace.sweeped(line, true, true);
-        
+        const sectionFace = this._getOrientatedSectionFace(); // orientates the Face according to section alignment where control line at [0,0,0]
+        const line = this._setBaseLine(false); // update baseline first
+        const solid = sectionFace
+                        .sweeped(line, true, true) // Created Solid from Section, auto rotate
+                        .move(line.start()) // Make sure the solid is positioned on base line according to section alignment
+
         if(!this._shape)
         {
             this._shape = solid;
             this._shape.addToScene();
         }
         else {
-            this._shape.replaceShape(solid);
+            this._shape.replaceShape(solid); // replace in Scene
+            this._shape = solid; // Need to update reference too!
         }
         
         return this;
@@ -269,13 +348,11 @@ class Beam
     {
         if (cached && this._baseLine)
         { 
-                return this._baseLine   
+            return this._baseLine   
         };
 
-        const dir = new Vector(1,0,0).rotateY(-this._pitch).rotateZ(this._rotation); // NOTE: rotation around -y gives positive rotation from X to Z
-        if(dir.z < 0){ dir.reverse() } // make sure the base line always has its start at the lowest Z axis
-        // TODO
-        //if(dir.x < 0){ dir.reverse() } // make sure the base line start is always most left
+        const dir = new Vector(1,0,0).rotateY(-this._pitch).rotateZ(this._rotation); // NOTE: rotation around -y gives positive rotation from X to Z        
+
         // if length is not set
         if(!this._length)
         {
@@ -283,17 +360,21 @@ class Beam
             this._flags.autoLength = true;
         }
         const baseLine = new Edge().makeLine(this._position, this._position.moved(dir.scaled(this._length)))
-        
+
+        if(baseLine.start().x > baseLine.end().x){ baseLine.reverse() } // make sure the base line start is always most left
+        if(baseLine.start().z > baseLine.end().z ){ baseLine.reverse() } // make sure the base line always has its start at the lowest Z axis
+
         if(this._baseLine)
         {
             this._baseLine.replaceShape(baseLine);
+            this._baseLine = baseLine; // Need to update reference too!
         }
         else {
             this._baseLine = baseLine;
             this._baseLine.addToScene().color('blue').dashed();
         }
 
-        return baseLine
+        return this._baseLine
     }
 
 
@@ -362,22 +443,49 @@ class Beam
         
         const otherBeams = others.filter(o => o instanceof(Beam))
 
-        if(otherBeams.length === 0){ throw new Error(`Beam.place({others}): ERROR: Please supply one or more Beams to place this beam on`);}
-        // Place with one other beam: implicitely means 'on' if no alignment given
+        if(otherBeams.length === 0)
+        { 
+            throw new Error(`Beam.place({others}): ERROR: Please supply one or more Beams to place this beam on`);
+        }
         else if (otherBeams.length === 1)
         {
+            // Place with one other beam: implicitely means 'on' if no alignment given
             const otherBeam = otherBeams[0]
-            this._placeAt(otherBeam, at ?? 'end');
+            this._placeAt(otherBeam, at ?? otherBeam._flags.placeOtherAt ?? 'end');
+            this.rotation(otherBeam._rotation); // Take over rotation of parent
+            // TODO: relations
+        }
+        else if (otherBeams.length === 2)
+        {
+            // Place a beam on/between two others
+            this._placeAtOthers(otherBeams, at ?? 'end', this._flags?.autoLength ?? true); 
         }
 
         return this;
     }
 
-    /** The point on the base line of other beams to place this beam on/between */
+    /** The point on the base line of other beams to place this beam on */
     _placeAt(other:Beam, at?:BeamBaseLineAlignment):this
     {
        return this.at(other._pointAtBaseLine(at));
     }
+
+    /** Place this Beam in relation to two or more others */
+    _placeAtOthers(others:Array<Beam>, at?:BeamBaseLineAlignment, autoLength:boolean=false):this
+    {
+        if(others.length === 2)
+        {
+            const otherStart = others[0]._pointAtBaseLine(at);
+            const otherEnd = others[1]._pointAtBaseLine(at);
+            this.along(otherStart, otherEnd, autoLength);
+        }
+        else {
+            console.warn(`Beam::_placeAtOthers(): More than two others: Not yet implemented!`)
+        }
+
+        return this;
+    }
+
 
     /** point along base line of Beam
      *  @param at start,end, middle/center or [0-1] or distance from start in model units (like mm)
@@ -385,7 +493,7 @@ class Beam
     _pointAtBaseLine(at?:BeamBaseLineAlignment):Point
     {   
         at = at ?? this._flags?.placeOtherAt ?? BEAM_PLACE_DEFAULT_ALIGNMENT; 
-        const baseLine = this._setBaseLine();
+        const baseLine = this._setBaseLine(false);
         return ((typeof at === 'string') ? 
                 baseLine[at]() :  // NOTE: center/middle,start and end are methods of Edge
                 (at < 1.0) ? 
@@ -475,6 +583,7 @@ interface BeamFlags
     autoLength?:boolean
     autoRotation?:boolean
     autoPitch?:boolean
+    ortho?:boolean // TODO
     // TODO: joint types
 }
 
