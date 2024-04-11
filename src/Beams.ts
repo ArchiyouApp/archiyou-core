@@ -38,11 +38,12 @@ const BEAM_SECTION_WIDTH_DEFAULT = 100;
 const BEAM_SECTION_HEIGHT_DEFAULT = 100;
 const BEAM_SECTION_LENGTH_DEFAULT = 2000;
 const BEAM_TYPE_PROPERTIES = {
-    beam: { pitch: 0, rotation: 0, alignment: 'centerbottom'},
+    beam: { pitch: 0, rotation: 0, alignment: 'centerbottom', autoLength:true, autoPitch: false},
     post: { pitch: 90, rotation: 0, alignment: 'center', placeOtherAt: 'end', autoLength: false },
     stud: { pitch: 90, rotation: 0, alignment: 'center', placeOtherAt: 'end', autoLength: false },
-    brace: { pitch: 45, rotation: 0, alignment: 'centerbottom' },
-    rafter : { pitch: 45, rotation: 0, alignment: 'centerbottom' },
+    diagonal: { pitch: 45, alignment: 'center', autoPitch: true  }, // stabilizing diagonal between two Beam members, mostly posts. Pitch/rotation is set from parents
+    brace: { pitch: 45, rotation: 0, alignment: 'centerbottom', autoPitch: false }, // stabilizing diagonal between a post and beam
+    rafter : { pitch: 45, rotation: 0, alignment: 'centerbottom', autoPitch: true },
     noggin : { pitch: 0, rotation: 90, alignment: 'centerbottom'},
     girt : { pitch: 0, rotation: 0, alignment: 'centerbottom' },
 }
@@ -95,6 +96,12 @@ export class Beams
         });
     }
 
+    reset()
+    {
+        this.beams = [];
+        this.activeSection = new BeamSection();
+    }
+
     //// CREATION METHODS ////
 
     new(type:BeamType = 'beam', length?:number)
@@ -108,6 +115,21 @@ export class Beams
     }
     
     //// MANAGING BEAMS ////
+
+    /** TODO: Resolve all joints of Beam system */
+    join()
+    {
+        console.log('==== BEAMS JOIN ====');
+
+        this.beams.forEach((b,i) => 
+            {
+                console.log(`--- BEAM ${b._type} serial=${b._serial} with ${b._relations.length} relations`);
+                b._relations.forEach((r,i) => {
+                    console.log(`RELATION: ${r.type}`)
+                })
+            }        
+        )
+    }
 
     getLastBeam():Beam|null
     {
@@ -142,7 +164,7 @@ export class Beams
  *  representation of the beams
  * 
  */
-class Beam
+export class Beam
 {
     _type?:BeamType = 'beam';
     // Default flags. NOTE: overwriting on creation by BEAM_TYPE_PROPERTIES
@@ -152,11 +174,10 @@ class Beam
         autoRotation: true,
         placeOtherAt: 'center',
     };
-    _section:BeamSection;
-    _others:Array<Beam>; // all beams in the scene created with the Beams module (by reference)
-    _relations:Array<BeamRelation>; // other beams that are related to this one
 
     _id:string;
+    _serial:number; // 0..N based on creation order
+    _parent:Beams;
     _length:number; // can be set manually or automatic
     _position:Point; // position of pivot (start of base line) in space of beam 
     _pitch:number = 0;
@@ -166,23 +187,29 @@ class Beam
     _shape:AnyShape;
     _baseLine:Edge;
 
-    name:string; // easy name to identify later
+    _section:BeamSection;
+    _others:Array<Beam>; // all beams in the scene created with the Beams module (by reference)
+    _relations:Array<BeamRelation> = []; // other beams that are related to this one
+
+    name:string; // easy name to identify later [TODO]
 
     constructor(parent:Beams)
     {
-        this._section = parent.activeSection.copy(); // deep copy
-        this._others = parent.beams; // reference
+        this._parent = parent; 
+        this._section = this._parent.activeSection.copy(); // deep copy
+        this._others = this._parent.beams; // reference
         this._id = uuidv4().toString();
+        this._serial = (this._others ?? []).length;
     }
 
-    //// BASE SHAPE AND POSITIONING ////
+    //// BASE PROPERTIES ////
 
     @checkInput('Number','auto')
-    length(l:number):this
+    length(l:number, updateShape:boolean=true):this
     {
         if(l){ 
             this._length = l;
-            this._setShape(); // regenerate shape with new length
+            if(updateShape){ this._setShape() }; // regenerate shape with new length
         }
         return this;
     }
@@ -218,8 +245,10 @@ class Beam
         const [s,e]  = this._checkStartEnd(start,end);
 
         const dir = e.toVector().subtract(s.toVector())
+
         this.at(s); // place at position
 
+        this.pitch(dir.angle(dir.copy().setZ(0))); // pitch is angle between along direction and a copy projected on XY plane (z = 0) - NOTE: don't update shape just yet!
         this.rotation(dir.angle2D()); // rotate to become parallel to rotation of line
 
         if(autoLength)
@@ -243,19 +272,29 @@ class Beam
         return this;
     }
 
+    /** Set absolute pitch angle in degrees of this Beam */
+    pitch(angle:number):this
+    {
+        this._pitch = angle;
+        this._setShape();
+        return this;
+    }   
+
     /** Set absolute rotation to given angle */
-    rotation(angle:number)
+    rotation(angle:number):this
     {
         if(!this._shape){ this._setShape() };
         this.rotate(angle - this._rotation);
+        return this;
     }
 
     /** Rotate around Z-axis in degrees */
-    rotate(d:number)
+    rotate(d:number):this
     {
         this._rotation += d;
         this._shape.rotateZ(d, this._position);
         this._updateBaseLine();
+        return this;
     }
 
     /** Get start of base line of Beam 
@@ -282,7 +321,7 @@ class Beam
         {
             line.reverse();
         }
-        else if(line.start().z > line.end().z)
+        if(line.start().z > line.end().z) // lowest has priority as start
         {
             line.reverse();
         }
@@ -290,8 +329,36 @@ class Beam
         return [line.start().toPoint(),line.end().toPoint()]
     }
 
-    /** Make Section Face with correct orientation for the Beam 
-     *  NOTE: We anticipate more complex sections, like I-beams, cylinders etc.
+    //// SET SPECIFIC TYPES ////
+
+    @checkInput([[Number,2000]], ['auto'])
+    beam(length?:number)
+    {
+        return this.type('beam', length);
+    }
+
+    @checkInput([[Number,2000]], ['auto'])
+    post(length?:number):this
+    {
+        return this.type('post', length);
+    }
+
+    @checkInput([[Number,2000]], ['auto'])
+    stud(length?:number):this
+    {
+        return this.post(length); 
+    }
+
+    @checkInput([[Number,1000]], ['auto'])
+    brace(length?:number):this
+    {
+        return this.type('brace', length);
+    }
+
+    //// SHAPING ////
+
+    /** Make Section Face at start position with correct orientation for the Beam 
+     *  NOTE: With sweep() we anticipate more complex sections, like I-beams, cylinders etc.
     */
     _getOrientatedSectionFace():Face
     {
@@ -299,18 +366,31 @@ class Beam
         const sectionFace = new Face().makePlane(this._section.width, this._section.height,[0,0,0], [0,1,0]); // center of plane at origin
         const alignmentPerc:Array<number> = sectionFace._alignPerc(this._alignment); // alignment inside Section from string or [px,py]
         const sectionPivot = sectionFace.bbox().getPositionAtPerc(alignmentPerc);
-        const movePivotVec = new Vector().subtracted(sectionPivot.toVector());
+        const movePivotVec = new Vector().subtracted(sectionPivot.toVector()); // offset Solid from base line according to alignment
         
-        if(!this._position)
-        {
-            this._position = new Point(0,0,0); // position always start at origin
-        }
+        if(!this._position){ this._position = new Point(0,0,0); } // position always start at origin
 
         sectionFace
             .move(movePivotVec)
-            .rotateX(this._pitch,[0,0,0]).rotateZ(this._rotation-90, this._position);
+            .rotateX(this._pitch,[0,0,0])
+            .rotateZ(this._rotation-90, [0,0,0])
+            .moveTo(this._position.moved(this._getBaseLineToSectionCenterVec())) // move to start of baseline
+            
 
         return sectionFace;
+    }
+
+    /** Get offset Vector from baseline to center of Beam section */
+    _getBaseLineToSectionCenterVec():Vector
+    {
+        const sectionFace = new Face().makePlane(this._section.width, this._section.height,[0,0,0], [0,1,0]); // center of plane at origin
+        const alignmentPerc:Array<number> = sectionFace._alignPerc(this._alignment); // alignment inside Section from string or [px,py]
+        return sectionFace.bbox().getPositionAtPerc(alignmentPerc)
+                    .toVector()
+                    .rotateX(this._pitch)
+                    .rotateZ(this._rotation-90)
+                    .reverse()
+
     }
 
     /** Set Beam solid Shape from base properties or replace if existing 
@@ -318,16 +398,14 @@ class Beam
     */
     _setShape():this
     {
-        const sectionFace = this._getOrientatedSectionFace(); // orientates the Face according to section alignment where control line at [0,0,0]
+        const sectionFace = this._getOrientatedSectionFace(); // orientated Face at start of baseline
         const line = this._setBaseLine(false); // update baseline first
-        const solid = sectionFace
-                        .sweeped(line, true, true) // Created Solid from Section, auto rotate
-                        .move(line.start()) // Make sure the solid is positioned on base line according to section alignment
+        const solid = sectionFace._sweeped(line, true, false) // Created Solid from Section
 
         if(!this._shape)
         {
+            solid.addToScene();
             this._shape = solid;
-            this._shape.addToScene();
         }
         else {
             this._shape.replaceShape(solid); // replace in Scene
@@ -378,7 +456,7 @@ class Beam
     }
 
 
-    //// CREATION AND TYPING ////
+    //// TYPING, POSITIONING IN CONTEXT ////
 
     type(t:BeamType, length?:number): this
     {
@@ -403,33 +481,7 @@ class Beam
         this._setShape();
 
         return this
-    }
-
-    //// SET SPECIFIC TYPES ////
-
-    @checkInput([[Number,2000]], ['auto'])
-    beam(length?:number)
-    {
-        return this.type('beam', length);
-    }
-
-    @checkInput([[Number,2000]], ['auto'])
-    post(length?:number):this
-    {
-        return this.type('post', length);
-    }
-
-    @checkInput([[Number,2000]], ['auto'])
-    stud(length?:number):this
-    {
-        return this.post(length); 
-    }
-
-    @checkInput([[Number,1000]], ['auto'])
-    brace(length?:number):this
-    {
-        return this.type('brace', length);
-    }
+    }  
 
     //// PLACING, RELATIONS AND JOINTS ////
     /**
@@ -438,10 +490,10 @@ class Beam
      */
     place(others:BeamOrBeamSequence, at?:BeamBaseLineAlignment):this
     {
-        if(others instanceof(Beam)) others = [others]
+        if(others instanceof Beam) others = [others]
         else if (!Array.isArray(others)){ throw new Error(`Beam.place({others}): ERROR: Please supply one or more Beams to place this beam on. If you want to set position, use Beam.at() or Beam.move()!`); }
         
-        const otherBeams = others.filter(o => o instanceof(Beam))
+        const otherBeams = others.filter(o => o instanceof Beam)
 
         if(otherBeams.length === 0)
         { 
@@ -451,17 +503,51 @@ class Beam
         {
             // Place with one other beam: implicitely means 'on' if no alignment given
             const otherBeam = otherBeams[0]
-            this._placeAt(otherBeam, at ?? otherBeam._flags.placeOtherAt ?? 'end');
+            at = at ?? otherBeam._flags.placeOtherAt ?? 'end'
+            this._placeAt(otherBeam, at);
             this.rotation(otherBeam._rotation); // Take over rotation of parent
-            // TODO: relations
+            this._addRelation(otherBeam, at);
         }
         else if (otherBeams.length === 2)
         {
             // Place a beam on/between two others
-            this._placeAtOthers(otherBeams, at ?? 'end', this._flags?.autoLength ?? true); 
+            at = at ?? 'end';
+            this._placeAtOthers(otherBeams, at, this._flags?.autoLength ?? true); 
+            const relation = (this._getBeamRelationBaseLocation(at) === 'along') ? 'between' : 'on'
+            this._addRelation(otherBeams[0], at, relation);
+            this._addRelation(otherBeams[1], at, relation);
         }
 
         return this;
+    }
+
+    /** Add Relation from current Beam to others at a given location
+     *  Based on the other Beams and location a BeamRelationType is determined (or manually set)
+     */
+    _addRelation(other:Beam, location:BeamBaseLineAlignment, type?:BeamRelationType)
+    {
+        const REVERSED_RELATIONS = {
+            on: 'support',
+        }
+
+        this._relations.push( new BeamRelation(this, other, type, location)); 
+        other._relations.push( new BeamRelation(other, this, REVERSED_RELATIONS[type] ?? type, location )); // on both Beams 
+    }
+
+    /** Relations can be either along a Beam (including start) or at the end ('on') 
+     *  which defines together with number of Beams the exact Relation type
+    */
+    _getBeamRelationBaseLocation(location:BeamBaseLineAlignment):'along'|'on'
+    {
+        if((typeof location === 'string') ? 
+                            ['start','center','middle'].includes(location) 
+                            : (location >= 0 && location < 1.0))
+                {
+                    return 'along'; 
+                }
+                else {
+                    return 'on';
+                }
     }
 
     /** The point on the base line of other beams to place this beam on */
@@ -486,6 +572,22 @@ class Beam
         return this;
     }
 
+    /** Create Diagonal between current and other beam
+     *  @param endBeam 
+     */
+    @checkInput(['Beam', ['BeamBaseLineAlignment','start']], ['auto', 'auto'])
+    diagonal(endBeam:Beam, startAt:BeamBaseLineAlignment='start'):this
+    {
+        const start = this._pointAtBaseLine(startAt);
+        const end = endBeam.end();
+        this._parent.new('diagonal').along(start,end,true); 
+        this._addRelation(this, 'start', 'diagonal');
+        this._addRelation(endBeam, 'end', 'diagonal');
+
+        return this;
+    }
+
+    // TODO: Brace between current Beam and other
 
     /** point along base line of Beam
      *  @param at start,end, middle/center or [0-1] or distance from start in model units (like mm)
@@ -508,11 +610,11 @@ class Beam
 
 //// TYPES, INTERFACES, TYPEGUARDS AND HELPER CLASSES ////
 
-type BeamType = 'beam'|'post'|'stud'|'rafter'|'brace'|'nogging'|'girt'
-type BeamSectionOrientation = 'flat'|'up'|'rect'
-type BeamOrBeamSequence = Array<Beam>|Beam
-type BeamBaseLineAlignment = 'start'|'end'|'center'|'middle'|number // alignment along base line of Beam
-type BeamRelationType = 'placed'|'fitted'; // TODO: more
+export type BeamType = 'beam'|'post'|'stud'|'rafter'|'diagonal'|'brace'|'nogging'|'girt'
+export type BeamSectionOrientation = 'flat'|'up'|'rect'
+export type BeamOrBeamSequence = Array<Beam>|Beam
+export type BeamBaseLineAlignment = 'start'|'end'|'center'|'middle'|number // alignment along base line of Beam
+export type BeamRelationType = 'support'|'on'|'along'|'between'|'brace'|'diagonal'; // Main relations between Beams
 
 class BeamSection
 {
@@ -558,19 +660,28 @@ class BeamSection
     }
 }
 
-/** Describes a relation between two (or more) Beams */
+/** Describes a relation between two Beams at one Location 
+ *  Most relations already make the number of Beams implicit
+ *  Like: 
+ *      - on: 1 other Beam
+ *      - between: 2 other Beams
+ * 
+ *  Different Relations can be combined by location into Joints and resolved into fitting Shapes
+*/
 class BeamRelation
 {
     from:Beam
-    to:Array<Beam> = [];
+    to:Beam;
+    location: BeamBaseLineAlignment; // on or more location of Relationship 
     type:BeamRelationType
-    // TODO: more
+    // TODO: order?
 
-    constructor(from:Beam,to:Array<Beam>|Beam, type?:BeamRelationType)
+    constructor(from:Beam,to:Beam,type?:BeamRelationType, location?:BeamBaseLineAlignment)
     {
         this.from = from;
-        this.to = (Array.isArray(to) ? to : [to]);
-        this.type = type ?? 'placed';
+        this.to = to;
+        this.type = type ?? 'on';
+        this.location = location;
     }
 }
 

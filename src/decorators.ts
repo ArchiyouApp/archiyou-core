@@ -13,7 +13,8 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
-            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions } from './internal'
+            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,
+            isBeam, isBeamBaseLineAlignment } from './internal'
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
 
@@ -426,7 +427,24 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             check: isModelUnits,
             errorMessage: { possible: [`ModelUnits: 'mm','cm','dm','m','km','inch','feet','yd','mi'`]},
             transformInput: null,
+        },
+        'isBeam':
+        {
+            name: 'Beam',
+            obj: isBeam,
+            check: isBeam,
+            errorMessage: { possible: ['Beam'] },
+            transformInput: null,
+        },
+        'isBeamBaseLineAlignment':
+        {
+            name: 'BeamBaseLineAlignment',
+            obj: isBeamBaseLineAlignment,
+            check: isBeamBaseLineAlignment,
+            errorMessage: { possible: ['start|end|center|middle|number']},
+            transformInput: null,
         }
+
     } 
 
     let decoratorTargetInfo;

@@ -695,10 +695,19 @@ export class Vector extends Point
         return roundToTolerance(toDeg(this._ocVector.Angle(otherVec._ocVector)));
     }
 
-    /** Angle [0-360] on XY plane */
-    angle2D()
+    /** Angle [0-360] on XY plane 
+     *  alias backwards compat
+    */
+    angle2D():number
     {
-        let a = this.angleRef([1,0,0],[0,0,-1]);
+        return this.angleXY();
+    }
+
+    /** Angle [0-360] on XY plane */
+    angleXY()
+    {
+        const v = this.copy().setZ(0); // make 2D on XY plane
+        let a = v.angleRef([1,0,0],[0,0,-1]);
         return (a < 0) ? 360+a : a;
     }
 

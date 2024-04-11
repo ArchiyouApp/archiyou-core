@@ -1,4 +1,6 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, DimensionLineData, PipelineType  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, 
+            VertexCollection, DimensionLineData, PipelineType, Beam  } from './internal'
+
 import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
           AnyShapeOrCollection, AnyShapeOrSequence, PointLikeOrAnyShapeOrCollection, ColorInput,
@@ -9,7 +11,8 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           PointLikeOrVertexCollection,
           ModelUnits, 
           ShapeAttributes, 
-          DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput
+          DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput,
+          BeamBaseLineAlignment
         } from './internal' // types
 
 import { ParamType, Param, PublishParam } from './internal'
@@ -21,6 +24,7 @@ import { BaseStyle, ContainerAlignment, Position, ScaleInput, DataRows,
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
+
 import { isNumeric, isRelativeCoordString } from './internal'
 
 
@@ -470,4 +474,18 @@ export function isWidthHeightInput(o:any): o is WidthHeightInput
 export function isContainerTableInput(o:any): o is ContainerTableInput
 {
     return (typeof o === 'string') || isDataRows(o)
+}
+
+//// BEAMS MODULE ////
+
+export function isBeam(o:any): o is Beam
+{
+    return o instanceof Beam
+}
+
+export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
+{
+    return (typeof o === 'string') ? 
+        ['start','end','center','middle'].includes(o)
+        : isNumeric(o)
 }

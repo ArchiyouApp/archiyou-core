@@ -1787,12 +1787,20 @@ export class Shape
 
     /** Create a new Shape by sweeping a the Shape's Wire representation through a Wire Path */
     @checkInput([ 'LinearShape', [Boolean,SHAPE_SWEEP_DEFAULT_SOLID ], [Boolean, SHAPE_SWEEP_DEFAULT_AUTOROTATE],[String, null]], ['Wire', Boolean, Boolean, String ] )
-    sweeped(path:LinearShape, solid?:boolean, autoRotate?:boolean, alignToPath?:string):Face|Shell|Solid 
+    _sweeped(path:LinearShape, solid?:boolean, autoRotate?:boolean, alignToPath?:string):Face|Shell|Solid 
     {
         // TODO: add holes
         path = path as Wire;
         let sweepWire = this._toWire(); // works on Edge, Face...
-        return sweepWire.sweeped(path, solid, autoRotate, alignToPath);
+        return sweepWire._sweeped(path, solid, autoRotate, alignToPath);        
+    }
+
+    /** Sweep and add result to Scene */
+    @addResultShapesToScene
+    @checkInput([ 'LinearShape', [Boolean,SHAPE_SWEEP_DEFAULT_SOLID ], [Boolean, SHAPE_SWEEP_DEFAULT_AUTOROTATE],[String, null]], ['Wire', Boolean, Boolean, String ] )
+    sweeped(path:LinearShape, solid?:boolean, autoRotate?:boolean, alignToPath?:string):Face|Shell|Solid 
+    {
+        return this._sweeped(path, solid, autoRotate, alignToPath);
     }
 
     /** Is the same Shape in OC */
