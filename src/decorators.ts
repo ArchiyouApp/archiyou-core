@@ -275,7 +275,7 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             name: 'MakeShapeCollectionInput', 
             obj: isMakeShapeCollectionInput,
             check: isMakeShapeCollectionInput,
-            errorMessage: { possible: ['PointLike', 'PointLikeSequence', 'AnyShape', 'ShapeCollection'] },
+            errorMessage: { possible: ['PointLike', 'PointLikeSequence', 'AnyShape', 'ShapeCollection', 'Array<PointLike|AnyShape>'] },
             transformInput: null, // no target
         },
         'ShapeCollection': {

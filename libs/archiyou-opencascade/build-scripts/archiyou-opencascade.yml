@@ -287,6 +287,7 @@ mainBuild:
   - symbol: ShapeAnalysis_FreeBoundsProperties
   - symbol: TopTools
   - symbol: TopTools_SequenceOfShape  
+  - symbol: BRepProj_Projection
   #- symbol: TopTools_HSequenceOfShape # not there
   - symbol: OCJS
   emccFlags:

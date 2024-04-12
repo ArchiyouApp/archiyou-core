@@ -915,6 +915,20 @@ export class Face extends Shape
          return this;     
     }
 
+    /** Create a new Face by projecting current onto another Face, Shell or Solid 
+     *   NOTE: converted from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562
+    */
+    
+    @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
+    _projectTo(other:AnyShape, direction:Vector, center:Vector):ShapeCollection
+    {
+        if(!direction && !center){ throw new Error(`Wire._projectTo: Please supply a PointLike for direction or center!`);}
+        if(['Vertex', 'Edge', 'Wire'].includes(other.type())){ throw new Error(`Wire._projectTo: Please supply a Face, Shell or Solid to project on!`);}
+
+        const projOuterWires = this.outerWire();
+        const projInnerWires = this.innerWires()
+    }
+
 
     //// SPECIFIC METHODS ON FACE ====
 

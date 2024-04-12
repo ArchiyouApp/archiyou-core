@@ -1,3 +1,4 @@
+// @ts-nocheck
 export declare class BRepAdaptor_CompCurve extends Adaptor3d_Curve {
   static get_type_name(): Standard_Character;
   static get_type_descriptor(): Handle_Standard_Type;
@@ -3730,6 +3731,24 @@ export declare class IntTools_FaceFace {
   Context(): Handle_IntTools_Context;
   delete(): void;
 }
+
+export declare class BRepProj_Projection {
+  IsDone(): Standard_Boolean;
+  Init(): void;
+  More(): Standard_Boolean;
+  Next(): void;
+  Current(): TopoDS_Wire;
+  Shape(): TopoDS_Compound;
+  delete(): void;
+}
+
+  export declare class BRepProj_Projection_1 extends BRepProj_Projection {
+    constructor(Wire: TopoDS_Shape, Shape: TopoDS_Shape, D: gp_Dir);
+  }
+
+  export declare class BRepProj_Projection_2 extends BRepProj_Projection {
+    constructor(Wire: TopoDS_Shape, Shape: TopoDS_Shape, P: gp_Pnt);
+  }
 
 export declare class BRepExtrema_DistShapeShape {
   SetDeflection(theDeflection: Standard_Real): void;
@@ -9220,6 +9239,9 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   IntTools_EdgeEdge_2: typeof IntTools_EdgeEdge_2;
   IntTools_EdgeEdge_3: typeof IntTools_EdgeEdge_3;
   IntTools_FaceFace: typeof IntTools_FaceFace;
+  BRepProj_Projection: typeof BRepProj_Projection;
+  BRepProj_Projection_1: typeof BRepProj_Projection_1;
+  BRepProj_Projection_2: typeof BRepProj_Projection_2;
   BRepExtrema_DistShapeShape: typeof BRepExtrema_DistShapeShape;
   BRepExtrema_DistShapeShape_1: typeof BRepExtrema_DistShapeShape_1;
   BRepExtrema_DistShapeShape_2: typeof BRepExtrema_DistShapeShape_2;

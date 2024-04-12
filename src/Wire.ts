@@ -1432,6 +1432,88 @@ export class Wire extends Shape
         return newSolid;
     }
 
+    /** Create a new Wire by projecting this Wire onto another Shape
+     *  either from one direction or concentric
+     *  
+     *  Returns a ShapeCollection with front and back groups
+     * 
+     *  NOTE: converted from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562
+     */
+    @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
+    projectTo(other:AnyShape, direction:Vector, center:Vector):ShapeCollection|null
+    {
+        if(['Vertex', 'Edge', 'Wire'].includes(other.type())){ throw new Error(`Wire._projectTo: Please supply a Face, Shell or Solid to project on!`);}
+        if(!direction && !center){ throw new Error(`Wire._projectTo: Please supply a PointLike for direction or center!`);}
+
+        let onlyFront = false;
+        // Face is OK, but we use a trick to convert to solid first by extruding away from projection and use front projection only
+        if(other.type() === 'Face')
+        {
+            const extrudeVec = (other.center().distance(this.center()) > 0) ? other.center().toVector().subtracted(this.center()) : direction ?? null;
+            if(extrudeVec)
+            {
+                other = other._extruded(10, extrudeVec )
+                onlyFront = true;
+            }
+            else {
+                console.warn('Wire::projectTo: You provided a Face to project on, could not extrude it with direction or distance Vector. Projection with fail!')
+            }
+        }
+
+        const ocProj = (direction) 
+                            ? new this._oc.BRepProj_Projection_1(this._ocShape, other._ocShape, direction._toOcDir())
+                            : new this._oc.BRepProj_Projection_2(this._ocShape, other._ocShape, center._toOcPoint())
+        
+        const ocOrigOrientation = this._ocShape.Orientation_1();
+        const projWires = [];
+
+        while (ocProj.More())
+        {
+            const projOcWire = ocProj.Current()
+            if(ocOrigOrientation !== projOcWire.Orientation_1())
+            {
+                projOcWire.Reverse();
+            }
+            projWires.push(new Wire()._fromOcShape(projOcWire));
+            ocProj.Next()
+        }
+
+        const frontWires = [] as Array<Wire>;
+        const backWires = [] as Array<Wire>;
+        if (projWires.length > 1)
+        {
+            const projWireCenters = projWires.map(w => w.center().toVector())
+            const projectionCenter = projWireCenters.reduce(
+                    (v1,v2) => v1.added(v2), 
+                    new Vector(0,0,0)).scaled(1/projWireCenters.length)
+                
+            const projWiresDirections:Array<Vector> = projWireCenters.map( c => c.subtracted(projectionCenter).normalized())
+            const directionNormalized:Vector = (direction) ? direction.normalized() : center.subtracted(projectionCenter).normalized();
+            
+            projWiresDirections.forEach((d,i) => 
+            {
+                if(d.dot(directionNormalized) > 0)
+                {
+                    frontWires.push(projWires[i]) 
+                }
+                else {
+                    backWires.push(projWires[i])
+                }
+            })
+        }
+        else if (projWires.length === 1) 
+        {
+            frontWires.push(projWires[0]);
+        }
+
+        const c = new ShapeCollection()
+                        .addGroup('front', frontWires);
+
+        if(!onlyFront && backWires.length > 0){ c.addGroup('back', backWires) };
+                        
+        return (c.length > 0) ? c.addToScene() : null;
+    }
+
     /** Aligning linear Shapes to each other so they form a connected Line */
     @checkInput(['LinearShape','LinearShapeTail'],['auto','auto'])
     alignTo(other:LinearShape, pivot:LinearShapeTail='start', alignment:LinearShapeTail='end'):Wire
