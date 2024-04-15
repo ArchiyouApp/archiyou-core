@@ -28,8 +28,8 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, Edge, ShapeCollection, AnyShapeCollection } from './internal'
-import { Alignment, PointLike } from './internal'
+import { ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, Edge, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
+import { Alignment, PointLike, isPointLike } from './internal'
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
 
 //// SETTINGS ////
@@ -212,6 +212,18 @@ export class Beam
             if(updateShape){ this._setShape() }; // regenerate shape with new length
         }
         return this;
+    }
+
+    direction():Vector
+    {
+        return this.end().toVector().subtracted(this.start().toVector()).normalize();
+    }
+
+    center():Point|null
+    {
+        return (this._length)
+            ? this.start().moved(this.direction().scale(this._length/2))
+            : null
     }
 
     @checkInput(['PointLike','PointLike'],['Point','Point'])
@@ -415,6 +427,31 @@ export class Beam
         return this;
     }
 
+    /** Remove any shape from inner Shape
+     *  TODO: Invent something with operation stack to make this parametric
+     */
+    _subtract(other:AnyShape):this
+    {
+        if(this._shape)
+        {
+            // NOTE: we still need to update the reference (why?)
+            const subtract = this._shape.subtract(other);
+            this._shape = ( ShapeCollection.isShapeCollection(subtract) ) ? (subtract as ShapeCollection).first() : subtract as AnyShape;
+        }
+        return this;
+    }
+
+    _union(other:AnyShape):this
+    {
+        if(this._shape)
+        {
+            // NOTE: we still need to update the reference (why?)
+            const union = this._shape.union(other);
+            this._shape = ( ShapeCollection.isShapeCollection(union) ) ? (union as ShapeCollection).first() : union as AnyShape;
+        }
+        return this;
+    }
+
     _setFromStartEnd():this
     {
         
@@ -456,7 +493,7 @@ export class Beam
     }
 
 
-    //// TYPING, POSITIONING IN CONTEXT ////
+    //// TYPING AND POSITIONING IN CONTEXT ////
 
     type(t:BeamType, length?:number): this
     {
@@ -483,7 +520,7 @@ export class Beam
         return this
     }  
 
-    //// PLACING, RELATIONS AND JOINTS ////
+    //// PLACING AND RELATIONS ////
     /**
      *  Position this Beam from the top onto one or more other beams
      *  Relations will be formed, that are resolved into joints
@@ -504,18 +541,18 @@ export class Beam
             // Place with one other beam: implicitely means 'on' if no alignment given
             const otherBeam = otherBeams[0]
             at = at ?? otherBeam._flags.placeOtherAt ?? 'end'
-            this._placeAt(otherBeam, at);
+            const relationAt = this._placeAt(otherBeam, at);
             this.rotation(otherBeam._rotation); // Take over rotation of parent
-            this._addRelation(otherBeam, at);
+            this._addRelation(otherBeam, relationAt);
         }
         else if (otherBeams.length === 2)
         {
             // Place a beam on/between two others
             at = at ?? 'end';
-            this._placeAtOthers(otherBeams, at, this._flags?.autoLength ?? true); 
+            const placedAtPoints = this._placeAtOthers(otherBeams, at, this._flags?.autoLength ?? true); 
             const relation = (this._getBeamRelationBaseLocation(at) === 'along') ? 'between' : 'on'
-            this._addRelation(otherBeams[0], at, relation);
-            this._addRelation(otherBeams[1], at, relation);
+            this._addRelation(otherBeams[0], placedAtPoints[0], relation);
+            this._addRelation(otherBeams[1], placedAtPoints[1], relation);
         }
 
         return this;
@@ -524,14 +561,13 @@ export class Beam
     /** Add Relation from current Beam to others at a given location
      *  Based on the other Beams and location a BeamRelationType is determined (or manually set)
      */
-    _addRelation(other:Beam, location:BeamBaseLineAlignment, type?:BeamRelationType)
+    _addRelation(other:Beam, at:Point, type?:BeamRelationType)
     {
         const REVERSED_RELATIONS = {
             on: 'support',
         }
-
-        this._relations.push( new BeamRelation(this, other, type, location)); 
-        other._relations.push( new BeamRelation(other, this, REVERSED_RELATIONS[type] ?? type, location )); // on both Beams 
+        this._relations.push( new BeamRelation(this, other, type, at)); 
+        other._relations.push( new BeamRelation(other, this, REVERSED_RELATIONS[type] ?? type, at )); // on both Beams 
     }
 
     /** Relations can be either along a Beam (including start) or at the end ('on') 
@@ -549,27 +585,36 @@ export class Beam
                     return 'on';
                 }
     }
+    
 
-    /** The point on the base line of other beams to place this beam on */
-    _placeAt(other:Beam, at?:BeamBaseLineAlignment):this
+    /** The point on the base line of other beams to place this beam on 
+     *  @return Point where this Beam is placed at
+    */
+    _placeAt(other:Beam, atOther?:BeamBaseLineAlignment):Point
     {
-       return this.at(other._pointAtBaseLine(at));
+        const atPoint = other._pointAtBaseLine(atOther);
+        this.at(atPoint);
+        return this.start();
     }
 
-    /** Place this Beam in relation to two or more others */
-    _placeAtOthers(others:Array<Beam>, at?:BeamBaseLineAlignment, autoLength:boolean=false):this
+    /** Place this Beam in relation to two or more others 
+     *  @param others the other Beams to place the current at
+        @param atOther alignment where to place. Use 1 if same (like with posts) or multiple to define for all other Beams
+    */  
+    _placeAtOthers(others:Array<Beam>, atOther?:BeamBaseLineAlignment|Array<BeamBaseLineAlignment>, autoLength:boolean=false):[Point,Point]
     {
+        const atOthers = (Array.isArray(atOther)) ? atOther : new Array(others.length).fill(null).map(v => atOther);
         if(others.length === 2)
         {
-            const otherStart = others[0]._pointAtBaseLine(at);
-            const otherEnd = others[1]._pointAtBaseLine(at);
+            const otherStart = others[0]._pointAtBaseLine(atOthers[0]);
+            const otherEnd = others[1]._pointAtBaseLine(atOthers[1]);
             this.along(otherStart, otherEnd, autoLength);
         }
         else {
             console.warn(`Beam::_placeAtOthers(): More than two others: Not yet implemented!`)
         }
 
-        return this;
+        return [this.start(),this.end()]
     }
 
     /** Create Diagonal between current and other beam
@@ -581,8 +626,8 @@ export class Beam
         const start = this._pointAtBaseLine(startAt);
         const end = endBeam.end();
         this._parent.new('diagonal').along(start,end,true); 
-        this._addRelation(this, 'start', 'diagonal');
-        this._addRelation(endBeam, 'end', 'diagonal');
+        this._addRelation(this, start, 'diagonal');
+        this._addRelation(endBeam, end, 'diagonal');
 
         return this;
     }
@@ -604,6 +649,120 @@ export class Beam
                 ) as Point 
     }
 
+    //// JOINTS ////
+
+    /** Resolve (unresolved) relations to joints */
+    join(type:BeamJointType='butt')
+    {
+        const relationsByPoint = this._relations.reduce((acc,cv) => {
+            const rel = cv as BeamRelation
+            const relId = `[${rel.at.x},${rel.at.y},${rel.at.z}]`;
+            if(!acc[relId]){ acc[relId] = [] };
+            acc[relId].push(rel)
+            return acc
+        }, {})
+
+        Object.keys(relationsByPoint).forEach(pnt => 
+        {
+            const rels = relationsByPoint[pnt]
+            rels.forEach(r => 
+            {
+                this._resolveRelationToJoint(r, type)
+            })
+        })
+    }
+
+    _resolveRelationToJoint(r:BeamRelation, type:BeamJointType): any
+    {
+        const EXTEND_BEAM_AMOUNT = 500; // TODO: how much?
+        const [ curExt, curExtDir ] = r.from._getExtendedShape(EXTEND_BEAM_AMOUNT, r.at);
+        const [ otherExt, otherExtDir ] = r.to._getExtendedShape(EXTEND_BEAM_AMOUNT, r.at);
+
+        // gather data around relation
+        const jointInp = {
+            relation: r,
+            intersection: r.from._getExtendedIntersection(curExt, otherExt),
+            extended1: curExt,
+            extended2: otherExt,
+            projSections1: r.from._getProjectedSections(otherExt, curExtDir),
+            projSections2: r.to._getProjectedSections(curExt, otherExtDir),
+        } as BeamJointResolveInput
+
+        // call specific function
+        const BEAM_JOINT_TYPE_TO_FUNC = {
+            'butt' : this._resolveJointButt,
+        } as Record<BeamJointType, (i:BeamJointResolveInput) => any> 
+
+        const fn = BEAM_JOINT_TYPE_TO_FUNC[type];
+
+        if(!fn){ throw new Error(`Beam._resolveRelationToJoin(): Unknown joint type: "${type}. Please use any of these ${Object.keys(BEAM_JOINT_TYPE_TO_FUNC).join(',')}`)}
+        return fn(jointInp)
+    }
+
+    /** Get the intersection Shape of  (extended) current and other beams 
+     * 
+    */
+    _getExtendedIntersection(curExt:AnyShape, otherExt:AnyShape):AnyShape
+    {
+        const intersection = curExt._intersections(otherExt)?.first();
+        // TODO: check
+        return intersection;
+    }
+
+    /**
+     * 
+     * @returns Resulting Solid and normalized extend direction
+     */
+    _getExtendedShape(amount:number, at:Point|BeamBaseLineAlignment):[Solid,Vector]
+    {
+        const dirPoint = (isBeamBaseLineAlignment(at)) ? this._pointAtBaseLine(at) : isPointLike(at) ? new Point(at) : this.end();
+        const extDir = dirPoint.toVector().subtracted(this.center().toVector()).normalize();
+
+        const sectionFace =  this._getOrientatedSectionFace();
+        if(!this.direction().equals(extDir)) // extend not from end => start
+        { 
+            sectionFace.move(this.direction().scaled(this._length)); // place Face at start/end that remains same 
+        };
+
+        return [
+            sectionFace._extruded(this._length + amount, extDir),
+            extDir,
+        ]
+
+    }
+
+    _getProjectedSections(other:Solid, dir:Vector):ShapeCollection
+    {
+        const moveToCenter = this.center().toVector().subtract(this.start());
+        return this._getOrientatedSectionFace()
+                    .move(moveToCenter)
+                    ._toWire()
+                    ._projectTo(other, dir); // TODO: Face._projectTo is not there yet!
+    }
+
+    //// JOINT RESOLVE ////
+
+    _resolveJointButt(inp:BeamJointResolveInput)
+    {
+        console.log('====_resolveJointButt');
+        console.log(inp)
+
+        const primaryBeam = inp.relation.from;
+        const secondaryBeam = inp.relation.to; 
+        
+        
+        primaryBeam
+            ._subtract(inp.intersection) // first clean
+            ._union(inp.intersection) // than simply add
+        
+        // first extend, then cut off secondary
+        const extLength = inp.relation.at._toVertex().distance(inp.intersection.center()); // TODO
+        const [extendedShape] = inp.relation.to._getExtendedShape(extLength, inp.relation.at);
+        secondaryBeam
+            ._union(extendedShape)
+            ._subtract(inp.intersection);
+        
+    }
     
 }
 
@@ -615,6 +774,7 @@ export type BeamSectionOrientation = 'flat'|'up'|'rect'
 export type BeamOrBeamSequence = Array<Beam>|Beam
 export type BeamBaseLineAlignment = 'start'|'end'|'center'|'middle'|number // alignment along base line of Beam
 export type BeamRelationType = 'support'|'on'|'along'|'between'|'brace'|'diagonal'; // Main relations between Beams
+export type BeamJointType = 'butt'|'miter'|'lap'
 
 class BeamSection
 {
@@ -672,16 +832,18 @@ class BeamRelation
 {
     from:Beam
     to:Beam;
-    location: BeamBaseLineAlignment; // on or more location of Relationship 
+    at: Point;
     type:BeamRelationType
+    resolved:boolean
     // TODO: order?
 
-    constructor(from:Beam,to:Beam,type?:BeamRelationType, location?:BeamBaseLineAlignment)
+    constructor(from:Beam,to:Beam,type?:BeamRelationType, at:Point)
     {
         this.from = from;
         this.to = to;
         this.type = type ?? 'on';
-        this.location = location;
+        this.at = at;
+        this.resolved = false;
     }
 }
 
@@ -696,6 +858,16 @@ interface BeamFlags
     autoPitch?:boolean
     ortho?:boolean // TODO
     // TODO: joint types
+}
+
+interface BeamJointResolveInput
+{
+    relation:BeamRelation
+    extended1:AnyShape
+    extended2:AnyShape
+    projSections1?:ShapeCollection // TODO
+    projSections2?:ShapeCollection // TODO
+    intersection:AnyShape
 }
 
 

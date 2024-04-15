@@ -1440,7 +1440,7 @@ export class Wire extends Shape
      *  NOTE: converted from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562
      */
     @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
-    projectTo(other:AnyShape, direction:Vector, center:Vector):ShapeCollection|null
+    _projectTo(other:AnyShape, direction:Vector, center?:Vector):ShapeCollection|null
     {
         if(['Vertex', 'Edge', 'Wire'].includes(other.type())){ throw new Error(`Wire._projectTo: Please supply a Face, Shell or Solid to project on!`);}
         if(!direction && !center){ throw new Error(`Wire._projectTo: Please supply a PointLike for direction or center!`);}
@@ -1511,7 +1511,14 @@ export class Wire extends Shape
 
         if(!onlyFront && backWires.length > 0){ c.addGroup('back', backWires) };
                         
-        return (c.length > 0) ? c.addToScene() : null;
+        return (c.length > 0) ? c : null;
+    }
+
+    @addResultShapesToScene
+    @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
+    projectTo(other:AnyShape, direction:Vector, center:Vector):ShapeCollection|null
+    {
+        return this._projectTo(other,direction,center);
     }
 
     /** Aligning linear Shapes to each other so they form a connected Line */

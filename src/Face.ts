@@ -920,7 +920,7 @@ export class Face extends Shape
     */
     
     @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
-    _projectTo(other:AnyShape, direction:Vector, center:Vector):ShapeCollection
+    _projectTo(other:AnyShape, direction:Vector, center?:Vector):ShapeCollection
     {
         if(!direction && !center){ throw new Error(`Wire._projectTo: Please supply a PointLike for direction or center!`);}
         if(['Vertex', 'Edge', 'Wire'].includes(other.type())){ throw new Error(`Wire._projectTo: Please supply a Face, Shell or Solid to project on!`);}
