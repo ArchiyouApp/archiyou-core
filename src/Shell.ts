@@ -201,43 +201,30 @@ export class Shell extends Shape
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     fromWireframe(wireframe:AnyShapeOrCollection):this
     {
-        console.log('fromWireframe');
-        console.log(wireframe)
-
         const allEdges = new ShapeCollection();
         (wireframe as ShapeCollection) // auto converted by checkInput
             .filter( s => isLinearShape(s))
             .forEach( s => allEdges.add(s.edges()))
-
-        console.log(this._oc.BOPAlgo_Tools);
         
         const resultWires = new this._oc.TopoDS_Shape(); // Can be a compound!
         const wr = this._oc.BOPAlgo_Tools.EdgesToWires(
                                     allEdges.toOcCompound(),
                                     resultWires,
-                                    false,
+                                    false, // NOTE: for example 4 edges don't yield results if true. TODO: autodetect
                                     1.e-8 // angular tolerance
                                 )
         // Some errors
         if(wr === 1){ throw new Error(`Shell::fromWireFrame: No edges found in input!`); }
         if(wr === 2){ throw new Error(`Shell::fromWireFrame: Could not combine edges!`); }
 
-        const tmpW = new Shape()._fromOcShape(resultWires).addToScene().color('green').move(0,0,100);
-        console.log(tmpW)
-        console.log(tmpW.wires());
-        console.log(tmpW.edges());
-
-
         // Make a Face from the Wires
         const resultFaces = new this._oc.TopoDS_Shape();
         const fr = this._oc.BOPAlgo_Tools.WiresToFaces(resultWires, resultFaces, 1.e-8);
 
-
         if(!fr){ throw new Error(`Shell::fromWireFrame: Could not make Faces from Wires!`); }
-
         const faces = new ShapeCollection(new Shape()._extractShapesFromOcCompound(resultFaces)); // one of more faces
-        
         this.fromFaces(faces);
+        
         return this;
     }
 

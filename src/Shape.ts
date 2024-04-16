@@ -1895,24 +1895,27 @@ export class Shape
     @checkInput('AnyShape', 'auto')
     _distanceToShape(other:AnyShape):number
     {
-        let shapeDistanceCalculator = new this._oc.BRepExtrema_DistShapeShape_2(this._ocShape, other._ocShape,
-            this._oc.Extrema_ExtFlag.prototype.constructor.Extrema_ExtFlag_MINMAX, 
+        const ocShapeDistanceCalculator = new this._oc.BRepExtrema_DistShapeShape_2(this._ocShape, other._ocShape,
+            this._oc.Extrema_ExtFlag.prototype.constructor.Extrema_ExtFlag_MINMAX, // NOTE: maximum distance can not be calculated with this!
             this._oc.Extrema_ExtAlgo.prototype.constructor.Extrema_ExtAlgo_Grad,
             new this._oc.Message_ProgressRange_1(),
             );
-        shapeDistanceCalculator.Perform(new this._oc.Message_ProgressRange_1());
+        ocShapeDistanceCalculator.Perform(new this._oc.Message_ProgressRange_1());
 
-        if (shapeDistanceCalculator.IsDone())
+        if (ocShapeDistanceCalculator.IsDone())
         {
-            if(shapeDistanceCalculator.NbSolution() > 0)
+            if(ocShapeDistanceCalculator.NbSolution() > 0)
             {
                 // NOTE: returns only one but there might be multiple solutions
-                return roundToTolerance(shapeDistanceCalculator.Value());
+                return roundToTolerance(ocShapeDistanceCalculator.Value());
             }
         }
 
+        ocShapeDistanceCalculator.destroy();
+
         return null;
     }
+
 
      /** Calculate the closest distance between two Shapes: returns one or more straight Link Object, where start is from the first Shape 
      *      NOTE: If two Shapes are the same and parallel ( for example two Edges ) two links for each Vertex are returned
@@ -2369,7 +2372,7 @@ export class Shape
      *     The other Shapes are removed after the operation
      */
     @checkInput([['AnyShapeOrCollection', null],['Boolean', false]], ['ShapeCollection', 'auto'])
-    _splitted(others:AnyShapeOrCollection, excludeOverlapping:boolean):AnyShapeOrCollection
+    _splitted(others:AnyShapeOrCollection, excludeOverlapping?:boolean):AnyShapeOrCollection
     {
         /* OC docs:
             * https://dev.opencascade.org/doc/refman/html/class_b_o_p_algo___splitter.html

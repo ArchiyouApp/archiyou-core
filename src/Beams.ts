@@ -28,11 +28,10 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Wire, Face, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
+import { ArchiyouApp, Point, Vector, Shape, AnyShape, Vertex, Edge, Wire, Face, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
 import { Alignment, PointLike, isPointLike } from './internal'
 import { isNumeric }  from './internal'
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
-import { Shape } from 'three';
 
 //// SETTINGS ////
 
@@ -394,6 +393,13 @@ export class Beam
         return sectionFace;
     }
 
+    /** Get Section face align to center of Beam */
+    _getOrientatedSectionFaceCenter():Face
+    {
+        const mv = this.center().toVector().subtract(this.start())
+        return this._getOrientatedSectionFace().move(mv)
+    }
+
     /** Get offset Vector from baseline to center of Beam section */
     _getBaseLineToSectionCenterVec():Vector
     {
@@ -426,6 +432,39 @@ export class Beam
             this._shape = solid; // Need to update reference too!
         }
         
+        return this;
+    }
+
+    /** Cut Shape of Beam at section given by Face
+     *  Optionally extend Beam first
+     *  TODO: Make this into a parametric operation
+    */
+    cut(at:Face, autoLength:boolean=false):this
+    {
+        if(autoLength)
+        {
+            // TODO
+        }
+
+        const r = this._shape._splitted(at._scaled(10))
+        if(Shape.isShape(r))
+        { 
+            return this; // nothing cut
+        }
+        else {
+            const cuttedBeamShape = (r as ShapeCollection).sort((a,b) => a.distance(this.center()) - b.distance(this.center())).first();
+            cuttedBeamShape._unifyDomain();
+            this._shape.replaceShape(cuttedBeamShape);
+            this._shape = cuttedBeamShape; 
+        }
+        return this;
+    }
+
+    setShape(s:AnyShape):this
+    {
+        this._shape.replaceShape(s);
+        this._shape = s;
+
         return this;
     }
 
@@ -676,9 +715,9 @@ export class Beam
 
     _resolveRelationToJoint(r:BeamRelation, type:BeamJointType): any
     {
-        const EXTEND_BEAM_AMOUNT = 500; // TODO: how much?
-        const [ curExt, curExtDir ] = r.from._getExtendedShape(EXTEND_BEAM_AMOUNT, r.at);
-        const [ otherExt, otherExtDir ] = r.to._getExtendedShape(EXTEND_BEAM_AMOUNT, r.at);
+        const EXTEND_BEAM_AMOUNT = 5000; // TODO: how much?
+        const [ curExt, curExtDir ] = r.from._getExtendedShapeAndDir(EXTEND_BEAM_AMOUNT, r.at);
+        const [ otherExt, otherExtDir ] = r.to._getExtendedShapeAndDir(EXTEND_BEAM_AMOUNT, r.at);
 
         // gather data around relation
         const jointInp = {
@@ -692,8 +731,9 @@ export class Beam
 
         // VISUAL DEBUG
         jointInp.intersection.addToScene().color('red')
-        jointInp.projSectionsFrom.addToScene().color('yellow')
-        jointInp.projSectionsTo.addToScene().color('yellow')
+        //jointInp.projSectionsFrom.addToScene().color('yellow')
+        //jointInp.projSectionsTo.addToScene().color('yellow')
+        
 
         // call specific function
         const BEAM_JOINT_TYPE_TO_FUNC = {
@@ -719,8 +759,9 @@ export class Beam
     /**
      * Extend current Beam a given amount or to a given Face and return Shape
      */
-    _getExtendedShape(to:number|Wire, at:Point|BeamBaseLineAlignment):[Solid,Vector]
+    _getExtendedShapeAndDir(to:number|Wire|Face, at?:Point|BeamBaseLineAlignment):[Solid,Vector]
     {
+        at = at || ((Shape.isShape(to)) ? (to as Shape).center() : null); // if given a Shape as extend target, use its center as target if not set
         const dirPoint = (isBeamBaseLineAlignment(at)) ? this._pointAtBaseLine(at) : isPointLike(at) ? new Point(at) : this.end();
         const extDir = dirPoint.toVector().subtracted(this.center().toVector()).normalize();
 
@@ -730,24 +771,42 @@ export class Beam
             sectionFace.move(this.direction().scaled(this._length)); // place Face at start/end that remains same 
         };
 
-        const extShape = (isNumeric(to)) 
-                            ? sectionFace._extruded(this._length + (to as number), extDir)
-                            : sectionFace._lofted(new ShapeCollection(to), true) as Solid
+        if(isNumeric(to))
+        {
+            const extShape = sectionFace._extruded(this._length + (to as number), extDir)
+            return [extShape, extDir]
+        }
+        else {
+            // given to is a Shape that we use as boundary
+            const extTestShape = sectionFace._extruded(this._length + 500, extDir)
+            const toFace = ((to as AnyShape).type() === 'Face') ? to as Face : (to as Wire)._toFace();
+            const intersection = extTestShape.intersection(toFace._scaled(10));
 
-        return [
-            extShape,
-            extDir,
-        ]
+            if(!intersection)
+            {
+                throw new Error(`Beam::_getExtendedShapeAndDir: Can not extend Beam Shape to given Shape of type ${to.type()}`);
+            }
+            else {
+                const extShape = sectionFace._lofted(intersection, true) as Solid
+                return [
+                    extShape,
+                    extDir,
+                ]
+            }            
+        }
 
     }
 
+    /** Get the project Section of this Beam onto another Solid 
+     *  IMPORTANT: Results might be inaccurate when difference between projections are minor!
+    */
     _getProjectedSections(other:Solid, dir:Vector):ShapeCollection
     {
         const moveToCenter = this.center().toVector().subtract(this.start());
         return this._getOrientatedSectionFace()
                     .move(moveToCenter)
                     ._toWire()
-                    ._projectTo(other._scaled(1.01), dir); // TODO: Face._projectTo is not there yet!
+                    ._projectTo(other, dir); // TODO: Face._projectTo is not there yet!
     }
 
     //// JOINT RESOLVE ////
@@ -757,9 +816,29 @@ export class Beam
         const primaryBeam = inp.relation.from;
         const secondaryBeam = inp.relation.to; 
 
-        //primaryBeam._getExtendedShape((inp.projSectionsFrom.group('back').first() as Wire).close(), inp.relation.at)
+        //primaryBeam._getExtendedShapeAndDir((inp.projSectionsFrom.group('back').first() as Wire).close(), inp.relation.at)
 
-        inp.projSectionsFrom.moved(0,0,500).color('blue')
+        //inp.projSectionsFrom.moved(0,0,500).color('blue')
+
+        const primaryOuterFace = inp.intersection.faces().sort((a,b) => b.distance(primaryBeam.center()) - a.distance(primaryBeam.center())).first() as Face;
+        const primaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(primaryBeam.center()) - b.distance(primaryBeam.center())).first() as Face;
+        primaryBeam
+            //.cut(primaryInnerFace)
+            .setShape(primaryBeam._getExtendedShapeAndDir(primaryOuterFace as Face, inp.relation.at)[0]);
+
+        const secondaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(secondaryBeam.center()) - b.distance(secondaryBeam.center())).first() as Face;
+        const extSecondaryBeam = secondaryBeam._getExtendedShapeAndDir(secondaryInnerFace as Face, inp.relation.at)[0];
+        secondaryBeam
+            //.cut(secondaryInnerFace)
+            .setShape(extSecondaryBeam);
+
+
+        
+        /*
+        primaryBeam._union(
+                
+        )
+        */
         
         
         /*
@@ -769,7 +848,7 @@ export class Beam
         
         // first extend, then cut off secondary
         const extLength = inp.relation.at._toVertex().distance(inp.intersection.center()); // TODO
-        const [extendedShape] = inp.relation.to._getExtendedShape(extLength, inp.relation.at);
+        const [extendedShape] = inp.relation.to._getExtendedShapeAndDir(extLength, inp.relation.at);
         secondaryBeam
             ._union(extendedShape)
             ._subtract(inp.intersection);
