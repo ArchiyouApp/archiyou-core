@@ -6,7 +6,8 @@
  */
 
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Solid, ShapeCollection } from './internal'
-import { PointLike, isCoordArray, isMakeShellInput, MakeShellInput, AnyShape, ThickenDirection, isThickenDirection, AnyShapeSequence, isAnyShapeSequence } from './internal' // types
+import { PointLike, isCoordArray, isMakeShellInput, MakeShellInput, AnyShape, ThickenDirection, isThickenDirection, AnyShapeOrCollection, 
+            isLinearShape, AnyShapeSequence, isAnyShapeSequence } from './internal' // types
 import { checkInput, cacheOperation, addResultShapesToScene, protectOC } from './decorators'; // Direct import to avoid error in ts-node/jest
 
 import { flattenEntities } from './internal' // utils
@@ -192,6 +193,54 @@ export class Shell extends Shape
 
         }   
     }
+
+    /** Create a Shell from a Wireframe of planar Edges or Wires 
+     *  See: https://old.opencascade.com/doc/occt-7.5.0/overview/html/occt_user_guides__modeling_algos.html
+     *  docs: https://dev.opencascade.org/doc/refman/html/class_b_o_p_algo___tools.html
+    */
+    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
+    fromWireframe(wireframe:AnyShapeOrCollection):this
+    {
+        console.log('fromWireframe');
+        console.log(wireframe)
+
+        const allEdges = new ShapeCollection();
+        (wireframe as ShapeCollection) // auto converted by checkInput
+            .filter( s => isLinearShape(s))
+            .forEach( s => allEdges.add(s.edges()))
+
+        console.log(this._oc.BOPAlgo_Tools);
+        
+        const resultWires = new this._oc.TopoDS_Shape(); // Can be a compound!
+        const wr = this._oc.BOPAlgo_Tools.EdgesToWires(
+                                    allEdges.toOcCompound(),
+                                    resultWires,
+                                    false,
+                                    1.e-8 // angular tolerance
+                                )
+        // Some errors
+        if(wr === 1){ throw new Error(`Shell::fromWireFrame: No edges found in input!`); }
+        if(wr === 2){ throw new Error(`Shell::fromWireFrame: Could not combine edges!`); }
+
+        const tmpW = new Shape()._fromOcShape(resultWires).addToScene().color('green').move(0,0,100);
+        console.log(tmpW)
+        console.log(tmpW.wires());
+        console.log(tmpW.edges());
+
+
+        // Make a Face from the Wires
+        const resultFaces = new this._oc.TopoDS_Shape();
+        const fr = this._oc.BOPAlgo_Tools.WiresToFaces(resultWires, resultFaces, 1.e-8);
+
+
+        if(!fr){ throw new Error(`Shell::fromWireFrame: Could not make Faces from Wires!`); }
+
+        const faces = new ShapeCollection(new Shape()._extractShapesFromOcCompound(resultFaces)); // one of more faces
+        
+        this.fromFaces(faces);
+        return this;
+    }
+
 
     _fromOcShell(ocShell:any):Shell // TODO: OC typing
     {

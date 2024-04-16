@@ -2743,6 +2743,19 @@ export declare class BOPAlgo_ToolsProvider extends BOPAlgo_Builder {
     constructor(theAllocator: Handle_NCollection_BaseAllocator);
   }
 
+export declare class BOPAlgo_Tools {
+  constructor();
+  static FillMap_2(thePB1: Handle_BOPDS_PaveBlock, theF: Graphic3d_ZLayerId, theMILI: BOPDS_IndexedDataMapOfPaveBlockListOfInteger, theAllocator: Handle_NCollection_BaseAllocator): void;
+  static ComputeToleranceOfCB(theCB: Handle_BOPDS_CommonBlock, theDS: BOPDS_PDS, theContext: Handle_IntTools_Context): Standard_Real;
+  static EdgesToWires(theEdges: TopoDS_Shape, theWires: TopoDS_Shape, theShared: Standard_Boolean, theAngTol: Standard_Real): Graphic3d_ZLayerId;
+  static WiresToFaces(theWires: TopoDS_Shape, theFaces: TopoDS_Shape, theAngTol: Standard_Real): Standard_Boolean;
+  static IntersectVertices(theVertices: TopTools_IndexedDataMapOfShapeReal, theFuzzyValue: Standard_Real, theChains: TopTools_ListOfListOfShape): void;
+  static ClassifyFaces(theFaces: TopTools_ListOfShape, theSolids: TopTools_ListOfShape, theRunParallel: Standard_Boolean, theContext: Handle_IntTools_Context, theInParts: TopTools_IndexedDataMapOfShapeListOfShape, theShapeBoxMap: TopTools_DataMapOfShapeBox, theSolidsIF: TopTools_DataMapOfShapeListOfShape, theRange: Message_ProgressRange): void;
+  static FillInternals(theSolids: TopTools_ListOfShape, theParts: TopTools_ListOfShape, theImages: TopTools_DataMapOfShapeListOfShape, theContext: Handle_IntTools_Context): void;
+  static TrsfToPoint(theBox1: Bnd_Box, theBox2: Bnd_Box, theTrsf: gp_Trsf, thePoint: gp_Pnt, theCriteria: Standard_Real): Standard_Boolean;
+  delete(): void;
+}
+
 export declare class BOPAlgo_Options {
   Allocator(): Handle_NCollection_BaseAllocator;
   Clear(): void;
@@ -9098,6 +9111,7 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   BOPAlgo_ToolsProvider: typeof BOPAlgo_ToolsProvider;
   BOPAlgo_ToolsProvider_1: typeof BOPAlgo_ToolsProvider_1;
   BOPAlgo_ToolsProvider_2: typeof BOPAlgo_ToolsProvider_2;
+  BOPAlgo_Tools: typeof BOPAlgo_Tools;
   BOPAlgo_Options: typeof BOPAlgo_Options;
   BOPAlgo_Options_1: typeof BOPAlgo_Options_1;
   BOPAlgo_Options_2: typeof BOPAlgo_Options_2;

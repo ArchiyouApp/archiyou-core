@@ -1437,7 +1437,10 @@ export class Wire extends Shape
      *  
      *  Returns a ShapeCollection with front and back groups
      * 
-     *  NOTE: converted from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562
+     *  TODO: When projecting on surface that has same dimensions as projecting Face results can wrong, 
+     *          edges are added between front and back projection
+     *  NOTE: Converted from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562
+     
      */
     @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
     _projectTo(other:AnyShape, direction:Vector, center?:Vector):ShapeCollection|null

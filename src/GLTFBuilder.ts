@@ -106,7 +106,7 @@ export class GLTFBuilder
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):ArrayBuffer
+    addArchiyouData(gltfContent:Uint8Array|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<Uint8Array>
     {
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
@@ -149,7 +149,7 @@ export class GLTFBuilder
 
 
     /** Add all loose point and line Shapes (Vertex,Edge,Wire) to the GLTF buffer */
-    addPointsAndLines(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):ArrayBuffer
+    addPointsAndLines(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
     {
         const io = new WebIO({credentials: 'include'});
         this.doc = io.readBinary(gltfContent);
@@ -263,7 +263,7 @@ export class GLTFBuilder
     /** For visualization purposes it's handy output seperate point- and line buffer into the GLTF
      *  So these can be seperately styled in a GLTF viewer
      */
-    addSeperatePointsAndLinesForShapes(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):ArrayBuffer
+    addSeperatePointsAndLinesForShapes(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
     {
         const io = new WebIO({credentials: 'include'});
         this.doc = io.readBinary(gltfContent);
@@ -282,11 +282,11 @@ export class GLTFBuilder
     //// READ-ONLY FUNCTIONS ////
 
     /** Get ArchiyouData from GLTF binary */
-    async readArchiyouData(gltf:ArrayBuffer):Promise<ArchiyouData>
+    async readArchiyouData(gltf:Uint8Array):Promise<ArchiyouData>
     {   
         const io = new WebIO();
         const doc = await io.readBinary(gltf);
-        return doc.getRoot().getAsset()?.extras?.archiyou as ArchiyouData
+        return (doc.getRoot().getAsset()?.extras as any)?.archiyou as ArchiyouData; // avoid TS errors
     }
 
 }

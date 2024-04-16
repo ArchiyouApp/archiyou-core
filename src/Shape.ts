@@ -825,7 +825,7 @@ export class Shape
         // Copying does take 10-15ms for even simple geometries like Boxes!
         let ocBuilderCopy = new this._oc.BRepBuilderAPI_Copy_1();
         ocBuilderCopy.Perform(this._ocShape, true, false); // TopoDS_Shape &S, copyGeom=Standard_True, copyMesh=Standard_False
-        let newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as AnyShape;
+        let newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as this;
         
         newShape._copyAttributes(this); 
         newShape._parent = this._parent; // also take over _parent
@@ -938,7 +938,7 @@ export class Shape
     movedTo(to:PointLike, ...args):this
     {
         let moveVec = (to as Vector).subtracted(this.center()); // auto convert to Vector
-        let newShape = (this.copy() as AnyShape).move(moveVec);
+        let newShape = this.copy().move(moveVec);
         return newShape;
     }
 
@@ -968,9 +968,16 @@ export class Shape
 
     /** Same as scale but returning a copy of Shape */
     @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number, 'Point'])
+    _scaled(factor?:number, pivot?:PointLike):this
+    {
+        return this._copy().scale(factor,pivot);
+    }
+
+    @addResultShapesToScene
+    @checkInput([[Number,SHAPE_SCALE_DEFAULT_FACTOR], ['PointLike', null]],[Number, 'Point'])
     scaled(factor?:number, pivot?:PointLike):this
     {
-        return this.copy().scale(factor,pivot);
+        return this._scaled(factor, pivot);
     }
 
     /** 
@@ -1148,7 +1155,7 @@ export class Shape
 
     /** Flatten a Solid into a Face */
     // !!!! TMP METHOD !!!! Needs a lot of work
-    _flattened():this
+    _flattened():AnyShape
     {
         if(this.type() !== 'Solid')
         {
@@ -1161,7 +1168,7 @@ export class Shape
         
         if(bottomFace && bottomFace.type() === 'Face')
         {
-            return bottomFace._copy() as Face; // auto added to Scene
+            return bottomFace._copy() as Face;
         }
         return null;
     }
@@ -1246,7 +1253,7 @@ export class Shape
     // TODO: @checkInput
     alignedByPoints(fromPoints:Array<Vector|Vertex|Point|Array<number>>, toPoints:Array<Vector|Vertex|Point|Array<number>>):this
     {
-        return (this.copy() as Shape).alignByPoints(fromPoints, toPoints)
+        return this.copy().alignByPoints(fromPoints, toPoints)
     }
 
     /** Rotate this Shape by a Quaternion made by two Vectors */
@@ -1300,7 +1307,7 @@ export class Shape
         newShape._copyAttributes(this); // copy attributes over
         newShape._parent = this._parent; // also take over _parent
 
-        return newShape;
+        return newShape as this;
 
     }
 
@@ -1442,7 +1449,7 @@ export class Shape
     /** Extrude this Shape towards a given Point or other Shape - we do keep the normal of the Shape if available */
     // TODO: Add ShapeCollection as input
     @checkInput('PointLikeOrAnyShapeOrCollection', 'auto')
-    extrudedTo(other:PointLikeOrAnyShapeOrCollection, ...args):this
+    extrudedTo(other:PointLikeOrAnyShapeOrCollection, ...args):null|AnyShape
     {
         let distance:number;
         let toVertex:Vertex;
@@ -1525,7 +1532,7 @@ export class Shape
             throw new Error(`${this.type()}::_offsetted: Offset Failed with empty Shape. Check Shape continuity. ${(type == 'intersection') ? 'Try again with type to "arc". Intersection is rather unstable' : ''}`);
             // NOTE: simple calculation does weird things, so avoid here
         }
-        let newShape = new Shape()._fromOcShape(ocNewShape)
+        let newShape = new Shape()._fromOcShape(ocNewShape);
         return newShape;
         
     }
@@ -1533,7 +1540,7 @@ export class Shape
     /** Offset Shape to create a new version parallel to original with a given distance and by corners of given type (arc, intersection)  */
     // This is overriden in simpler topologies (Edge, Wire)
     @checkInput([[Number,null],[String,null],['PointLike', null]], ['auto', 'auto', 'Vector'])
-    offset(amount?:number, type?:string, onPlaneNormal?:PointLike):this
+    offset(amount?:number, type?:string, onPlaneNormal?:PointLike):AnyShapeOrCollection
     {
         if(!['Face','Shell','Solid'].includes(this.type()))
         {
@@ -1542,18 +1549,18 @@ export class Shape
 
         let newShape = this._offsetted(amount); 
         this.replaceShape(newShape);
-        return newShape as Shape;
+        return newShape;
     }
 
     @addResultShapesToScene
     @checkInput([[Number,null],[String,null],['PointLike', null]], ['auto', 'auto', 'Vector'])
-    offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):this
+    offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):AnyShapeOrCollection
     {
         if(!['Face','Shell','Solid'].includes(this.type()))
         {
             throw new Error(`Shape::offset: Cannot offset Shape type ${this.type()}. Check if it makes sense!`);
         }
-        return this._offsetted(amount) as Shape; 
+        return this._offsetted(amount); 
     }
 
     /** Thicken Shell or Solid to create a hollow Solid (private) */
@@ -1773,10 +1780,15 @@ export class Shape
      *   We can use this method on Shapes: Edges, Wires and Faces. For Shells and Solids lofting does not make much sense
      *   @param sections: Can be a Vertex,Edge,Wire,Face or an Array of those
      */
-    lofted(sections:AnyShapeOrCollection, solid?:boolean):Shell|Solid 
+    _lofted(sections:AnyShapeOrCollection, solid?:boolean):Shell|Solid 
     {   
         // if not overriden by subclass (Edge,Wire,Face): we give this error
         throw new Error(`Shape::lofted: Sorry, cannot loft a Shape of type '${this.type()}'!`);
+    }
+
+    lofted(sections:AnyShapeOrCollection, solid?:boolean)
+    {
+        this._lofted(sections, solid);
     }
 
     loft(sections:AnyShapeOrCollection, solid?:boolean):Shell|Solid 
@@ -2791,7 +2803,7 @@ export class Shape
         let sceneShapes:AnyShapeCollection = this._geom.allShapes(); // get all Shapes in scene
         let intersectingShapeCollection = sceneShapes.filter(shape => (shape as AnyShape)._intersections(this) != null );
 
-        return new ShapeCollection(intersectingShapeCollection); // filter can return single Shape
+        return intersectingShapeCollection;
     }
 
     @checkInput('AnyShape', 'auto')

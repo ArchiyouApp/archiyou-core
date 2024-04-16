@@ -695,13 +695,15 @@ export interface BeamLikeDims
 export interface DocPathStyle {
     // see: https://pdfkit.org/docs/vector.html
     lineWidth?:number // in pnts
-    lineCap?:'miter'|'bevel'|'round' // same as join. See: https://raw.githack.com/MrRio/jsPDF/master/docs/jspdf.js.html#line5364
-    lineJoin?:'miter'|'bevel'|'round'
+    // NOTE: butt=miter, bevel=square etc. see: https://artskydj.github.io/jsPDF/docs/jspdf.js.html#line4237
+    lineCap?:'butt'|'round'|'bevel'
+    lineJoin?:'butt'|'round'|'bevel'
     lineDashPattern?:Array<number|number> // size, space
     strokeColor?:string // 'red', '#FF0000'
     strokeOpacity?:number // [0.0-1.0] - NOTE: on jsPDF this is (set)drawColor 
     fillColor?:string
     fillOpacity?:number
+    dash?: Array<number>
 }
 
 export interface PDFLinePath 

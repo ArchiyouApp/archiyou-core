@@ -616,7 +616,7 @@ export class Face extends Shape
      *  NOTE: onPlaneNormal is for consistency and does nothing
     */
     @checkInput([[Number,FACE_OFFSET_AMOUNT],[String, FACE_OFFSET_TYPE],['PointLike',null]], ['auto', 'auto', 'Vector'])
-    _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Face
+    _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):this
     {
         /*
             OC docs:
@@ -634,10 +634,10 @@ export class Face extends Shape
         if(!offsetWire)
         {
             console.warn(`Face::offsetted: Failed to offset Wire. Returned copy of original`);
-            return this.copy() as Face;
+            return this.copy() as this; // avoid TS warning 
         }
         
-        let newFace = offsetWire._toFace()._copy() as Face;
+        let newFace = offsetWire._toFace()._copy() as this; // avoid TS warning 
 
         return newFace;        
     }
@@ -645,14 +645,14 @@ export class Face extends Shape
     /** Make a bigger (+amount) or smaller (-amount) Face (private) */
     @addResultShapesToScene
     @checkInput([[Number,FACE_OFFSET_AMOUNT],[String, FACE_OFFSET_TYPE],['PointLike',null]], ['auto', 'auto', 'Vector'])
-    offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Face
+    offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):this
     {
         return this._offsetted(amount,type,onPlaneNormal);
     }
 
     /** Make the Face bigger (+amount) or smaller (-amount) */
     @checkInput([[Number,FACE_OFFSET_AMOUNT],[String, FACE_OFFSET_TYPE],['PointLike',null]], ['auto', 'auto', 'Vector'])
-    offset(amount?:number, type?:string, onPlaneNormal?:PointLike):Face
+    offset(amount?:number, type?:string, onPlaneNormal?:PointLike):this
     {
        let offsetFace = this._offsetted(amount, type)
 
@@ -700,10 +700,17 @@ export class Face extends Shape
 
     /** Make a Shell or Solid by lofting outerWire of Face to other Wire Shapes  */
     @checkInput(['AnyShapeOrCollection', [Boolean, FACE_LOFT_SOLID ]], ['ShapeCollection', 'auto'])
-    lofted(sections:AnyShapeOrCollection, solid?:boolean):IShell|Solid
+    _lofted(sections:AnyShapeOrCollection, solid?:boolean):IShell|Solid
     {
         let outerWire = this.outerWire();
-        return outerWire.lofted(sections, solid); // already added to Scene
+        return outerWire._lofted(sections, solid); // already added to Scene
+    }
+
+    @addResultShapesToScene
+    @checkInput(['AnyShapeOrCollection', [Boolean, FACE_LOFT_SOLID ]], ['ShapeCollection', 'auto'])
+    lofted(sections:AnyShapeOrCollection, solid?:boolean):IShell|Solid
+    {
+        return this._lofted(sections, solid)
     }
 
     /** Loft current Face */
@@ -917,16 +924,19 @@ export class Face extends Shape
 
     /** Create a new Face by projecting current onto another Face, Shell or Solid 
      *   NOTE: converted from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562
+     *   TODO: FINISH
     */
     
     @checkInput(['AnyShape', ['PointLike',null], ['PointLike', null]], ['auto','Vector', 'Vector'])
-    _projectTo(other:AnyShape, direction:Vector, center?:Vector):ShapeCollection
+    _projectTo(other:AnyShape, direction:Vector, center?:Vector):null|ShapeCollection
     {
         if(!direction && !center){ throw new Error(`Wire._projectTo: Please supply a PointLike for direction or center!`);}
         if(['Vertex', 'Edge', 'Wire'].includes(other.type())){ throw new Error(`Wire._projectTo: Please supply a Face, Shell or Solid to project on!`);}
 
         const projOuterWires = this.outerWire();
         const projInnerWires = this.innerWires()
+
+        return null
     }
 
 

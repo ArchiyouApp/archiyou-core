@@ -1286,11 +1286,10 @@
       }
 
       /** Array API - Filter Shapes in this Collection and return a new ShapeCollection or single Shape
-       *  NOTE: Returning one shape is not entirely consistent with Array !
        */
-      filter(func: (value: any, index: number, arr:Array<any>) => boolean ):AnyShape|ShapeCollection
+      filter(func: (value: any, index: number, arr:Array<any>) => boolean ):ShapeCollection
       {
-         return new ShapeCollection(this.shapes.filter(func)).checkSingle();
+         return new ShapeCollection(this.shapes.filter(func))
       }
 
       reduce(func: (prevValue: number, curValue:AnyShape, index:number, arr:Array<AnyShape>) => number, startSum:number):number

@@ -28,9 +28,11 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, Edge, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
+import { ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Wire, Face, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
 import { Alignment, PointLike, isPointLike } from './internal'
+import { isNumeric }  from './internal'
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
+import { Shape } from 'three';
 
 //// SETTINGS ////
 
@@ -682,11 +684,16 @@ export class Beam
         const jointInp = {
             relation: r,
             intersection: r.from._getExtendedIntersection(curExt, otherExt),
-            extended1: curExt,
-            extended2: otherExt,
-            projSections1: r.from._getProjectedSections(otherExt, curExtDir),
-            projSections2: r.to._getProjectedSections(curExt, otherExtDir),
+            fromExtended: curExt,
+            toExtended: otherExt,
+            projSectionsFrom: r.from._getProjectedSections(otherExt, curExtDir),
+            projSectionsTo: r.to._getProjectedSections(curExt, otherExtDir),
         } as BeamJointResolveInput
+
+        // VISUAL DEBUG
+        jointInp.intersection.addToScene().color('red')
+        jointInp.projSectionsFrom.addToScene().color('yellow')
+        jointInp.projSectionsTo.addToScene().color('yellow')
 
         // call specific function
         const BEAM_JOINT_TYPE_TO_FUNC = {
@@ -710,10 +717,9 @@ export class Beam
     }
 
     /**
-     * 
-     * @returns Resulting Solid and normalized extend direction
+     * Extend current Beam a given amount or to a given Face and return Shape
      */
-    _getExtendedShape(amount:number, at:Point|BeamBaseLineAlignment):[Solid,Vector]
+    _getExtendedShape(to:number|Wire, at:Point|BeamBaseLineAlignment):[Solid,Vector]
     {
         const dirPoint = (isBeamBaseLineAlignment(at)) ? this._pointAtBaseLine(at) : isPointLike(at) ? new Point(at) : this.end();
         const extDir = dirPoint.toVector().subtracted(this.center().toVector()).normalize();
@@ -724,8 +730,12 @@ export class Beam
             sectionFace.move(this.direction().scaled(this._length)); // place Face at start/end that remains same 
         };
 
+        const extShape = (isNumeric(to)) 
+                            ? sectionFace._extruded(this._length + (to as number), extDir)
+                            : sectionFace._lofted(new ShapeCollection(to), true) as Solid
+
         return [
-            sectionFace._extruded(this._length + amount, extDir),
+            extShape,
             extDir,
         ]
 
@@ -737,20 +747,22 @@ export class Beam
         return this._getOrientatedSectionFace()
                     .move(moveToCenter)
                     ._toWire()
-                    ._projectTo(other, dir); // TODO: Face._projectTo is not there yet!
+                    ._projectTo(other._scaled(1.01), dir); // TODO: Face._projectTo is not there yet!
     }
 
     //// JOINT RESOLVE ////
 
     _resolveJointButt(inp:BeamJointResolveInput)
     {
-        console.log('====_resolveJointButt');
-        console.log(inp)
-
         const primaryBeam = inp.relation.from;
         const secondaryBeam = inp.relation.to; 
+
+        //primaryBeam._getExtendedShape((inp.projSectionsFrom.group('back').first() as Wire).close(), inp.relation.at)
+
+        inp.projSectionsFrom.moved(0,0,500).color('blue')
         
         
+        /*
         primaryBeam
             ._subtract(inp.intersection) // first clean
             ._union(inp.intersection) // than simply add
@@ -761,7 +773,7 @@ export class Beam
         secondaryBeam
             ._union(extendedShape)
             ._subtract(inp.intersection);
-        
+        */
     }
     
 }
@@ -837,7 +849,7 @@ class BeamRelation
     resolved:boolean
     // TODO: order?
 
-    constructor(from:Beam,to:Beam,type?:BeamRelationType, at:Point)
+    constructor(from:Beam,to:Beam,type?:BeamRelationType, at?:Point)
     {
         this.from = from;
         this.to = to;
@@ -862,12 +874,20 @@ interface BeamFlags
 
 interface BeamJointResolveInput
 {
-    relation:BeamRelation
-    extended1:AnyShape
-    extended2:AnyShape
-    projSections1?:ShapeCollection // TODO
-    projSections2?:ShapeCollection // TODO
+    relation:BeamRelation // { from:Beam, to:Beam, at:Point etc }
+    fromExtended:AnyShape // Extended Beam Shape
+    toExtended:AnyShape
+    projSectionsFrom?:ShapeCollection // projection from Beam to Beam
+    projSectionsTo?:ShapeCollection // TODO
     intersection:AnyShape
+    flags:BeamJointResolveFlags
+}
+
+interface BeamJointResolveFlags 
+{
+    fullIntersection:boolean // if (extended) Beams intersect each other fully
+    largestBeamSection:Beam // What beam has the largest section
+    orthogonal:boolean // TODO
 }
 
 

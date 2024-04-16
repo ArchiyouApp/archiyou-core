@@ -241,6 +241,7 @@ mainBuild:
   - symbol: BOPAlgo_Algo
   - symbol: BOPAlgo_BuilderShape
   - symbol: BOPAlgo_Builder
+  - symbol: BOPAlgo_Tools
   - symbol: BOPAlgo_ToolsProvider
   - symbol: BOPAlgo_Options
   - symbol: BOPAlgo_Operation

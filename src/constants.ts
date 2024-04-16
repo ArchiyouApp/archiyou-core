@@ -13,7 +13,7 @@ export const CLASS_TO_STYLE:Record<string, DocPathStyle> = {
     line: { 
         lineWidth: 0.425, // 0.15 mm
         lineCap: 'butt',
-        lineJoin: 'miter',
+        lineJoin: 'butt',
     },
     dashed: {
         lineWidth: 0.425, // 0.15 mm
