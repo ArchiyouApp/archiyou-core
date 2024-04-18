@@ -28,7 +28,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { ArchiyouApp, Point, Vector, Shape, AnyShape, Vertex, Edge, Wire, Face, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
+import { ArchiyouApp, Point, Vector, Shape, AnyShape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
 import { Alignment, PointLike, isPointLike } from './internal'
 import { isNumeric }  from './internal'
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
@@ -394,7 +394,7 @@ export class Beam
     }
 
     /** Get Section face align to center of Beam */
-    _getOrientatedSectionFaceCenter():Face
+    _getOrientatedSectionFaceCentered():Face
     {
         const mv = this.center().toVector().subtract(this.start())
         return this._getOrientatedSectionFace().move(mv)
@@ -715,35 +715,94 @@ export class Beam
 
     _resolveRelationToJoint(r:BeamRelation, type:BeamJointType): any
     {
-        const EXTEND_BEAM_AMOUNT = 5000; // TODO: how much?
+        const EXTEND_BEAM_AMOUNT = 2000; // TODO: how much?
         const [ curExt, curExtDir ] = r.from._getExtendedShapeAndDir(EXTEND_BEAM_AMOUNT, r.at);
         const [ otherExt, otherExtDir ] = r.to._getExtendedShapeAndDir(EXTEND_BEAM_AMOUNT, r.at);
+        
+        const fromProjections = r.from._getProjectedSections(otherExt, curExtDir);
+        const toProjections = r.to._getProjectedSections(curExt, otherExtDir);
+
+        fromProjections.addToScene().color('blue').moveZ(200);
+        toProjections.addToScene().color('red').moveZ(100);
+
+        /*
+
+        // Make shell from projections
+        const fromProjShells = this._makeShellsFromProjections(fromProjections, otherExt);
+        const toProjShells = this._makeShellsFromProjections(toProjections, curExt);
+
+        //// DEBUG
+        //fromProjShells.addToScene().color('red').moveZ(100);
+        //fromProjections.addToScene().color('blue').moveZ(200);
+        //toProjections.addToScene().color('red').moveZ(100);
+        //toProjShells.addToScene().color('red').moveZ(100);
 
         // gather data around relation
         const jointInp = {
             relation: r,
-            intersection: r.from._getExtendedIntersection(curExt, otherExt),
             fromExtended: curExt,
             toExtended: otherExt,
-            projSectionsFrom: r.from._getProjectedSections(otherExt, curExtDir),
-            projSectionsTo: r.to._getProjectedSections(curExt, otherExtDir),
+            intersection: r.from._getExtendedIntersection(curExt, otherExt),
+            fromProjIn: fromProjections.group('front').first(),
+            fromProjOut: fromProjections.group('back').first(),
+            fromProjInShell: fromProjShells.group('front').first(),
+            fromProjOutShell: fromProjShells.group('back').first(),
+            toProjIn: toProjections.group('front').first(),
+            toProjOut: toProjections.group('back').first(),
+            toProjInShell: toProjShells.group('front').first(),
+            toProjOutShell: toProjShells.group('back').first(),
         } as BeamJointResolveInput
 
-        // VISUAL DEBUG
-        jointInp.intersection.addToScene().color('red')
-        //jointInp.projSectionsFrom.addToScene().color('yellow')
-        //jointInp.projSectionsTo.addToScene().color('yellow')
-        
-
+                
+  
         // call specific function
         const BEAM_JOINT_TYPE_TO_FUNC = {
             'butt' : this._resolveJointButt,
+            'miter' : this._resolveJointMiter,
         } as Record<BeamJointType, (i:BeamJointResolveInput) => any> 
 
         const fn = BEAM_JOINT_TYPE_TO_FUNC[type];
 
         if(!fn){ throw new Error(`Beam._resolveRelationToJoin(): Unknown joint type: "${type}. Please use any of these ${Object.keys(BEAM_JOINT_TYPE_TO_FUNC).join(',')}`)}
         return fn(jointInp)
+        */
+    }
+
+
+    /** Make Shells from Wire projections
+     *  Uses the powerful Shell.fromWireframe algorithm
+     */
+    _makeShellsFromProjections(projections:ShapeCollection, on:AnyShape):ShapeCollection
+    {
+        const inProjWire = projections.group('front').first() as Wire;
+        const outProjWire = projections.group('back').first() as Wire;
+
+        const shells = new ShapeCollection();
+        shells.addGroup('front', this._makeShellFromProjection(inProjWire, on))
+        shells.addGroup('back', this._makeShellFromProjection(outProjWire, on))
+
+        return shells;
+    }
+
+    _makeShellFromProjection(proj:Wire, on:AnyShape):Shell
+    {
+        // planar projection: skip wireframe algorithm
+        if(proj.planar())
+        {
+            proj.toFace().toShell();   
+        }
+        
+        const wireframeEdges = new ShapeCollection(proj.edges())
+            
+        on.edges().forEach(e => {
+            const intVerts = e.intersections(proj)
+            if(intVerts && intVerts.length >= 2)
+            {
+                wireframeEdges.add(new Edge().makeLine(intVerts[0],intVerts[1]))
+            }
+        })
+
+        return new Shell().fromWireFrame(wireframeEdges)
     }
 
     /** Get the intersection Shape of  (extended) current and other beams 
@@ -802,57 +861,58 @@ export class Beam
     */
     _getProjectedSections(other:Solid, dir:Vector):ShapeCollection
     {
-        const moveToCenter = this.center().toVector().subtract(this.start());
-        return this._getOrientatedSectionFace()
-                    .move(moveToCenter)
-                    ._toWire()
-                    ._projectTo(other, dir); // TODO: Face._projectTo is not there yet!
+        // !!!! IMPORTANT: Projection might not always fit the other
+        // What is a robust calculation and use of projections?
+        return this._getOrientatedSectionFaceCentered()
+                    ._toWire() // TODO: Face._projectTo is not there yet!
+                    ._scaled(0.99) // Make slightly smaller to avoid edge-cases
+                    ._projectTo(other, dir); 
+                    
     }
 
     //// JOINT RESOLVE ////
 
+    
+    /** A butt joint is the most simple joint with one mutual touching face
+     *  either by combining two orthogonal Beams without any angled cuts, one beam has priority over the other
+     *  Or cutting one Beam at an angle to place at the other
+     */
     _resolveJointButt(inp:BeamJointResolveInput)
     {
         const primaryBeam = inp.relation.from;
         const secondaryBeam = inp.relation.to; 
 
-        //primaryBeam._getExtendedShapeAndDir((inp.projSectionsFrom.group('back').first() as Wire).close(), inp.relation.at)
-
-        //inp.projSectionsFrom.moved(0,0,500).color('blue')
-
         const primaryOuterFace = inp.intersection.faces().sort((a,b) => b.distance(primaryBeam.center()) - a.distance(primaryBeam.center())).first() as Face;
-        const primaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(primaryBeam.center()) - b.distance(primaryBeam.center())).first() as Face;
         primaryBeam
-            //.cut(primaryInnerFace)
             .setShape(primaryBeam._getExtendedShapeAndDir(primaryOuterFace as Face, inp.relation.at)[0]);
 
         const secondaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(secondaryBeam.center()) - b.distance(secondaryBeam.center())).first() as Face;
         const extSecondaryBeam = secondaryBeam._getExtendedShapeAndDir(secondaryInnerFace as Face, inp.relation.at)[0];
         secondaryBeam
-            //.cut(secondaryInnerFace)
             .setShape(extSecondaryBeam);
 
+    }
 
-        
-        /*
-        primaryBeam._union(
-                
-        )
-        */
-        
-        
-        /*
+    /** A miter joint is characterized by clean outside angles (see for example too SVG stroke style)
+     *  that can be achieved by either a symmetrical cut on both Beams
+     *  or assymmetrically extending and cutting with one Beam that has priority
+     *  For pitch=0 an assymmetrical Miter joint is the same as a butt joint
+    */
+    _resolveJointMiter(inp:BeamJointResolveInput)
+    {
+        const primaryBeam = inp.relation.from;
+        const secondaryBeam = inp.relation.to; 
+
+        const primaryOuterFace = inp.intersection.faces().sort((a,b) => b.distance(primaryBeam.center()) - a.distance(primaryBeam.center())).first() as Face;
+        const primaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(primaryBeam.center()) - b.distance(primaryBeam.center())).first() as Face;
         primaryBeam
-            ._subtract(inp.intersection) // first clean
-            ._union(inp.intersection) // than simply add
-        
-        // first extend, then cut off secondary
-        const extLength = inp.relation.at._toVertex().distance(inp.intersection.center()); // TODO
-        const [extendedShape] = inp.relation.to._getExtendedShapeAndDir(extLength, inp.relation.at);
+            .setShape(primaryBeam._getExtendedShapeAndDir(primaryOuterFace as Face, inp.relation.at)[0]);
+
+        const secondaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(secondaryBeam.center()) - b.distance(secondaryBeam.center())).first() as Face;
+        const extSecondaryBeam = secondaryBeam._getExtendedShapeAndDir(secondaryInnerFace as Face, inp.relation.at)[0];
         secondaryBeam
-            ._union(extendedShape)
-            ._subtract(inp.intersection);
-        */
+            .setShape(extSecondaryBeam);
+
     }
     
 }
@@ -956,10 +1016,16 @@ interface BeamJointResolveInput
     relation:BeamRelation // { from:Beam, to:Beam, at:Point etc }
     fromExtended:AnyShape // Extended Beam Shape
     toExtended:AnyShape
-    projSectionsFrom?:ShapeCollection // projection from Beam to Beam
-    projSectionsTo?:ShapeCollection // TODO
-    intersection:AnyShape
-    flags:BeamJointResolveFlags
+    fromProjIn?:Wire
+    fromProjOut:Wire
+    fromProjInShell:Shell // with one or more faces
+    fromProjOutShell:Shell // with one or more faces
+    toProjIn?:Wire
+    toProjOut:Wire
+    toProjInShell:Shell
+    toProjOutShell:Shell
+    intersection:AnyShape // full (mostly) Solid intersection
+    flags?:BeamJointResolveFlags
 }
 
 interface BeamJointResolveFlags 

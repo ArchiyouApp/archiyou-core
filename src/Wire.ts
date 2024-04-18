@@ -1446,6 +1446,12 @@ export class Wire extends Shape
     _projectTo(other:AnyShape, direction:Vector, center?:Vector):ShapeCollection|null
     {
         if(['Vertex', 'Edge', 'Wire'].includes(other.type())){ throw new Error(`Wire._projectTo: Please supply a Face, Shell or Solid to project on!`);}
+        // default direction: from center to center
+        if(!direction)
+        {
+            direction = (other.center().distance(this.center()) > 0) ? other.center().toVector().subtract(this.center()).toVector() : null;
+        }
+    
         if(!direction && !center){ throw new Error(`Wire._projectTo: Please supply a PointLike for direction or center!`);}
 
         let onlyFront = false;
@@ -1490,12 +1496,12 @@ export class Wire extends Shape
                     (v1,v2) => v1.added(v2), 
                     new Vector(0,0,0)).scaled(1/projWireCenters.length)
                 
-            const projWiresDirections:Array<Vector> = projWireCenters.map( c => c.subtracted(projectionCenter).normalized())
+            const projWiresDirections:Array<Vector> = projWireCenters.map( c => projectionCenter.subtracted(c).normalized()); // Fixed from original code
             const directionNormalized:Vector = (direction) ? direction.normalized() : center.subtracted(projectionCenter).normalized();
             
             projWiresDirections.forEach((d,i) => 
             {
-                if(d.dot(directionNormalized) > 0)
+                if(d.dot(directionNormalized) > 0) // dot product > 0 means angle < 90
                 {
                     frontWires.push(projWires[i]) 
                 }
@@ -1509,8 +1515,7 @@ export class Wire extends Shape
             frontWires.push(projWires[0]);
         }
 
-        const c = new ShapeCollection()
-                        .addGroup('front', frontWires);
+        const c = new ShapeCollection().addGroup('front', frontWires);
 
         if(!onlyFront && backWires.length > 0){ c.addGroup('back', backWires) };
                         

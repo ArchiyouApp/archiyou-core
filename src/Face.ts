@@ -4,7 +4,7 @@
 
  */
 
-import { FACE_PLANE_WIDTH, FACE_PLANE_DEPTH, FACE_PLANE_POSITION, FACE_PLANE_NORMAL, FACE_BASEPLANE_AXIS, FACE_BASEPLANE_SIZE, FACE_CIRCLE_RADIUS, FACE_EXTRUDE_AMOUNT, FACE_OFFSET_AMOUNT, FACE_OFFSET_TYPE, FACE_THICKEN_AMOUNT, FACE_THICKEN_DIRECTION, FACE_LOFT_SOLID, FACE_NORMAL_EDGE_SIZE, FACE_FILLET_RADIUS, FACE_CHAMFER_DISTANCE, FACE_CHAMFER_ANGLE } from './internal'
+import { FACE_PLANE_WIDTH, FACE_PLANE_DEPTH, FACE_PLANE_POSITION, FACE_PLANE_NORMAL, FACE_BASEPLANE_AXIS, FACE_BASEPLANE_SIZE, FACE_CIRCLE_RADIUS, FACE_EXTRUDE_AMOUNT, FACE_OFFSET_AMOUNT, FACE_OFFSET_TYPE, FACE_THICKEN_AMOUNT, FACE_THICKEN_DIRECTION, FACE_LOFT_SOLID, FACE_NORMAL_EDGE_SIZE, FACE_FILLET_RADIUS, FACE_CHAMFER_DISTANCE, FACE_CHAMFER_ANGLE, LinearShape } from './internal'
 import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, ShapeCollection } from './internal'
 import { addResultShapesToScene, checkInput, protectOC  } from './decorators'; // Import directly to avoid ts-node error
 import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPointLikeSequence, MakeFaceInput, 
@@ -83,6 +83,106 @@ export class Face extends Shape
 
         return this;
 
+    }
+    
+    //@cacheOperation
+    /** Create Face from a Wire */
+    @checkInput('Wire', 'Wire')
+    fromWire(wire: Wire):Face|Shell
+    {   
+        /*
+         - BREPBuilderAPI_MakeFace: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_builder_a_p_i___make_face.html#a8a9938b47aeace1c59ee3af7fea43919
+         - Non planar with BRepFill_Filling: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fill___filling.html
+         - more info: https://dev.opencascade.org/content/create-face-non-planar-wire-using-ocgcmakearcofcircle-and-straight-lines
+        */
+        wire.close(); 
+
+        if (wire.planar())
+        {
+            let faceBuilder = new this._oc.BRepBuilderAPI_MakeFace_15(wire._ocShape, false); // OnlyPlane = Standard_False 
+            
+            faceBuilder.Build(new this._oc.Message_ProgressRange_1());
+
+            if (!faceBuilder.IsDone())
+            {
+                throw new Error(`Face::fromWire: Cannot build Face: "${faceBuilder.Error().constructor.name}". Check if the Wire describes a space!`);
+            }
+            else 
+            {
+                let face = faceBuilder.Face();
+                this._fromOcFace(face);
+                return this;
+            }
+        }
+        else 
+        {
+            let wireEdges = wire.edges();
+            if (wireEdges.length > 4)
+            {
+                throw new Error(`Face::fromWire: Cannot build non-planar Face with more than 4 Edges. Got ${wireEdges.length}`);
+            }
+            else {
+                // use Shell.fromEdges to make non-planar Face
+                let newShape = new Shell().fromEdges(wireEdges).checkDowngrade();
+                
+                this._fromOcFace(newShape._ocShape);
+                
+                if(newShape.type() != 'Face')
+                {
+                    // !!!! This results in a Face class with a Shell Shape inside it !!!!
+                    console.warn('Face::fromEdges: Non-planar Edges generated a Shell, not a Face. ')
+                }
+
+                return this;
+            }
+            
+        }
+    }
+
+    /** Create a Face from Vertices */
+    //@cacheOperation
+    @checkInput('PointLikeSequence', 'VertexCollection')
+    fromVertices(vertices:PointLikeSequence, ...args):Face // also get args for ex: Face.fromVertices([0,0,0],[100,0,0])
+    {
+        vertices = vertices as VertexCollection; // auto converted
+        let wire = new Wire().fromVertices(vertices)
+        wire.close();
+
+        return this.fromWire(wire) as Face;
+    }
+
+    //@cacheOperation
+    @checkInput('AnyShapeSequence', 'ShapeCollection')
+    fromEdges(shapes:AnyShapeSequence, ...args):Face // also flat arguments Face.fromEdges(edge1,edge2)
+    {
+        // TODO: auto-connect Edges?
+        shapes = shapes as ShapeCollection; // auto convert
+        let edgeCollection = shapes.getShapesByType('Edge');
+
+        if (edgeCollection.length == 0)
+        {
+            console.warn(`Face::fromEdges: Could not create Face from Edges. Please provide a Array or ShapeCollection of connected Edges!`);
+            return null;
+        }
+
+        let wire = new Wire().fromEdges(edgeCollection);
+        wire.close();
+        return this.fromWire(wire) as Face;
+    }
+
+    _fromOcFace(ocFace:any):Face
+    {
+        if(ocFace && (ocFace instanceof this._oc.TopoDS_Face || ocFace instanceof this._oc.TopoDS_Shape) && !ocFace.IsNull())
+        {
+            this._ocShape = ocFace;
+            this._ocId = this._hashcode();
+            this.round(); // round to tolerance
+
+            return this;
+        }
+        else {
+            throw new Error(`Face::_fromOcFace: Could not make a valid Face. Check if not null, is the right OC Shape and is not null!`)
+        }
     }
 
     //// CURSOR ////
@@ -208,107 +308,33 @@ export class Face extends Shape
         return this;
     }
 
-    //@cacheOperation
-    /** Create Face from a Wire */
-    @checkInput('Wire', 'Wire')
-    fromWire(wire: Wire):Face|Shell
-    {   
-        /*
-         - BREPBuilderAPI_MakeFace: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_builder_a_p_i___make_face.html#a8a9938b47aeace1c59ee3af7fea43919
-         - Non planar with BRepFill_Filling: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fill___filling.html
-         - more info: https://dev.opencascade.org/content/create-face-non-planar-wire-using-ocgcmakearcofcircle-and-straight-lines
-        */
-        wire.close(); 
-
-        if (wire.planar())
+    /** 
+     *  docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_offset_a_p_i___make_filling.html#a50e5b1deb08a18908eb8c8dde15dcefd
+     *  NOTE: Taken from code by Roger Maitland for CadQuery: https://github.com/CadQuery/cadquery/issues/562 */
+    @checkInput(['AnyShapeOrCollection', ['PointLikeSequence', null], ['AnyShapeOrCollection',null]], ['ShapeCollection', 'auto', 'ShapeCollection'])
+    makeNonPlanar(wireOrEdges:AnyShapeOrCollection, surfacePoints?:PointLikeSequence, holes?:AnyShapeOrCollection):this|AnyShapeOrCollection
+    {
+        const ocMakeFilling = new this._oc.BRepOffsetAPI_MakeFilling(3,15,2,false, 0.0001, 0.0001, 0.01, 0.1, 8, 9)
+        const allEdges = new ShapeCollection();
+        (wireOrEdges as ShapeCollection).forEach(s => { if(['Wire','Edge'].includes(s.type())){ allEdges.add(s.edges()) }}); // wireOrEdges auto converted to ShapeCollection
+        allEdges.forEach(e => ocMakeFilling.Add_1(e._ocShape, this._oc.GeomAbs_Shape.GeomAbs_C0, true)) // Add to MakeFilling - NOTE: this changes depending on OC version
+        ocMakeFilling.Build(new this._oc.Message_ProgressRange_1());
+        if(ocMakeFilling.IsDone())
         {
-            let faceBuilder = new this._oc.BRepBuilderAPI_MakeFace_15(wire._ocShape, false); // OnlyPlane = Standard_False 
-            
-            faceBuilder.Build(new this._oc.Message_ProgressRange_1());
-
-            if (!faceBuilder.IsDone())
+            const newShapeOrCollection = new Shape()._fromOcShape(ocMakeFilling.Shape())
+            if(Shape.isShape(newShapeOrCollection) && newShapeOrCollection.type() === 'Face')
             {
-                throw new Error(`Face::fromWire: Cannot build Face: "${faceBuilder.Error().constructor.name}". Check if the Wire describes a space!`);
-            }
-            else 
-            {
-                let face = faceBuilder.Face();
-                this._fromOcFace(face);
+                this._fromOcFace((newShapeOrCollection as Shape)._ocShape)
                 return this;
-            }
-        }
-        else 
-        {
-            let wireEdges = wire.edges();
-            if (wireEdges.length > 4)
-            {
-                throw new Error(`Face::fromWire: Cannot build non-planar Face with more than 4 Edges. Got ${wireEdges.length}`);
             }
             else {
-                // use Shell.fromEdges to make non-planar Face
-                let newShape = new Shell().fromEdges(wireEdges).checkDowngrade();
-                
-                this._fromOcFace(newShape._ocShape);
-                
-                if(newShape.type() != 'Face')
-                {
-                    // !!!! This results in a Face class with a Shell Shape inside it !!!!
-                    console.warn('Face::fromEdges: Non-planar Edges generated a Shell, not a Face. ')
-                }
-
-                return this;
+                console.warn(`Face::makeNonPlanar: Result not a Face. Returned new Shape or ShapeCOllection, but did not update original Face`)
+                return newShapeOrCollection
             }
-            
         }
-    }
+        ocMakeFilling.destroy();
 
-    /** Create a Face from Vertices */
-    //@cacheOperation
-    @checkInput('PointLikeSequence', 'VertexCollection')
-    fromVertices(vertices:PointLikeSequence, ...args):Face // also get args for ex: Face.fromVertices([0,0,0],[100,0,0])
-    {
-        vertices = vertices as VertexCollection; // auto converted
-        let wire = new Wire().fromVertices(vertices)
-        wire.close();
-
-        return this.fromWire(wire) as Face;
-    }
-
-    //@cacheOperation
-    @checkInput('AnyShapeSequence', 'ShapeCollection')
-    fromEdges(shapes:AnyShapeSequence, ...args):Face // also flat arguments Face.fromEdges(edge1,edge2)
-    {
-        // TODO: auto-connect Edges?
-        shapes = shapes as ShapeCollection; // auto convert
-        let edgeCollection = shapes.getShapesByType('Edge');
-
-        if (edgeCollection.length == 0)
-        {
-            console.warn(`Face::fromEdges: Could not create Face from Edges. Please provide a Array or ShapeCollection of connected Edges!`);
-            return null;
-        }
-
-        let wire = new Wire().fromEdges(edgeCollection);
-        wire.close();
-        return this.fromWire(wire) as Face;
-    }
-
-
-    //// TRANSFORMATION METHODS ////
-
-    _fromOcFace(ocFace:any):Face
-    {
-        if(ocFace && (ocFace instanceof this._oc.TopoDS_Face || ocFace instanceof this._oc.TopoDS_Shape) && !ocFace.IsNull())
-        {
-            this._ocShape = ocFace;
-            this._ocId = this._hashcode();
-            this.round(); // round to tolerance
-
-            return this;
-        }
-        else {
-            throw new Error(`Face::_fromOcFace: Could not make a valid Face. Check if not null, is the right OC Shape and is not null!`)
-        }
+        // TODO: implement holes and surface points
     }
     
     _setToOc()

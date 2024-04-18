@@ -199,29 +199,47 @@ export class Shell extends Shape
      *  docs: https://dev.opencascade.org/doc/refman/html/class_b_o_p_algo___tools.html
     */
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-    fromWireframe(wireframe:AnyShapeOrCollection):this
+    fromWireFrame(wireframe:AnyShapeOrCollection):this
     {
+        const ANG_TOL = 1e-3;
+
         const allEdges = new ShapeCollection();
         (wireframe as ShapeCollection) // auto converted by checkInput
             .filter( s => isLinearShape(s))
             .forEach( s => allEdges.add(s.edges()))
         
-        const resultWires = new this._oc.TopoDS_Shape(); // Can be a compound!
+        const ocResultWires = new this._oc.TopoDS_Shape(); // Can be a compound!
         const wr = this._oc.BOPAlgo_Tools.EdgesToWires(
                                     allEdges.toOcCompound(),
-                                    resultWires,
+                                    ocResultWires,
                                     false, // NOTE: for example 4 edges don't yield results if true. TODO: autodetect
-                                    1.e-8 // angular tolerance
+                                    ANG_TOL // angular tolerance
                                 )
         // Some errors
         if(wr === 1){ throw new Error(`Shell::fromWireFrame: No edges found in input!`); }
         if(wr === 2){ throw new Error(`Shell::fromWireFrame: Could not combine edges!`); }
 
-        // Make a Face from the Wires
         const resultFaces = new this._oc.TopoDS_Shape();
-        const fr = this._oc.BOPAlgo_Tools.WiresToFaces(resultWires, resultFaces, 1.e-8);
+        const fr = this._oc.BOPAlgo_Tools.WiresToFaces(ocResultWires, resultFaces, ANG_TOL);
 
-        if(!fr){ throw new Error(`Shell::fromWireFrame: Could not make Faces from Wires!`); }
+        if(!fr)
+        { 
+            // Some effort to still get some Faces from Wires. Might work for simple Wireframes
+            const resWires = new ShapeCollection(new Shape()._fromOcShape(ocResultWires))
+                                .filter( w => w.edges().length > 2) // Filter wires that can not be closed for robustness
+            
+            const faces = resWires.map( w => (w as Wire)._toFace()).filter( w => w)
+                
+            if (faces.length > 0)
+            {  
+                this.fromFaces(faces) 
+                return this;
+            }
+            else {
+                throw new Error(`Shell::fromWireFrame: Could not get any Faces from Wires!`)
+            }
+
+        }
         const faces = new ShapeCollection(new Shape()._extractShapesFromOcCompound(resultFaces)); // one of more faces
         this.fromFaces(faces);
         

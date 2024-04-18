@@ -246,7 +246,7 @@ export class Geom
   @checkInput([ [Number, FACE_PLANE_WIDTH], [Number, FACE_PLANE_DEPTH], ['PointLike', FACE_PLANE_NORMAL], ['PointLike', FACE_PLANE_POSITION]], ['auto','auto',Vector, Point])
   Plane(width?:number, depth?:number, normal?:PointLike, position?:PointLike):Face
   {
-    let plane = new Face().makePlane(width, depth, normal, position);
+    let plane = new Face().makePlane(width, depth, position, normal); // NOTE: other way around. TODO: fix inconsistency
     plane.addToScene();
     plane.name(this.getNextObjName('Plane')); // auto name
     console.geom(`Geom::Plane: Created a Plane Face with area ${plane.area()}`);

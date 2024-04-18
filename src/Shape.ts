@@ -2608,7 +2608,7 @@ export class Shape
     {
         let intersections = this._intersections(other);
         
-        return intersections != null;
+        return intersections != null && intersections.length > 0; // NOTE: all intersections return ShapeCollection
     }
     
     /** Returns the shared Shape between two Shapes (private) */
