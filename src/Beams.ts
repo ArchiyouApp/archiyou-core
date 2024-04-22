@@ -30,7 +30,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { ArchiyouApp, Point, Vector, Shape, AnyShape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
 import { Alignment, PointLike, isPointLike } from './internal'
-import { isNumeric }  from './internal'
+import { isNumeric, toRad }  from './internal'
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
 
 //// SETTINGS ////
@@ -191,6 +191,7 @@ export class Beam
     _section:BeamSection;
     _others:Array<Beam>; // all beams in the scene created with the Beams module (by reference)
     _relations:Array<BeamRelation> = []; // other beams that are related to this one
+    _operations:Array<BeamOperation> = []; // operations on original shape of a Beam
 
     name:string; // easy name to identify later [TODO]
 
@@ -233,6 +234,18 @@ export class Beam
         const l = (start as Point).distance(end); // Point autoconverted
         this.length(l);
 
+        return this;
+    }
+
+    /** Set length from internal Beam Shape
+     *  If cut at an angle we take the largest length 
+     */
+    _setLengthFromShape():this
+    {
+        // Because a Beam is box-like we can simply use a orientated bounding box
+        const {width, depth, height} = this._shape._getOBbox();
+        const l = [width,depth,height].sort((a,b) => b - a)[0];
+        this._length = l;
         return this;
     }
 
@@ -413,6 +426,18 @@ export class Beam
 
     }
 
+    /** Get center line of Beam */
+    _getSectionCenterToPivot():Vector
+    {
+        return this.start().toVector().subtracted(this._getOrientatedSectionFace().center());
+    }
+
+    _getCenterLine():Edge
+    {
+        const ov = this._getSectionCenterToPivot().reverse();
+        return new Edge().makeLine(this.start().add(ov), this.end().add(ov));
+    }
+
     /** Set Beam solid Shape from base properties or replace if existing 
      *  NOTE: base line has priority over the solid Shape!
     */
@@ -435,17 +460,36 @@ export class Beam
         return this;
     }
 
-    /** Cut Shape of Beam at section given by Face
-     *  Optionally extend Beam first
-     *  TODO: Make this into a parametric operation
-    */
-    cut(at:Face, autoLength:boolean=false):this
-    {
-        if(autoLength)
-        {
-            // TODO
-        }
 
+    //// OPERATIONS ////
+
+    /** Apply an operation to this Beam */
+    apply(op:BeamOperation)
+    {
+        this.checkDuplicateOperation(op);
+        this._operations.push(op);
+        op.apply(this);
+    }
+
+    checkDuplicateOperation(op:BeamOperation):this
+    {
+        if(this._operations.find(o => o.id === op.id))
+        {
+            throw new Error(`Beam.apply(): Duplicate operation: ${op} on this Beam!`);
+        }
+        return this;
+    }
+
+    /** Add parametric Cut operation to Beam and update its Shape */
+    cut(start:number, angle:number=90, inclination:number=0)
+    {
+        const sawOp = new BeamSawCut(start, angle, inclination);
+        this.apply(sawOp);
+    }
+
+    /** cut Shape of Beam at given Face */
+    _cutShape(at:Face):this
+    {
         const r = this._shape._splitted(at._scaled(10))
         if(Shape.isShape(r))
         { 
@@ -453,12 +497,21 @@ export class Beam
         }
         else {
             const cuttedBeamShape = (r as ShapeCollection).sort((a,b) => a.distance(this.center()) - b.distance(this.center())).first();
-            cuttedBeamShape._unifyDomain();
             this._shape.replaceShape(cuttedBeamShape);
             this._shape = cuttedBeamShape; 
         }
         return this;
     }
+
+    extend(to:number|PointLike|Wire|Face, at?:Point|BeamBaseLineAlignment):this
+    {
+        const [extendedShape] = this._getExtendedShapeAndDir(to, at)
+        this.setShape(extendedShape);
+        this._setLengthFromShape();
+        return this
+    }
+
+    
 
     setShape(s:AnyShape):this
     {
@@ -693,7 +746,7 @@ export class Beam
     //// JOINTS ////
 
     /** Resolve (unresolved) relations to joints */
-    join(type:BeamJointType='butt')
+    join(type:BeamJointType='butt', options:BeamJointOptions)
     {
         const relationsByPoint = this._relations.reduce((acc,cv) => {
             const rel = cv as BeamRelation
@@ -708,28 +761,25 @@ export class Beam
             const rels = relationsByPoint[pnt]
             rels.forEach(r => 
             {
-                this._resolveRelationToJoint(r, type)
+                this._resolveRelationToJoint(r, type, options)
             })
         })
     }
 
-    _resolveRelationToJoint(r:BeamRelation, type:BeamJointType): any
+    _resolveRelationToJoint(r:BeamRelation, type:BeamJointType, options:BeamJointOptions): any
     {
         const EXTEND_BEAM_AMOUNT = 2000; // TODO: how much?
         const [ curExt, curExtDir ] = r.from._getExtendedShapeAndDir(EXTEND_BEAM_AMOUNT, r.at);
         const [ otherExt, otherExtDir ] = r.to._getExtendedShapeAndDir(EXTEND_BEAM_AMOUNT, r.at);
         
+        /*
         const fromProjections = r.from._getProjectedSections(otherExt, curExtDir);
         const toProjections = r.to._getProjectedSections(curExt, otherExtDir);
-
-        fromProjections.addToScene().color('blue').moveZ(200);
-        toProjections.addToScene().color('red').moveZ(100);
-
-        /*
 
         // Make shell from projections
         const fromProjShells = this._makeShellsFromProjections(fromProjections, otherExt);
         const toProjShells = this._makeShellsFromProjections(toProjections, curExt);
+        */
 
         //// DEBUG
         //fromProjShells.addToScene().color('red').moveZ(100);
@@ -743,14 +793,14 @@ export class Beam
             fromExtended: curExt,
             toExtended: otherExt,
             intersection: r.from._getExtendedIntersection(curExt, otherExt),
-            fromProjIn: fromProjections.group('front').first(),
-            fromProjOut: fromProjections.group('back').first(),
-            fromProjInShell: fromProjShells.group('front').first(),
-            fromProjOutShell: fromProjShells.group('back').first(),
-            toProjIn: toProjections.group('front').first(),
-            toProjOut: toProjections.group('back').first(),
-            toProjInShell: toProjShells.group('front').first(),
-            toProjOutShell: toProjShells.group('back').first(),
+            //fromProjIn: fromProjections.group('front').first(),
+            //fromProjOut: fromProjections.group('back').first(),
+            //fromProjInShell: fromProjShells.group('front').first(),
+            //fromProjOutShell: fromProjShells.group('back').first(),
+            //toProjIn: toProjections.group('front').first(),
+            //toProjOut: toProjections.group('back').first(),
+            //toProjInShell: toProjShells.group('front').first(),
+            //toProjOutShell: toProjShells.group('back').first(),
         } as BeamJointResolveInput
 
                 
@@ -759,13 +809,13 @@ export class Beam
         const BEAM_JOINT_TYPE_TO_FUNC = {
             'butt' : this._resolveJointButt,
             'miter' : this._resolveJointMiter,
-        } as Record<BeamJointType, (i:BeamJointResolveInput) => any> 
+        } as Record<BeamJointType, (i:BeamJointResolveInput, o:BeamJointOptions) => BeamJointResult> 
 
         const fn = BEAM_JOINT_TYPE_TO_FUNC[type];
 
         if(!fn){ throw new Error(`Beam._resolveRelationToJoin(): Unknown joint type: "${type}. Please use any of these ${Object.keys(BEAM_JOINT_TYPE_TO_FUNC).join(',')}`)}
-        return fn(jointInp)
-        */
+        return fn(jointInp, options)
+          
     }
 
 
@@ -816,12 +866,24 @@ export class Beam
     }
 
     /**
-     * Extend current Beam a given amount or to a given Face and return Shape
+     * Extend current Beam a given amount or to a given Point, Wire or Face and return Shape
+     *  NOTE: The direction of the Beam stays the same
+     *  NOTE: Depending on the to input this returns a butt or cutted Beam - TODO: Make this more transparent
      */
-    _getExtendedShapeAndDir(to:number|Wire|Face, at?:Point|BeamBaseLineAlignment):[Solid,Vector]
+    _getExtendedShapeAndDir(to:number|PointLike|Wire|Face, at?:Point|BeamBaseLineAlignment):[Solid,Vector]
     {
-        at = at || ((Shape.isShape(to)) ? (to as Shape).center() : null); // if given a Shape as extend target, use its center as target if not set
-        const dirPoint = (isBeamBaseLineAlignment(at)) ? this._pointAtBaseLine(at) : isPointLike(at) ? new Point(at) : this.end();
+        const TEST_EXT_SHAPE = 2000; // TODO: Make more robust?
+        const TO_FACE_SCALE = 1000; // TODO: Make more robust?
+
+        at = at || 
+                    ((Shape.isShape(to)) ? (to as Shape).center() 
+                        : (isPointLike(to)) ? new Point(to) : null); // if given a Shape as extend target, use its center as target if not set
+
+        const dirPoint = (isBeamBaseLineAlignment(at)) 
+                            ? this._pointAtBaseLine(at) :  
+                            ( new Vertex(at as PointLike).distance(this.start()._toVertex()) < new Vertex(at as PointLike).distance(this.end()._toVertex())) 
+                            ? this.start() : this.end();
+        
         const extDir = dirPoint.toVector().subtracted(this.center().toVector()).normalize();
 
         const sectionFace =  this._getOrientatedSectionFace();
@@ -836,14 +898,23 @@ export class Beam
             return [extShape, extDir]
         }
         else {
-            // given to is a Shape that we use as boundary
-            const extTestShape = sectionFace._extruded(this._length + 500, extDir)
-            const toFace = ((to as AnyShape).type() === 'Face') ? to as Face : (to as Wire)._toFace();
-            const intersection = extTestShape.intersection(toFace._scaled(10));
+            // given to is a PointLike or Shape that we use as boundary
+            const extTestShape = sectionFace._extruded(this._length + TEST_EXT_SHAPE, extDir)
+            let toFace:Face;
+
+            if (isPointLike(to))
+            {
+                toFace = sectionFace._copy().moveTo(new Point(to))
+            }
+            else {
+                toFace = ((to as AnyShape).type() === 'Face') ? to as Face : (to as Wire)._toFace();
+            }
+
+            const intersection = extTestShape.intersection(toFace._scaled(TO_FACE_SCALE)); // Make toFace very big, so we can get the intersection with extended Beam
 
             if(!intersection)
             {
-                throw new Error(`Beam::_getExtendedShapeAndDir: Can not extend Beam Shape to given Shape of type ${to.type()}`);
+                throw new Error(`Beam::_getExtendedShapeAndDir: Can not extend Beam Shape to given Shape`);
             }
             else {
                 const extShape = sectionFace._lofted(intersection, true) as Solid
@@ -870,26 +941,71 @@ export class Beam
                     
     }
 
+    /** Get a extended Line Edge in direction of Beam along baseline */
+    _getTestBaseLine():Edge
+    {
+        const EXTEND = 2000; // on both sides
+        return new Edge().makeLine(this.start().toVector().subtracted(this.direction().scaled(EXTEND)), this.end().added(this.direction().scaled(EXTEND)) )
+    }
+
     //// JOINT RESOLVE ////
 
     
-    /** A butt joint is the most simple joint with one mutual touching face
+    /** A butt joint is the most simple joint with one mutual touching line or face
      *  either by combining two orthogonal Beams without any angled cuts, one beam has priority over the other
      *  Or cutting one Beam at an angle to place at the other
+     *  
+     *  Options (TODO):
+     *      strategy: butt-only, cutone
+     *      auto priority: top, horizontal
+     *      location: outside, baseline    
      */
-    _resolveJointButt(inp:BeamJointResolveInput)
+    _resolveJointButt(inp:BeamJointResolveInput, options?:BeamJointOptions): BeamJointResult
     {
-        const primaryBeam = inp.relation.from;
+        const DEFAULT_OPTIONS = {
+            strategy: 'butt-only',
+            at: 'outside'
+         } as BeamJointOptions
+
+        options = { ...DEFAULT_OPTIONS, ...(options || {}) } as BeamJointOptions
+
+        const primaryBeam = inp.relation.from; // TODO: auto priority
         const secondaryBeam = inp.relation.to; 
 
-        const primaryOuterFace = inp.intersection.faces().sort((a,b) => b.distance(primaryBeam.center()) - a.distance(primaryBeam.center())).first() as Face;
-        primaryBeam
-            .setShape(primaryBeam._getExtendedShapeAndDir(primaryOuterFace as Face, inp.relation.at)[0]);
+        const intersection = inp.intersection; // for convenience
+        const numIntFaces = intersection.faces().length;
+        const primaryOuterFace = intersection.faces().sort((a,b) => b.distance(primaryBeam.center()) - a.distance(primaryBeam.center())).first() as Face;
 
-        const secondaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(secondaryBeam.center()) - b.distance(secondaryBeam.center())).first() as Face;
-        const extSecondaryBeam = secondaryBeam._getExtendedShapeAndDir(secondaryInnerFace as Face, inp.relation.at)[0];
-        secondaryBeam
-            .setShape(extSecondaryBeam);
+        // simple orthogonal intersection
+        if (numIntFaces === 6)
+        {
+            // Primary Beam
+            const intFaceBaseline = primaryOuterFace._scaled(10).intersection(primaryBeam._getTestBaseLine())
+            if (!intFaceBaseline){ throw new Error(`Beam::_resolveJointButt: Error finding a intersection between primary outher Face and baseline.`) }
+            primaryBeam.extend(intFaceBaseline as Vertex); 
+            // Secondary
+            const secondaryInnerFace = inp.intersection.faces().sort((a,b) => a.distance(secondaryBeam.center()) - b.distance(secondaryBeam.center())).first() as Face;
+            
+            console.log('==== HIERO ====');
+            secondaryInnerFace.addToScene().color('red');
+
+            if(options.strategy === 'butt-only')
+            {
+                const mostInnerVert = secondaryInnerFace.vertices().sort((v1,v2) => v1.distance(secondaryBeam.center()) - v2.distance(secondaryBeam.center())).first();
+                secondaryBeam.extend(mostInnerVert as Vertex);
+            }
+            else
+            {
+                // cutone
+                secondaryBeam.extend(secondaryInnerFace);
+            }
+
+            return {
+                input: inp,
+                output: null, // TODO
+            } 
+        }
+
 
     }
 
@@ -898,7 +1014,7 @@ export class Beam
      *  or assymmetrically extending and cutting with one Beam that has priority
      *  For pitch=0 an assymmetrical Miter joint is the same as a butt joint
     */
-    _resolveJointMiter(inp:BeamJointResolveInput)
+    _resolveJointMiter(inp:BeamJointResolveInput, options?:BeamJointOptions): BeamJointResult
     {
         const primaryBeam = inp.relation.from;
         const secondaryBeam = inp.relation.to; 
@@ -912,6 +1028,11 @@ export class Beam
         const extSecondaryBeam = secondaryBeam._getExtendedShapeAndDir(secondaryInnerFace as Face, inp.relation.at)[0];
         secondaryBeam
             .setShape(extSecondaryBeam);
+
+        return {
+            input: inp,
+            output: null, // TODO
+        } 
 
     }
     
@@ -933,10 +1054,10 @@ class BeamSection
     _height: number
     _orientation?: BeamSectionOrientation
 
-    constructor(width?:number, height?:number)
+    constructor(width:number=BEAM_SECTION_WIDTH_DEFAULT, height:number=BEAM_SECTION_HEIGHT_DEFAULT)
     {
-        width = width ?? BEAM_SECTION_WIDTH_DEFAULT;
-        height = height ?? BEAM_SECTION_HEIGHT_DEFAULT;
+        this._width = width;
+        this._height = height;
     }
 
     set width(w:number)
@@ -967,7 +1088,7 @@ class BeamSection
 
     copy():BeamSection
     {
-        return new BeamSection(this.width, this.height)
+        return new BeamSection(this._width, this._height)
     }
 }
 
@@ -1016,23 +1137,147 @@ interface BeamJointResolveInput
     relation:BeamRelation // { from:Beam, to:Beam, at:Point etc }
     fromExtended:AnyShape // Extended Beam Shape
     toExtended:AnyShape
+    intersection:AnyShape // full (mostly) Solid intersection
     fromProjIn?:Wire
     fromProjOut:Wire
-    fromProjInShell:Shell // with one or more faces
-    fromProjOutShell:Shell // with one or more faces
+    fromProjInShell?:Shell // with one or more faces
+    fromProjOutShell?:Shell // with one or more faces
     toProjIn?:Wire
     toProjOut:Wire
-    toProjInShell:Shell
-    toProjOutShell:Shell
-    intersection:AnyShape // full (mostly) Solid intersection
+    toProjInShell?:Shell
+    toProjOutShell?:Shell
     flags?:BeamJointResolveFlags
 }
 
 interface BeamJointResolveFlags 
 {
     fullIntersection:boolean // if (extended) Beams intersect each other fully
-    largestBeamSection:Beam // What beam has the largest section
+    largestBeamIntersection:Beam // What beam has the largest section
     orthogonal:boolean // TODO
+}
+
+/** Specific options to solve a joint */
+
+type BeamJointOptionsButt = 'butt-only'|'cutone'
+
+interface BeamJointOptions
+{
+    strategy?: BeamJointOptionsButt
+    at?: 'outside'|'baseline'
+}
+
+interface BeamJointResult 
+{
+    input: BeamJointResolveInput
+    output: any // TODO
+}
+
+
+//// OPERATIONS ////
+
+class BeamOperation
+{
+    id:string // automatic hash to identify duplicates
+    type:string
+
+    constructor(type)
+    {
+        this.type = type;
+    }
+
+    hash():string
+    {
+        return this.type;
+    }
+
+    apply(to:Beam):this
+    {
+        // Implemented by subclasses
+        return this;
+    }
+}
+
+/** Parametric representation of a SawCut
+ *  
+ *  TODO: Protect agains very unpractical Sharp cut angles
+ *  
+ *  NOTE: somewhat inspired by simplified BTLX. See: https://design2machine.com/btlx/BTLx_2_2_0.pdf
+ */
+class BeamSawCut extends BeamOperation
+{
+    start: number // start of cut along Beam from start
+    angle: number // angle of cut in degrees relative to Beam axis on width Face, straight cut is 90 degrees
+    inclination: number // angle of cut at side Face, relative to top Face on inside of Beam (0 is along Face and does nothing, 90 is straight cut)
+    depth?: number // depth of cut, null for full width of Beam
+    length?: number // length of cut from start. null for full height of Beam 
+    offsetX?: number // not used yet
+    offsetY?: number // not used yet
+    toolPosition?:'left'|'right'|'center' // left=inner, right=outer
+
+    constructor(start:number, angle:number=90, inclination:number=90)
+    {
+        super('SawCut');
+        this.start = start;
+        this.angle = angle;
+        this.inclination = inclination;
+        this.id = this.hash();
+    }
+
+    hash():string
+    {
+        return `${this.type}${this.start}${this.angle}${this.inclination}`; // WIP
+    }
+    
+    /** Apply SawCut operation to a Beam */
+    apply(to:Beam):this
+    {
+        if(this.start < 0 || this.start > to._length){ throw new Error(`BeamSawCut::apply(): Can't apply Saw Cut because start is not along Beam! start > 0 && start < beam length`)}
+        if(this.angle === 0){ throw new Error(`BeamSawCyt::apply(). Cutting at zero angle (parallel to direction of Beam) does not make sense. Straight cut is 90 degrees!`); }
+        if(this.inclination === 0){ throw new Error(`BeamSawCyt::apply(). Cutting at zero inclination (parallel to top face of Beam) does not make sense. Straight cut is 90 degrees!`); }
+
+        let startLengthOffset = (this.angle !== 90) ? to._section.width/Math.tan(toRad(this.angle))*0.5 : 0;
+        if(this.angle < 90){ startLengthOffset *= -1 }
+
+        // DEBUG START
+        new Edge().makeLine([this.start,0,0], [this.start, -100,0]).addToScene().color('red');
+
+        const cutFace = to._getOrientatedSectionFace()
+                            .move(to.direction().scaled(this.start+startLengthOffset))
+        const cutFaceAxis = new Vector(0,-1,0).crossed(cutFace.normal())
+
+        cutFace.rotateAround(this.angle-90, cutFaceAxis) // pivot = center
+        
+        
+
+        const cutEdge = cutFace.edges().sort((a,b) => b.center().z - a.center().z)[0] as Edge; // NOTE: .select('E||top') not robust! TODO
+        const inclinationAxis = cutEdge.direction();
+        // We want incline towards start of Beam when incl < 90
+        const testInclFace = cutFace._copy();
+        const distanceBeforeIncl = to.start().toVertex().distance(testInclFace);
+        testInclFace.rotateAround(45-90, inclinationAxis, cutEdge.center() );  // Use 45 as test which is always inside
+        if( distanceBeforeIncl < to.start().toVertex().distance(testInclFace))
+        {
+            inclinationAxis.reverse(); // simply reverse the inclination axis to rotate the other way
+        }
+        cutFace.rotateAround(this.inclination-90, inclinationAxis, cutEdge.center())
+        // Need to offset inside above 90 degrees to keep length the same
+        if(this.inclination > 90)
+        {
+            const inclOffset = Math.tan(toRad(this.inclination-90)) * to._section.height;
+            cutFace.move(to.direction().reversed().scale(inclOffset))
+        }
+
+        cutFace.addToScene().color('red');
+
+        to._cutShape(cutFace)
+        return this;
+    }
+
+    toString():string
+    {
+        return `<BeamSawCut start="${this.start}" angle="${this.angle}" inclination="${this.inclination}"`;
+    }
+
 }
 
 
