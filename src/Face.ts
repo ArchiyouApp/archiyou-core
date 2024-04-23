@@ -332,8 +332,7 @@ export class Face extends Shape
                 return newShapeOrCollection
             }
         }
-        ocMakeFilling.destroy();
-
+        ocMakeFilling.delete();
         // TODO: implement holes and surface points
     }
     

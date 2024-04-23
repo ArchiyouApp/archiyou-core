@@ -204,7 +204,7 @@ export class Shape
     _unifyDomain():AnyShape
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_shape_upgrade___unify_same_domain.html
-        let fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(this._ocShape, true, true, true); // unify edges, unify faces, concat bsplines
+        let fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(this._ocShape, true, true, false); // unify edges, unify faces, concat bsplines
         fusor.Build();
         let fusedOcShape = new Shape()._fromOcShape(fusor.Shape()) as AnyShape;
         this._ocShape = fusedOcShape._ocShape;
@@ -1911,7 +1911,7 @@ export class Shape
             }
         }
 
-        ocShapeDistanceCalculator.destroy();
+        ocShapeDistanceCalculator.delete();
 
         return null;
     }
@@ -2248,7 +2248,7 @@ export class Shape
         }
 
         let fuser = new this._oc.BRepAlgoAPI_Fuse_3(this._ocShape, otherShape._ocShape, new this._oc.Message_ProgressRange_1());
-        fuser.SetFuzzyValue(0.1);
+        fuser.SetFuzzyValue(0.001);
         fuser.Build(new this._oc.Message_ProgressRange_1());
         let combined = fuser.Shape();
 
@@ -2658,6 +2658,13 @@ export class Shape
     @addResultShapesToScene
     @checkInput('PointLikeOrAnyShapeOrCollection', 'auto')
     intersection(others:PointLikeOrAnyShapeOrCollection):AnyShape
+    {
+        let i = this._intersections(others)?.first();
+        return (!i) ? null : i;
+    }
+
+    @checkInput('PointLikeOrAnyShapeOrCollection', 'auto')
+    _intersection(others:PointLikeOrAnyShapeOrCollection):AnyShape
     {
         let i = this._intersections(others)?.first();
         return (!i) ? null : i;
