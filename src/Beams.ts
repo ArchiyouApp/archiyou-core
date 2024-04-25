@@ -127,7 +127,6 @@ export class Beams
     /** TODO: Resolve all joints of Beam system */
     join()
     {
-        console.log('==== BEAMS JOIN ====');
 
         this.beams.forEach((b,i) => 
             {
@@ -416,6 +415,7 @@ export class Beam
         return this._getOrientatedSectionFace().move(mv)
     }
 
+
     /** Get offset Vector from baseline to center of Beam section */
     _getBaseLineToSectionCenterVec():Vector
     {
@@ -428,6 +428,7 @@ export class Beam
                     .reverse()
 
     }
+
 
     /** Get center line of Beam */
     _getSectionCenterToPivot():Vector
@@ -463,6 +464,63 @@ export class Beam
         return this;
     }
 
+    /** Get normal of top face of Beam */
+    _getTopFaceNormal():Vector
+    {
+        if(this.direction().equals([0,1,0])){ return new Vector(0,0,1); }
+        return this.direction().crossed(new Vector(0,1,0)).normalized();
+    }
+
+    /** Get (simplified) top Face of Beam */
+    _getTopTestFace():Face
+    {
+        const testTopVert = this.start().moved(
+                this._getTopFaceNormal().scale(this._section.height/2))
+                ._toVertex();
+        const topEdge = this._getOrientatedSectionFace().edges().sort((e1,e2) => e2.distance(testTopVert) - e1.distance(testTopVert)).first();
+        return topEdge.extruded(this._length, this.direction()) as Face;
+    }
+
+    /** Get the cutting top Edge given a cutting Face 
+     *  NOTE: Does not test if it even cuts!
+    */
+    _getTopCutEdge(intersectionFace:Face):Edge
+    {
+        const testTopVert = intersectionFace.center().moved(
+            this._getTopFaceNormal().scale(this._section.height/2))
+            ._toVertex();
+        return intersectionFace.edges().sort((e1,e2) => e1.distance(testTopVert) - e2.distance(testTopVert)).first() as Edge; 
+    }
+
+    /** Get normal of side face of Beam 
+     *  The main side is the one facing y=-1 when beam is places along x-axis with start at origin
+    */
+    _getSideFaceNormal():Vector
+    {
+        return this.direction().crossed(this._getTopFaceNormal()).normalize();
+    }
+
+    /** Get origin for operation (a la BTLX) */
+    _getOperationOrigin():Point
+    {
+        return this._getOrientatedSectionFace().center()
+            .move(this._getTopFaceNormal().scaled(this._section.height/2))
+            .move(this._getSideFaceNormal().scaled(this._section.width/2))
+    }
+
+    _getOperationTestLine():Edge
+    {
+        return new Edge().makeLine(this._getOperationOrigin(), this._getOperationOrigin().move(this.direction().scaled(this._length)));
+    }
+
+    /** Add debug shapes */
+    debug()
+    {
+        // Small line from origin towards direction forr operations
+        new Edge().makeLine(this._getOperationOrigin(),this._getOperationOrigin().moved(this.direction().scaled(10)))
+            .move(this._getTopFaceNormal().scaled(this._section._height*0.005)) // a bit above to guarantee visibility: TODO: improve rendering order in the future
+            .addToScene().color('red')
+    }
 
     //// OPERATIONS ////
 
@@ -501,8 +559,11 @@ export class Beam
         const intersectionPlane = this._shape._copy()._intersection(cutPlane) as Face;
         if(!intersectionPlane || intersectionPlane.type() !== 'Face'){ throw new Error(`Beam::cutAt: Supplied cut Face is not on Beam!`);}
          
-        const sectionCentered = this._getOrientatedSectionFaceCentered();
-        const start = this._getOrientatedSectionFace().distance(intersectionPlane.vertices().sort((v1,v2) => v1.distance(sectionCentered) - v2.distance(sectionCentered)).first());
+        // start if intersection of intersectionPlane and a testline from operation origin along Beam direction
+        const int = this._getOperationTestLine()._intersection(intersectionPlane)
+        if(!int){ throw new Error(`Beam::cutAt(): Could not determine start of cutting plane!`)}
+        const start = this._getOrientatedSectionFace().distance(int);
+
 
         // Cut at Point always results in a straight butt cut
         if(isPointLike(other))
@@ -511,9 +572,26 @@ export class Beam
             return this;
         }
         else {
-            const angle = intersectionPlane.normal().angle(this.direction()) + 90;
-            this.cut(start,90,angle);
+            const intPlaneNorm = intersectionPlane.normal();
+            // always guarantee normal of intersection that points to start of Beam
+            const checkedNormal = (intPlaneNorm.angle(this.direction()) > 180) ? intPlaneNorm : intPlaneNorm.reversed(); 
+            
+            const angle = Math.abs(( ( checkedNormal.copy().angle(this._getSideFaceNormal()) < 90) ? -90 : 90 ) + checkedNormal.angleAround(
+                                this.direction().reversed(),
+                                this._getTopFaceNormal(),
+                                ));
+            
+            // We need to get the Edge that is on the topFace of the Beam: The saw cutting line
+            const topIntersectionEdge = this._getTopCutEdge(intersectionPlane);
+                        
+            const inclination = checkedNormal.angleAround(
+                this._getTopFaceNormal(), 
+                topIntersectionEdge.direction(),
+                );
+
+            this.cut(start,angle,inclination);
         }
+        return this;
     }
 
     /** Add parametric Extend operation to Beam and update its Shape */
@@ -1128,7 +1206,8 @@ export class Beam
             if(options.strategy === 'butt-only')
             {
                 // cut straight
-                const closestInnerVert = secondaryInnerFace.vertices().sort((v1,v2) => v1.distance(secondaryBeam.center().toVertex()) - v2.distance(secondaryBeam.center().toVertex())).first() as Vertex;
+                const closestInnerVert = secondaryInnerFace.vertices().sort((v1,v2) => 
+                        v1.distance(secondaryBeam.center()._toVertex()) - v2.distance(secondaryBeam.center()._toVertex())).first() as Vertex;
                 secondaryBeam.cutAt(closestInnerVert)
             }
             else
@@ -1397,10 +1476,10 @@ class BeamSawCut extends BeamOperation
     start: number // start of cut along Beam from start. If start < 0 begin from end 
     angle: number // angle of cut in degrees relative to Beam axis on width Face, straight cut is 90 degrees
     inclination: number // angle of cut at side Face, relative to top Face on inside of Beam (0 is along Face and does nothing, 90 is straight cut)
-    depth?: number // depth of cut, null for full width of Beam
+    depth?: number // [NOT USED NOW ] depth of cut, null for full width of Beam
     offsetX?: number // not used yet
     offsetY?: number // not used yet
-    toolPosition?:'left'|'right'|'center' // left=inner, right=outer
+    toolPosition?:'left'|'right'|'center' // [NOT USED] left=inner, right=outer
 
     constructor(start:number, angle:number=90, inclination:number=90)
     {
@@ -1417,7 +1496,9 @@ class BeamSawCut extends BeamOperation
         return `${this.type}${this.start}${this.angle}${this.inclination}`; // WIP
     }
     
-    /** Apply SawCut operation to the solid Shape of the Beam */
+    /** Apply SawCut operation to the solid Shape of the Beam from start of its baseline
+     *  The cut starts at start x, at beginning from beam at top face with direction of Beam
+     */
     apply(to:Beam):this
     {
         if(this.angle === 0){ throw new Error(`BeamSawCyt::apply(). Cutting at zero angle (parallel to direction of Beam) does not make sense. Straight cut is 90 degrees!`); }
@@ -1432,11 +1513,9 @@ class BeamSawCut extends BeamOperation
         } // if start < 0 we start from end. So -300 means 300 from end. For beam of 2000 this is 1700
         */
 
-        let startLengthOffset = (this.angle !== 90) ? to._section.width/Math.tan(toRad(this.angle))*0.5 : 0;
-        if(this.angle < 90){ startLengthOffset *= -1 }
-
+        const startOffsetVec = to.direction().scaled(this.start);
         const cutFace = to._getOrientatedSectionFace()
-                            .move(to.direction().scaled(this.start+startLengthOffset))
+                            .move(startOffsetVec)
 
         if(!cutFace.intersects(to._shape))
         { 
@@ -1444,27 +1523,15 @@ class BeamSawCut extends BeamOperation
             return this;
         }
         
-        const cutFaceAxis = new Vector(0,-1,0).crossed(cutFace.normal())
+        const cutFaceRotateAxis = to._getTopFaceNormal();
+        const cutFaceRotatePivot = to._getOperationOrigin().move(startOffsetVec);
 
-        cutFace.rotateAround(this.angle-90, cutFaceAxis) // pivot = center
+        cutFace.rotateAround(90-this.angle, cutFaceRotateAxis, cutFaceRotatePivot);
 
-        const cutEdge = cutFace.edges().sort((a,b) => b.center().z - a.center().z)[0] as Edge; // NOTE: .select('E||top') not robust! TODO
+        
+        const cutEdge = to._getTopCutEdge(cutFace);
         const inclinationAxis = cutEdge.direction();
-        // We want incline towards start of Beam when incl < 90
-        const testInclFace = cutFace._copy();
-        const distanceBeforeIncl = to.start()._toVertex().distance(testInclFace);
-        testInclFace.rotateAround(45-90, inclinationAxis, cutEdge.center() );  // Use 45 as test which is always inside
-        if( distanceBeforeIncl < to.start()._toVertex().distance(testInclFace))
-        {
-            inclinationAxis.reverse(); // simply reverse the inclination axis to rotate the other way
-        }
-        cutFace.rotateAround(this.inclination-90, inclinationAxis, cutEdge.center())
-        // Need to offset inside above 90 degrees to keep length the same
-        if(this.inclination > 90)
-        {
-            const inclOffset = Math.tan(toRad(this.inclination-90)) * to._section.height;
-            cutFace.move(to.direction().reversed().scale(inclOffset))
-        }
+        cutFace.rotateAround(this.inclination-90, inclinationAxis, cutEdge.center());
 
         to._cutShape(cutFace)
 

@@ -728,6 +728,23 @@ export class Vector extends Point
         return roundToTolerance(toDeg(this._ocVector.AngleWithRef(otherVec._ocVector, refVec._ocVector)));
     }
 
+    @checkInput('PointLike', 'Vector')
+    projectedToPlane(normal:PointLike):Vector
+    {
+        const n = normal as Vector; // auto converted
+        return this.subtracted(
+                n.scaled(
+                    this.copy().dot(normal)/n.squareMagnitude())
+                )
+    }
+
+    /** Get smallest angle with another Vector around a axis direction */
+    @checkInput(['PointLike', 'PointLike'], ['Vector', 'Vector'])
+    angleAround(other:PointLike, axis:PointLike):number
+    {
+        return this.projectedToPlane(axis as Vector).angle(other as Vector)
+    }
+
     /** Check if this Vector is the same as another */
     @checkInput('PointLike', 'Vector')
     equals(other:PointLike, ...args):boolean

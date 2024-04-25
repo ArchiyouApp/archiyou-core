@@ -533,7 +533,7 @@ export class Face extends Shape
             }
         }
         else {
-            console.error(`normalAtUv: Could not get normal of this Face.`)
+            console.error(`Face::normalAtUv: Could not get normal of this Face.`)
             return null;
         }
     }
