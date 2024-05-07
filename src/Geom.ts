@@ -991,9 +991,10 @@ export class Geom
    *  @returns Arr2DPolygon { area, points } ordered by area descending
    *  NOTE: This is pretty fast. The following OC routines are not! 
    */
-  _getArrangementPolys(shapesOrPoints:ShapeCollection|Array<Point>):Array<Arr2DPolygon>
+  _getArrangementPolys(shapesOrPoints:ShapeCollection|Array<Point>, smallestArea:number):Array<Arr2DPolygon>
   {
-    const AREA_FILTER = 50;
+    const AREA_FILTER = 50 ;
+    smallestArea = smallestArea || AREA_FILTER
 
     if(!this._Arr2D)
     {
@@ -1050,7 +1051,7 @@ export class Geom
       }
     }
 
-    return polys.filter(p => p.area > AREA_FILTER).sort((a,b) => b.area - a.area);
+    return polys.filter(p => p.area > smallestArea).sort((a,b) => b.area - a.area);
   }
 
   arrange2DShapesToFaces(shapesOrPoints:ShapeCollection|Array<Point>):ShapeCollection

@@ -15,7 +15,7 @@
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, Arr2DPolygon, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
  import { LayoutOrderType, LayoutOptions, AutoDimSettings, MainAxis } from './internal'
 
@@ -2474,17 +2474,20 @@
        *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
        *    TODO: run these algorithms apart from OC
       */
-      toSvg(options:toSVGOptions = { all: false, annotations: true, contours:false }):string
+      toSvg(options:toSVGOptions = { all: false, annotations: true, fills:true, outlines:false }):string
       {
-         const shapeEdges = this._get2DXYShapeEdges(options?.all);
+         let shapeEdges = this._get2DXYShapeEdges(options?.all);
          
          if (shapeEdges.length == 0){ return null;}
 
          // NOTE: SVG has reversed y-axis
+         shapeEdges = shapeEdges.map(s => s._mirroredX(0)); 
+
+         // Edges to SVG paths
          let svgPaths:Array<string> = [];
          shapeEdges.forEach( edge => 
          {
-            svgPaths.push(edge._mirroredX(0).toSvg());
+            svgPaths.push(edge.toSvg());
          })
 
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
@@ -2496,10 +2499,11 @@
             const annotations = this.getAnnotations();
             if(annotations.length > 0)
             {
-               bbox = bbox.added(new ShapeCollection(this.getAnnotations().map(a => a.toShape())).bbox());
+               bbox = bbox.added(
+                     new ShapeCollection(this.getAnnotations().map(a => a.toShape().mirrorX(0))).bbox());
             } 
          }
-         bbox = bbox.flippedY(); // flip for SVG coordinate system
+         // bbox = bbox.flippedY(); // flip for SVG coordinate system
 
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
          // TODO: bbox is not including dimension lines
@@ -2507,26 +2511,41 @@
          // Add some handy graphical entities, like contour to SVG to style it better
          let svgPolysFill = [];
          let svgPolysOutline = [];
-         if(options?.contours)
+         if(options?.fills || options?.outlines)
          {
             let linePoints = [] as Array<Point>;
             const SKIP_EDGE_TYPES = ['Ellipse', 'Circle']; // For now skip these Edge types because they gives problems
             shapeEdges
             .filter(e => !SKIP_EDGE_TYPES.includes(e.edgeType()))
             .forEach((e,i) => {
-               const segmPoints = (e as Edge)._segmentizeToPoints(10,true);
+               const segmPoints = (e as Edge)._copy()._segmentizeToPoints(10,true);
                linePoints = linePoints.concat(segmPoints); // sets z=0
             })
-            const contourWires = new ShapeCollection(this._geom.arrange2DShapesToContours(linePoints)).filter(s => s.type() === 'Wire');
 
-            svgPolysOutline = contourWires.toArray().map(w => {
-               const contourSvgPoints = w._mirroredX(0).vertices().toArray().map(v => `${v.x}, ${v.y}`).join(' ')
-               return `<polygon class="contour-outline" points="${contourSvgPoints}" stroke-width="2" fill="none"/>`
-            })
-            svgPolysFill = contourWires.toArray().map(w => {
-               const contourSvgPoints = w._mirroredX(0).vertices().toArray().map(v => `${v.x}, ${v.y}`).join(' ')
-               return `<polygon class="contour-fill" points="${contourSvgPoints}" stroke="none" fill="#FFF"/>`
-            })
+            const arrPolys = this._geom._getArrangementPolys(linePoints, 10);
+
+            // SVG Fills
+            if(options?.fills)
+            {
+               svgPolysFill = arrPolys.map(p => 
+               {
+                  const poly = p as Arr2DPolygon;
+                  const points = poly.points.map(pnt => `${pnt.x}, ${pnt.y}`).join(' ')
+                  return `<polygon class="contour-fill" points="${points}" stroke="none" fill="#FFF"/>`
+               })
+            }
+
+            // SVG outlines (SLOW!)
+            // TODO: find a better approach to get outer boundary of polygons. With OC routines is terrible slow!
+            if(options?.outlines)
+            {
+               const contourWires = new ShapeCollection(this._geom.arrange2DShapesToContours(linePoints)).filter(s => s.type() === 'Wire');
+
+               svgPolysOutline = contourWires.toArray().map(w => {
+                  const contourSvgPoints = w.vertices().toArray().map(v => `${v.x}, ${v.y}`).join(' ')
+                  return `<polygon class="contour-outline" points="${contourSvgPoints}" stroke-width="2" fill="none"/>`
+               })
+            }
          }
 
          const svg = `<svg 

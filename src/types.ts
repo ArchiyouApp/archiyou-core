@@ -549,7 +549,8 @@ export interface toSVGOptions
 {
     all?:boolean // also invisible
     annotations?:boolean
-    contours?:boolean
+    fills?:boolean // Generate fills in SVG
+    outlines?:boolean // Calculate the Shape outlines (Slow!)
 }
 
 export interface SVGtoPDFtransform
