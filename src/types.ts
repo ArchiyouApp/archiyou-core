@@ -547,8 +547,9 @@ export interface TextOptions
 
 export interface toSVGOptions
 {
+    all?:boolean // also invisible
     annotations?:boolean
-    all?:boolean // also visible
+    contours?:boolean
 }
 
 export interface SVGtoPDFtransform
@@ -801,3 +802,10 @@ export interface CalcData
 // NOTE: See above for general types around Params
 
 export type ParamOperation = 'new'|'updated'|'same'|'deleted'
+
+//// ARRANGEMENT 2D ////
+
+export interface Arr2DPolygon {
+    area:number
+    points:Array<Point> // with z = 0
+}

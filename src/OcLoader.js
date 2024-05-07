@@ -65,7 +65,7 @@ export default class OcLoader
         {
           let mainWasm = wasmModule.default;
           new mainJS({
-            locateFile(path) {
+            locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
               if (path.endsWith('.wasm')) {
                 return mainWasm;
               }

@@ -601,6 +601,10 @@ export class DocViewSVGManager
         drawContext.stroke(); // finalize path. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html#~stroke
         drawContext.setTransform(1, 0, 0, 1, 0 ,0); // reset transformations
     }
+    
+    //// IMPROVE SVG INPUT ROUTINES ////
+
+
 
     //// UTILS ////
 

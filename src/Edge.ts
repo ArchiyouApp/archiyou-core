@@ -919,6 +919,34 @@ export class Edge extends Shape
         }
     }
 
+    /** Get distributed points on Edge according to QuasiUniformDeflection method  
+     *  See: https://dev.opencascade.org/doc/refman/html/class_g_c_pnts___quasi_uniform_deflection.html#details
+     *  Used in toSVG()
+    */
+    _segmentizeToPoints(angularDeflection:number=10, force2D:boolean=true):Array<Point>
+    {
+        const deflection = toRad(angularDeflection);
+
+        const curve = this._toOcCurve();
+        const [start,end] = this.getParamMinMax();
+
+        const ocPointGenerator = new this._oc.GCPnts_QuasiUniformDeflection_4(curve, deflection, start,end, this._oc.GeomAbs_Shape.GeomAbs_C1);
+        const points = [] as Array<Point>
+
+        if(ocPointGenerator.IsDone())
+        {
+            for(let p = 0; p < ocPointGenerator.NbPoints(); p++)
+            {
+                const ocPoint = ocPointGenerator.Value(p+1); // NOTE: index start = 1
+                const newPoint = new Point()._fromOcPoint(ocPoint);
+                if(force2D){ newPoint.setZ(0) }
+                points.push(newPoint);
+            }
+        }
+        
+        return points;
+    }
+
     //// CONTEXT PREDICATES ////
 
     /* Get the Shapes where given current Edge and another intersect */
@@ -1077,35 +1105,25 @@ export class Edge extends Shape
         /* OC docs: 
             - GCPnts_QuasiUniformDeflection: https://dev.opencascade.org/doc/refman/html/class_g_c_pnts___quasi_uniform_deflection.html
         */
-
-        const curve = this._toOcCurve();
-        const [start,end] = this.getParamMinMax();
-
-        const ocPointGenerator = new this._oc.GCPnts_QuasiUniformDeflection_4(curve, this._oc.SHAPE_TOLERANCE, start,end, this._oc.GeomAbs_Shape.GeomAbs_C1);
         
         let svgPathD = '' // d attribute of SVG Path
+        const segmPoints = this._segmentizeToPoints();
 
-        if(ocPointGenerator.IsDone())
+        segmPoints.forEach((point,i) =>
         {
-            for(let p = 0; p < ocPointGenerator.NbPoints(); p++)
+            // NOTE: We just omit the z coordinate. TODO: Warn about exporting a non-flat Edge
+            if(i == 0) // first point of Edge, move command
             {
-                const ocPoint = ocPointGenerator.Value(p+1); // NOTE: index start = 1
-                let point = new Point()._fromOcPoint(ocPoint);
-                
-                // NOTE: We just omit the x coordinate. TODO: Warn about exporting a non-flat Edge
-                if(p == 0) // first point of Edge, move command
-                {
-                    svgPathD += `M ${point.x} ${point.y}`;
-                }
-                else {
-                    // all others: lineTo command
-                    svgPathD += ` L ${point.x} ${point.y}`;
-                }
+                svgPathD += `M ${point.x} ${point.y}`;
             }
-        }
+            else {
+                // all others: lineTo command
+                svgPathD += ` L ${point.x} ${point.y}`;
+            }
+        })
         
         // Based on attributes we assign some classes for later styling
-        const svgNodeStr = `<path d="${svgPathD}" ${this._getSvgPathAttributes()} class="${this._getSvgClasses()}"/>`; 
+        const svgNodeStr = `<path d="${svgPathD}" ${this._getSvgPathAttributes()} fill="none" class="${this._getSvgClasses()}"/>`; 
 
         // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSvg() method
 

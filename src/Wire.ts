@@ -432,7 +432,7 @@ export class Wire extends Shape
     /** Try to convert Wire to Face (private) */
     _toFace()
     {
-        return new Face().fromWire(this.checkAndFix().close()) as Face;
+        return new Face().fromWire(this.close()) as Face;
     }
 
     /** Try to convert Wire to Face */

@@ -326,3 +326,13 @@ export const arrayBufferToBase64 = (arraybuffer: ArrayBuffer): string =>
 
     return base64;
 };
+
+export function isBrowser():boolean
+{
+    return typeof window === 'object';
+}
+
+export function isWorker():boolean
+{
+    return (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
+} 

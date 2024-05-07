@@ -182,7 +182,7 @@ export class Shape
         {
             let ocFixer = new this._oc.ShapeFix_Shape_2(this._ocShape);
             ocFixer.Perform( new this._oc.Message_ProgressRange_1() );
-            let ocShape = ocFixer.Shape();
+            const ocShape = ocFixer.Shape();
             if (ocShape && !ocShape.IsNull())
             {
                 // success
@@ -222,7 +222,7 @@ export class Shape
     {
         ocShape = ocShape || this._ocShape;
 
-        if (ocShape == null || ocShape.IsNull())
+        if (ocShape === null || ocShape?.IsNull())
         {
             console.error('Shape::_fromOcShape: No valid OC Shape given!')
             return null;

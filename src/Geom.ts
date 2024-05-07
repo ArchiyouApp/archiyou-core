@@ -20,8 +20,10 @@ import {  SKETCH_FILLET_SIZE, SKETCH_CHAMFER_DISTANCE, SKETCH_CHAMFER_ANGLE } fr
 
 import { Annotator } from './internal';
 
-import { isNumeric } from './utils';
+import { isNumeric, isBrowser, isWorker, roundToTolerance } from './utils';
 
+import Arrangement2D from '../libs/arrangement-2d-js'
+import { Arr2DPolygon } from './internal'
 
 //// OWN DEFAULTS
 const DEFAULT_UNITS = 'mm';
@@ -52,6 +54,8 @@ export class Geom
   _activeLayerGroupInObj:Obj = null;
   _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
   // NOTE: meshingQuality is either in Main or Webworker scope
+  _Arr2D:any; // holds class Reference to Arrangements2D module
+
 
   constructor()
   {
@@ -80,6 +84,8 @@ export class Geom
 
     this.scene = new Obj().name("scene") as Obj; // create empty Collection
     this.setActiveLayer(this.scene);
+
+    this._loadArr2D(); // Load the arrangements-2d wasm module
   }
 
   //// ADMIN METHODS ////
@@ -942,6 +948,163 @@ export class Geom
   sceneToOCCompound()
   {
 
+  }
+
+  //// Some special geometric operations ////
+
+  /** Load the CGAL arrangement wasm module 
+   *  NOTE: We place this in the libs directory because it gave problems in node_modules with transpilation
+   *  TODO: We can probably make this work in node_modules
+  */
+  async _loadArr2D()
+  {
+    if(isBrowser() || isWorker())
+    {
+        if(!Arrangement2D)
+        {
+            console.error(`Geom::loadArr2D(): Please import Arrangement2D from 'arrangement-2d-js`);
+            return;
+        }
+        const loadedWasmModule = await import('../libs/arrangement-2d-js/build/Arrangement2D.esm.wasm')
+        const mainWasm = loadedWasmModule.default;
+
+        this._Arr2D = await Arrangement2D({
+          locateFile(path){
+              if (path.endsWith('.wasm'))
+              {
+                return mainWasm;
+              }
+              return path;
+          }
+        })
+        console.info('**** Loaded Arrangment2D wasm module ****');
+    }
+    else {
+        // TODO
+        const arrLibPath = 'arrangement-2d-js'; 
+        this._Arr2D = await import(arrLibPath); // Use path as variable to keep Node happy
+    }  
+  }
+
+  /** From 2D shapes consisting of Line Edges try to find closed polygons
+   *  Using CGAL Arrangement2D
+   *  @returns Arr2DPolygon { area, points } ordered by area descending
+   *  NOTE: This is pretty fast. The following OC routines are not! 
+   */
+  _getArrangementPolys(shapesOrPoints:ShapeCollection|Array<Point>):Array<Arr2DPolygon>
+  {
+    const AREA_FILTER = 50;
+
+    if(!this._Arr2D)
+    {
+      console.error(`Geom::_getArrangementPolys(): Arrangement2D not loaded!`)  
+      return [];
+    }
+
+    const Arr2D = this._Arr2D;
+    
+    const points = new Arr2D.PointList();
+
+    if(ShapeCollection.isShapeCollection(shapesOrPoints))
+    {
+      const lines = shapesOrPoints.filter( s => s.type() === 'Edge' && s.edgeType() === 'Line');
+
+      if(shapesOrPoints.length !== lines.length)
+      {
+        console.warn(`Geom::_getArrangmentPolys: Filterd out ${shapesOrPoints.length - lines.length} shapes. Arrangements only work with line Edges on XY plane!`)
+      }
+      lines.forEach(l => {
+          // NOTE: roundToTolerance to get better results!
+          points.push_back(new Arr2D.Point(roundToTolerance(l.start().x), roundToTolerance(l.start().y)))
+          points.push_back(new Arr2D.Point(roundToTolerance(l.end().x), roundToTolerance(l.end().y)))
+      })
+    }
+    else {
+      if(Array.isArray(shapesOrPoints) && shapesOrPoints.every(p => Point.isPoint(p)))
+      {
+        shapesOrPoints.forEach(p => points.push_back(new Arr2D.Point(roundToTolerance(p.x), roundToTolerance(p.y))))
+      }
+      else {
+        console.error(`Geom::_getArrangmentPolys: Detected non-Point in input. Cancelled`);
+        return [];
+      }
+    }
+
+    const arrBuilder = new Arr2D.ArrangementBuilder();
+    const arrPolys = arrBuilder.getPolygons(points);
+    const polys = [] as Array<Arr2DPolygon>
+
+    for (let i=0; i<arrPolys.size(); i++)
+    {
+      const arrPoly = arrPolys.at(i);
+      const poly = {
+        area: arrPoly.getPolyTristripArea(),
+        points: [] as Array<Point>
+      } as Arr2DPolygon
+      polys.push(poly)    
+
+      for (let c=0; c<arrPoly.contour.size(); c++)
+      {
+        const point = arrPoly.contour.at(c);
+        poly.points.push(new Point(point.x, point.y));
+      }
+    }
+
+    return polys.filter(p => p.area > AREA_FILTER).sort((a,b) => b.area - a.area);
+  }
+
+  arrange2DShapesToFaces(shapesOrPoints:ShapeCollection|Array<Point>):ShapeCollection
+  {
+    const polys = this._getArrangementPolys(shapesOrPoints);
+    return new ShapeCollection(polys.map( p => new Wire().fromPoints(p.points)._toFace() ));
+  }
+
+  /** Arrange 2D Shapes into closed boundaries (Shells or Faces) */
+  arrange2DShapesToBoundaries(shapesOrPoints:ShapeCollection|Array<Point>):ShapeCollection
+  {
+      const faces = this.arrange2DShapesToFaces(shapesOrPoints);
+      const shapes = (faces.length) ? new ShapeCollection(new Shell().fromFaces(faces)) : null;
+
+      return shapes.filter(s => ['Shell','Face'].includes(s.type()) )
+  }
+
+  /** Arrange 2D Shapes and get the outer contours
+   *  NOTE: To get outlines we force Faces into Shells and use outerWire to get the outer Wire
+   */
+  arrange2DShapesToContours(shapesOrPoints:ShapeCollection|Array<Point>):ShapeCollection
+  {
+    try {
+      const shellOrFaces = this.arrange2DShapesToBoundaries(shapesOrPoints);
+      
+      const faces = shellOrFaces.filter(s => s.type() === 'Face')
+      const shells = shellOrFaces.filter(s => s.type() === 'Shell');
+      const remainingFaces = faces.shallowCopy();
+      
+      const contours = new ShapeCollection();
+
+      // Try to combine loose Faces with Shells
+      shells.forEach(shell => {
+        const overlapFaces = faces.filter(f => shell.overlaps(f))
+        const facesToCombine = shell.faces().concat(overlapFaces);
+        remainingFaces.remove(facesToCombine);
+        const forcedShell = new Shell().fromFaces(facesToCombine, true) as Shell;
+        const contour = forcedShell.outerWire();
+        if(contour.closed()) // TODO: more tests
+        {
+          contours.add(contour)
+        }
+      })
+
+      // Remaining isolated Faces
+      contours.add(remainingFaces.map(f => (f as Face).outerWire()))
+
+      return contours;
+    }
+    catch (e)
+    {
+      return new ShapeCollection();
+    }
+    
   }
 
 

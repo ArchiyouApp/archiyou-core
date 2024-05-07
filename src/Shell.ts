@@ -61,7 +61,10 @@ export class Shell extends Shape
 
         if (shapes.getShapesByType('Face').length >= 1)
         {
-            return this.fromFaces(shapes);
+            const r = this.fromFaces(shapes); // Can return non-Shells - 
+            return (r.type() === 'Shell')
+                    ? r as Shell
+                    : (r as ShapeCollection).filter(s => s.type() === 'Shell').first() as Shell
         }
         else if (shapes.getShapesByType('Edge').length >= 2)
         {
@@ -80,8 +83,8 @@ export class Shell extends Shape
         return this._fromOcShell(newOcShell);
     }
 
-    @checkInput('MakeShellInput', 'ShapeCollection')
-    fromFaces(faces:MakeShellInput):Shell
+    @checkInput(['MakeShellInput',[Boolean,false]], ['ShapeCollection', 'auto'])
+    fromFaces(faces:MakeShellInput, forceShell?:boolean):Shell|AnyShapeOrCollection|null
     {
         let shapes = faces as ShapeCollection; // auto converted
         let facesCollection = shapes.getShapesByType('Face');
@@ -101,16 +104,32 @@ export class Shell extends Shape
         facesCollection.forEach( curFace => ocShellBuilder.Add(curFace._ocShape));
         ocShellBuilder.Perform( new this._oc.Message_ProgressRange_1());
         
-        let ocShell = ocShellBuilder.SewedShape();
+        const ocSewResult = ocShellBuilder.SewedShape(); // Can be a single Shell or Compound
         
-        if (ocShell.IsNull())
+        if (ocSewResult.IsNull())
         {
             console.error(`Shell::fromFaces: Could not combine ${faces.length} Faces into Shell!`);
             return null;
         }
         else {
             // successfull sew
-            return this._fromOcShell(ocShell).checkAndFix() as Shell; // !!!! check and fix needed? !!!!
+            console.log('==== FROM FACES ====');
+            console.log(forceShell);
+
+            const ocSewResultType = this._getShapeTypeFromOcShape(ocSewResult)
+            if (ocSewResultType === 'Shell' || forceShell)
+            {
+                if(ocSewResultType !== 'Shell')
+                {
+                    console.warn(`Shell::fromFaces(): Combining Faces did not result in one Shell, but forceShell is set! a Bad Shell can be expected!`)
+                }
+                return this._fromOcShell(ocSewResult).checkAndFix() as Shell; // !!!! check and fix needed? !!!!
+            }
+            else {
+                const nonShellShape = this._fromOcShape(ocSewResult) as AnyShapeOrCollection
+                console.warn(`Shell::fromFaces(): Combining ${facesCollection.length} Faces resulted in result type "${nonShellShape.type()}"`)
+                return nonShellShape;
+            }
         }
 
     }
@@ -333,7 +352,11 @@ export class Shell extends Shape
             let ocAnalysor = new this._oc.ShapeAnalysis_FreeBounds_2(this._ocShape, 1e-3, false, true);
             let ocOuterWire = ocAnalysor.GetClosedWires(); // gives back a Compound of outerwires, but _fromOcShape will make this into one Wire
         
-            return new Shape()._fromOcShape(ocOuterWire) as Wire;
+            const wires = new Shape()._fromOcShape(ocOuterWire);
+            // Make sure we get one closed Wire
+            return (ShapeCollection.isShapeCollection(wires)) 
+                    ? (wires as ShapeCollection).filter(w => w.closed()).sort((a,b) => b.length - a.length).first() as Wire 
+                    : wires as Wire;
         }
     }
     

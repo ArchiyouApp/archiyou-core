@@ -25,6 +25,7 @@
  // special libraries
  import chroma from 'chroma-js';
  import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+ 
  interface PackerItem {
    name:string
    width:number
@@ -2468,8 +2469,12 @@
 
       /** Export Shapes that are 2D and on XY plane to SVG 
        *    All shapes will be converted to Edges
+       *    @param options { all:boolean, annotations: boolean, contours:boolean  }
+       * 
+       *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
+       *    TODO: run these algorithms apart from OC
       */
-      toSvg(options?:toSVGOptions):string
+      toSvg(options:toSVGOptions = { all: false, annotations: true, contours:false }):string
       {
          const shapeEdges = this._get2DXYShapeEdges(options?.all);
          
@@ -2499,14 +2504,46 @@
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
          // TODO: bbox is not including dimension lines
 
-         const svg = `<svg _bbox="${svgRectBbox}" _worldUnits="${this._geom._units}" stroke="black">
+         // Add some handy graphical entities, like contour to SVG to style it better
+         let svgPolysFill = [];
+         let svgPolysOutline = [];
+         if(options?.contours)
+         {
+            let linePoints = [] as Array<Point>;
+            const SKIP_EDGE_TYPES = ['Ellipse', 'Circle']; // For now skip these Edge types because they gives problems
+            shapeEdges
+            .filter(e => !SKIP_EDGE_TYPES.includes(e.edgeType()))
+            .forEach((e,i) => {
+               const segmPoints = (e as Edge)._segmentizeToPoints(10,true);
+               linePoints = linePoints.concat(segmPoints); // sets z=0
+            })
+            const contourWires = new ShapeCollection(this._geom.arrange2DShapesToContours(linePoints)).filter(s => s.type() === 'Wire');
+
+            svgPolysOutline = contourWires.toArray().map(w => {
+               const contourSvgPoints = w._mirroredX(0).vertices().toArray().map(v => `${v.x}, ${v.y}`).join(' ')
+               return `<polygon class="contour-outline" points="${contourSvgPoints}" stroke-width="2" fill="none"/>`
+            })
+            svgPolysFill = contourWires.toArray().map(w => {
+               const contourSvgPoints = w._mirroredX(0).vertices().toArray().map(v => `${v.x}, ${v.y}`).join(' ')
+               return `<polygon class="contour-fill" points="${contourSvgPoints}" stroke="none" fill="#FFF"/>`
+            })
+         }
+
+         const svg = `<svg 
+                        xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+                        viewBox="${svgRectBbox}"
+                        _bbox="${svgRectBbox}" 
+                        _worldUnits="${this._geom._units}" stroke="black">
+                        ${svgPolysFill.join('\n')}
                         ${svgPaths.join('\n\t')}
                         ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
+                        ${svgPolysOutline.join('\n')}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
 
          return svg;
       }
+
 
       /** Add dimension lines that are tied to shapes in this Collection */
       _getDimensionLinesSvgElems():string
