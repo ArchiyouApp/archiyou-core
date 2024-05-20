@@ -746,23 +746,29 @@ export class Wire extends Shape
     @checkInput([[Number,WIRE_POPULATE_NUM]], Number)
     populated(num?:number):ShapeCollection
     {
-       let totalEdgeLength = this.edges().all().reduce((acc, e) => acc + e.length(), 0);
-       
-       let distancePerPoint = totalEdgeLength/(num - 1);
+        // Forward to Edge if only one 
+        if(this.edges().length === 1)
+        {
+            return this.edges()[0].populated(num)
+        }
 
-       let travelledDistance = 0;
-       let allEdges = this.edges();
-       let curEdgeIndex = 0;
-       let curEdge = allEdges[curEdgeIndex];
-       let curEdgeTravelledAtStart = 0;
+        const totalEdgeLength = this.edges().all().reduce((acc, e) => acc + e.length(), 0);
+        
+        const distancePerPoint = totalEdgeLength/(num - 1);
 
-       let verticesOnWire = new ShapeCollection();
-       
-       for (let p = 0; p < num; p++ )
-       {
+        let travelledDistance = 0;
+        const allEdges = this.edges();
+        let curEdgeIndex = 0;
+        let curEdge = allEdges[curEdgeIndex];
+        let curEdgeTravelledAtStart = 0;
+
+        let verticesOnWire = new ShapeCollection();
+        
+        for (let p = 0; p < num; p++ )
+        {
             travelledDistance = distancePerPoint * p; // start with 0
             let travelledOnEdge = travelledDistance - curEdgeTravelledAtStart;
-       
+        
             if (travelledOnEdge > curEdge.length() ) // does not fit on the current Edge
             {
                 // move to next Edge
@@ -780,11 +786,11 @@ export class Wire extends Shape
             }
 
             verticesOnWire.add( curEdge.pointAt( travelledOnEdge / curEdge.length())._toVertex() ); // add Vertex to ShapeCollection
-       }
+        }
 
-       verticesOnWire.setName(`PopulatedVertices`); // set name in scenegraph. TODO: smart names like PopulatedVerticesOf{ParentShape}
+        verticesOnWire.setName(`PopulatedVertices`); // set name in scenegraph. TODO: smart names like PopulatedVerticesOf{ParentShape}
 
-       return verticesOnWire;
+        return verticesOnWire;
     }
 
     /** Get the length of this Wire */

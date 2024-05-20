@@ -366,10 +366,10 @@ export class Face extends Shape
         return this.wires()[0];
     }
 
-    /** Create an one Face */
+    /** Create Shell with one Face */
     toShell():IShell
     {
-        return new Shell().fromFaces([this]);
+        return new Shell().fromFaces([this], true) as Shell;
     }
 
     _toShellWhenOcShell():Face|Shell

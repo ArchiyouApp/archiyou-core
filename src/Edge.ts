@@ -17,7 +17,7 @@ import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_
     EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_SIZE
 } from './internal'
 import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
-import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShapeOrCollection,
+import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, AnyShapeOrCollection,
         LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
 import { roundToTolerance } from './internal'
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
@@ -360,6 +360,12 @@ export class Edge extends Shape
     is2DXY(): boolean 
     {
         return this.start().z <= this._oc.SHAPE_TOLERANCE && this.end().z <= this._oc.SHAPE_TOLERANCE
+    }
+
+    /** TODO: Make this more robust? */
+    isCircular():boolean
+    {
+        return ['Circle', 'Ellipse'].includes(this.edgeType())
     }
 
     /** Get length of Edge */
@@ -805,18 +811,20 @@ export class Edge extends Shape
     @checkInput([ [Number, EDGE_DEFAULT_EXTEND_AMOUNT], ['LinearShapeTail', EDGE_DEFAULT_EXTEND_DIRECTION]], [Number,'auto'])
     extend(amount?:number, direction?:LinearShapeTail):Edge
     {
+        if(!['Line','Arc'].includes(this.edgeType())){ throw new Error(`Edge::extend(): Extend with edge type "${this.edgeType()}" not yet implemented!`)}
+
         // NOTE: we need to normalize U with the length because Arcs have U based on angle, not distance
         let uMin:number, uMax:number;
         [uMin,uMax] = this.getParamMinMax();
-        let edgeLength = this.length(); 
+        const edgeLength = this.length(); 
         
-        let amountToU = (uMax - uMin) / edgeLength;
-        let normalizedAmount = amountToU * amount;
+        const amountToU = (uMax - uMin) / edgeLength;
+        const normalizedAmount = amountToU * amount;
 
-        let ocEdgeCreator = (direction == 'end') ? 
+        const ocEdgeCreator = (direction == 'end') ? 
                 new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), uMin, uMax+normalizedAmount)
                 : new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), uMin-normalizedAmount, uMax);
-        let ocEdge = ocEdgeCreator.Edge();
+        const ocEdge = ocEdgeCreator.Edge();
         this._fromOcEdge(ocEdge);
 
         return this;
@@ -824,10 +832,87 @@ export class Edge extends Shape
 
     /** Extend Edge into a certain direction (start or end) and return a copy */
     @checkInput([[Number,EDGE_DEFAULT_POPULATE_NUM],['LinearShapeTail', EDGE_DEFAULT_EXTEND_DIRECTION]], [Number,'auto'])
+    _extended(amount?:number, direction?:LinearShapeTail):Edge 
+    {
+        return (this._copy() as Edge).extend(amount, direction);
+    }
+
+    /** Extend Edge into a certain direction (start or end) and return a copy */
+    @addResultShapesToScene
+    @checkInput([[Number,EDGE_DEFAULT_POPULATE_NUM],['LinearShapeTail', EDGE_DEFAULT_EXTEND_DIRECTION]], [Number,'auto'])
     extended(amount?:number, direction?:LinearShapeTail):Edge 
     {
-        return (this.copy() as Edge).extend(amount, direction);
+        return this._extended(amount, direction);
     }
+
+    /** Extend Edge to nearest point that is shared by other Shape (if any!)
+     *  @param other
+     *  @param direction Extend at start or end. If not given pick closest
+     */
+    @checkInput(['AnyShape', ['LinearShapeTail', null]], ['auto', 'auto'])
+    extendTo(other:AnyShape, direction?:LinearShapeTail):this
+    {
+        const EXTEND_NON_CIRCULAR_PERC_DISTANCE = 2;
+        const isCircularEdge = this.isCircular();
+
+        direction = direction || (
+                        (this.end().distance(other) < this.start().distance(other)) 
+                            ? 'end' : 'start');
+        
+        const extendAtVertex = this[direction](); // .start() or end()
+        const extendFromVertex = this[direction === 'start' ? 'end' : 'start']();
+        const distance = other.distance(extendAtVertex)
+
+        if(distance === 0)
+        {
+            console.warn(`Edge::extendTo: Don't need to extend. Already touching!`)
+            return null; 
+        }
+
+        const extendedTestShape =  (!isCircularEdge) 
+                                ? this._extended(distance*EXTEND_NON_CIRCULAR_PERC_DISTANCE, direction)
+                                : this._maxCircularShape()
+        
+        const testIntersection = extendedTestShape._intersection(other);
+        if(!testIntersection)
+        { 
+            console.warn(`Edge::extendTo: Can't extend to Shape because they never intersect!`)
+            return null; 
+        }
+        
+        const testIntVertex = (testIntersection.type() === 'Vertex') 
+                                ? (testIntersection as Vertex)
+                                : testIntersection.vertices()
+                                    .sort((v1,v2) => v1.distance(extendAtVertex) - v2.distance(extendAtVertex)).first() as Vertex
+
+        const testIntPoint = testIntVertex.toPoint();
+
+        // const paramMinMax = this.getParamMinMax();
+
+        //const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), paramMinMax[0], this.getParamAt(testIntPoint))
+        const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_26(this._toOcCurveHandle(), extendFromVertex._toOcPoint(), testIntPoint._toOcPoint());
+        const extendedEdge = this._fromOcEdge(ocEdgeCreator.Edge());
+        ocEdgeCreator.delete(); // OC destructor
+        this.replaceShape(extendedEdge);
+
+        return this;
+    }
+
+    @addResultShapesToScene
+    @checkInput(['AnyShape', ['LinearShapeTail', null]], ['auto', 'auto'])
+    extendedTo(other:AnyShape, direction?:LinearShapeTail):Edge
+    {
+        return this._copy().extendTo(other,direction);
+    }
+
+    _maxCircularShape():Edge|null
+    {
+        const paramMinMax = this.getParamMinMax()
+        return (this.isCircular())
+            ? new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), paramMinMax[0], paramMinMax[1])
+            : null;
+    }
+
 
     /** Loft (forwarded to Wire) */
     @checkInput(['AnyShapeOrCollection', [Boolean, WIRE_LOFTED_SOLID ]], ['ShapeCollection', 'auto'])
@@ -869,9 +954,11 @@ export class Edge extends Shape
     @checkInput([[Number, EDGE_DEFAULT_POPULATE_NUM]], Number)
     populated(num?:number):VertexCollection
     {
-        let lengthIncrement = 1.0/(num-1); // pointAt uses a percentage [0-1.0]
-        let vertices = new VertexCollection();
-        for (let p = 0; p < num; p++) // we start and end with start and end Vertex
+        // NOTE: 4 points means 3 Edges ~ increments - except for circular Edges
+        if(this.isCircular()){ num += 1 };
+        const lengthIncrement = 1.0/(num-1); // pointAt uses a percentage [0-1.0]
+        const vertices = new VertexCollection();
+        for (let p = 0; p <= num; p++) // we start and end with start and end Vertex
         {
             let newVertex = this.pointAt(p*lengthIncrement).toVertex(); // directly add to Scene
             if (newVertex)

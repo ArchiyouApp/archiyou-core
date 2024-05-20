@@ -3616,10 +3616,10 @@ export class Shape
             return null;
         }
 
-        let point = new Vector(pointRange.point);
+        const point = new Vector(pointRange.point);
         pointRange.range = Math.abs(pointRange.range); // negative range does not make sense
-        let comparatorFunc = RANGE_OPERATORS_TO_COMPARATORS[pointRange.operator];
-        let selectedShapes = new ShapeCollection(
+        const comparatorFunc = RANGE_OPERATORS_TO_COMPARATORS[pointRange.operator];
+        const selectedShapes = new ShapeCollection(
                                 shapes.filter( shape => comparatorFunc(shape.distance(point._toVertex()), pointRange.range )));
 
         console.info(`Shape::_selectorWithinRange: Selected ${selectedShapes.length} shapes that are within (${pointRange.operator}) of range ${pointRange.range} from Vertex (${point.toArray()})`);

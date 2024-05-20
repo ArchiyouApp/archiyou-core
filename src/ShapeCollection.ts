@@ -2542,7 +2542,7 @@
                const contourWires = new ShapeCollection(this._geom.arrange2DShapesToContours(linePoints)).filter(s => s.type() === 'Wire');
 
                svgPolysOutline = contourWires.toArray().map(w => {
-                  const contourSvgPoints = w.vertices().toArray().map(v => `${v.x}, ${v.y}`).join(' ')
+                  const contourSvgPoints = w.vertices().toArray().map(v => `${(v as Vertex).x}, ${(v as Vertex).y}`).join(' ')
                   return `<polygon class="contour-outline" points="${contourSvgPoints}" stroke-width="2" fill="none"/>`
                })
             }

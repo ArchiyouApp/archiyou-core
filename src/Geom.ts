@@ -22,7 +22,8 @@ import { Annotator } from './internal';
 
 import { isNumeric, isBrowser, isWorker, roundToTolerance } from './utils';
 
-import Arrangement2D from '../libs/arrangement-2d-js'
+// import Arrangement2D from '../libs/arrangement-2d-js' // DISABLED FOR NOW
+const Arrangement2D = null
 import { Arr2DPolygon } from './internal'
 
 //// OWN DEFAULTS
@@ -965,7 +966,8 @@ export class Geom
             console.error(`Geom::loadArr2D(): Please import Arrangement2D from 'arrangement-2d-js`);
             return;
         }
-        const loadedWasmModule = await import('../libs/arrangement-2d-js/build/Arrangement2D.esm.wasm')
+        const arrLibPath = '../libs/arrangement-2d-js/build/Arrangement2D.esm.wasm';
+        const loadedWasmModule = await import(arrLibPath);
         const mainWasm = loadedWasmModule.default;
 
         this._Arr2D = await Arrangement2D({
@@ -991,7 +993,7 @@ export class Geom
    *  @returns Arr2DPolygon { area, points } ordered by area descending
    *  NOTE: This is pretty fast. The following OC routines are not! 
    */
-  _getArrangementPolys(shapesOrPoints:ShapeCollection|Array<Point>, smallestArea:number):Array<Arr2DPolygon>
+  _getArrangementPolys(shapesOrPoints:ShapeCollection|Array<Point>, smallestArea?:number):Array<Arr2DPolygon>
   {
     const AREA_FILTER = 50 ;
     smallestArea = smallestArea || AREA_FILTER

@@ -1120,7 +1120,14 @@ export class Sketch
 
     }
 
+    /** Alias for import */
     importSketch():ShapeCollection|AnyShape
+    {
+        return this.import();
+    }
+
+    /** Alias for import */
+    end():ShapeCollection|AnyShape
     {
         return this.import();
     }
