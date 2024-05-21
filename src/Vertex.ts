@@ -238,7 +238,7 @@ export class Vertex extends Shape
 
     toPoint():Point
     {
-        return new Point(this._x, this._y, this._z);
+        return new Point(this._x, this._y, this._z).rounded(); // round to OC tolerance
     }
 
     _toOcPoint():any // TODO: OC typing

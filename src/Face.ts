@@ -12,7 +12,7 @@ import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPoin
         PointLikeOrAnyShape, isPointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection, AnyShapeOrSequence, isAnyShapeOrSequence,
         isAnyShapeCollection, AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, SelectionString, isSelectionString} from './internal'; // types
 
-import { flattenEntities, toRad } from './internal' // utils
+import { flattenEntities, toRad, roundToTolerance } from './internal' // utils
 
 // this can disable TS errors when subclasses are not initialized yet
 type IShell = Shell
@@ -553,7 +553,7 @@ export class Face extends Shape
         
         BRepGProp.SurfaceProperties_1(this._ocShape, ocProps, false, false);
 
-        return ocProps.Mass();
+        return roundToTolerance(ocProps.Mass());
     }
     
 

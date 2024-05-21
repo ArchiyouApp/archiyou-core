@@ -321,29 +321,29 @@ export class Obj
         return children;
     }
 
-    /** Return Obj ShapeCollection: NOTE: use allShapes() to also get the Shapes of children. 
-        For example layers don't have Shapes of their own! 
-        !!!! IMPORTANT: returns reference. So don't change the return value !!!!*/
-    shapes():ShapeCollection 
+    /** Return shapes of this Obj
+        @param all (default:true) also those of descendant Objs
+    */
+    shapes(all:boolean=true):ShapeCollection 
     {
-        return this._shapes; // all children of ShapeCollection _shapes
+        return (all) ? this.allShapes() : this._shapes; // all children of ShapeCollection _shapes
     }
 
     /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection */
     allShapesCollection():ShapeCollection
     {
-        let collection = this.shapes().shallowCopy(); // IMPORTANT: don't change reference this._shapes
+        let collection = this._shapes.shallowCopy(); // IMPORTANT: don't change reference this._shapes
 
         this.children().forEach((child,i) => 
         {
             // add as layers
             if(child.isLayer())
             {
-                const groupShapes = new ShapeCollection(child.allShapes());
+                const groupShapes = child.allShapes();
                 collection.addGroup( child?.name() as string || `obj${i}`, groupShapes);
             }
             else {
-                collection.add(child.shapes())
+                collection.add(child._shapes)
             }
         });
  
@@ -351,13 +351,12 @@ export class Obj
     }
 
     /** Get all Shapes within this Obj and its children Objs */
-    allShapes():Array<AnyShape>
+    allShapes():ShapeCollection
     {
-        // NOTE: shapes is a ShapeCollection, to get its Shapes use getShapes()
-        let shapes:Array<AnyShape> = this.shapes().getShapes();
+        const shapes = new ShapeCollection();
         this.descendants().forEach(obj => 
         {
-            shapes = shapes.concat( obj.shapes().getShapes()) 
+            shapes.add(obj._shapes) 
         });
 
         return shapes;
@@ -527,7 +526,7 @@ export class Obj
     toString():string
     {
         let shapeStrings = [];
-        this.shapes().forEach(s => 
+        this._shapes.forEach(s => 
             { 
                 shapeStrings.push(s.toString())
             } 

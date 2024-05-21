@@ -93,7 +93,7 @@ export class Db
             console.error(`Db::generateShapesData: Cannot get Shapes without an instance of Geom. Please supply it in constructor!`);
             return [];
         }
-        let shapesData = this._geom.allShapes().toArray().map(shape => shape.toTableData());
+        let shapesData = this._geom.all().toArray().map(shape => shape.toTableData());
         return shapesData;
     }
 

@@ -3634,23 +3634,27 @@ export class Shape
     @checkInput(['ShapeCollection', String], ['auto', 'auto'])
     _selectorSide(shapes:AnyShapeCollection, sidesString:string):AnyShapeCollection
     {
-        let sideShape = this._getSide(sidesString);
+        const sideShapes = this._getSide(sidesString);
 
-        if (!sideShape)
+        if (!sideShapes || sideShapes.length === 0)
         {
             console.warn(`Shape::_selectorSide: Cannot find side Shape. No shapes selected!`)
             return new ShapeCollection();
         }
 
-        let selectedShapes = new ShapeCollection(shapes.filter( shape => 
+        const selectedShapes = new ShapeCollection(shapes.filter( shape => 
         {
-            // more robust than contains dealing with tolerances
+            // More robust than contains dealing with tolerances
             // use Shape.center() instead of real Shape otherwise touching Shapes also get selected
-            if (sideShape.distance(shape.center()._toVertex()) < this._oc.SHAPE_TOLERANCE) 
+            return sideShapes.toArray().some( sideShape => 
             {
-                return true
-            }
-            return false;
+                if (sideShape.distance(shape.center()._toVertex()) < this._oc.SHAPE_TOLERANCE) 
+                {
+                    return true
+                }
+                return false;
+            })
+            
         })); // force collection, filter can return single Shape
 
         console.info(`Shape::_selectorSide: Selected ${selectedShapes.length} shapes that belong to given sides "${sidesString}" of main Shape.`);
@@ -3709,7 +3713,7 @@ export class Shape
     /** Sorts objects by distance in a certain axis (X,Y,Z) and direcion (- or +)
      * @param axisAndDirection - string with axis, direction and count: X, -Z - TODO num (unique results)[2] 
      */
-    directionMinMaxSelector(shapes:AnyShapeCollection, axisAndDirection:string):Shape
+    directionMinMaxSelector(shapes:AnyShapeCollection, axisAndDirection:string):AnyShape
     {
         const AXIS = ['x','y','z'];
 
@@ -3726,12 +3730,137 @@ export class Shape
         return sortedShapes[0]; // TODO: count
     }
 
+    /** Get side subshapes - public version of _getSide */
+    @checkInput('String', 'auto')
+    side(sidesString?:string):AnyShapeCollection|null
+    {
+        return this._getSide(sidesString);
+    }
+
+    /** Getting Side sub shapes that overlap with side of bbox 
+        New approach that ties Vertices/Edges/Faces to sides based on distance (and some tolerance)
+        TODO: Add per-Face side for Edges/Vertices?
+    */
+    @checkInput('String', 'auto')
+    _getSide(sidesString?:string):AnyShapeCollection|null
+    {
+        const DISTANCE_FUZZYNESS_PERC = 0.01; // percentage of max size of Bbox
+
+        const resultsByTypeAndSide = {
+            faces: {} as Record<Side,ShapeCollection>,
+            edges: {} as Record<Side,ShapeCollection>,
+            vertices: {} as Record<Side,ShapeCollection>
+        }
+
+        const selectedSideFaces = this.bbox()._getIndividualSideShapes(sidesString);
+
+        if (Object.keys(selectedSideFaces).length === 0)
+        {
+            console.error('Shape::_getSide(): Could not get any sides of bounding box!')
+            return null;
+        }
+
+        const selectDistance = DISTANCE_FUZZYNESS_PERC*this.bbox().maxSize();
+
+        let faceWithinSideRange = true;
+        let edgeWithinSideRange = true;
+
+        for (const [side,sideShape] of Object.entries(selectedSideFaces))
+        {
+            this.faces().forEach( face => 
+            {
+                faceWithinSideRange = true;
+                face.edges().forEach( edge => 
+                {
+                    edge.vertices().forEach( vertex => 
+                    {
+                        if(sideShape.distance(vertex) < selectDistance)
+                        {
+                            if(!resultsByTypeAndSide.vertices[side]){
+                                resultsByTypeAndSide.vertices[side] = new ShapeCollection();
+                            }
+                            resultsByTypeAndSide.vertices[side].add(vertex);
+                        }
+                        else {
+                            // not within distance
+                            edgeWithinSideRange = false;
+                            faceWithinSideRange = false;
+                        }
+                    })
+                    // evaluate Edge within distance
+                    if(edgeWithinSideRange)
+                    {
+                        if(!resultsByTypeAndSide.edges[side])
+                        {
+                            resultsByTypeAndSide.edges[side] = new ShapeCollection();
+                        }
+                        resultsByTypeAndSide.edges[side].add(edge);
+                    }
+                    edgeWithinSideRange = true; // reset
+                })
+                // evaluate Face
+                // IMPORTANT: Vertices don't always describe a Face well
+                // TODO: Faces that substantially touch the side shape are also included
+                if(faceWithinSideRange)
+                {
+                    if(!resultsByTypeAndSide.faces[side])
+                    {
+                        resultsByTypeAndSide.faces[side] = new ShapeCollection();
+                    }
+                    resultsByTypeAndSide.faces[side].add(face);
+                }
+                faceWithinSideRange = true; // reset
+            });
+        }
+
+        // Based on number of sides in sidesString we return results
+        const sz = sidesString.includes('top') || sidesString.includes('bottom') ? 1 : 0;
+        const sx = sidesString.includes('left') || sidesString.includes('right') ? 1 : 0;
+        const sy = sidesString.includes('front') || sidesString.includes('back') ? 1 : 0;
+        const numSides = sx + sy + sz;
+
+        const sideX = sidesString.includes('left') ? 'left' : sidesString.includes('right') ? 'right' : null;
+        const sideY = sidesString.includes('front') ? 'front' : sidesString.includes('back') ? 'back' : null; 
+        const sideZ = sidesString.includes('top') ? 'top' : sidesString.includes('bottom') ? 'bottom' : null;
+
+        const sides = [sideX,sideY,sideZ].filter(s => s !== null);
+
+        switch(numSides)
+        {
+            case 1: 
+                // Return Face or if not present any other Shape that is on the given side
+                const side = sides[0];
+                const results = resultsByTypeAndSide.faces[side] || resultsByTypeAndSide.edges[side] || resultsByTypeAndSide.vertices[side];
+                return results.distinct();
+            case 2: 
+            case 3:
+                // Return Edges or Vertices
+                let shapesOnAllSides:ShapeCollection;
+                const shapesOnSides = (numSides === 2) ? resultsByTypeAndSide.edges : resultsByTypeAndSide.vertices;
+                sides.forEach((s,i) => 
+                {
+                    if(i === 0)
+                    {
+                        shapesOnAllSides = shapesOnSides[s];
+                    }
+                    else {
+                        shapesOnAllSides = shapesOnAllSides.getEquals(shapesOnSides[s]);
+                    }
+                })
+                return shapesOnAllSides.distinct();
+            
+            default:
+                return null;
+        }
+
+    }
+
     /** Getting Side sub shapes that clearly overlaps Side of bbox 
      *  @param sideString combination of Sides. Example: 'lefttop'
+     *  Deprecated due to bad results
     */
-    // NOTE: Getting sides for Shapes is not trivial, see below for an attempt based on raycasting
     @checkInput('String', 'auto')
-    _getSide(sidesString:string):AnyShape
+    _getSideDeprecated(sidesString?:string):AnyShape|null
     {
         const SIDE_FUZZYNESS = 0.5;
         const SIDE_SCALE_FUZZYNESS = 1.02;
@@ -3744,7 +3873,7 @@ export class Shape
         
         if(!bboxSideShape)
         {
-            console.error(`Shape::_getSide: Failed to get a bbox for this Shape.`)
+            console.error(`Shape::_getSide: Failed to get a bbox for this Shape. Returned null`)
             return null;
         }
 
@@ -3781,7 +3910,6 @@ export class Shape
 
         while(true)
         {
-            
             testShapes.toArray().every( testShape => 
                 {
                     let overlap = 0;
@@ -3844,133 +3972,6 @@ export class Shape
         }
     }
 
-    /** Get 'side view' Edges, Wire or (TODO) Shells and Solid: 
-     *  !!!! REFACTOR NEEDED - WORKS ONLY FOR 2D !!!!
-     *  NOTE: Sides really only make sense with closed Shapes: but we keep it in also for Wires
-    */
-    @checkInput('Side', 'auto')
-    _getSideReal(side:Side):Vertex|Edge|Wire|Face
-    {
-        const NUM_RAYCAST_POINTS_PER_LENGTH_UNIT = 1/5; // TODO: better formule - also related to number of Edges
-        const SIDES = { 
-            'front' :  [0,1,0],
-            'back' : [0,-1,0],
-            'top' : [0,0,-1], 
-            'bottom' : [0,0,1],
-            'left' : [1,0,0],
-            'right' : [-1,0,0] };
-
-        const SIDES_TO_SIZE = {
-            front : 'depth',
-            back : 'depth',
-            left : 'width',
-            right : 'width',
-            top: 'height',
-            bottom: 'height'
-        }
-
-        if (!Object.keys(SIDES).includes(side))
-        {
-            throw new Error(`Shape::_getSide: Please supply one of these sides: ${Object.keys(SIDES).join()}`);
-            return null;
-        }
-
-        if( this.type() == 'Vertex' || this.type() == 'Edge'){
-            throw new Error(`Shape::_getSide: Getting a side does not make sense with one Vertex or Edge!`);
-            return null;
-        }
-        if( this.type() == 'Wire'){
-            console.warn(`Shape::_getSide: Getting a side of a Wire could not make sense!`);
-        }
-
-        // ==== 2D or 3D ====
-        let bbox = this.bbox();
-        if (bbox.is2D())
-        {
-            // 2D Side: return a Edge or Wire
-            let bboxSideEdge = bbox[side as keyof Bbox](); // a box has functions like 'front', 'back' etc
-
-            // We use a raycast method to select basically the Edges 'in view' from this side
-            let rayCastPointsCollection = bboxSideEdge.populated(Math.round(bboxSideEdge.length() * NUM_RAYCAST_POINTS_PER_LENGTH_UNIT));
-            let rayCastPoints = rayCastPointsCollection.all(); 
-            let rayCastEdges = rayCastPoints.map( p => new Edge(p as Point, (p as Point).added( SIDES[side]))   );
-
-            let hitEdges:Array<Edge> = [];
-            rayCastEdges.forEach( rayCastEdge => 
-            {
-                let link = this.raycast(rayCastEdge);
-                if (link)
-                {
-                    if (link.toSupport instanceof Edge)
-                    {
-                        let exists = false;
-                        // TODO: we are generating new Edges from raycast - we need to give back the existing ones!
-                        for(let i = 0; i < hitEdges.length; i++)
-                        {
-                            let curHitEdge = hitEdges[i];
-                            if (curHitEdge.equals(link.toSupport)){
-                                exists = true;
-                                break;
-                            }
-                        }
-
-                        if(exists == false)
-                        {
-                            hitEdges.push(link.toSupport);
-                        }
-                    }
-                }
-            });
-
-            // We have all hit Edges: make them contineous
-            // TEST: Raycast to shared Vertex (corner)
-            // !!!! REFACTOR !!!!
-            let hitEdgesCollection = new ShapeCollection(hitEdges);
-            let edgesInShape = new ShapeCollection(this.edges());
-            let edgesInShapeHit = edgesInShape.getEquals(hitEdgesCollection).toArray();
-            let edgeIndexStart = Math.min(...edgesInShapeHit.map( e => edgesInShape.indexOf(e as Shape)));
-            let edgeIndexEnd = Math.max(...edgesInShapeHit.map( e => edgesInShape.indexOf(e as Shape)));
-
-            let sideEdgesContinueous = new ShapeCollection();
-            let direction = ( edgeIndexEnd - edgeIndexStart > edgesInShape.count() - edgeIndexEnd + edgeIndexStart ) ? 'reverse' : 'normal';
-            
-            if (direction == 'reverse')
-            {
-                let i = edgeIndexEnd;
-                while(i != edgeIndexStart + 1)
-                {
-                    sideEdgesContinueous.push(edgesInShape[i]);
-                    i++;
-                    if (i >= edgesInShape.count()){
-                        i = 0;
-                    }
-                }
-            }
-            else {
-                sideEdgesContinueous = edgesInShape.slice(edgeIndexStart,edgeIndexEnd + 1);
-            }
-
-            // evaluate results and return 
-            if(sideEdgesContinueous.length == 0)
-            {
-                console.warn(`Shape::_getSide: Could not get '${side}' Side geometry!`);
-                return null;
-            }
-            else if(sideEdgesContinueous.length == 1)
-            {
-                return sideEdgesContinueous.first() as Vertex|Edge|Wire|Face;
-            }
-            else {
-                return new Wire().fromEdges(sideEdgesContinueous.all() as Array<Edge>);
-            }
-        
-
-        }
-        else {
-            // 3D Side: return Face(s)
-            // TODO
-        }
-    }
 
     //// SHAPE ANNOTATIONS API ////
 

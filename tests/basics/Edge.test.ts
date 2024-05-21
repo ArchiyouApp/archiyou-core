@@ -49,22 +49,22 @@ test("Edge Basics", () =>
 test("Edge Advanced", () => 
 {
     // ExtendTo Line to Plane
-    const l = new Edge().makeLine([0,0,0],[50,50,100])
-    const pl = new Face().makePlane(3000,3000).moveZ(-500).rotateX(10)
+    const l = new Edge().makeLine([0,0,0],[0,0,100])
+    const pl = new Face().makePlane(3000,3000).moveZ(-500)
     l.extendTo(pl)
-    expect(l.end().toArray()).toEqual([0,0,0]);
+    expect(l.start().toArray()).toEqual([0,0,-500]);
 
     // ExtendTo Line to Solid
-    const l2 = new Edge().makeLine([0,0,0],[100,50,200]);
-    const pl2 = new Solid().makeBox(2000,2000).moveZ(-2000);
+    const l2 = new Edge().makeLine([0,0,10],[0,0,200]);
+    const pl2 = new Solid().makeBox(2000,2000).moveZ(-1000);
     l2.extendTo(pl2);
-    expect(l.end().toArray()).toEqual([0,0,0]);
+    expect(l2.start().toArray()).toEqual([0,0,0]);
 
     // extendTo Arc to Line
     const a = new Edge().makeArc([0,0],[100,50],[200,0]);
     const ln = new Edge().makeLine([150,0,0],[300,0,0]).moveY(-50);
     a.extendTo(ln);
-    expect(a.end().toArray()).toEqual([222.47448713915952,-50.00000000000293,0]);
+    expect(a.end().toArray()).toEqual([222.474,-50,0]);
 })
     
 

@@ -1583,7 +1583,6 @@
          let uniqueShapes:Array<AnyShape> = []; 
 
          // TODO: ShapeCollection containing ShapeCollection?
-
          shapes.forEach( curShape => 
          {
             if (!usedShapes.includes(curShape))

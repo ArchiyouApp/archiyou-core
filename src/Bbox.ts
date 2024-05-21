@@ -4,12 +4,12 @@
  *          Is used also for selecting and aligning 
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, Shell, Solid } from './internal'
+import { Point, Vector, Shape, Obj, Vertex, Edge, Face, Shell, Solid, ShapeCollection } from './internal'
 import { checkInput } from './decorators' // import directly because of error in ts-node
-import { PointLike, isPointLike, MainAxis } from './internal' // types
+import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
 
-import { SIDE_TO_AXIS } from './internal'
+import { SIDES, SIDE_TO_AXIS } from './internal'
 
 export class Bbox
 {
@@ -203,6 +203,12 @@ export class Bbox
     {
         let [xmin, xmax, ymin, ymax, zmin, zmax] = this.bounds;
         return (xmax-xmin);
+    }
+
+    /** Maximum size of Bbox */
+    maxSize():number
+    {
+        return [this.width(), this.height(),this.depth()].sort((a,b) => b - a )[0];
     }
 
     /** Get frontal Face (3D) or Edge (2D) */
@@ -514,6 +520,25 @@ export class Bbox
         }
     }
 
+    /** Get individual side shapes based on sidestring
+     *  @param sidesString any combination between front/back,left/right,top/bottom
+     */
+    _getIndividualSideShapes(sidesString:string):Record<Side,Face|Edge|Vertex>
+    {
+        const sideShapes = {} as Record<Side,Face>; 
+        SIDES.forEach(side => {
+            if(sidesString.includes(side))
+            {
+                const sideShape = this._getSide(side);
+                if(sideShape)
+                {
+                    sideShapes[side] = sideShape;
+                }
+            }
+        })
+        return sideShapes;
+    }
+
     /** Get area of bbox */
     area():number
     {
@@ -607,7 +632,8 @@ export class Bbox
             let bboxSolid = this.box();
             return bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axis).specific() as Vertex|Edge|Face;
         }   
-        
     }
+
+
 
 }

@@ -820,12 +820,22 @@ export class Edge extends Shape
         
         const amountToU = (uMax - uMin) / edgeLength;
         const normalizedAmount = amountToU * amount;
+        const extendFrom = (direction === 'start') ? 'end' : 'start';
+        const extendFromVertex = this[extendFrom](); // original stable Vertex
 
         const ocEdgeCreator = (direction == 'end') ? 
                 new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), uMin, uMax+normalizedAmount)
                 : new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), uMin-normalizedAmount, uMax);
         const ocEdge = ocEdgeCreator.Edge();
         this._fromOcEdge(ocEdge);
+        ocEdgeCreator.delete();
+
+        // Moving before extending with Params can result in wrong results: correct using the stable (non-extended) Vertex
+        const extendFromVertexAfter = this[extendFrom]();
+        if(!extendFromVertex.equals(extendFromVertexAfter))
+        {
+            this.move(extendFromVertex.toVector().subtracted(extendFromVertexAfter));
+        }
 
         return this;
     }
@@ -853,14 +863,14 @@ export class Edge extends Shape
     extendTo(other:AnyShape, direction?:LinearShapeTail):this
     {
         const EXTEND_NON_CIRCULAR_PERC_DISTANCE = 2;
-        const isCircularEdge = this.isCircular();
 
         direction = direction || (
                         (this.end().distance(other) < this.start().distance(other)) 
                             ? 'end' : 'start');
         
         const extendAtVertex = this[direction](); // .start() or end()
-        const extendFromVertex = this[direction === 'start' ? 'end' : 'start']();
+        const extendFrom = (direction === 'start') ? 'end' : 'start';
+        const extendFromVertex = this[extendFrom]();
         const distance = other.distance(extendAtVertex)
 
         if(distance === 0)
@@ -869,11 +879,12 @@ export class Edge extends Shape
             return null; 
         }
 
-        const extendedTestShape =  (!isCircularEdge) 
+        const extendedTestShape =  (!this.isCircular()) 
                                 ? this._extended(distance*EXTEND_NON_CIRCULAR_PERC_DISTANCE, direction)
-                                : this._maxCircularShape()
+                                : this._maxCircularShape();
         
         const testIntersection = extendedTestShape._intersection(other);
+
         if(!testIntersection)
         { 
             console.warn(`Edge::extendTo: Can't extend to Shape because they never intersect!`)
@@ -885,15 +896,18 @@ export class Edge extends Shape
                                 : testIntersection.vertices()
                                     .sort((v1,v2) => v1.distance(extendAtVertex) - v2.distance(extendAtVertex)).first() as Vertex
 
-        const testIntPoint = testIntVertex.toPoint();
-
-        // const paramMinMax = this.getParamMinMax();
-
-        //const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(this._toOcCurveHandle(), paramMinMax[0], this.getParamAt(testIntPoint))
-        const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_26(this._toOcCurveHandle(), extendFromVertex._toOcPoint(), testIntPoint._toOcPoint());
-        const extendedEdge = this._fromOcEdge(ocEdgeCreator.Edge());
+        // NOTE: using BRepBuilderAPI_MakeEdge_26 with Points is not robust, use with params instead
+        const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(
+                this._toOcCurveHandle(), this.getParamAt(extendFromVertex), this.getParamAt(testIntVertex));
+        this._fromOcEdge(ocEdgeCreator.Edge())
         ocEdgeCreator.delete(); // OC destructor
-        this.replaceShape(extendedEdge);
+
+        // And again like in extend check if Edge still has the position  
+        const extendFromVertexAfter = this[extendFrom]();
+        if(!extendFromVertex.equals(extendFromVertexAfter))
+        {
+            this.move(extendFromVertex.toVector().subtracted(extendFromVertexAfter));
+        }
 
         return this;
     }

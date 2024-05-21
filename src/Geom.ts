@@ -630,15 +630,6 @@ export class Geom
       return this.scene.descendants();
   }
   
-  /** Recursively get all objects within the scene and get their children Shapes */
-  allShapes():ShapeCollection
-  {
-      let shapes:Array<Shape> = this.scene.allShapes();
-      let shapeCollection = new ShapeCollection(shapes);
-      
-      return shapeCollection;
-  }
-
   /** Remove Obj from Scene */
   removeObj(o:Obj)
   {
