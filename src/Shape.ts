@@ -84,6 +84,10 @@ export class Shape
     _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
     {
         // Can be overriden by subclass
+        if(ocShape && !ocShape?.IsNull())
+        {
+            this._ocShape = ocShape;
+        }
     }
 
     /** Do an effort to create a Shape */
@@ -615,7 +619,7 @@ export class Shape
         */
         let ocSystem = new this._oc.GProp_GProps_1();
         this._oc.BRepGProp.SurfaceProperties_1(this._ocShape, ocSystem, false, false);
-        return ocSystem.Mass(); 
+        return roundToTolerance(ocSystem.Mass()); 
     }
 
     /** The total surface Area of a Shape - for example the total surface area of Sphere is 4πr2 */
@@ -632,7 +636,7 @@ export class Shape
     {
         let ocSystem = new this._oc.GProp_GProps_1();
         this._oc.BRepGProp.VolumeProperties_1(this._ocShape, ocSystem, false, false, false);
-        return ocSystem.Mass(); 
+        return roundToTolerance(ocSystem.Mass()); 
     }
 
     /** Get all Vertices of this Shape */
@@ -2466,9 +2470,10 @@ export class Shape
 
     }
 
-    /** Cut off Shapes orthogonally by a plane with normal parallel to axis and at level and keep the largest piece */
-    @checkInput([['MainAxis', 'x'],['Number', 0]], ['auto', 'auto'])
-    cutoff(axisNormal?:MainAxis, level?:number)
+    /** Cut off Shapes orthogonally by a plane with normal parallel to axis and at level and keep the largest piece 
+    */
+    @checkInput([['MainAxis', 'x'],['Number', 0], ['Boolean', false]], ['auto', 'auto','auto'])
+    cutoff(axisNormal?:MainAxis, level?:number, smallest?:boolean)
     {
         const bb = this.bbox();
         if(!bb.hasAxes().includes(axisNormal)){ throw new Error(`Shape::cutoff: Shape can not be cut off: It has no size on axis "${axisNormal}"!`);}
@@ -2481,21 +2486,27 @@ export class Shape
             return this
         }
 
-        const cutDirection = ((maxLevel - level) < (level - minLevel)) ? 1 : -1; // NOTE: take off part of Shape with least size
-        const planeSizes = ['x','z','y'].filter(a => a !== axisNormal); // NOTE: order is important
+        const setAxisFunc = `set${axisNormal.toUpperCase()}`;
+        const cutPlane = new Face().makePlaneBetween(bb.min()[setAxisFunc](level), bb.max()[setAxisFunc](level));
+        const splittedShapes = this._splitted(cutPlane);
 
-        const pw = bb.sizeAlongAxis(planeSizes[0] as MainAxis) || 100; // make sure cutplane has size on both axis
-        const pd = bb.sizeAlongAxis(planeSizes[1] as MainAxis) || 100;
-        const cutPlaneNormal = new Vector(AXIS_TO_VECS[axisNormal]).scaled(cutDirection)
-        const cutPlane = new Face().makePlane(
-            pw,
-            pd,
-            bb.center()['set'+ axisNormal.toUpperCase()](level), // a bit ugly - setting the {axisNormal} coordinate to level using Point.setX/Y/Z() methods
-            cutPlaneNormal
-            )
-        const extrudeAmount = Math.abs(level - this.bbox()[((cutDirection === 1) ? 'max' : 'min') + axisNormal.toUpperCase()]());
-        const cutSolid = cutPlane._extruded(extrudeAmount + 1, cutPlaneNormal); // NOTE: make cutSolid a bit bigger
-        return this.subtract(cutSolid);
+        if(Shape.isShape(splittedShapes) || splittedShapes.length === 0){ console.warn(`Shape::cutoff: No splitted Shapes. Check level!`); return null; }
+        if(splittedShapes.length === 1){ console.warn(`Shape::cutoff: Only one splitted Shapes. Returned original`); return this; }
+
+        // Order by area() or length()
+        (splittedShapes as ShapeCollection).sort((a,b) => (b.area() || b.length()) - (a.area() || a.length()))
+
+        const result = (!smallest) ? splittedShapes[0] : splittedShapes[1];
+
+        if(result.type() !== this.type())
+        {
+            this.replaceShape(result);
+        }
+        else {
+            this._updateFromOcShape(result._ocShape);
+        }
+
+        return this;
     }
 
 
