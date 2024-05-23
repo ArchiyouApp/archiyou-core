@@ -365,9 +365,9 @@ export class Bbox
     /** Check if Bounding Box of zero size so a Point */
     isPoint():boolean
     {
-        return (this.height() <= this._oc.SHAPE_TOLERANCE 
-                    && this.width() <= this._oc.SHAPE_TOLERANCE 
-                    && this.depth() <= this._oc.SHAPE_TOLERANCE);
+        return (this.width() <= this._oc.SHAPE_TOLERANCE 
+                    && this.depth() <= this._oc.SHAPE_TOLERANCE 
+                    && this.height() <= this._oc.SHAPE_TOLERANCE);
     }
     
     /** Check if Bounding Box is 2D */
@@ -377,19 +377,33 @@ export class Bbox
         // We introduce this TOLERANCE_2D
         const TOLERANCE_2D = 0.4;
         
-        return (this.height() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE 
-                    || this.width() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE 
-                    || this.depth() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE);
+        return (this.width() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE 
+                    || this.depth() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE 
+                    || this.height() <= TOLERANCE_2D + this._oc.SHAPE_TOLERANCE);
         
     }
 
-    /** The axis that is missing in 2D bbox */
-    axisMissingIn2D():MainAxis
+    /** Checks if sizes along axis are zero */
+    _sizesAreZero():Array<boolean|boolean|boolean>
     {
-        if(!this.is2D())
-        {
-            return null;
-        }
+        const TOLERANCE = 0.4;
+        return [
+            (this.width() <= TOLERANCE + this._oc.SHAPE_TOLERANCE),
+            (this.depth() <= TOLERANCE + this._oc.SHAPE_TOLERANCE), 
+            (this.height() <= TOLERANCE + this._oc.SHAPE_TOLERANCE)
+        ];
+    }
+
+    /** Bbox has only one size dimension (the others are zero) */
+    is1D():boolean
+    {
+        return this._sizesAreZero().filter(dim => dim).length === 2
+    }
+
+    /** The axis that is missing in 2D bbox */
+    axisMissingIn2D():MainAxis|null
+    {
+        if(!this.is2D()){ return null;}
 
         if (this.height() <= this._oc.SHAPE_TOLERANCE)
         {
@@ -402,6 +416,14 @@ export class Bbox
         else {
             return 'y';
         }
+    }
+
+    /** Along what axis is this 1D Bbox */
+    sizeAxis1D():MainAxis|null
+    {
+        if(!this.is1D()){ return null };
+        const axisIndex = this._sizesAreZero().findIndex(isZero => !isZero);
+        return (axisIndex !== -1) ? ['x','y','z'][axisIndex] as MainAxis : null;
     }
 
     /** Axis on which the bbox has a size */
@@ -427,9 +449,26 @@ export class Bbox
         return this[AXIS_TO_SIDE[axis]]();
     }   
 
+    /** Make Line from 1D Bbox */
+    line():Edge|null
+    {
+        if(!this.is1D())
+        { 
+            console.warn(`Bbox::line: Bbox is not 1D, so can't turn into a single Line!`);
+            return null; 
+        }
+        return new Edge().makeLine(this.min(), this.max());
+    }
+
     /** Create 2D Rectangle Face from Bbox */
     rect():Face
     {
+        if(!this.is2D())
+            { 
+                console.warn(`Bbox::rect: Bbox is not 2D, so can't turn into a rectangle Face!`);
+                return null; 
+        }
+
         return new Face().makePlaneBetween(this.min(), this.max()); // Just a simple 2D Plane on XY plane ( normal parallel in Z)
     }
 
@@ -520,7 +559,7 @@ export class Bbox
         }
     }
 
-    /** Get individual side shapes based on sidestring
+    /** Get individual Bbox side shapes based on sidestring
      *  @param sidesString any combination between front/back,left/right,top/bottom
      */
     _getIndividualSideShapes(sidesString:string):Record<Side,Face|Edge|Vertex>
@@ -600,7 +639,8 @@ export class Bbox
     // TODO: REFACTOR NEEDED
     _getSide(side:string):Vertex|Edge|Face
     {   
-        const axis = SIDE_TO_AXIS[side];
+        const axisWithDir = SIDE_TO_AXIS[side]; // For example: left: -x, right: x
+        const axis = axisWithDir.replace('-', ''); // Axis without direction
 
         // check input
         if (!Object.keys(SIDE_TO_AXIS).includes(side))
@@ -615,22 +655,33 @@ export class Bbox
             return this.center()._toVertex();
         }
 
+        if(this.is1D())
+        {
+            // We need to check along what axis this Bbox has a size
+            // 1D Bbox size along x axis means Bbox has a side along y (front/back) and z (top/bottom)
+            const bboxLine = this.line();
+
+            return (axis !== this.sizeAxis1D()) 
+                    ? bboxLine
+                    : bboxLine.directionMinMaxSelector(bboxLine.vertices(), axisWithDir).specific() as Vertex;
+        }
+
         if(this.is2D())
         {
-            let bboxShape2D = this.rect(); // a Face plane 
-            let axisAbs = axis.replace('-', '');
-            if (axisAbs == this.axisMissingIn2D())
+            let bboxRect = this.rect(); // a Face plane 
+            if (axis.replace('-', '') === this.axisMissingIn2D())
             {
-                return bboxShape2D;
+                return bboxRect;
             }
             else {
                 // one of the edge sides
-                return bboxShape2D.directionMinMaxSelector(bboxShape2D.edges(), axis).specific() as Vertex|Edge|Face;
+                return bboxRect.directionMinMaxSelector(bboxRect.edges(), axisWithDir).specific() as Vertex|Edge|Face;
             }
         }
         else {
+            // 3D
             let bboxSolid = this.box();
-            return bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axis).specific() as Vertex|Edge|Face;
+            return bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axisWithDir).specific() as Vertex|Edge|Face;
         }   
     }
 

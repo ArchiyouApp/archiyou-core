@@ -2810,7 +2810,7 @@ export class Shape
     @checkInput('AnyShape', 'auto')
     intersecting():AnyShapeCollection
     {
-        let sceneShapes:AnyShapeCollection = this._geom.allShapes(); // get all Shapes in scene
+        let sceneShapes:AnyShapeCollection = this._geom.all(); // get all Shapes in scene
         let intersectingShapeCollection = sceneShapes.filter(shape => (shape as AnyShape)._intersections(this) != null );
 
         return intersectingShapeCollection;
@@ -3739,12 +3739,20 @@ export class Shape
 
     /** Getting Side sub shapes that overlap with side of bbox 
         New approach that ties Vertices/Edges/Faces to sides based on distance (and some tolerance)
-        TODO: Add per-Face side for Edges/Vertices?
+        
+        TODO: Visually it's evident that when a Face is touching a side, its subshapes (Edges,Vertices) need to be evaluated too! 
     */
     @checkInput('String', 'auto')
     _getSide(sidesString?:string):AnyShapeCollection|null
     {
         const DISTANCE_FUZZYNESS_PERC = 0.01; // percentage of max size of Bbox
+
+        // A Vertex does not have side
+        if(this.type() === 'Vertex')
+        {
+            console.warn(`Shape::_getSide: Shape is a Vertex and has no sides: returned null!`);
+            return null;
+        }
 
         const resultsByTypeAndSide = {
             faces: {} as Record<Side,ShapeCollection>,
@@ -3752,9 +3760,9 @@ export class Shape
             vertices: {} as Record<Side,ShapeCollection>
         }
 
-        const selectedSideFaces = this.bbox()._getIndividualSideShapes(sidesString);
+        const selectedBboxSideShapes = this.bbox()._getIndividualSideShapes(sidesString); // { side: Face|Edge|Vertex }
 
-        if (Object.keys(selectedSideFaces).length === 0)
+        if (Object.keys(selectedBboxSideShapes).length === 0)
         {
             console.error('Shape::_getSide(): Could not get any sides of bounding box!')
             return null;
@@ -3765,12 +3773,23 @@ export class Shape
         let faceWithinSideRange = true;
         let edgeWithinSideRange = true;
 
-        for (const [side,sideShape] of Object.entries(selectedSideFaces))
+        /* Iterate all subshapes of current Shape and check distance of vertices
+            If all vertices of Edge are close to side include Edge, 
+            If all vertices of edges include Face.
+            
+            Start iteration of Shapes is bound by type of current Shape
+            Solid,Shell,Face => Face
+            Edge => Edge - We use a dummy if this is the case
+        */
+        for (const [side,sideShape] of Object.entries(selectedBboxSideShapes))
         {
-            this.faces().forEach( face => 
+            const facesOrNullArr = (['Edge','Wire'].includes(this.type())) ? [null] : this.faces().toArray();
+            facesOrNullArr.forEach( face => 
             {
+                const edges = (face) ? face.edges() : this.edges(); 
                 faceWithinSideRange = true;
-                face.edges().forEach( edge => 
+
+                edges.forEach( edge => 
                 {
                     edge.vertices().forEach( vertex => 
                     {
@@ -3799,9 +3818,8 @@ export class Shape
                     edgeWithinSideRange = true; // reset
                 })
                 // evaluate Face
-                // IMPORTANT: Vertices don't always describe a Face well
-                // TODO: Faces that substantially touch the side shape are also included
-                if(faceWithinSideRange)
+                // NOTE: Vertices don't always describe a Face well
+                if(faceWithinSideRange && face) // Skip Face if was iteration dummy
                 {
                     if(!resultsByTypeAndSide.faces[side])
                     {
@@ -3824,6 +3842,9 @@ export class Shape
         const sideZ = sidesString.includes('top') ? 'top' : sidesString.includes('bottom') ? 'bottom' : null;
 
         const sides = [sideX,sideY,sideZ].filter(s => s !== null);
+
+        console.log('==== SIDE RESULTS ====');
+        console.log(resultsByTypeAndSide);
 
         switch(numSides)
         {
