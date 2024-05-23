@@ -2488,7 +2488,8 @@ export class Shape
 
         const setAxisFunc = `set${axisNormal.toUpperCase()}`;
         const cutPlane = new Face().makePlaneBetween(bb.min()[setAxisFunc](level), bb.max()[setAxisFunc](level));
-        const splittedShapes = this._splitted(cutPlane);
+
+        const splittedShapes = this._splitted(cutPlane.scale(1.1)); // Scaling makes results more robust
 
         if(Shape.isShape(splittedShapes) || splittedShapes.length === 0){ console.warn(`Shape::cutoff: No splitted Shapes. Check level!`); return null; }
         if(splittedShapes.length === 1){ console.warn(`Shape::cutoff: Only one splitted Shapes. Returned original`); return this; }
@@ -3863,7 +3864,7 @@ export class Shape
                 // Return Face or if not present any other Shape that is on the given side
                 const side = sides[0];
                 const results = resultsByTypeAndSide.faces[side] || resultsByTypeAndSide.edges[side] || resultsByTypeAndSide.vertices[side];
-                return results.distinct();
+                return results?.distinct();
             case 2: 
             case 3:
                 // Return Edges or Vertices
