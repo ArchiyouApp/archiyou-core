@@ -2473,7 +2473,7 @@ export class Shape
     /** Cut off Shapes orthogonally by a plane with normal parallel to axis and at level and keep the largest piece 
     */
     @checkInput([['MainAxis', 'x'],['Number', 0], ['Boolean', false]], ['auto', 'auto','auto'])
-    cutoff(axisNormal?:MainAxis, level?:number, smallest?:boolean)
+    cutoff(axisNormal?:MainAxis, level?:number, smallest?:boolean):this
     {
         const bb = this.bbox();
         if(!bb.hasAxes().includes(axisNormal)){ throw new Error(`Shape::cutoff: Shape can not be cut off: It has no size on axis "${axisNormal}"!`);}
@@ -2505,6 +2505,32 @@ export class Shape
         }
         else {
             this._updateFromOcShape(result._ocShape);
+        }
+
+        return this;
+    }
+
+    /** Cut current Shape by other Shape and keep the biggest part */
+    @checkInput(['AnyShape',['Boolean', false]], ['auto', 'auto'])
+    cutoffBy(other:AnyShape, smallest?:boolean):this
+    {
+        const splitResult = this._splitted(other);
+        if(Shape.isShape(splitResult))
+        {
+            console.warn('Shape::cutoffBy: No result. Are the Shapes overlapping? Returned original Shape');
+            return this;
+        }
+        else {
+            (splitResult as ShapeCollection).sort((a,b) => (b.area() || b.length()) - (a.area() || a.length()))
+            const result = (!smallest) ? splitResult[0] : splitResult[1];
+
+            if(result.type() !== this.type())
+            {
+                this.replaceShape(result);
+            }
+            else {
+                this._updateFromOcShape(result._ocShape);
+            }
         }
 
         return this;
@@ -3854,9 +3880,6 @@ export class Shape
         const sideZ = sidesString.includes('top') ? 'top' : sidesString.includes('bottom') ? 'bottom' : null;
 
         const sides = [sideX,sideY,sideZ].filter(s => s !== null);
-
-        console.log('==== SIDE RESULTS ====');
-        console.log(resultsByTypeAndSide);
 
         switch(numSides)
         {
