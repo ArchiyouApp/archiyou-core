@@ -1,4 +1,4 @@
-import { Geom, Vertex, Edge } from '../../src/internal' // import only from internal, otherwise we get circular import problems
+import { Geom, Vertex, Edge, Face } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 import OcLoader from '../../src/OcLoader'
 
 // see Jest docs: https://jestjs.io/docs/expect
@@ -34,6 +34,10 @@ test("Selectors Basics", () =>
     const vr = new Edge().makeLine([0,0],[100,100])
                 .select('V||right') as Vertex;
     expect(vr.toArray()).toEqual([100,100,0]);
+    
+    expect((new Face().makePlane(100,100).select('V||frontleft') as Vertex).toArray()).toEqual([-50,-50,0]); // Shape with 2D Bbox
+
+
     // Side with 1D Bbox
     expect((new Edge().makeLine([0,0],[100,0]).select('V||right') as Vertex).toArray()).toEqual([100,0,0]);
     expect(new Edge().makeLine([0,0],[100,0]).select('V||top').length).toEqual(2);

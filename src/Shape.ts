@@ -3891,8 +3891,18 @@ export class Shape
             case 2: 
             case 3:
                 // Return Edges or Vertices
+
+                // Based on what Shape type the sides or highest order are, the overlapping Shape is one order below (if any)
+                const highestOrderSideShapes = (Object.keys(resultsByTypeAndSide.faces).length) 
+                                                    ? 'faces' 
+                                                    : (Object.keys(resultsByTypeAndSide.edges).length) 
+                                                        ? 'edges' : 'vertices';
+
                 let shapesOnAllSides:ShapeCollection;
-                const shapesOnSides = (numSides === 2) ? resultsByTypeAndSide.edges : resultsByTypeAndSide.vertices;
+                const shapesOnSides = (numSides === 2) 
+                    ? ((highestOrderSideShapes === 'faces') ? resultsByTypeAndSide.edges : resultsByTypeAndSide.vertices) 
+                        : resultsByTypeAndSide.vertices;
+                        
                 sides.forEach((s,i) => 
                 {
                     if(i === 0)

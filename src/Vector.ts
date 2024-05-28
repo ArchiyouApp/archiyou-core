@@ -704,11 +704,35 @@ export class Vector extends Point
     }
 
     /** Angle [0-360] on XY plane */
-    angleXY()
+    angleXY():number
     {
         const v = this.copy().setZ(0); // make 2D on XY plane
         let a = v.angleRef([1,0,0],[0,0,-1]);
         return (a < 0) ? 360+a : a;
+    }
+
+    /** Angle on XY (top) plane */
+    angleXZ():number
+    {
+        return this.copy().setY(0).angleRef([1,0,0], [0,0,1]);
+    }
+
+    /** Angle around Y-axis, alias of angleXZ */
+    angleY():number
+    {
+        return this.angleXZ();
+    }
+
+    /** Angle on YZ (right) plane */
+    angleYZ():number
+    {
+        return this.copy().setX(0).angleRef([0,1,0], [0,0,1]);
+    }
+
+    /** Angle around X-axis, alias of angleYZ */
+    angleX():number
+    {
+        return this.angleYZ();
     }
 
     /** Return the angle between one Vector and another where ref defines the positive sense of rotation */

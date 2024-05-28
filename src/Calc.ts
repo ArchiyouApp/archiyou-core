@@ -165,7 +165,7 @@
         if (data === null || data === undefined){ throw new Error(`Calc::metric: Please supply some data reference. Either an real value or table name or location as string!`)};
         if(!isMetricName(name))
         {
-            throw new Error(`Calc::metric: Please use any of these metric names: ${METRICS.join(', ')}`);
+            console.warn(`Calc::metric: Your metric "${name}" is not part of official ones: ${METRICS.join(', ')}`);
         }
 
         this.autoInit();

@@ -149,6 +149,19 @@ export function isNumeric(x:any):boolean
            !isNaN(parseFloat(x)) // ...and ensure strings of whitespace fail
 }
 
+export function isBoolean(x:any):boolean
+{
+    return x === false || x === true;
+}
+
+/** Used for Calc excel export */
+export function getTypeClass(x:any):StringConstructor|NumberConstructor|BooleanConstructor
+{
+    return (isNumeric(x)) ? Number
+                : (isBoolean(x)) ? Boolean
+                    : String
+}
+
 export function rangeArray(min:number,max:number):Array<number>
 {
     return Array.from(Array(max + 1).keys()).slice(min, max + 1)

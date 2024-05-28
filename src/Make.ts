@@ -5,7 +5,7 @@
  * 
  */
 
-import { ConsoleMessage, ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, ShapeCollection, LayoutOptions } from './internal' // classes
+import { ConsoleMessage, ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, ShapeCollection, LayoutOptions, addResultShapesToScene } from './internal' // classes
 import { Table } from './internal'; 
 import { PointLike } from './internal' // types
 
@@ -48,6 +48,7 @@ export interface Layout2DOptions
     seamsStartOffset?: number // let seams start later then start of layout
     leftover?:boolean // 
     cutMargin?:number
+    stats?: boolean // calculate stats after operation
 }
 
 export function Layout2DOptions(o:any): o is Layout2DOptions
@@ -138,6 +139,7 @@ export class Make
             secondaryGridOffset: o?.secondaryGridOffset || 0, // not yet implemented
             leftover: o?.leftover || false,
             cutMargin: o?.cutMargin || this.LAYOUT2D_BOX_DEFAULT_FITTING_MARGIN_SIZE,
+            stats: o?.stats ?? true
         }
     }
 
@@ -175,7 +177,6 @@ export class Make
             boxVec[mainAxis] = mainLimit - cursor[mainAxis];
             boxLimitedPrim = true;
         }
-
 
         // if not out of primary limit, snap to grid
         if(!boxLimitedPrim && o.grid) // check if box arrives in primary direction at grid as defined in o.grid, with offset o.gridOffset
@@ -233,6 +234,13 @@ export class Make
         {
             // find next box
             const newBox = this._layout2DBoxesNewBox(cursor, o, leftOverBoxSize); // this method find a next box (where needed cut to seams or end of layout)
+            
+            if (!newBox)
+            { 
+                // Can't find a new box anymore
+                break; 
+            }
+    
             leftOverBoxSize = null; // reset left over
             createdElems.add(newBox);
             
@@ -258,12 +266,16 @@ export class Make
             // check cursor in secondary direction - and break
             if( (o.direction === 'horizontal' && cursor.y >= o.height) || (o.direction === 'vertical' && cursor.x >= o.width))
             {
-                break
+                break;
             }
 
         }
-        
-        this._layout2DBoxesStats(o);
+
+        // calculate stats (default: true)
+        if(o.stats)
+        {
+            this._layout2DBoxesStats(o);
+        }
 
         return createdElems.length ? createdElems : null; 
     }
@@ -277,20 +289,35 @@ export class Make
 
         if (this.stats.cut.length > 0)
         {
-            this.stats.fitted = this.stats.cut.pack({ stockWidth: o.stockWidth, stockHeight: o.stockHeight, margin: o.cutMargin }, true)
-            this.stats.fitted?.removeFromScene(); // don't add automatically to Scene
+            this.stats.fitted = this.stats.cut.pack(
+                    { 
+                        stockWidth: o.stockWidth, 
+                        stockHeight: o.stockHeight, 
+                        margin: o.cutMargin,
+                        autoRotate: false, 
+                     }, true)
+
             this.stats.numStock += this.stats.fitted.getGroup('bins').length;
             const stockUsedArea = this.stats.numStock * o.stockWidth * o.stockHeight;
             const cutPartsArea = this.stats.fitted.getGroup('cut').reduce( (sum,shape) => sum + shape.area(), 0)
             const fullPartsArea = this.stats.full.length * (this.stats.full?.first()?.area() || 0)
             this.stats.efficiency = Math.round((fullPartsArea + cutPartsArea) / stockUsedArea * 100);
+            this.stats.wastedArea = stockUsedArea - fullPartsArea - cutPartsArea;
         }
         
         return this.stats;
     }
 
-    /** Public method to generate rectangular boarding on rectangle plane on XY plane */
+    /** Public method to generate rectangular boarding on rectangle plane on XY plane 
+     *  Generates statistics on waste, cuts etc at make.stats
+    */
+    @addResultShapesToScene
     boarding(o?:Layout2DOptions):ShapeCollection
+    {
+        return this._boarding(o);
+    }
+
+    _boarding(o?:Layout2DOptions):ShapeCollection
     {
         return this._layout2DBoxes(o);
     }

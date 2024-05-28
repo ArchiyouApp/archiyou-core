@@ -818,7 +818,7 @@
       }
 
       /** Shape API - Extrude Shapes in ShapeCollection a certain amount in a given direction (default: [0,0,1]) */
-      @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', [0,0,1] ]], [Number, 'Vector'])
+      @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', null ]], [Number, 'auto'])
       extrude(amount?:number, direction?:PointLike):AnyShapeCollection
       {
          this.shapes.forEach( shape => {
@@ -829,7 +829,7 @@
       }
 
       /** Shape API - Extrude Shapes in ShapeCollection a certain amount in a given direction (default: [0,0,1]) */
-      @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', [0,0,1] ]], [Number, 'Vector'])
+      @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', null ]], [Number, 'auto'])
       extruded(amount?:number, direction?:PointLike):AnyShapeCollection
       {
          let newCollection = new ShapeCollection();
@@ -2064,18 +2064,21 @@
          {
             let s = (autoRotate) ? shape._copy().rotateToLayFlat() : shape;
             s = (flatten) ? s._flattened() : s;
-            s.color('red');
             return this._makeBinPackBox(s, boxMargin, i)
          });
          // place boxes with skewest width-height ratio first
          boxes.sort((a,b) => this._calculateSizeSkewness(b) - this._calculateSizeSkewness(a)); // order boxes from big to small for better fitting
          
-         const packResult = packer({ 
-            binHeight: binHeight,
-            binWidth: binWidth,
-            items: boxes,
+         const packResult = packer(
+            { 
+               binHeight: binHeight,
+               binWidth: binWidth,
+               items: boxes,
             },
-            { kerfSize: boxMargin, allowRotation: true }
+            { 
+               kerfSize: boxMargin, 
+               allowRotation: true 
+            }
          ); // returns Array<Array<PackerResultItem>>
 
          // now align shapes to all bins
@@ -2098,8 +2101,7 @@
                   let newWorkShape = workShape._copy(); // IMPORTANT: don't add to scene - flattened leaves this copy around
                   newWorkShape = (autoRotate) ? newWorkShape.rotateToLayFlat() : newWorkShape;
                   newWorkShape = (flatten) ? newWorkShape._flattened() : newWorkShape;
-                  newWorkShape.color('red');
-                  newWorkShape.addToScene();
+                  
                   toShapeCollection.addGroup('cut', newWorkShape);
                   workShape = newWorkShape;
                } // copy shape or move in place
@@ -2124,8 +2126,9 @@
             {
                let binStartX = bi*(binWidth+BIN_MARGIN)+position.x;
                let binStartY = position.y;
-               let outline = new Face().makePlaneBetween([binStartX, binStartY],[binStartX+binWidth, binStartY+binHeight]).toWire();
-               outline.addToScene();
+               let outline = new Face()
+                              .makePlaneBetween([binStartX, binStartY],[binStartX+binWidth, binStartY+binHeight])
+                              ._toWire();
                binShapes.add(outline);
             })
             
