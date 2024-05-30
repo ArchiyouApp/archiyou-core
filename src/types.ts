@@ -147,6 +147,12 @@ export interface ArchiyouAppInfo
     hasDocs?:boolean // if there are docs part of the script
 }
 
+/** TODO */
+export interface ExportSVGOptions 
+{
+
+}
+
 export interface ExportGLTFOptions 
 {
     binary?: boolean

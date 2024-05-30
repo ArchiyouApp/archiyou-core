@@ -77,15 +77,6 @@ export class DocViewSVGManager
         return this._svg
     }
 
-    /** Used for JsPDF */
-    // NEEDED?
-    /*
-    parseToElement(view?:ContainerData):Element
-    {
-        this._setCleanSvg(view)
-        return new JSDOM(this._svg)
-    }
-    */
 
     reset()
     {

@@ -3,6 +3,9 @@ import { ExportGLTFOptions } from './internal'
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
 import { GLTFBuilder } from './GLTFBuilder';
 
+import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
+import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
+
 
 //// TYPES ////
 
@@ -291,14 +294,74 @@ export class Exporter
         });
     }
 
-    exportToSVG():string
+    /** Export entire (visual) model by creating a isometric 2D view  */
+    exportToSvg(only2D:boolean=false):string
     {
-        // For now only export 2D edges on XY plane
-        let edges2DCollection = new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && s.is2DXY()));
-        return edges2DCollection.toSvg();
+        if(!only2D)
+        {
+            const visibleShapes = this._parent.geom.all().filter(s => s.visible());
+            
+            console.log(visibleShapes);
+
+            return visibleShapes._isometry().toSvg();
+        }
+        else {
+            // Only export 2D edges on XY plane
+            const edges2DCollection = new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && s.is2DXY()));
+            return edges2DCollection.toSvg();
+        }
     }
 
-    async exportToSVGWindow(content:string)
+    /** Combine all SVG's into one with SMIL keyframe animations
+     *  We parse all SVGs and put all their content in seperate groups named "frame{{N}}"
+     *  At the same time apply special SLIM SVG keyframe animation tags 
+     *  so the SVG animation can be viewed inside ordinary browsers
+     */
+    exportToSvgAnimation(svgs:Array<string>):string
+    {
+        const SVG_FPS = 2; // 2 frames per second
+        const SVG_FRAME_DURATION = 1 / SVG_FPS;
+
+        const svgRootNodes = [] as Array<TXmlNode>;
+        const svgFrameGroups = [] as Array<string>; // <g id="frameN"><set id="anN" />{{ svg paths }}</g>
+        const numFrames = svgs.length;
+
+
+        svgs.forEach( (svg,frameNum) => {
+            const parsedSvg = txml.parse(svg)[0];
+            svgRootNodes.push(parsedSvg); // to find largest bbox later
+            const pathNodes = txml.filter(parsedSvg.children, node => node.tagName === 'path'); // SVG only consists of path elements
+
+            const svgFrameGroup = `
+                        <g id="frame${frameNum}" visibility="hidden">
+                            <set id="an${frameNum*2}" attributeName="visibility" begin="${SVG_FRAME_DURATION*frameNum}; an${frameNum*2+1}.end" to="visible" dur="${SVG_FRAME_DURATION}s" />
+                            <set id="an${frameNum*2+1}" attributeName="visibility" begin="an${frameNum*2}.end" to="hidden" dur="${numFrames*SVG_FRAME_DURATION}s" />
+                            ${pathNodes.map(p => this._txmlNodeToString(p)).join('')}
+                        </g>`
+            svgFrameGroups.push(svgFrameGroup);
+        })
+
+        // Get biggest bounding box
+        svgRootNodes.sort( (a,b) => this._getSvgBboxArea(b) - this._getSvgBboxArea(a))
+        const svgAnimated = this._txmlNodeToString(svgRootNodes[0], svgFrameGroups.join('\n')); // Wrap al groupes with largest SVG bbox
+
+        return svgAnimated
+    }
+
+    /** For some reason TXML does not offer a good node.toString() method */
+    _txmlNodeToString(n:TXmlNode, wrapped:string=''):string
+    {
+        const attrsStr = Object.keys(n.attributes).map( attr => `${attr}="${n.attributes[attr]}"`).join(' ');
+        return `<${n.tagName} ${attrsStr}>${wrapped}</${n.tagName}>`
+    }
+
+    _getSvgBboxArea(svg:TXmlNode):number
+    {
+        const bbox = svg.attributes['viewBox']?.split(' ');
+        return (bbox) ? bbox[2] * bbox[3] : 0;
+    }
+
+    async exportToSvgWindow(content:string)
     {
         const fileHandle = await this.getNewFileHandle("SVG files", "text/plain", "svg");
         this.writeFile(fileHandle, content).then(() => 
