@@ -11,16 +11,6 @@ import { sequence } from '@gltf-transform/functions';
 
 */
 
-export interface exportGLTFOptions 
-{
-    // exportToGLTF(quality?:MeshingQualitySettings, binary:boolean=true, archiyouFormat:boolean=true, includePointsAndLines:boolean=true, extraShapesAsPointLines:boolean=false):ArrayBuffer|string
-    quality?: MeshingQualitySettings
-    binary?: boolean
-    archiyouFormat?: boolean // use Archiyou format
-    includePointsAndLines?: boolean // export loose points and edges 
-    extraShapesAsPointLines?: boolean // for visualization purposes seperate points and lines
-}   
-
 
 export class GLTFBuilder
 {
@@ -49,20 +39,19 @@ export class GLTFBuilder
     //// GLTF ANIMATION EXPORT ////
 
     /** build Animated GLTF */
-    createAnimation(frameGLBs:Array<Uint8Array>):boolean
+    async createAnimation(frameGLBs:Array<Uint8Array>)
     {
-        this.loadFramesIntoScene(frameGLBs) // load GLB buffers into scene
+        await this.loadFramesIntoScene(frameGLBs) // load GLB buffers into scene
 
         // now we got all frames into seperate nodes - we can use the special function sequence to build a animation out of it
         // NOTE: Blender has default FPS on animation of 24 - we want to place one Shape frame into exactly one frame in Blender
         let sequenceOptions = { fps: 24, pattern: /FrameShapes[0-9]+/, animation: 'ParamAnimation', sort: false }; // see: https://github.com/donmccurdy/glTF-Transform/blob/8d1eba3de55b93e1f3a656f1701c37dea48b3af1/packages/functions/src/sequence.ts#L6
         this.doc.transform(sequence(sequenceOptions));
-        return true;
     }
 
     /** Load GLB of frame into scene */
     async frameGLBToNode(GLBBuffer:Uint8Array, nodeName:string)
-    {   
+    {  
         const io = new WebIO();
         let frameGlbDoc = await io.readBinary(GLBBuffer);
         let incomingNode = frameGlbDoc.getRoot().listScenes()[0].listChildren()[0];
@@ -82,9 +71,12 @@ export class GLTFBuilder
         addedScene.dispose();        
     }
 
-    loadFramesIntoScene(frameGLBs:Array<Uint8Array>)
+    async loadFramesIntoScene(frameGLBs:Array<Uint8Array>)
     {
-        frameGLBs.forEach( (glb,i) => this.frameGLBToNode(glb, `FrameShapes${i}`));
+        for (let i = 0; i < frameGLBs.length; i++)
+        {
+            await this.frameGLBToNode(frameGLBs[i], `FrameShapes${i}`);
+        }
         // merge buffers
         const buffer = this.doc.getRoot().listBuffers()[0];
         this.doc.getRoot().listAccessors().forEach((a) => a.setBuffer(buffer));
@@ -106,8 +98,9 @@ export class GLTFBuilder
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    addArchiyouData(gltfContent:Uint8Array|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<Uint8Array>
+    async addArchiyouData(gltfContent:Uint8Array|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<Uint8Array>
     {
+
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
         {
@@ -115,7 +108,7 @@ export class GLTFBuilder
         }
         else {
             // Open ArrayBuffer and write extra data
-            this.doc = io.readBinary(gltfContent);
+            this.doc = await io.readBinary(new Uint8Array(gltfContent)); // Force Uint8Array from ArrayBuffer
             let asset = this.doc.getRoot().getAsset();
 
             asset.generator = 'Archiyou';
@@ -149,10 +142,10 @@ export class GLTFBuilder
 
 
     /** Add all loose point and line Shapes (Vertex,Edge,Wire) to the GLTF buffer */
-    addPointsAndLines(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
+    async addPointsAndLines(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
     {
         const io = new WebIO({credentials: 'include'});
-        this.doc = io.readBinary(gltfContent);
+        this.doc = await io.readBinary(gltfContent);
         let buffer = this.doc.getRoot().listBuffers()[0];
 
         // Create a node for every loose Vertex (TODO: check performace implications?)
@@ -167,7 +160,6 @@ export class GLTFBuilder
                 
         // export new GLTF binary content
         return io.writeBinary(this.doc); 
-
     }
 
     /** Add Vertices of Shape (including just one Vertex) as node to GLTF */
@@ -263,10 +255,10 @@ export class GLTFBuilder
     /** For visualization purposes it's handy output seperate point- and line buffer into the GLTF
      *  So these can be seperately styled in a GLTF viewer
      */
-    addSeperatePointsAndLinesForShapes(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
+    async addSeperatePointsAndLinesForShapes(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
     {
         const io = new WebIO({credentials: 'include'});
-        this.doc = io.readBinary(gltfContent);
+        this.doc = await io.readBinary(gltfContent);
         let buffer = this.doc.getRoot().listBuffers()[0];
         
         shapes.forEach(shape =>
@@ -276,7 +268,7 @@ export class GLTFBuilder
         })
 
         // export new GLTF binary content
-        return io.writeBinary(this.doc); 
+        return await io.writeBinary(this.doc); 
     }
 
     //// READ-ONLY FUNCTIONS ////

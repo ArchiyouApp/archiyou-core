@@ -1,6 +1,7 @@
 import { MeshingQualitySettings, Shape, AnyShape, ShapeCollection} from './internal'
+import { ExportGLTFOptions } from './internal'
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
-import { GLTFBuilder, exportGLTFOptions } from './GLTFBuilder';
+import { GLTFBuilder } from './GLTFBuilder';
 
 
 //// TYPES ////
@@ -42,7 +43,7 @@ export class Exporter
         includePointsAndLines: true,
         extraShapesAsPointLines: true,
         messages: [],
-    } as exportGLTFOptions
+    } as ExportGLTFOptions
 
     //// END SETTINGS ////
 
@@ -164,10 +165,10 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    exportToGLTF(options?:exportGLTFOptions):Promise<ArrayBuffer|string>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|string>
     {
         const oc = this._parent.geom._oc;
-        options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : options;
+        options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
         
         const meshingQuality = options.quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
         const filename = `file.${(options.binary) ? 'glb' : 'gltf'}`
@@ -224,7 +225,7 @@ export class Exporter
         const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (options.binary) ? 'binary' : 'utf8' });
         oc.FS.unlink("./" + filename);
         
-        let gltfContent =  (options.binary) ? gltfFile.buffer : gltfFile;
+        let gltfContent =  (options.binary) ? new Uint8Array(gltfFile.buffer) : gltfFile;
 
         // clean up OC classes
         ocShapeTool.delete();
@@ -237,24 +238,26 @@ export class Exporter
             const pointAndLineShapes:ShapeCollection = new ShapeCollection(
                         this._parent.geom.all()
                         .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type()))));
-            if (pointAndLineShapes.length > 0) gltfContent = new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, meshingQuality); 
+            if (pointAndLineShapes.length > 0)
+            {
+                gltfContent = await new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, meshingQuality); 
+            }
         }
 
         // Add special archiyou data in GLTF asset.extras section
-        if(options.archiyouFormat)
+        if(options?.archiyouFormat)
         {
             // add special Archiyou data to GLTF
-            gltfContent = new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, {}); 
+            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, {}); 
         }
 
         // extra vertices and lines for specific visualization styles
-        if (options.extraShapesAsPointLines)
+        if (options?.extraShapesAsPointLines)
         {
             const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
-            gltfContent = new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
+            gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
         }
-        
-        
+
         return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
     }
 
@@ -271,10 +274,10 @@ export class Exporter
         });
     }
 
-    exportToGLTFAnimation(frameGLBs:Array<Uint8Array>):Promise<Uint8Array>
+    async exportToGLTFAnimation(frameGLBs:Array<Uint8Array>):Promise<Uint8Array>
     {
         let gltfExporter = new GLTFBuilder();
-        gltfExporter.createAnimation(frameGLBs);
+        await gltfExporter.createAnimation(frameGLBs);
         let buffer = gltfExporter.toGLTFBuffer();
         return buffer;
     }
@@ -284,7 +287,7 @@ export class Exporter
         const fileHandle = await this.getNewFileHandle("GLTF files", "application/octet-stream", "glb");
         this.writeFile(fileHandle, content).then(() => 
         {
-          console.info("Saved GLTF Animation to " + fileHandle.name);
+            console.info("Saved GLTF Animation to " + fileHandle.name);
         });
     }
 

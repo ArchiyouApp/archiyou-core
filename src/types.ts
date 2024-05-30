@@ -147,6 +147,16 @@ export interface ArchiyouAppInfo
     hasDocs?:boolean // if there are docs part of the script
 }
 
+export interface ExportGLTFOptions 
+{
+    binary?: boolean
+    quality?: MeshingQualitySettings
+    archiyouFormat?: boolean // use Archiyou format
+    includePointsAndLines?: boolean // export loose points and edges 
+    extraShapesAsPointLines?: boolean // for visualization purposes seperate points and lines
+}   
+
+
 //// PARAMS ////
 
 // NOTE: We put these in the core library because of the ParamManager 
