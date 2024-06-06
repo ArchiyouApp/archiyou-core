@@ -563,8 +563,8 @@ export class Face extends Shape
     @checkInput(['PointLike',['PointLike', null]], ['Vector', 'auto'])
     rotateTo(vector:PointLike,pivot?:PointLike):Face
     {
-        let toVec = (vector as Vector).normalize();
-        let curNormal = this.normal();
+        const toVec = (vector as Vector).normalize();
+        const curNormal = this.normal();
 
         if (toVec.equals(curNormal))
         {
@@ -572,10 +572,10 @@ export class Face extends Shape
             return;
         }
 
-        let angle = curNormal.angle(toVec);
+        const angle = curNormal.angle(toVec);
 
-        let rotationAxisVec = curNormal.crossed(toVec);
-        let rotationPivot = (pivot as Point) || this.center();
+        const rotationAxisVec = curNormal.crossed(toVec);
+        const rotationPivot = (pivot as Point) || this.center();
 
         this.rotateAround(angle, rotationAxisVec, rotationPivot);
 

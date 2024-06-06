@@ -284,6 +284,7 @@ export class Shape
         return this.center();
     }
 
+
     /** Attach obj to Shape for adding it to the scene and styling */
     object(forceNew:boolean=false):Obj
     {
@@ -1286,7 +1287,8 @@ export class Shape
 
     /** 
      *   Mirror Shape
-     *   @param planeNormal The normal of the Mirror plane (not direction of orthogonal plane) !!!! different from Vector.mirror()
+     *   @param planeNormal The normal of the Mirror plane (not direction of orthogonal plane) 
+     *   !!!! different from Vector.mirror()
      *   origin: Origin of mirror plane
      */
     @checkInput([ ['PointLike', [0,0,0]], ['PointLike', 'x']], ['Vector', 'Vector']) // the default mirror plane is the YZ plane with normal +X-axis at [0,0,0]
@@ -1322,16 +1324,16 @@ export class Shape
         return this._mirrored(origin,normal);
     }
     
-    /** Mirror Shape relative to XZ plane with its center as pivot or given offset y-coord */
+    /** Mirror Shape in X plane (x=0) with its center as pivot or given offset along x-axis */
     @checkInput([[Number,null]], 'auto')
     mirrorX(offset?:number):this
     {
-        let mirroredShape = this._mirroredX(offset); 
+        const mirroredShape = this._mirroredX(offset); 
         this.replaceShape(mirroredShape);
         return mirroredShape;
     }
 
-    /** Create mirrored copy relative to XZ plane with its center as pivot or given offset y-coord */
+    /** Create mirrored copy in X plane (x=0) with its center as pivot or given offset along x-axis */
     @checkInput([[Number,null]], 'auto')
     _mirroredX(offset?:number):this
     {
@@ -1345,7 +1347,7 @@ export class Shape
         return this._mirroredX(offset);
     }
     
-    /** Mirror Shape relative to YZ plane with its center as pivot or given offset x-coord */
+    /** Mirror Shape in Y plane (y=0) with its center as pivot or given offset along y-axis */
     @checkInput([[Number,null]], 'auto')
     mirrorY(offset?:number):this
     {
@@ -1354,7 +1356,7 @@ export class Shape
         return mirroredShape;
     }
 
-    /** Create mirrored copy relative to the YZ plane with its center as pivot or given offset x-coord  */
+    /** Create mirror copy of Shape in Y plane (y=0) with its center as pivot or given offset along y-axis */
     @checkInput([[Number,null]], 'auto')
     _mirroredY(offset?:number):this
     {
@@ -1368,7 +1370,7 @@ export class Shape
         return this._mirroredY(offset);
     }
 
-    /** Mirror Shape relative to XY plane with its center as pivot or given offset z-coord */
+    /** Mirror Shape in Z plane (z=0) with its center as pivot or given offset along z-axis */
     @checkInput([[Number,null]], 'auto')
     mirrorZ(offset?:number):this
     {
@@ -1377,7 +1379,7 @@ export class Shape
         return mirroredShape;
     }
 
-    /** Create mirrored copy relative to XY plane with its center as pivot */
+    /** Create mirror copy of Shape in Z plane (z=0) with its center as pivot or given offset along z-axis */
     @checkInput([[Number,null]], 'auto')
     _mirroredZ(offset?:number):this
     {
@@ -1397,22 +1399,7 @@ export class Shape
     @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', null ]], [Number, 'Vector'])
     extrude(amount?:number, direction?:PointLike):IEdge|Face|Shell|ISolid
     {
-       let directionVec = direction as Vector; // auto converted
-
-       // auto extrusion Vector
-       if (!directionVec)
-       {
-            if(['Edge','Wire', 'Face', 'Shell'].includes(this.type()))
-            {
-                directionVec = (this as any).normal();
-            }
-            else {
-                // default: z-axis
-                directionVec = new Vector(0,0,1);
-            }
-       }       
-       
-       let newShape = this.extruded(amount, directionVec); // auto converted to Vector
+       let newShape = this.extruded(amount, direction); // auto converted to Vector
        this.replaceShape(newShape as AnyShapeOrCollection);
 
        return newShape; // return the new Shape, not the original!
@@ -1424,13 +1411,28 @@ export class Shape
      *   TODO: solid flag
      */
     
-    @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', [0,0,1] ]], [Number, 'Vector'])
+    @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', null ]], [Number, 'Vector'])
     _extruded(amount?:number, direction?:PointLike):IEdge|Face|Shell|Solid
     {
         /* OC docs:
             - MakePrism: https://dev.opencascade.org/doc/refman/html/class_b_rep_prim_a_p_i___make_prism.html
         */
-        let extrudeVec = (direction as Vector).normalized().scale(amount);
+
+        // auto extrusion Vector
+        let directionVec = direction as Vector; // auto-converted
+        if (!directionVec)
+        {
+            if(['Edge','Wire', 'Face', 'Shell'].includes(this.type()))
+            {
+                directionVec = (this as any).normal();
+            }
+            else {
+                // default: z-axis
+                directionVec = new Vector(0,0,1);
+            }
+        }       
+
+        let extrudeVec = directionVec.normalized().scale(amount);
         let ocPrismBuilder = new this._oc.BRepPrimAPI_MakePrism_1(this._ocShape, extrudeVec._toOcVector(), false, true);
         let ocShape = ocPrismBuilder.Shape();
         if (ocShape.IsNull())
@@ -1444,7 +1446,7 @@ export class Shape
     }
 
     @addResultShapesToScene
-    @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', [0,0,1] ]], [Number, 'Vector'])
+    @checkInput([ [Number, SHAPE_EXTRUDE_DEFAULT_AMOUNT], ['PointLike', null ]], [Number, 'Vector'])
     extruded(amount?:number, direction?:PointLike):IEdge|Face|Shell|Solid
     {
         return this._extruded(amount, direction);

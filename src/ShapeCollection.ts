@@ -705,11 +705,11 @@
          return newCollection;
       }
 
-      /** Shape API - Mirror Shapes relative to XZ plane with its collection center as pivot or given offset y-coord */
+      /** Shape API - Mirror Shapes relative to X-plane (x=0) with its collection center as pivot or given offset x-coord */
       @checkInput([[Number,null]], ['auto'])
       mirrorX(offset?:number):AnyShapeCollection
       {
-         offset = offset || this.center().y; // based on given offset or center of collection
+         offset = offset ?? this.center().y; // based on given offset or center of collection
 
          this.shapes.forEach( shape => {
             shape.mirrorX(offset);
@@ -717,83 +717,81 @@
          return this;
       }
 
-      /** Shape API - Mirror copies of Shapes relative to XZ plane with its collection center as pivot or given offset y-coord */
+      /** Shape API - Mirror copies of Shapes relative to X-plane (x=0) with its collection center as pivot or given offset x-coord */
       @checkInput([[Number,null]], 'auto')
       _mirroredX(offset?:number)
       {
-         let newCollection = new ShapeCollection();
+         const newCollection = new ShapeCollection();
          offset = (offset !== null) ? offset : this.center().y; // based on given offset or center of collection
          this.shapes.forEach(shape => newCollection.add(shape._mirroredX(offset)));
          return newCollection;
       }
 
-      /** Shape API - Mirror copies of Shapes relative to XZ plane with its collection center as pivot or given offset y-coord */
+      /** Shape API - Mirror copies of Shapes relative to X-plane (x=0) with its collection center as pivot or given offset x-coord */
+      @addResultShapesToScene
       @checkInput([[Number,null]], 'auto')
       mirroredX(offset?:number)
       {
-         let newCollection = this.copy(); // automatically added to scene
-         newCollection.mirrorX(offset);
-         return newCollection;
+         return this._mirroredX(offset);
       }
 
-      /** Shape API - Mirror Shapes relative to XZ plane with its collection center as pivot or given offset x-coord */
+      /** Shape API - Mirror Shapes relative to Y plane (y=0) with its collection center as pivot or given offset y-coord */
       @checkInput([[Number,null]], 'auto')
       mirrorY(offset?:number):AnyShapeCollection
       {
-         offset = offset || this.center().x; // based on given offset or center of collection
+         offset = offset ?? this.center().x; // based on given offset or center of collection
+
          this.shapes.forEach( shape => {
             shape.mirrorY(offset);
          })
          return this;
       }
 
-      /** Shape API - Mirror copies of Shapes relative to XZ plane with its collection center as pivot or given offset x-coord */
+      /** Shape API - Mirror copies of Shapes relative to Y plane (y=0) with its collection center as pivot or given offset y-coord */
       @checkInput([[Number,null]], 'auto')
       _mirroredY(offset?:number)
       {
-         let newCollection = new ShapeCollection();
-         offset = (offset !== null) ? offset : this.center().x // based on given offset or center of collection
+         const newCollection = new ShapeCollection();
+         offset = offset ?? this.center().x // based on given offset or center of collection
          this.shapes.forEach(shape => newCollection.add(shape._mirroredY(offset)));
          return newCollection;
       }
 
-      /** Shape API - Mirror copies of Shapes relative to XZ plane with its collection center as pivot or given offset x-coord */
+      /** Shape API - Mirror copies of Shapes relative to Y plane (y=0) with its collection center as pivot or given offset y-coord */
+      @addResultShapesToScene
       @checkInput([[Number,null]], 'auto')
       mirroredY(offset?:number)
       {
-         let newCollection = this.copy();
-         newCollection.mirrorY(offset);
-         return newCollection;
+         return this._mirroredY(offset);
       }
 
-      /** Shape API - Mirror Shapes relative to XZ plane with its collection center as pivot or given offset z-coord */
+      /** Shape API - Mirror Shapes relative to Z plane (z=0) with its collection center as pivot or given offset z-coord */
       @checkInput([[Number,null]], 'auto')
       mirrorZ(offset?:number):AnyShapeCollection
       {
+         offset = offset ?? this.center().z; // based on given offset or center of collection
          this.shapes.forEach( shape => {
             shape.mirrorZ(offset);
          })
          return this;
       }
 
-      /** Shape API - Mirror copies of Shapes relative to XZ plane with its collection center as pivot or given offset z-coord */
+      /** Shape API - Mirror copies of Shapes in Z-plane (z=0) with its collection center as pivot or given offset z-coord */
       @checkInput([[Number,null]], 'auto')
       _mirroredZ(offset?:number)
       {
-         let newCollection = new ShapeCollection();
-         offset = (offset !== null) ? offset : this.center().z; // based on given offset or center of collection
+         const newCollection = new ShapeCollection();
+         offset = offset ?? this.center().z; // based on given offset or center of collection
          this.shapes.forEach(shape => newCollection.add(shape._mirroredZ(offset)));
          return newCollection;
       }
 
       /** Shape API - Mirror copies of Shapes relative to XZ plane with its collection center as pivot or given offset z-coord */
+      @addResultShapesToScene
       @checkInput([[Number,null]], 'auto')
       mirroredZ(offset?:number)
       {
-         let newCollection = this.copy();
-         offset = offset || this.center().z; // based on given offset or center of collection
-         newCollection.mirrorZ(offset);
-         return newCollection;
+         return this._mirroredZ(offset);
       }
 
       /** Shape API - offset Shapes in Collection */
