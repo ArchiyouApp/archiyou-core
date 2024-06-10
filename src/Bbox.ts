@@ -211,6 +211,14 @@ export class Bbox
         return [this.width(), this.height(),this.depth()].sort((a,b) => b - a )[0];
     }
 
+    /** Maximum size of Bbox */
+    minSize():number
+    {
+        return [this.width(), this.height(),this.depth()]
+                    .sort((a,b) => a - b )
+                    .filter(s => s !== 0)[0]; // 0 sizes (when Bbox is 2D/1D) are not used
+    }
+
     /** Get frontal Face (3D) or Edge (2D) */
     front():Vertex|Edge|Face
     {

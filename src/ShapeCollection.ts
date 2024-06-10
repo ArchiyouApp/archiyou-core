@@ -2053,17 +2053,25 @@
          const binWidth = options?.stockWidth || DEFAULT_BIN_WIDTH;
          const binHeight = options?.stockHeight || DEFAULT_BIN_HEIGHT;
 
-         const autoRotate = (options?.autoRotate == undefined || options?.autoRotate);
-         const flatten = (options?.flatten);
+         const autoRotate = options?.autoRotate ?? true;
+         const flatten = options?.flatten ?? true;
          if(autoRotate || flatten){ copy = true };
 
-         let boxMargin = (options?.margin !== undefined) ? options.margin : BOX_MARGIN_DEFAULT;
-         let boxes = this.toArray().map( (shape,i) => 
+         console.log('==== PACK DEBUG ====');
+
+         const boxMargin = (options?.margin !== undefined) ? options.margin : BOX_MARGIN_DEFAULT;
+         const boxes = this.toArray().map( (shape,i) => 
          {
+            console.log('AUTO ROTATE');
+            console.log(autoRotate);
+
             let s = (autoRotate) ? shape._copy().rotateToLayFlat() : shape;
             s = (flatten) ? s._flattened() : s;
+            s.addToScene().move(-10000).color('red'); // DEBUG
             return this._makeBinPackBox(s, boxMargin, i)
          });
+
+
          // place boxes with skewest width-height ratio first
          boxes.sort((a,b) => this._calculateSizeSkewness(b) - this._calculateSizeSkewness(a)); // order boxes from big to small for better fitting
          

@@ -3785,7 +3785,7 @@ export class Shape
     @checkInput('String', 'auto')
     _getSide(sidesString?:string):AnyShapeCollection|null
     {
-        const DISTANCE_FUZZYNESS_PERC = 0.01; // percentage of max size of Bbox
+        const DISTANCE_FUZZYNESS_PERC = 0.01; // percentage of min size of Bbox
 
         // A Vertex does not have side
         if(this.type() === 'Vertex')
@@ -3808,7 +3808,7 @@ export class Shape
             return null;
         }
 
-        const selectDistance = DISTANCE_FUZZYNESS_PERC*this.bbox().maxSize();
+        const selectDistance = DISTANCE_FUZZYNESS_PERC*this.bbox().minSize();
 
         let faceWithinSideRange = true;
         let edgeWithinSideRange = true;
