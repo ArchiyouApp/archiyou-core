@@ -131,6 +131,12 @@ export function roundToTolerance(n:number):number
     return roundTo(n, DECIMALS);
 }
 
+/** Round to step size */
+export function roundToStep(n:number, step:number, start:number):number
+{
+    return Math.ceil((n - start) / step ) * step + start;
+}
+
 export function toDeg(r:number):number
 {
     return r * 180.0/Math.PI;

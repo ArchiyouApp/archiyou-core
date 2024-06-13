@@ -26,6 +26,7 @@ export class DocViewSVGManager
 {
     //// SETTINGS ////
     PATH_BASE_STYLE = {
+            strokeColor: '#000000', 
             lineWidth: 0.15
         } as DocPathStyle
 
@@ -161,6 +162,7 @@ export class DocViewSVGManager
     }
 
     /** Transform and scale SVG Shape data to PDF space coordinates (points) 
+     *      This includes styling based on classes
      * 
      *  NOTES:
      *      - incoming SVG units are worldUnits (in <svg _worldUnits="..">) [ NOTE: after parsing XML nodes _ is removed!]
@@ -218,8 +220,8 @@ export class DocViewSVGManager
     {
         return {
             ...this.PATH_BASE_STYLE, // start with minimum styling
-            ...this._pathAttributesToPDFPathStyle(svgPathNode),
-            ...this._pathClassesToPDFPathStyle(svgPathNode),
+            ...this._pathClassesToPDFPathStyle(svgPathNode), // Override style PDF paths based on class on svg path
+            ...this._pathAttributesToPDFPathStyle(svgPathNode), // SVG path attributes are set on individual shapes. These have priority of class styling
         }
     }
 

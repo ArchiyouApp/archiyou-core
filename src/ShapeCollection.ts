@@ -2046,6 +2046,8 @@
       {
          const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
          const DEFAULT_BIN_HEIGHT = 1000;
+         const DEFAULT_AUTOROTATE = false;
+         const DEFAULT_FLATTEN = false;
          const BOX_MARGIN_DEFAULT = 5;
          const BIN_MARGIN = 100; 
          
@@ -2053,21 +2055,15 @@
          const binWidth = options?.stockWidth || DEFAULT_BIN_WIDTH;
          const binHeight = options?.stockHeight || DEFAULT_BIN_HEIGHT;
 
-         const autoRotate = options?.autoRotate ?? true;
-         const flatten = options?.flatten ?? true;
+         const autoRotate = options?.autoRotate ?? DEFAULT_AUTOROTATE;
+         const flatten = options?.flatten ?? DEFAULT_FLATTEN;
          if(autoRotate || flatten){ copy = true };
-
-         console.log('==== PACK DEBUG ====');
 
          const boxMargin = (options?.margin !== undefined) ? options.margin : BOX_MARGIN_DEFAULT;
          const boxes = this.toArray().map( (shape,i) => 
          {
-            console.log('AUTO ROTATE');
-            console.log(autoRotate);
-
             let s = (autoRotate) ? shape._copy().rotateToLayFlat() : shape;
             s = (flatten) ? s._flattened() : s;
-            s.addToScene().move(-10000).color('red'); // DEBUG
             return this._makeBinPackBox(s, boxMargin, i)
          });
 

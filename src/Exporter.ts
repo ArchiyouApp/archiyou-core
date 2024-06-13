@@ -334,8 +334,8 @@ export class Exporter
 
             const svgFrameGroup = `
                         <g id="frame${frameNum}" visibility="hidden">
-                            <set id="an${frameNum*2}" attributeName="visibility" begin="${SVG_FRAME_DURATION*frameNum}; an${frameNum*2+1}.end" to="visible" dur="${SVG_FRAME_DURATION}s" />
-                            <set id="an${frameNum*2+1}" attributeName="visibility" begin="an${frameNum*2}.end" to="hidden" dur="${numFrames*SVG_FRAME_DURATION}s" />
+                            <set id="an${frameNum*2}" attributeName="visibility" begin="${SVG_FRAME_DURATION*frameNum}; an${frameNum*2+1}.end" to="visible" dur="${SVG_FRAME_DURATION-SVG_FRAME_DURATION}s" />
+                            <set id="an${frameNum*2+1}" attributeName="visibility" begin="an${frameNum*2}.end" to="hidden" dur="${numFrames*SVG_FRAME_DURATION-SVG_FRAME_DURATION}s" />
                             ${pathNodes.map(p => this._txmlNodeToString(p)).join('')}
                         </g>`
             svgFrameGroups.push(svgFrameGroup);

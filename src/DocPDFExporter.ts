@@ -45,7 +45,7 @@ export class DocPDFExporter
     
     TABLE_FONTSIZE_DEFAULT = 8;
     TABLE_BORDER_THICKNESS_MM = 0.1;
-    TABLE_PADDING_MM = 2;
+    TABLE_PADDING_MM = 1;
 
     
 
@@ -384,7 +384,7 @@ export class DocPDFExporter
                 let svgRootElem;
                 if (this.isBrowser())
                 {
-                    svgRootElem = new DOMParser().parseFromString(img.content.data, 'image/svg+xml').rootElement; // TODO: replace rootElement
+                    svgRootElem = new DOMParser().parseFromString(img.content.data, 'image/svg+xml').documentElement; 
                 }
                 else {
                     // TODO: node js solution replacing DOMParser
@@ -479,7 +479,6 @@ export class DocPDFExporter
      *      - view.content.data contains raw SVG string (<svg _bbox="..." _worldUnits='mm'><path .. >... )
      *      - TODO: Implement view.zoomLevel, view.zoomRelativeTo etc. - NOW: only automatic filling of viewport/container
      * 
-     *      see svg-to-pdfkit: https://github.com/alafr/SVG-to-PDFKit
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
@@ -503,20 +502,20 @@ export class DocPDFExporter
                 this._setPathStyle(path.style);
                 // jsPDF needs Line paths as [{op: m|l, c: [x,y] }]
                 const pathLines = svgEdit._pdfLinePathToJsPDFPathLines(path);
-                this.activePDFDoc.path(pathLines)                        
-            })
+                this.activePDFDoc.path(pathLines);
+            })            
         }
         
-        //this.activePDFDoc.restoreGraphicsState(); // restore Gstate
+        //this.activePDFDoc.restoreGraphicsState(); // restore Gstate - Not working
 
         // Draw annotations
         svgEdit.drawDimLinesToPDF(this);
 
         // draw border around container
         // TODO: check!
-        const viewPositionPnts = this.containerToPositionInPnts(view, p);
         if (view.border)
         {
+            const viewPositionPnts = this.containerToPositionInPnts(view, p);
             let d = this.activePDFDoc.rect(
                 viewPositionPnts.x,
                 viewPositionPnts.y,
@@ -526,14 +525,21 @@ export class DocPDFExporter
             this._setPathStyle(view?.borderStyle)
         }
 
+        // Force putting to canvas
+        this._drawFakePath();
+
     }
 
-    /** Set styling before drawing anything
-     *  IMPORTANT: Please backup and restore these settings if needed 
-     *      with 
-     *          this.activePDFDoc.saveGraphicsState(); // backup GState
-     *          this.activePDFDoc.restoreGraphicsState()
-     */
+    /** HACK: For some reason using this.activePDFDoc.path in _placeViewSVG() 
+     *  does not apply drawing and styling to canvas. By drawing this bogus empty rectangle it does!
+     *  TODO: research why this works in code: https://github.com/parallax/jsPDF/blob/5d09af9135a2fe049c7d3c8b95df280d22e4a6db/src/jspdf.js#L4485
+      */
+    _drawFakePath()
+    {  
+        this.activePDFDoc.rect(0,0,0,0);
+    }
+
+    /** Set styling before drawing anything */
     _setPathStyle(style?:DocPathStyle):jsPDF // doc: PDFDocument
     {
         // Convert special props that need to be get in GState instead directly on jsPDF doc in activePDFDoc
@@ -566,6 +572,7 @@ export class DocPDFExporter
             else {
                 const stylePropJsPDF = STYLE_PROPS_TRANSFORM_FOR_JSPDF[styleProp] ?? styleProp;
                 const setFnName = `set${stylePropJsPDF.charAt(0).toUpperCase() + stylePropJsPDF.slice(1)}`; // transform from prop to set{Prop}() function
+
                 if(typeof this.activePDFDoc[setFnName] === 'function')
                 {
                     this.activePDFDoc[setFnName](val); // execute style function
