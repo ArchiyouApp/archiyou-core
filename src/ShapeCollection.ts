@@ -1955,8 +1955,8 @@
       }
 
       /** Shape API - Try to union all shapes in Collection (without adding to Scene) */
-      @checkInput([['AnyShapeOrCollection',null ]], 'auto')
-      _unioned(other?:AnyShapeOrCollection):ShapeCollection|AnyShape
+      @checkInput([['AnyShapeOrCollection',null ],[Boolean, false]], ['auto', 'auto'])
+      _unioned(other?:AnyShapeOrCollection, noRecurse?:boolean):ShapeCollection|AnyShape
       {
          // just add the other to collection, and then union
          if(other)
@@ -1998,11 +1998,12 @@
          })
 
          // We recurse one level by trying again to union the results
-         if(results.length > 1)
+         if(!noRecurse && results.length > 1)
          {
             // To increase chances of succesful union order by volume
+            // TODO: introduce a smarter approach
             results.sort((a,b) => b.volume() - a.volume())
-            results = new ShapeCollection(results._unioned());
+            results = new ShapeCollection(results._unioned(null, true));
          }
 
          return results.checkSingle();
