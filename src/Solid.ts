@@ -102,13 +102,13 @@ export class Solid extends Shape
         if(finalSolid.valid())
         {
             console.geom(`Solid::fromShell: Succesfully created a Solid out of ${shells.length} Shells!`);
+            return finalSolid;
         }
         else 
         {
             console.warn(`Solid::fromShell: We created a Solid out of ${shells.length} Shells but validation was not succesfull. Be careful with this Solid!`);
+            return null;
         }
-    
-        return finalSolid;
         
     }
 

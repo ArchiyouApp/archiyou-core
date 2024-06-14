@@ -1551,7 +1551,8 @@
       {
          this._connectLinearShapes();
          // TODO: Combine Wires into Faces
-         // TODO: Combine Faces into Solids
+         // TODO: Combine Faces into Shells
+         // TODO: Combine Shells into Solids
 
          return this;
       }
@@ -1562,6 +1563,95 @@
          let newCollection = this.upgrade().copy();
          
          return newCollection
+      }
+
+      /** Try to combine into higher order Shape of same type of Shapes in Collection */
+      upgradeShapesByType():this
+      {
+         const UPGRADE_SHAPE_TYPES = ['Face','Shell'] as Array<ShapeType>; // TODO: more
+
+         UPGRADE_SHAPE_TYPES.forEach( (curType,i) => {
+            const groupedByType = this.getShapesByType(curType);
+            if(groupedByType.length)
+            {
+               // We try to be smart by first grouping Shapes if they touch or not, then try to combine them
+               const groupedByTouching = groupedByType.groupTouching();
+               groupedByTouching.forEachGroup((name,grouped) => {
+                  if(grouped.length > 1)
+                  {
+                     // Try to combine into higher order Shape
+                     let combinedShape;
+
+                     switch(curType)
+                     {
+                        case 'Face':
+                           combinedShape = new Shell().fromFaces(grouped);
+                           break;
+                        case 'Shell': 
+                           combinedShape = new Solid().fromShells(grouped);
+                           break;
+                        default:
+                           console.warn(`ShapeCollection: upgradeShapesByType(): Unknown current type "${curType}". Please check code.`)
+                     }
+
+                     // Test result
+                     const curUpgradeType = (i < UPGRADE_SHAPE_TYPES.length - 1) ? UPGRADE_SHAPE_TYPES[i+1] : 'Solid';
+                     if(combinedShape?.type() === curUpgradeType)
+                     {
+                        // Remove old ones from Collection and add new upgraded
+                        this.remove(grouped);
+                        this.add(combinedShape);
+
+                        console.info(`ShapeCollection: upgradeShapesByType(): Combined ${grouped.length} Shapes of type ${curType} into higher order Shape of type ${curUpgradeType}"`);
+                     }
+                  }
+               })
+
+            }
+         }) 
+
+         return this;
+      }
+
+      /** Combine touching Shapes into groups with names like touching{{n=0,1,2}} */
+      groupTouching():this
+      {
+         const touchGroups = [] as Array<ShapeCollection>;
+         const shapeTolerance = this._oc.SHAPE_TOLERANCE;
+
+         this.shapes.forEach((curShape,i) => {
+            if(i === 0)
+            {
+               touchGroups.push(new ShapeCollection(curShape));
+            }
+            else {
+               // see if curShape touches any shape in the touchGroups
+               let putInGroup = false;
+               touchGroups.every( groupColl => 
+               {
+                  groupColl.forEach( groupShape => 
+                  {
+                     if(!putInGroup && groupShape.distance(curShape) <= shapeTolerance)
+                     {
+                        groupColl.add(curShape)
+                        putInGroup = true;
+                     }
+                  })
+               })
+   
+               // cur Shape not in any touching group
+               if(!putInGroup)
+                  {
+                     // Add group 
+                     touchGroups.push(new ShapeCollection(curShape))
+               }
+            }
+         })
+         
+         // Make groups
+         touchGroups.forEach( (groupColl,i) => this._defineGroup(`touching${i}`, groupColl))
+
+         return this;
       }
 
       /** Check downgrade */
@@ -1654,15 +1744,15 @@
       }
 
      /** Combining Linear Shapes (Edges and Wires) into Wires connected by Vertices
-     *    !!!! NEEDS WORK !!!!
      *    For Edges that overlap this does not work ( union could work: TODO )
      *    All other Shapes except Edges are kept in the collection
+     *    TODO: Use OC native methods here!
      */
       _connectLinearShapes()
      {
-         let edges = this.getShapesByType('Edge'); 
-         let wires = this.getShapesByType('Wire')
-         let wireEdges = new ShapeCollection();
+         const edges = this.getShapesByType('Edge'); 
+         const wires = this.getShapesByType('Wire')
+         const wireEdges = new ShapeCollection();
          wires.forEach( w => 
             {
                wireEdges.concat(w.edges());
@@ -1674,6 +1764,7 @@
          if (allEdges.length <= 1)
          {
             // no or only one Edge(s) to combine
+            console.warn(`ShapeCollection::_connectLinearShape: No linear (Edges,Wires) Shapes to combine! Returned original`);
             return this;
          }
 
@@ -1866,19 +1957,40 @@
             this.add(other);
          }
 
-         let result = new ShapeCollection();
-         let firstShape = this.first();
+         const results = new ShapeCollection();
 
-         this.forEach( shape => 
+         this.forEach( (curShape,i) => 
          {
-            if (shape !== firstShape)
+            if (i === 0)
             {
-               let r = firstShape._unioned(shape);
-               result = (r instanceof ShapeCollection) ? result.concat(r) : result.add(r);
+               results.add(curShape);
+            }
+            else
+            {
+               // Check if any previous union results can be unioned with curShape
+               let didUnion = false;
+               results.toArray().every( resultShape => {
+                  const unionResult = resultShape._unioned(curShape);
+                  if(unionResult)
+                  {
+                     // there was a union, keep track of mutations
+                     results.remove(resultShape); // remove old shape
+                     results.add(unionResult) // add new unioned Shape/ShapeCollection
+                     didUnion = true;
+                     return false; // break loop
+                  }
+                  return true;
+               }) 
+
+               // Shape was not unioned, add to results as is
+               if(!didUnion)
+               {
+                  results.add(curShape._copy());
+               }
             }
          })
 
-         return result.checkSingle()
+         return results.checkSingle();
       }
 
       /** Shape API - Try to union all shapes in Collection and add to Scene */

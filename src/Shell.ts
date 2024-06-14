@@ -113,9 +113,6 @@ export class Shell extends Shape
         }
         else {
             // successfull sew
-            console.log('==== FROM FACES ====');
-            console.log(forceShell);
-
             const ocSewResultType = this._getShapeTypeFromOcShape(ocSewResult)
             if (ocSewResultType === 'Shell' || forceShell)
             {
@@ -123,7 +120,7 @@ export class Shell extends Shape
                 {
                     console.warn(`Shell::fromFaces(): Combining Faces did not result in one Shell, but forceShell is set! a Bad Shell can be expected!`)
                 }
-                return this._fromOcShell(ocSewResult).checkAndFix() as Shell; // !!!! check and fix needed? !!!!
+                return this._fromOcShell(ocSewResult).checkAndFix() as Shell;
             }
             else {
                 const nonShellShape = this._fromOcShape(ocSewResult) as AnyShapeOrCollection

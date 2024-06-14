@@ -2221,13 +2221,25 @@ export class Shape
         return extrudedOthers;
     }
 
-    /** Unions one with another Shape (Private method without adding to Scene) */
-    @checkInput('AnyShape', 'auto')
-    _unioned(other:AnyShape):AnyShapeOrCollection
+    /** Unions one with another Shape(s) (Private method without adding to Scene) */
+    @checkInput('AnyShapeOrCollection', 'auto')
+    _unioned(other:AnyShapeOrCollection):AnyShapeOrCollection|null
     {
         // NOTE: Face Face operations don't work (anymore) - even with solidifying the operants: now use a own method
+        if(ShapeCollection.isShapeCollection(other))
+        {
+            return (other as ShapeCollection)._unioned(this)
+        }
         
-        let otherShape:AnyShape = other as AnyShape;
+        // Don't try to union if Shapes don't touch
+        const otherShape:AnyShape = other as AnyShape;
+        if(this.distance(otherShape) > this._oc.SHAPE_TOLERANCE)
+        {
+            console.error(`Shape::_unioned(): Given other Shape does not touch current one! Returned null`)
+            return null;
+        }
+
+        
         if(this.type() == 'Face' && other.type() == 'Face')
         {
             // check normals
@@ -2276,9 +2288,9 @@ export class Shape
             // 1 or multiple Shapes
             if( (s as ShapeCollection).count() > 1)
             {
-                let shapeCollection = s as ShapeCollection;
+                const shapeCollection = s as ShapeCollection;
                 console.warn(`Shape::union: Union resulted in multiple Shapes: trying to sew!`);
-                let sewedShape = shapeCollection._sewed();
+                const sewedShape = shapeCollection._sewed();
 
                 if ( !(sewedShape instanceof ShapeCollection))
                 {
@@ -2287,7 +2299,7 @@ export class Shape
                 }
                 else 
                 {
-                    console.warn(`Shape::Union: sew was unsuccesfull: this Shape changes into a ShapeCollection after union`);
+                    console.warn(`Shape::Union: sew was unsuccesfull: this Shape changes into a ShapeCollection with ${sewedShape.length} Shapes of types [${sewedShape.toArray().map(s => s.type()).join(',')}] after union`);
                 }
                 
                 // Replace original Shape or ShapeCollection
@@ -2299,47 +2311,47 @@ export class Shape
 
     /** Unions one with another Shape */
     @addResultShapesToScene
-    @checkInput('AnyShape', 'auto')
-    unioned(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    unioned(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._unioned(other);
     }
 
     /** Alias for unioned */
     @addResultShapesToScene
-    @checkInput('AnyShape', 'auto')
-    combined(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    combined(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._unioned(other);
     }
 
     /** Alias for unioned */
     @addResultShapesToScene
-    @checkInput('AnyShape', 'auto')
-    added(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    added(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._unioned(other);
     }
 
     /** Alias for unioned */
     @addResultShapesToScene
-    @checkInput('AnyShape', 'auto')
-    fused(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    fused(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._unioned(other);
     }
 
     /** Alias for unioned */
     @addResultShapesToScene
-    @checkInput('AnyShape', 'auto')
-    merged(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    merged(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this._unioned(other);
     }
 
     /** Same as unioned but replacing current Shape in Obj */
-    @checkInput('AnyShape', 'auto')
-    union(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    union(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         let unionedShape = this._unioned(other);
         this.replaceShape(unionedShape);
@@ -2347,29 +2359,29 @@ export class Shape
     }
 
     /** Alias for union */
-    @checkInput('AnyShape', 'auto')
-    combine(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    combine(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this.union(other);
     }
 
     /** Alias for union */
-    @checkInput('AnyShape', 'auto')
-    add(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    add(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this.union(other);
     }
 
     /** Alias for union */
-    @checkInput('AnyShape', 'auto')
-    merge(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    merge(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this.union(other);
     }
 
     /** Alias for union */
-    @checkInput('AnyShape', 'auto')
-    fuse(other:AnyShape):AnyShapeOrCollection
+    @checkInput('AnyShapeOrCollection', 'auto')
+    fuse(other:AnyShapeOrCollection):AnyShapeOrCollection
     {
         return this.union(other);
     }
