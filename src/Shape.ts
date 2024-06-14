@@ -2232,7 +2232,7 @@ export class Shape
         }
         
         // Don't try to union if Shapes don't touch
-        const otherShape:AnyShape = other as AnyShape;
+        let otherShape:AnyShape = other as AnyShape;
         if(this.distance(otherShape) > this._oc.SHAPE_TOLERANCE)
         {
             console.error(`Shape::_unioned(): Given other Shape does not touch current one! Returned null`)

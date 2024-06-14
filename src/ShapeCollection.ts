@@ -417,6 +417,13 @@
          return this;
       }
 
+      /** Clear current ShapeCollection */
+      empty():this
+      {
+         this.remove(this);
+         return this;
+      }
+
       /** Return a new Collection of given Shapes removed */
       @checkInput('AnyShapeOrCollection', 'ShapeCollection')
       removed(shapes:AnyShapeOrCollection): ShapeCollection
@@ -1957,7 +1964,7 @@
             this.add(other);
          }
 
-         const results = new ShapeCollection();
+         let results = new ShapeCollection();
 
          this.forEach( (curShape,i) => 
          {
@@ -1990,6 +1997,14 @@
             }
          })
 
+         // We recurse one level by trying again to union the results
+         if(results.length > 1)
+         {
+            // To increase chances of succesful union order by volume
+            results.sort((a,b) => b.volume() - a.volume())
+            results = new ShapeCollection(results._unioned());
+         }
+
          return results.checkSingle();
       }
 
@@ -2002,13 +2017,15 @@
       }
 
       /** Shape API - Try to union all shapes in Collection */
-      union():ShapeCollection|Shape
+      @addResultShapesToScene
+      union():this
       {
-         /* union is disabled for now because it can yield different results: 
-         we need to be clear that a change of Shape can occur. So signify that we make a copy! */
-         // TODO
-         console.error('ShapeCollection.union: **** TO BE IMPLEMENTED ****');
-         return null;
+         const unionedCollection = new ShapeCollection(this._unioned());
+         this.removeFromScene(); // Remove current Shapes
+         this.empty();
+         this.add(unionedCollection); // Add Shapes to current collection
+
+         return this;
       }
       
 
