@@ -1,5 +1,5 @@
 import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, 
-            ArchiyouApp, StatementError, ConsoleMessage, Shape, VertexCollection} from './internal'
+            ArchiyouApp, StatementResult, ConsoleMessage, Shape, VertexCollection} from './internal'
 import { toRad, MeshingQualitySettings, ArchiyouData, ArchiyouOutputSettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils  } from '@gltf-transform/core';
 import { sequence } from '@gltf-transform/functions';

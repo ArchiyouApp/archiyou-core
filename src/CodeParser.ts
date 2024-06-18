@@ -18,17 +18,6 @@ interface StatementFilter
     pattern:string; // just a simple str
 }
 
-export interface Statement
-{
-    code:string; // the real code
-    startIndex: number;
-    endIndex: number;
-    lineStart:number; // the line the statement starts (it can actually span multiple lines)
-    lineEnd:number;
-    columnStartIndex:number;
-    columnEndIndex:number;
-}
-
 
 export class CodeParser
 {   

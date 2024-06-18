@@ -132,7 +132,7 @@ export interface ArchiyouData
     gizmos: Array<Gizmo>,
     annotations: Array<DimensionLineData>, 
     docs: {[key:string]:DocData} // all documents in data and serialized content
-    errors?: Array<StatementError>, // only needed for internal use in the future
+    errors?: Array<StatementResult>, // only needed for internal use in the future
     messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
     metrics?: Record<string, Metric>,  
     tables?:{[key:string]:any}, // raw data tables
@@ -268,12 +268,24 @@ export interface SceneGraphNodeDetails {
     numWires?:number,
 }
 
-export interface StatementError 
+/** The Script seperated into statements */
+export interface Statement
 {
-    lineStart: number, // NOTE: lineIndex versus this!
-    lineEnd: number,
-    code: string,
-    message : string,
+    code:string; // the real code
+    startIndex?: number;
+    endIndex?: number;
+    lineStart?:number; // the line the statement starts (it can actually span multiple lines)
+    lineEnd?:number;
+    columnStartIndex?:number;
+    columnEndIndex?:number;
+}
+
+export interface StatementResult extends Statement
+{
+    status: 'error'|'success'
+    message?: string,
+    duration?: number
+    durationPerc?:number // Added by Archiyou app ProfilingMenu
 }
 
 export interface BaseStyle 
