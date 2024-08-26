@@ -1147,7 +1147,7 @@
       }
 
       /** Return new ShapeCollection with only the visible Shapes */
-      onlyVisible():ShapeCollection|AnyShape
+      visible():ShapeCollection|AnyShape
       {
          return this.filter(s => s.visible());
       }

@@ -2526,7 +2526,7 @@ export class Shape
 
     /** Cut current Shape by other Shape and keep the biggest part */
     @checkInput(['AnyShape',['Boolean', false]], ['auto', 'auto'])
-    cutoffBy(other:AnyShape, smallest?:boolean):this
+    cutoffBy(other:AnyShape, keepSmallest?:boolean):this
     {
         const splitResult = this._splitted(other);
         if(Shape.isShape(splitResult))
@@ -2536,7 +2536,7 @@ export class Shape
         }
         else {
             (splitResult as ShapeCollection).sort((a,b) => (b.area() || b.length()) - (a.area() || a.length()))
-            const result = (!smallest) ? splitResult[0] : splitResult[1];
+            const result = (!keepSmallest) ? splitResult[0] : splitResult[1];
 
             if(result.type() !== this.type())
             {
@@ -2548,6 +2548,13 @@ export class Shape
         }
 
         return this;
+    }
+
+    /** Alias of cutoffBy */
+    @checkInput(['AnyShape',['Boolean', false]], ['auto', 'auto'])
+    trim(other:AnyShape, keepSmallest?:boolean)
+    {
+        return this.cutoffBy(other)
     }
 
 
