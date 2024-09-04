@@ -925,7 +925,7 @@ export class Shape
     moveToY(y:number, pivot:Alignment):this
     {
         const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
-        this.move(y - pivotPoint.y );
+        this.moveY(y - pivotPoint.y );
         return this;
     }
 
@@ -934,7 +934,7 @@ export class Shape
     moveToZ(z:number, pivot:Alignment):this
     {
         const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
-        this.move(z - pivotPoint.z );
+        this.moveZ(z - pivotPoint.z );
         return this;
     }
 
