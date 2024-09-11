@@ -449,6 +449,7 @@ export interface DocData {
 
 export type PageSize = 'A0'|'A1'|'A2'|'A3'|'A4'|'A5'|'A6'|'A7';
 export type PageOrientation = 'landscape'|'portrait';
+export type PageSide = 'width'|'height'
 export type AnyPageContainer = Container|View
 
 export interface PageData {
@@ -466,7 +467,7 @@ export interface PageData {
 
 //// DOC:PAGE:CONTAINER ////
 
-export type ContainerType = 'view'|'image'|'text'|'textarea'|'table'
+export type ContainerType = 'view'|'image'|'text'|'textarea'|'table'|'graphic'
 export type ContainerHAlignment = 'left'|'center'|'right'
 export type ContainerVAlignment = 'top' | 'center' | 'bottom'
 export type ContainerAlignment = Array<ContainerHAlignment | ContainerVAlignment> // like [left,top]
@@ -474,8 +475,9 @@ export type ContainerSide = 'width'|'height'
 export type ZoomRelativeTo = 'container'|'world'
 export type ScaleInput = 'auto'|number;
 export type ContainerSizeRelativeTo = 'page' | 'page-content-area'; // page-content area is page without the padding on both sides
-export type Position = Array<number|number>
-export type PositionLike = Position|ContainerAlignment
+export type ContainerPositionRel= Array<number|number> // This is relative coords [ [0,1],[0,1]] from left bottom
+export type ContainerPositionAbs = Array<string|string> // '10mm', '20mm'
+export type ContainerPositionLike = ContainerPositionRel|ContainerAlignment|ContainerPositionAbs
 
 export type ContainerData = { // Combine all Container types for convenience
     _entity:string
@@ -488,8 +490,8 @@ export type ContainerData = { // Combine all Container types for convenience
     height:number // relative to (see: widthRelativeTo)
     heightRelativeTo:ContainerSizeRelativeTo
     heightAbs?:number // in doc units (added on place)
-    position:Position // relative to page-content-area
-    pivot:Position
+    position:ContainerPositionRel// relative to page-content-area
+    pivot:ContainerPositionRel
     border?:boolean // border around container
     borderStyle?:DocPathStyle // style to draw border
     frame?:any // advanced shapes as border
@@ -570,6 +572,49 @@ export interface TextOptions
     angle?:number // in degrees
     // NOTE: some of these parameters are plugged directly into jsPDF.text()
 }
+
+//// DOCS:PAGE:CONTAINER:GRAPHIC
+
+export type DocGraphicType = 'rect'|'circle'|'ellipse'|'line'|'hline'|'vline'|'triangle' // Later: poly?
+
+// Default simple input
+export interface DocGraphicInputBase
+{
+    type:DocGraphicType
+    size?:number
+    units?:DocUnits // default in mm
+    data?:any // TODO later: things to put inside graphic, like label number
+}
+
+export interface DocGraphicInputRect extends DocGraphicInputBase
+{
+    // if size => size=width=height
+    width:number
+    height:number
+    round?:number
+}
+
+export interface DocGraphicInputCircle extends DocGraphicInputBase
+{
+    // if size => size = radius
+    radius:number
+}
+
+export interface DocGraphicInputLine extends DocGraphicInputBase
+{
+    // if size => size = length
+    start:[number,number]
+    end:[number,number]
+}
+
+export interface DocGraphicInputOrthoLine extends DocGraphicInputBase
+{
+    length:number
+}
+
+
+
+
 
 //// DOCS:PAGE:CONTAINER:VIEW ////
 

@@ -1352,8 +1352,8 @@
          console.log(new this._oc.TopTools().TopTools_HSequenceOfShape);
          */
 
-         const ocShapeSequence = new this._oc.Handle_TopTools_HSequenceOfShape_2(new this._oc.TopTools_ListOfShape_1());
-         const ocEdges = new this._oc.Handle_TopTools_HSequenceOfShape_2(new this._oc.TopTools_ListOfShape_1());
+         const ocShapeSequence = new this._oc.Handle_TopTools_HSequenceOfShape_1();
+         const ocEdges = new this._oc.Handle_TopTools_HSequenceOfShape_1();
          this.edges().forEach( e => ocEdges.Append_1(e._ocShape));
 
          this._oc.ShapeAnalysis_FreeBounds.ConnectEdgesToWires(

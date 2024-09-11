@@ -3278,6 +3278,30 @@ export declare class Handle_TopTools_HSequenceOfShape {
     constructor(theHandle: Handle_TopTools_HSequenceOfShape);
   }
 
+export declare class Handle_TopTools_HArray1OfShape {
+  Nullify(): void;
+  IsNull(): boolean;
+  reset(thePtr: TopTools_HArray1OfShape): void;
+  get(): TopTools_HArray1OfShape;
+  delete(): void;
+}
+
+  export declare class Handle_TopTools_HArray1OfShape_1 extends Handle_TopTools_HArray1OfShape {
+    constructor();
+  }
+
+  export declare class Handle_TopTools_HArray1OfShape_2 extends Handle_TopTools_HArray1OfShape {
+    constructor(thePtr: TopTools_HArray1OfShape);
+  }
+
+  export declare class Handle_TopTools_HArray1OfShape_3 extends Handle_TopTools_HArray1OfShape {
+    constructor(theHandle: Handle_TopTools_HArray1OfShape);
+  }
+
+  export declare class Handle_TopTools_HArray1OfShape_4 extends Handle_TopTools_HArray1OfShape {
+    constructor(theHandle: Handle_TopTools_HArray1OfShape);
+  }
+
 export declare class TopTools {
   constructor();
   static Dump(Sh: TopoDS_Shape, S: Standard_OStream): void;
@@ -3331,6 +3355,85 @@ export declare class TopTools_SequenceOfShape extends NCollection_BaseSequence {
 
   export declare class TopTools_SequenceOfShape_3 extends TopTools_SequenceOfShape {
     constructor(theOther: TopTools_SequenceOfShape);
+  }
+
+export declare class TopTools_DataMapOfShapeSequenceOfShape extends NCollection_BaseMap {
+  begin(): any;
+  end(): any;
+  cbegin(): any;
+  cend(): any;
+  Exchange(theOther: TopTools_DataMapOfShapeSequenceOfShape): void;
+  Assign(theOther: TopTools_DataMapOfShapeSequenceOfShape): TopTools_DataMapOfShapeSequenceOfShape;
+  ReSize(N: Standard_Integer): void;
+  Bind(theKey: TopoDS_Shape, theItem: TopTools_SequenceOfShape): Standard_Boolean;
+  Bound(theKey: TopoDS_Shape, theItem: TopTools_SequenceOfShape): TopTools_SequenceOfShape;
+  IsBound(theKey: TopoDS_Shape): Standard_Boolean;
+  UnBind(theKey: TopoDS_Shape): Standard_Boolean;
+  Seek(theKey: TopoDS_Shape): TopTools_SequenceOfShape;
+  ChangeSeek(theKey: TopoDS_Shape): TopTools_SequenceOfShape;
+  ChangeFind(theKey: TopoDS_Shape): TopTools_SequenceOfShape;
+  Clear_1(doReleaseMemory: Standard_Boolean): void;
+  Clear_2(theAllocator: Handle_NCollection_BaseAllocator): void;
+  Size(): Standard_Integer;
+  delete(): void;
+}
+
+  export declare class TopTools_DataMapOfShapeSequenceOfShape_1 extends TopTools_DataMapOfShapeSequenceOfShape {
+    constructor();
+  }
+
+  export declare class TopTools_DataMapOfShapeSequenceOfShape_2 extends TopTools_DataMapOfShapeSequenceOfShape {
+    constructor(theNbBuckets: Standard_Integer, theAllocator: Handle_NCollection_BaseAllocator);
+  }
+
+  export declare class TopTools_DataMapOfShapeSequenceOfShape_3 extends TopTools_DataMapOfShapeSequenceOfShape {
+    constructor(theOther: TopTools_DataMapOfShapeSequenceOfShape);
+  }
+
+export declare class TopTools_Array1OfShape {
+  begin(): any;
+  end(): any;
+  cbegin(): any;
+  cend(): any;
+  Init(theValue: TopoDS_Shape): void;
+  Size(): Standard_Integer;
+  Length(): Standard_Integer;
+  IsEmpty(): Standard_Boolean;
+  Lower(): Standard_Integer;
+  Upper(): Standard_Integer;
+  IsDeletable(): Standard_Boolean;
+  IsAllocated(): Standard_Boolean;
+  Assign(theOther: TopTools_Array1OfShape): TopTools_Array1OfShape;
+  Move(theOther: TopTools_Array1OfShape): TopTools_Array1OfShape;
+  First(): TopoDS_Shape;
+  ChangeFirst(): TopoDS_Shape;
+  Last(): TopoDS_Shape;
+  ChangeLast(): TopoDS_Shape;
+  Value(theIndex: Standard_Integer): TopoDS_Shape;
+  ChangeValue(theIndex: Standard_Integer): TopoDS_Shape;
+  SetValue(theIndex: Standard_Integer, theItem: TopoDS_Shape): void;
+  Resize(theLower: Standard_Integer, theUpper: Standard_Integer, theToCopyData: Standard_Boolean): void;
+  delete(): void;
+}
+
+  export declare class TopTools_Array1OfShape_1 extends TopTools_Array1OfShape {
+    constructor();
+  }
+
+  export declare class TopTools_Array1OfShape_2 extends TopTools_Array1OfShape {
+    constructor(theLower: Standard_Integer, theUpper: Standard_Integer);
+  }
+
+  export declare class TopTools_Array1OfShape_3 extends TopTools_Array1OfShape {
+    constructor(theOther: TopTools_Array1OfShape);
+  }
+
+  export declare class TopTools_Array1OfShape_4 extends TopTools_Array1OfShape {
+    constructor(theOther: TopTools_Array1OfShape);
+  }
+
+  export declare class TopTools_Array1OfShape_5 extends TopTools_Array1OfShape {
+    constructor(theBegin: TopoDS_Shape, theLower: Standard_Integer, theUpper: Standard_Integer);
   }
 
 export declare class TopTools_ListOfShape extends NCollection_BaseList {
@@ -4157,6 +4260,34 @@ export declare class HLRBRep_HLRToShape {
   IsoLineHCompound_2(S: TopoDS_Shape): TopoDS_Shape;
   CompoundOfEdges_1(type: HLRBRep_TypeOfResultingEdge, visible: Standard_Boolean, In3d: Standard_Boolean): TopoDS_Shape;
   CompoundOfEdges_2(S: TopoDS_Shape, type: HLRBRep_TypeOfResultingEdge, visible: Standard_Boolean, In3d: Standard_Boolean): TopoDS_Shape;
+  delete(): void;
+}
+
+export declare class StdPrs_ShapeTool {
+  constructor(theShape: TopoDS_Shape, theAllVertices: Standard_Boolean)
+  InitFace(): void;
+  MoreFace(): Standard_Boolean;
+  NextFace(): void;
+  GetFace(): TopoDS_Face;
+  FaceBound(): Bnd_Box;
+  IsPlanarFace_1(): Standard_Boolean;
+  InitCurve(): void;
+  MoreCurve(): Standard_Boolean;
+  NextCurve(): void;
+  GetCurve(): TopoDS_Edge;
+  CurveBound(): Bnd_Box;
+  Neighbours(): Graphic3d_ZLayerId;
+  FacesOfEdge(): Handle_TopTools_HSequenceOfShape;
+  InitVertex(): void;
+  MoreVertex(): Standard_Boolean;
+  NextVertex(): void;
+  GetVertex(): TopoDS_Vertex;
+  HasSurface(): Standard_Boolean;
+  CurrentTriangulation(l: TopLoc_Location): Handle_Poly_Triangulation;
+  HasCurve(): Standard_Boolean;
+  PolygonOnTriangulation(Indices: Handle_Poly_PolygonOnTriangulation, T: Handle_Poly_Triangulation, l: TopLoc_Location): void;
+  Polygon3D(l: TopLoc_Location): Handle_Poly_Polygon3D;
+  static IsPlanarFace_2(theFace: TopoDS_Face): Standard_Boolean;
   delete(): void;
 }
 
@@ -7393,6 +7524,13 @@ export declare class NCollection_BaseList {
   delete(): void;
 }
 
+export declare class NCollection_BaseSequence {
+  IsEmpty(): Standard_Boolean;
+  Length(): Graphic3d_ZLayerId;
+  Allocator(): Handle_NCollection_BaseAllocator;
+  delete(): void;
+}
+
 export declare class NCollection_BaseMap {
   NbBuckets(): Graphic3d_ZLayerId;
   Extent(): Graphic3d_ZLayerId;
@@ -8681,6 +8819,12 @@ export declare class OCJS {
   delete(): void;
 }
 
+export declare class TopTools_HSequenceOfShape_Getter {
+  constructor();
+  static Get(): TopTools_HSequenceOfShape;
+  delete(): void;
+}
+
 type Standard_Boolean = boolean;
 type Standard_Byte = number;
 type Standard_Character = number;
@@ -9191,11 +9335,26 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   Handle_TopTools_HSequenceOfShape_2: typeof Handle_TopTools_HSequenceOfShape_2;
   Handle_TopTools_HSequenceOfShape_3: typeof Handle_TopTools_HSequenceOfShape_3;
   Handle_TopTools_HSequenceOfShape_4: typeof Handle_TopTools_HSequenceOfShape_4;
+  Handle_TopTools_HArray1OfShape: typeof Handle_TopTools_HArray1OfShape;
+  Handle_TopTools_HArray1OfShape_1: typeof Handle_TopTools_HArray1OfShape_1;
+  Handle_TopTools_HArray1OfShape_2: typeof Handle_TopTools_HArray1OfShape_2;
+  Handle_TopTools_HArray1OfShape_3: typeof Handle_TopTools_HArray1OfShape_3;
+  Handle_TopTools_HArray1OfShape_4: typeof Handle_TopTools_HArray1OfShape_4;
   TopTools: typeof TopTools;
   TopTools_SequenceOfShape: typeof TopTools_SequenceOfShape;
   TopTools_SequenceOfShape_1: typeof TopTools_SequenceOfShape_1;
   TopTools_SequenceOfShape_2: typeof TopTools_SequenceOfShape_2;
   TopTools_SequenceOfShape_3: typeof TopTools_SequenceOfShape_3;
+  TopTools_DataMapOfShapeSequenceOfShape: typeof TopTools_DataMapOfShapeSequenceOfShape;
+  TopTools_DataMapOfShapeSequenceOfShape_1: typeof TopTools_DataMapOfShapeSequenceOfShape_1;
+  TopTools_DataMapOfShapeSequenceOfShape_2: typeof TopTools_DataMapOfShapeSequenceOfShape_2;
+  TopTools_DataMapOfShapeSequenceOfShape_3: typeof TopTools_DataMapOfShapeSequenceOfShape_3;
+  TopTools_Array1OfShape: typeof TopTools_Array1OfShape;
+  TopTools_Array1OfShape_1: typeof TopTools_Array1OfShape_1;
+  TopTools_Array1OfShape_2: typeof TopTools_Array1OfShape_2;
+  TopTools_Array1OfShape_3: typeof TopTools_Array1OfShape_3;
+  TopTools_Array1OfShape_4: typeof TopTools_Array1OfShape_4;
+  TopTools_Array1OfShape_5: typeof TopTools_Array1OfShape_5;
   TopTools_ListOfShape: typeof TopTools_ListOfShape;
   TopTools_ListOfShape_1: typeof TopTools_ListOfShape_1;
   TopTools_ListOfShape_2: typeof TopTools_ListOfShape_2;
@@ -9299,6 +9458,7 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   HLRBRep_InternalAlgo_1: typeof HLRBRep_InternalAlgo_1;
   HLRBRep_InternalAlgo_2: typeof HLRBRep_InternalAlgo_2;
   HLRBRep_HLRToShape: typeof HLRBRep_HLRToShape;
+  StdPrs_ShapeTool: typeof StdPrs_ShapeTool;
   StdPrs_ToolTriangulatedShape: typeof StdPrs_ToolTriangulatedShape;
   STEPControl_Writer: typeof STEPControl_Writer;
   STEPControl_Writer_1: typeof STEPControl_Writer_1;
@@ -9657,6 +9817,7 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   GeomLProp_SLProps_2: typeof GeomLProp_SLProps_2;
   GeomLProp_SLProps_3: typeof GeomLProp_SLProps_3;
   NCollection_BaseList: typeof NCollection_BaseList;
+  NCollection_BaseSequence: typeof NCollection_BaseSequence;
   NCollection_BaseMap: typeof NCollection_BaseMap;
   HLRAlgo_Projector: typeof HLRAlgo_Projector;
   HLRAlgo_Projector_1: typeof HLRAlgo_Projector_1;
@@ -9764,6 +9925,7 @@ export type OpenCascadeInstance = {FS: typeof FS} & {
   ShapeUpgrade_UnifySameDomain_1: typeof ShapeUpgrade_UnifySameDomain_1;
   ShapeUpgrade_UnifySameDomain_2: typeof ShapeUpgrade_UnifySameDomain_2;
   OCJS: typeof OCJS;
+  TopTools_HSequenceOfShape_Getter: typeof TopTools_HSequenceOfShape_Getter;
 };
 
 declare function init(): Promise<OpenCascadeInstance>;

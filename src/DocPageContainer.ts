@@ -1,14 +1,14 @@
-import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPathStyle } from './internal'
+import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPathStyle, PositionInUnits, isContainerPositionRel, isContainerPositionAbs, ContainerPositionRel } from './internal'
 
 import { ContainerType, ContainerHAlignment, ContainerVAlignment, ContainerAlignment, ContainerSide, ZoomRelativeTo, ScaleInput,
-    ContainerSizeRelativeTo, Position, PositionLike, ContainerData, Frame,
-    ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, isPositionLike,
+    ContainerSizeRelativeTo, Position, ContainerPositionLike, ContainerData, Frame,
+    ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, isContainerPositionLike,
     isScaleInput } from './internal'
 
 export class Container
 {
     //// SETTINGS ////
-    WIDTH_DEFAULT = 1.0; // in perc of content area
+    WIDTH_DEFAULT = 1.0; // in perc of content areaContainerPositionLike
     HEIGHT_DEFAULT = 1.0;
     PIVOT_DEFAULT:ContainerAlignment = ['left', 'top'];
     POSITION_DEFAULT:ContainerAlignment = ['left', 'top'];
@@ -36,7 +36,7 @@ export class Container
     _zoomLevel:ScaleInput;
     _zoomRelativeTo:ZoomRelativeTo;
 
-    constructor(name?:string)
+    constructor(name?:string) // Is name really needed here?
     {
         this.name = name;
     }
@@ -44,16 +44,17 @@ export class Container
     _setDefaults()
     {
         // NOTE: this is set up when in constructor, don't apply options here because they will overwrite options in constructor
-        this.width(this.WIDTH_DEFAULT);
-        this.height(this.HEIGHT_DEFAULT);
-        this.pivot(this.PIVOT_DEFAULT);
-        this.position(this.POSITION_DEFAULT);
+        if(!this._width) this.width(this.WIDTH_DEFAULT);
+        if(!this._height) this.height(this.HEIGHT_DEFAULT);
+        if(!this._pivot) this.pivot(this.PIVOT_DEFAULT);
+        if(!this._position) this.position(this.POSITION_DEFAULT);
     }
 
     on(page:Page):Container
     {
         this._page = page;
         this._setDefaults();
+
         page.add(this); // Add to Page
 
         return this;
@@ -81,36 +82,61 @@ export class Container
         //console.info(`Container::width(): Set container height to :${this._height}`);
     }
 
-    /** Set position with a ContainerAlignment or percentage of width and height [x,y]  */
-    position(p:PositionLike):Container
+    /** Set position with a ContainerAlignment or percentage of width and height [x,y] or absolute position with units */
+    position(p:ContainerPositionLike):Container
     {
-        if(!isPositionLike(p)){ throw new Error(`Container::pivot: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
-        if(isContainerAlignment(p))
+        if(!isContainerPositionLike(p)){ throw new Error(`Container::pivot: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
+        
+        if(isContainerPositionRel(p))
+        {
+            this._position = p as Array<number|number>;
+            return this;
+        }
+        else if(isContainerAlignment(p))
         {
             this._position = this._containerAlignmentToPosition(p);
             return this;
         }
+        else if(isContainerPositionAbs(p))
+        {
+            this._position = [
+                this._page._resolveValueWithUnitsString(p[0], 'width'),
+                this._page._resolveValueWithUnitsString(p[1], 'height')
+            ]
+        } 
         else {
-            // Array[xr,yr]
-            this._position = p as Array<number|number>;
-            return this;
-        }   
+            throw new Error(`Doc::Container::position(): Invalid position. Try a page alignment like 'topleft' or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);
+        }
     }
 
     /** Set pivot with a ContainerAlignment ('top', 'topright') or percentage of width and height [x,y]  */
-    // TODO: enable 20%, 2cm from origin
-    pivot(p:PositionLike):Container
+    pivot(p:ContainerPositionRel|ContainerAlignment):Container
     {
-        if(!isPositionLike(p)){ throw new Error(`Container::position(): Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
-        if(isContainerAlignment(p))
+        if(!isContainerPositionLike(p))
+        { 
+            throw new Error(`Container::pivot(): Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)
+        };
+
+        if(isContainerPositionRel(p))
+        {
+            this._pivot = p as Array<number|number>;
+        }
+        else if(isContainerAlignment(p))
         {
             this._pivot = this._containerAlignmentToPosition(p);
-            return this;
         }
+        else if(isContainerPositionAbs(p))
+        {
+            this._pivot = [
+                this._page._resolveValueWithUnitsString(p[0], 'width'),
+                this._page._resolveValueWithUnitsString(p[1], 'height')
+            ]
+        } 
         else {
-            this._pivot = p as Array<number|number>;
-            return this;
-        }   
+            throw new Error(`Doc::Container::pivot(): Invalid pivot. Try a page alignment like 'topleft' or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);
+        }
+
+        return this;
     }
 
     /** Set zoom level (which is relative to view container size) */

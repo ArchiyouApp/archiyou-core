@@ -1,6 +1,6 @@
-import { Doc, Container, View, WidthHeightInput, ContainerData, 
+import { Doc, PageSide, Container, View, WidthHeightInput, ContainerData, 
     DocUnits, PageSize, PageOrientation, AnyPageContainer, isPageSize,
-    isPageOrientation,  isAnyPageContainer} from './internal'
+    isPageOrientation,  isAnyPageContainer, ValueWithUnitsString} from './internal'
 import { convertValueFromToUnit } from './internal' // utils
  
 
@@ -134,6 +134,14 @@ export class Page
         { 
             this._containers.push(container) 
         };
+    }
+
+    //// UTILS ////
+
+    // Alias forwarding to doc._resolveValueWithUnitsString
+    _resolveValueWithUnitsString(s:ValueWithUnitsString, side:PageSide):number
+    {
+        return this?._doc._resolveValueWithUnitsString(s,this,side);
     }
 
 

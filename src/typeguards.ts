@@ -17,10 +17,10 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
 
 import { ParamType, Param, PublishParam } from './internal'
 
-import { BaseStyle, ContainerAlignment, Position, ScaleInput, DataRows,
+import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
             ContainerHAlignment, ContainerVAlignment, MetricName,
-            ContainerTableInput
+            ContainerTableInput, ContainerPositionLike
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
@@ -401,10 +401,24 @@ export function isContainerAlignment(o:any): o is ContainerAlignment
     return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
 }
 
-export function isPosition(o:any): o is Position
+export function isContainerPositionRel(o:any): o is ContainerPositionRel
 {
     return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
-        || isContainerAlignment(o);
+}
+
+export function isContainerPositionAbs(o:any): o is ContainerPositionAbs
+{
+    return  (Array.isArray(o) && o.length === 2 
+        && o.every(e => typeof e === 'string')) 
+        && o.every(e => e.match(/mm|cm|inch|pnt/) )
+}
+
+/** Things that can be turned into a ContainerPositionRel (Array<number|number>) */
+export function isContainerPositionLike(o:any): o is ContainerPositionLike
+{
+    return isContainerPositionRel(o)
+        || isContainerAlignment(o) 
+        || isContainerPositionAbs(o)
 }
 
 export function isScaleInput(o:any): o is ScaleInput {
@@ -437,13 +451,6 @@ export function isAnyPageContainer(o:any): o is AnyPageContainer
 {
     return o instanceof Container ||
             o instanceof View; // TODO: more
-}
-
-/** Things that can be turned into a Position (Array<number|number>) */
-export function isPositionLike(o:any): o is Position
-{
-    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
-        || isContainerAlignment(o);
 }
 
 export function isDocUnits(o:any): o is DocUnits

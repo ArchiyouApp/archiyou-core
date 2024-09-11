@@ -51,6 +51,7 @@ export * from './DocPageContainerImage'
 export * from './DocPageContainerText'
 export * from './DocPageContainerTextArea'
 export * from './DocPageContainerTable'
+export * from './DocPageContainerGraphic'
 export * from './DocPage'
 export * from './DocUtils'
 

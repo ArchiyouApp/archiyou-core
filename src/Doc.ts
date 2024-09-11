@@ -26,17 +26,20 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, Page, PageSize, AnyPageContainer, View, TableContainerOptions, ArchiyouApp, DocPathStyle, 
-            ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection } from './internal' // classes
-import { isPageSize, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
-            PositionLike, isPositionLike, ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
+import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
+            ArchiyouApp, DocPathStyle, 
+            ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
+            ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs } from './internal' // classes
+import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
+            ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
 import { DocSettings, DocUnits, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, 
-        isWidthHeightInput, isContainerTableInput
+        isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
+                DocGraphicInputLine, DocGraphicInputOrthoLine
             } from './internal'
 
-import { convertValueFromToUnit } from './internal' // utils
+import { convertValueFromToUnit, isNumeric } from './internal' // utils
 
 //// MAIN CLASS ////
 
@@ -381,6 +384,98 @@ export class Doc
         return this;
     }
 
+    /** Draw rect graphic on current page
+     *  @param ?input { size (when width=height), width, height, round }
+     */
+    rect(input?:number|DocGraphicInputRect, style?:DocPathStyle)
+    {
+        if(typeof input === 'number'){ input = { width: input, height:input } as DocGraphicInputRect } // convert to DocGraphicInputRect
+        else if(!(typeof input === 'object' && (input.size || input.width))){ throw new Error(`Doc::rect: Please supply at least a number (width=height) or options object { width, height, ?round, ?units, ?data }}`); }
+
+        const newGraphicContainer = new GraphicContainer('rect', input).on(this._activePage);
+        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
+        this._activeContainer = newGraphicContainer;
+
+        return this;
+    }
+
+    /** Draw circle graphic on current page
+     *  @param input { size (=radius), radius }
+     */
+    circle(input?:number|DocGraphicInputCircle, style?:DocPathStyle):Doc
+    {
+        if(typeof input === 'number'){ input = { radius: input } as DocGraphicInputCircle }
+        else if(typeof input !== 'number' && !(typeof input === 'object' && (input.size || input.radius))){ throw new Error(`Doc::circle: Please supply at least a number (radius) or options object { radius, ?units, ?data }}`); }
+
+        const newGraphicContainer = new GraphicContainer('circle', input).on(this._activePage);
+        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
+        this._activeContainer = newGraphicContainer;
+
+        return this;
+    }
+
+    /** Draw line graphic on current page
+     *  @param input 
+     */
+    line(input?:number|DocGraphicInputLine, style?:DocPathStyle):Doc
+    {
+        if(typeof input === 'number'){ input = { start: [0,0], end: [input,0] } as DocGraphicInputLine }
+        else if(typeof input !== 'number' && !(typeof input === 'object' && (input.size || (input.start && input.end)))){ throw new Error(`Doc::line: Please supply at least a number (length) or options object { start:[x1,y1], end: [x2,y2], ?data }}`); }
+
+        const newGraphicContainer = new GraphicContainer('line', input).on(this._activePage);
+        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
+        this._activeContainer = newGraphicContainer;
+
+        return this;
+    }
+
+    /** Draw horizontal line graphic on current page
+     *  @param input string (10mm), number (10, with default units, mm) or object with options
+     *  @param style TODO
+     *     
+     */
+    hline(input?:string|number|DocGraphicInputOrthoLine, style?:DocPathStyle):Doc
+    {
+        if(!input || (typeof input === 'object' && !input.length))
+        { 
+            throw new Error(`Doc::hline: Please supply at least a number (length) or options object { length, ?units, ?data }}`); 
+        }
+        
+        // verify input in object
+        if (typeof input === 'object')
+        {
+            input = { length: this._splitNumberUnits(input.length)[0], units: this._splitNumberUnits(input.length)[1] } as DocGraphicInputOrthoLine;
+        }
+        else {
+            // or a raw number or string
+            input = { length: this._splitNumberUnits(input)[0], units: this._splitNumberUnits(input)[1] } as DocGraphicInputOrthoLine;
+        }
+
+        const newGraphicContainer = new GraphicContainer('hline', input).on(this._activePage);
+        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
+        this._activeContainer = newGraphicContainer;
+
+        return this;
+    }
+
+    /** Draw vertical line graphic on current page
+     *  @param input 
+     */
+    vline(input?:number|DocGraphicInputBase, style?:DocPathStyle):DOc
+    {
+        if(typeof input === 'number'){ input = { length: input} as DocGraphicInputOrthoLine }
+        else if(typeof input !== 'number' && !(typeof input === 'object' && (input.size))){ throw new Error(`Doc::vline: Please supply at least a number (length) or options object { length, ?units, ?data }}`); }
+
+        const newGraphicContainer = new GraphicContainer('vline', input).on(this._activePage);
+        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
+        this._activeContainer = newGraphicContainer;
+
+        return this;
+    }
+
+    // TODO: more graphics: ellipse, triangle, poly etc
+    
+
 
     //// DEFINE ACTIVE CONTAINER ////
 
@@ -414,37 +509,39 @@ export class Doc
     }
 
     /** Set Position of active Container
-     *   - relative to page content area (0.5,0.5 => center)
-     *   - Alignment: topleft, bottom(center)
-     *   TODO: in world units from origin
+     *   Possible arguments:  
+     *     - relative to page content area (0.5,0.5 => center)
+     *     - Alignment: topleft, bottom(center)
+     *     - absolute with units ('10mm')
      */
-    position(x:number|PositionLike, y?:number):Doc
+    position(x:number|ContainerPositionLike, y?:number|ContainerPositionLike):Doc
     {
-        if(!this._activeContainer || !this._activePage)
+        if(!this._activeContainer)
         {
-            throw new Error(`Doc::position(): Can not set position of active container. No active container and/or Page created!`);
+            throw new Error(`Doc::position(): Can not set position of active container. No active container`);
+        }
+        if(!this._activePage)
+        {
+            throw new Error(`Doc::position(): Can not set position of active container. No active page. Create at least one page!`);
         }
 
-        if (isPositionLike(x)) // array with coords or alignments
-        {
-            this._activeContainer.position(x)    
-        }
-        else if (typeof x === 'number')
-        {
-            this._activeContainer.position([x,y||0]);
-        }
-        else {
-            throw new Error(`Doc::position(): Invalid position. Try Alignment like 'topleft' or coords relative ([0-1]) relative to page content area origin`);
-        }
+        // two parameters, combine into ContainerPositionRel array
+        const setPosition = (typeof x === 'number' && typeof y === 'number') 
+                        ? [x,y] as ContainerPositionRel
+                        : (typeof x === 'string' && typeof y === 'string')
+                            ? [x,y] as ContainerPositionAbs
+                            : x as ContainerPositionLike; // maybe already an array, let container.position handle it
+        
+        this._activeContainer.position(setPosition)    
+        
         return this;
     }
 
      /** Set Pivot of active Container
      *   - relative to page content area (0.5,0.5 => center)
      *   - ContainerAlignment: 'left', 'top'
-     *   TODO: in world units from origin
      */
-    pivot(x:number|PositionLike|string|Array<number|number>, y?:number):Doc
+    pivot(x:number|ContainerPositionLike|string|Array<number|number>, y?:number):Doc
     {
         if(!this._activeContainer || !this._activePage)
         {
@@ -471,9 +568,9 @@ export class Doc
             args.reverse();
         }
 
-        if (isPositionLike(args))
+        if (isContainerPositionLike(args))
         {
-            this._activeContainer.pivot(args as PositionLike)    
+            this._activeContainer.pivot(args as isContainerPositionLike)    
         }
         else if (typeof x === 'number')
         {
@@ -607,9 +704,13 @@ export class Doc
     _generateContainerName(container:Container):string
     {
         const START_ITER_COUNT = 1;
+        
         const type = container._type as ContainerType; // table, view etc
+        // Check if name is even present, else make its type the name
+        container.name = container.name || container._type;
+        
         const containersWithAutoName = this._activePage._containers.filter( c => c._type === container._type 
-            && c.name.includes(type) && c.name !== type); // don't include simply 'table'
+            && c.name?.includes(type) && c?.name !== type); // don't include simply 'table'
 
         if(containersWithAutoName.length === 0)
         {
@@ -689,7 +790,7 @@ export class Doc
      }
  
      /** Return width or height in relative coords of current Page and document units */
-     _resolveValueWithUnitsString(s:ValueWithUnitsString, page:Page, side:ContainerSide):number 
+     _resolveValueWithUnitsString(s:ValueWithUnitsString, page:Page, side:PageSide):number 
      {
          if(typeof s !== 'string'){ return null };
          const m = s.match(/(\-*[\d\.]+)(mm|cm|inch|\")$/);
@@ -720,6 +821,32 @@ export class Doc
  
          }
          return null; 
+     }
+
+     /** Split given string like 10mm to number and unit and do some checking */
+     _splitNumberUnits(s:string|number):Array<number|DocUnits>|null
+     {
+        if(typeof s === 'number') return [s, this._units()];
+        if(typeof s !== 'string') return null;
+        
+        let result:Array<number|DocUnits>;
+        ['mm', 'cm', 'inch', 'pnt'].every( unit => {
+            if(s.includes(unit))
+            {
+                result = [parseFloat(s.replace('unit', '')), unit as DocUnits]
+                return false;
+            }
+            return true;
+        })
+
+        if (result){ return result; }
+        // other attempt
+        if (!result && isNumeric(s))
+        {
+            return [parseFloat(s), this._units()]; // return default doc units
+        }
+
+        return null;        
      }
 
 }
