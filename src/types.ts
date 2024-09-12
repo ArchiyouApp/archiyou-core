@@ -581,8 +581,8 @@ export type DocGraphicType = 'rect'|'circle'|'ellipse'|'line'|'hline'|'vline'|'t
 export interface DocGraphicInputBase
 {
     type:DocGraphicType
-    size?:number
     units?:DocUnits // default in mm
+    style?:DocPathStyle
     data?:any // TODO later: things to put inside graphic, like label number
 }
 

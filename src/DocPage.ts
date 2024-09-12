@@ -139,6 +139,7 @@ export class Page
     //// UTILS ////
 
     // Alias forwarding to doc._resolveValueWithUnitsString
+    /** Transform numeric value with units to relative position to page width or height */
     _resolveValueWithUnitsString(s:ValueWithUnitsString, side:PageSide):number
     {
         return this?._doc._resolveValueWithUnitsString(s,this,side);

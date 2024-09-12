@@ -301,6 +301,12 @@ export function convertValueFromToUnit(v:number, from:Units, to:Units):number
         if(to === 'inch'){ return v*10*MM_TO_INCH }
         if(to === 'pnt'){ return v*MM_TO_INCH*INCH_TO_PNT }
     }
+    else if(from === 'pnt')
+    {
+        if(to === 'mm'){ return v/INCH_TO_PNT*INCH_TO_MM }
+        if(to === 'cm'){ return v/INCH_TO_PNT*INCH_TO_MM/10 }
+        if(to === 'inch'){ return v/INCH_TO_PNT }
+    }
 
     console.warn(`Doc::_convertValueFromToUnit(): Could not convert. Check values for from ("${from}") and to ("${to}")!`);
     return null;

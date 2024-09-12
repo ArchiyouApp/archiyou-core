@@ -387,14 +387,39 @@ export class Doc
     /** Draw rect graphic on current page
      *  @param ?input { size (when width=height), width, height, round }
      */
-    rect(input?:number|DocGraphicInputRect, style?:DocPathStyle)
+    rect(input?:number|string|DocGraphicInputRect, style?:DocPathStyle)
     {
-        if(typeof input === 'number'){ input = { width: input, height:input } as DocGraphicInputRect } // convert to DocGraphicInputRect
-        else if(!(typeof input === 'object' && (input.size || input.width))){ throw new Error(`Doc::rect: Please supply at least a number (width=height) or options object { width, height, ?round, ?units, ?data }}`); }
+        const RECT_DEFAULT_LINE_WIDTH = 3; // in pnt
+        const RECT_DEFAULT_FILL_COLOR = null;
+        const RECT_DEFAULT_STROKE_COLOR = 'black';
+
+        if(typeof input === 'number' || typeof input === 'string'){ input = { width: input, height:input } as DocGraphicInputRect } // convert to DocGraphicInputRect
+        else if(!(typeof input === 'object' && (input.width))){ throw new Error(`Doc::rect: Please supply at least a number (width=height) or options object { width, height, ?round, ?units, ?data }}`); }
+
+        input.height = input.height ?? input.width; // make sure we got height or make equal sides
+
+        // styling
+        if(!style)
+        {
+            console.warn(`Doc::rect(input, style): You can use the argument style { lineWidth, strokeColor, filleColor } to style this rect!`)
+            input.style = {};
+        }
+        else {
+            // styling
+            input.style = style;
+            input.style.lineWidth = (input.style?.lineWidth) 
+                                        ? convertValueFromToUnit(this._splitNumberUnits(input.style.lineWidth)[0], this._splitNumberUnits(input.style.lineWidth)[1], 
+                        'pnt')  : RECT_DEFAULT_LINE_WIDTH; // always in pnts
+            input.style.strokeColor = input.style?.strokeColor ?? RECT_DEFAULT_STROKE_COLOR;
+            input.style.fillColor = input.style?.fillColor ?? RECT_DEFAULT_FILL_COLOR;
+        }
 
         const newGraphicContainer = new GraphicContainer('rect', input).on(this._activePage);
         newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
+
+        this.width(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.width).join(''), 'width'));
+        this.height(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.height).join(''), 'height'));
 
         return this;
     }
@@ -429,13 +454,17 @@ export class Doc
         return this;
     }
 
-    /** Draw horizontal line graphic on current page
+    /** Draw ortho (horizontal|vertical) line graphic on current page
      *  @param input string (10mm), number (10, with default units, mm) or object with options
-     *  @param style TODO
+     *  @param thickness strokeWidth
+     *  @param color 
      *     
      */
-    hline(input?:string|number|DocGraphicInputOrthoLine, style?:DocPathStyle):Doc
+    _oline(type:'h'|'v', input?:string|number|DocGraphicInputOrthoLine, thickness?:number|string, color?:string):Doc
     {
+        const STROKE_DEFAULT_WIDTH = 3; // in pnt
+        const STROKE_DEFAULT_COLOR = 'black'
+
         if(!input || (typeof input === 'object' && !input.length))
         { 
             throw new Error(`Doc::hline: Please supply at least a number (length) or options object { length, ?units, ?data }}`); 
@@ -444,6 +473,7 @@ export class Doc
         // verify input in object
         if (typeof input === 'object')
         {
+            // NOTE: _splitNumberUnits always return number and units (default if none given)
             input = { length: this._splitNumberUnits(input.length)[0], units: this._splitNumberUnits(input.length)[1] } as DocGraphicInputOrthoLine;
         }
         else {
@@ -451,26 +481,43 @@ export class Doc
             input = { length: this._splitNumberUnits(input)[0], units: this._splitNumberUnits(input)[1] } as DocGraphicInputOrthoLine;
         }
 
-        const newGraphicContainer = new GraphicContainer('hline', input).on(this._activePage);
+        // styling
+        if(!input.style){ input.style = {}}
+        input.style.lineWidth = (thickness) 
+            ? convertValueFromToUnit(
+                    this._splitNumberUnits(thickness)[0], 
+                    this._splitNumberUnits(thickness)[1], 
+                    'pnt')  : STROKE_DEFAULT_WIDTH; // always in pnts
+        input.style.strokeColor = color || STROKE_DEFAULT_COLOR;
+
+        const newGraphicContainer = new GraphicContainer((type === 'h') ? 'hline' : 'vline', input).on(this._activePage);
         newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
+
+        if(type === 'h')
+        { 
+            this.width(this._activePage._resolveValueWithUnitsString(input.length + input.units, 'width'));
+            this.height(this._activePage._resolveValueWithUnitsString(input.style.lineWidth + 'pnt', 'height'));
+        }
+        else {
+            this.height(this._activePage._resolveValueWithUnitsString(input.length + input.units, 'height'));
+            this.width(this._activePage._resolveValueWithUnitsString(input.style.lineWidth + 'pnt', 'width'));
+        }
+
+        this.pivot([0,1]); // default pivot left top instead of Graphic default center ([0.5,0.5])
+        
 
         return this;
     }
 
-    /** Draw vertical line graphic on current page
-     *  @param input 
-     */
-    vline(input?:number|DocGraphicInputBase, style?:DocPathStyle):DOc
+    hline(input?:string|number|DocGraphicInputOrthoLine, thickness?:number|string, color?:string):Doc
     {
-        if(typeof input === 'number'){ input = { length: input} as DocGraphicInputOrthoLine }
-        else if(typeof input !== 'number' && !(typeof input === 'object' && (input.size))){ throw new Error(`Doc::vline: Please supply at least a number (length) or options object { length, ?units, ?data }}`); }
+        return this._oline('h', input, thickness, color);
+    }
 
-        const newGraphicContainer = new GraphicContainer('vline', input).on(this._activePage);
-        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
-        this._activeContainer = newGraphicContainer;
-
-        return this;
+    vline(input?:string|number|DocGraphicInputOrthoLine, thickness?:number|string, color?:string):Doc
+    {
+        return this._oline('v', input, thickness, color);
     }
 
     // TODO: more graphics: ellipse, triangle, poly etc
@@ -570,7 +617,7 @@ export class Doc
 
         if (isContainerPositionLike(args))
         {
-            this._activeContainer.pivot(args as isContainerPositionLike)    
+            this._activeContainer.pivot(args as ContainerPositionLike)    
         }
         else if (typeof x === 'number')
         {
@@ -585,7 +632,7 @@ export class Doc
     /** Turn on border on active container with optional styling */
     border(style?:DocPathStyle):Doc
     {
-        if(!this._activeContainer){ throw new Error(`Doc::border(): Cannot set border on actie container! Make a container first!`)};
+        if(!this._activeContainer){ throw new Error(`Doc::border(): Cannot set border on active container! Make a container first!`)};
         (this._activeContainer as View).border(style);
 
         return this;
@@ -793,7 +840,7 @@ export class Doc
      _resolveValueWithUnitsString(s:ValueWithUnitsString, page:Page, side:PageSide):number 
      {
          if(typeof s !== 'string'){ return null };
-         const m = s.match(/(\-*[\d\.]+)(mm|cm|inch|\")$/);
+         const m = s.match(/(\-*[\d\.]+)(mm|cm|inch|\"|pnt)$/);
          if (m)
          {
              let num = parseFloat(m[1]); // value in units
@@ -824,7 +871,7 @@ export class Doc
      }
 
      /** Split given string like 10mm to number and unit and do some checking */
-     _splitNumberUnits(s:string|number):Array<number|DocUnits>|null
+     _splitNumberUnits(s:string|number):[number,DocUnits]|null
      {
         if(typeof s === 'number') return [s, this._units()];
         if(typeof s !== 'string') return null;

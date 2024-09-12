@@ -110,7 +110,7 @@ export class Container
     }
 
     /** Set pivot with a ContainerAlignment ('top', 'topright') or percentage of width and height [x,y]  */
-    pivot(p:ContainerPositionRel|ContainerAlignment):Container
+    pivot(p:ContainerPositionLike):Container
     {
         if(!isContainerPositionLike(p))
         { 
