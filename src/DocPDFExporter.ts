@@ -31,6 +31,9 @@ import { jsPDF, GState } from 'jspdf'
 import 'svg2pdf.js' // TODO: load dynamically?
 import autoTable from 'jspdf-autotable' // TODO: load dynamically?
 
+import { OutfitNormalByteString } from '../assets/fonts/Outfit-VariableFont_wght-normal'
+import { OutfitBoldByteString } from '../assets/fonts/Outfit-VariableFont_wght-bold'
+
 
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
 
@@ -146,6 +149,19 @@ export class DocPDFExporter
                 this._jsPDFDoc = this._jsPDF.jsPDF; 
             }
 
+            // Load custom fonts
+            const addCustomFonts = function()
+            {
+                this.addFileToVFS('OutfitNormal.ttf', OutfitNormalByteString);
+                this.addFileToVFS('OutfitBold.ttf', OutfitBoldByteString);
+                this.addFont('OutfitNormal.ttf', 'OutfitNormal', 'normal');
+                this.addFont('OutfitBold.ttf', 'OutfitBold', 'bold');
+            }
+
+            console.log('==== JSPDF LOADED ====');
+            console.log(this._jsPDF)
+            this._jsPDFDoc.API.events.push(['addFonts', addCustomFonts]);
+
             return this
         }
 
@@ -242,6 +258,8 @@ export class DocPDFExporter
         this.activePDFDoc = newPDFDoc;
         this.activeDoc = d;
 
+        this.setDocDefaults(newPDFDoc);
+
         // NOTE: cannot use forEach because it is not sequentially!
         for (const p of this.activeDoc.pages)
         {
@@ -249,6 +267,12 @@ export class DocPDFExporter
         }
         this._endActiveDoc();
 
+    }
+
+    /** Set defaults of a JsPDF document */
+    setDocDefaults(d:jsPDF)
+    {
+        d.setFont('OutfitNormal');
     }
     
     /** Wait until the active Doc stream is finished and place resulting Blob inside cache for later export */
@@ -291,21 +315,20 @@ export class DocPDFExporter
             case 'text':
                 this._placeText(c, p)
                 break;
-            
             case 'textarea':
                 this._placeText(c, p); // TextArea is the same in PDFKit
                 break;
-
             case 'view':
                 this._placeViewSVG(c, p)
                 break;
-
             case 'image':
                 await this._placeImage(c, p)
                 break;
-
             case 'table':
                 await this._placeTable(c, p);
+                break;
+            case 'graphic':
+                this._placeGraphic(c, p);
                 break;
 
             default:
@@ -376,7 +399,7 @@ export class DocPDFExporter
         if(img?.content?.data && img?.content?.source)
         {
             const imgExt = this._getImageExt(img.content.source);    
-            const { x, y } = this.containerToPositionInPnts(img, p);
+            const { x, y } = this.containerToPDFPositionInPnts(img, p);
 
             // if SVG image
             if (imgExt === 'svg')
@@ -515,7 +538,7 @@ export class DocPDFExporter
         // TODO: check!
         if (view.border)
         {
-            const viewPositionPnts = this.containerToPositionInPnts(view, p);
+            const viewPositionPnts = this.containerToPDFPositionInPnts(view, p);
             let d = this.activePDFDoc.rect(
                 viewPositionPnts.x,
                 viewPositionPnts.y,
@@ -623,6 +646,45 @@ export class DocPDFExporter
         
     }
 
+    //// GRAPHIC ////
+
+    /** Place Graphic (hline, vline, rect, circle, etc) on active PDF page */
+    _placeGraphic(g:ContainerData, p:PageData)
+    {
+        // Basic container position and pivot
+        const { x, y } = this.containerToPDFPositionInPnts(g, p); // PDF position in pnts, with regard for pivot (also y axis switch)
+        const w = this.relWidthToPoints(g.width, p);
+        const h = this.relHeightToPoints(g.height, p);
+
+        // Set style before drawing graphic
+        if(g?.content?.settings?.style)
+        { 
+            this._setPathStyle(g.content.settings.style);
+        }
+
+        switch (g.content.settings.type)
+        {
+            case 'rect':
+                this.activePDFDoc.rect(x,y,w,h)
+                break;
+            case 'hline':
+                const hl = this.relWidthToPoints(g.width, p); 
+                this.activePDFDoc.line(x,y,x+hl,y);
+                break;
+            case 'vline':
+                const vl = this.relHeightToPoints(g.height, p);
+                this.activePDFDoc.line(x,y,x,y+vl); // NOTE: jsPDF origin is at left,top
+                break;
+            case 'circle':
+                const r = w/2; // radius is taken from width of container, not from g.content.radius! (which can be in different units)
+                this.activePDFDoc.circle(x+r,y+r,r); // NOTE: correct for jsPDF circle position of left,top
+                break;
+            default:
+                console.error(`DocPdfExporter::_placeGraphic: Unknown/unsupported graphic type: "${g.content.settings.type}"`)
+        }
+
+    }
+
     //// UTILS ////
 
     isBrowser():boolean
@@ -681,7 +743,7 @@ export class DocPDFExporter
      *      NOTES: 
      *          - All incoming ContainerData data (position, width, height) is relative to page size
     */
-    containerToPositionInPnts(c:ContainerData, p:PageData):Record<string, number>
+    containerToPDFPositionInPnts(c:ContainerData, p:PageData):Record<string, number>
     {
         const x = this.coordRelWidthToPoints(
                     c.position[0] - ((c?.width) ? c.pivot[0] * c.width : 0),

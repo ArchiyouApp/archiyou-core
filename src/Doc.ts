@@ -109,6 +109,17 @@ export class Doc
         }
     }
 
+    /** Reset state of Doc instance */
+    reset()
+    {
+        this._docs = [];
+        this._pageSizeByDoc = {};
+        this._pageOrientationByDoc = {};
+        this._pagesByDoc = {};
+        this._unitsByDoc = {};
+        this._activeDoc = null;
+    }
+
     _setDefaults():Doc
     {   
         this.reset();
@@ -193,17 +204,6 @@ export class Doc
         this._activeDoc = n;
 
         return this;
-    }
-
-    /** Reset state of Doc instance */
-    reset()
-    {
-        this._docs = [];
-        this._pageSizeByDoc = {};
-        this._pageOrientationByDoc = {};
-        this._pagesByDoc = {};
-        this._unitsByDoc = {};
-        this._activeDoc = null;
     }
 
     /** Check if there is an active document, otherwise create a default one */
@@ -401,7 +401,7 @@ export class Doc
         // styling
         if(!style)
         {
-            console.warn(`Doc::rect(input, style): You can use the argument style { lineWidth, strokeColor, filleColor } to style this rect!`)
+            console.warn(`Doc::rect(input, style): You can use the argument style { lineWidth, strokeColor, fillColor } to style this rect!`)
             input.style = {};
         }
         else {
@@ -427,32 +427,41 @@ export class Doc
     /** Draw circle graphic on current page
      *  @param input { size (=radius), radius }
      */
-    circle(input?:number|DocGraphicInputCircle, style?:DocPathStyle):Doc
+    circle(input?:number|string|DocGraphicInputCircle, style?:DocPathStyle):Doc
     {
-        if(typeof input === 'number'){ input = { radius: input } as DocGraphicInputCircle }
-        else if(typeof input !== 'number' && !(typeof input === 'object' && (input.size || input.radius))){ throw new Error(`Doc::circle: Please supply at least a number (radius) or options object { radius, ?units, ?data }}`); }
+        const CIRCLE_DEFAULT_LINE_WIDTH = 3; // in pnt
+        const CIRCLE_DEFAULT_FILL_COLOR = null;
+        const CIRCLE_DEFAULT_STROKE_COLOR = 'black'
+        
+        if(typeof input === 'number' || typeof input === 'string'){ input = { radius: input } as DocGraphicInputCircle }
+        else if(!(typeof input === 'object' && (input.radius))){ throw new Error(`Doc::circle: Please supply at least a number (for radius) or options object { radius, ?units, ?data }}`); }
+
+        // radius is converted into container width and height that will be used for rendering, but for later reference we set units
+        input.radius =  this._splitNumberUnits(input.radius)[0];
+        input.units = this._splitNumberUnits(input.radius)[1]; // will be default doc units (mm) is not given
+
+        // styling
+        if(!style){ console.warn(`Doc::circle(input, style): You can use the argument style { lineWidth, strokeColor, fillColor } to style this rect!`) }
+        
+        // styling
+        input.style = style ?? {};
+        input.style.lineWidth = (input.style?.lineWidth) 
+                                    ? convertValueFromToUnit(this._splitNumberUnits(input.style.lineWidth)[0], this._splitNumberUnits(input.style.lineWidth)[1], 
+                    'pnt')  : CIRCLE_DEFAULT_LINE_WIDTH; // always in pnts
+        input.style.strokeColor = input.style?.strokeColor ?? CIRCLE_DEFAULT_STROKE_COLOR;
+        input.style.fillColor = input.style?.fillColor ?? CIRCLE_DEFAULT_FILL_COLOR;
+        
 
         const newGraphicContainer = new GraphicContainer('circle', input).on(this._activePage);
         newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
-        return this;
-    }
-
-    /** Draw line graphic on current page
-     *  @param input 
-     */
-    line(input?:number|DocGraphicInputLine, style?:DocPathStyle):Doc
-    {
-        if(typeof input === 'number'){ input = { start: [0,0], end: [input,0] } as DocGraphicInputLine }
-        else if(typeof input !== 'number' && !(typeof input === 'object' && (input.size || (input.start && input.end)))){ throw new Error(`Doc::line: Please supply at least a number (length) or options object { start:[x1,y1], end: [x2,y2], ?data }}`); }
-
-        const newGraphicContainer = new GraphicContainer('line', input).on(this._activePage);
-        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
-        this._activeContainer = newGraphicContainer;
+        this.width(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.radius*2).join(''), 'width'));
+        this.height(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.radius*2).join(''), 'height'));
 
         return this;
     }
+
 
     /** Draw ortho (horizontal|vertical) line graphic on current page
      *  @param input string (10mm), number (10, with default units, mm) or object with options
@@ -480,6 +489,10 @@ export class Doc
             // or a raw number or string
             input = { length: this._splitNumberUnits(input)[0], units: this._splitNumberUnits(input)[1] } as DocGraphicInputOrthoLine;
         }
+
+        // split length amount and possible units
+        input.length =  this._splitNumberUnits(input.length)[0];
+        input.units = this._splitNumberUnits(input.length)[1]; // will be default doc units (mm) is not given
 
         // styling
         if(!input.style){ input.style = {}}
