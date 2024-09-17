@@ -29,14 +29,15 @@
 import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
             ArchiyouApp, DocPathStyle, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
-            ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs } from './internal' // classes
+            ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs, 
+            isContainerPositionCoordAbs} from './internal' // classes
 import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
-import { DocSettings, DocUnits, PercentageString, ValueWithUnitsString, WidthHeightInput, 
+import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, 
         isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
-                DocGraphicInputLine, DocGraphicInputOrthoLine
+                DocGraphicInputLine, DocGraphicInputOrthoLine, TitleBlockInput, isContainerPositionCoordRel
             } from './internal'
 
 import { convertValueFromToUnit, isNumeric } from './internal' // utils
@@ -384,6 +385,9 @@ export class Doc
         return this;
     }
 
+
+    //// GRAPHICAL ELEMENTS ////
+
     /** Draw rect graphic on current page
      *  @param ?input { size (when width=height), width, height, round }
      */
@@ -408,7 +412,8 @@ export class Doc
             // styling
             input.style = style;
             input.style.lineWidth = (input.style?.lineWidth) 
-                                        ? convertValueFromToUnit(this._splitNumberUnits(input.style.lineWidth)[0], this._splitNumberUnits(input.style.lineWidth)[1], 
+                                        ? convertValueFromToUnit(this._splitInputNumberUnits(input.style.lineWidth)[0], 
+                                                                    this._splitInputNumberUnits(input.style.lineWidth)[1], 
                         'pnt')  : RECT_DEFAULT_LINE_WIDTH; // always in pnts
             input.style.strokeColor = input.style?.strokeColor ?? RECT_DEFAULT_STROKE_COLOR;
             input.style.fillColor = input.style?.fillColor ?? RECT_DEFAULT_FILL_COLOR;
@@ -418,8 +423,8 @@ export class Doc
         newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
-        this.width(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.width).join(''), 'width'));
-        this.height(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.height).join(''), 'height'));
+        this.width(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.width).join(''), 'width'));
+        this.height(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.height).join(''), 'height'));
 
         return this;
     }
@@ -437,8 +442,8 @@ export class Doc
         else if(!(typeof input === 'object' && (input.radius))){ throw new Error(`Doc::circle: Please supply at least a number (for radius) or options object { radius, ?units, ?data }}`); }
 
         // radius is converted into container width and height that will be used for rendering, but for later reference we set units
-        input.radius =  this._splitNumberUnits(input.radius)[0];
-        input.units = this._splitNumberUnits(input.radius)[1]; // will be default doc units (mm) is not given
+        input.radius =  this._splitInputNumberUnits(input.radius)[0];
+        input.units = this._splitInputNumberUnits(input.radius)[1]; // will be default doc units (mm) is not given
 
         // styling
         if(!style){ console.warn(`Doc::circle(input, style): You can use the argument style { lineWidth, strokeColor, fillColor } to style this rect!`) }
@@ -446,7 +451,7 @@ export class Doc
         // styling
         input.style = style ?? {};
         input.style.lineWidth = (input.style?.lineWidth) 
-                                    ? convertValueFromToUnit(this._splitNumberUnits(input.style.lineWidth)[0], this._splitNumberUnits(input.style.lineWidth)[1], 
+                                    ? convertValueFromToUnit(this._splitInputNumberUnits(input.style.lineWidth)[0], this._splitInputNumberUnits(input.style.lineWidth)[1], 
                     'pnt')  : CIRCLE_DEFAULT_LINE_WIDTH; // always in pnts
         input.style.strokeColor = input.style?.strokeColor ?? CIRCLE_DEFAULT_STROKE_COLOR;
         input.style.fillColor = input.style?.fillColor ?? CIRCLE_DEFAULT_FILL_COLOR;
@@ -456,8 +461,8 @@ export class Doc
         newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
-        this.width(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.radius*2).join(''), 'width'));
-        this.height(this._activePage._resolveValueWithUnitsString(this._splitNumberUnits(input.radius*2).join(''), 'height'));
+        this.width(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.radius*2).join(''), 'width'));
+        this.height(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.radius*2).join(''), 'height'));
 
         return this;
     }
@@ -481,29 +486,32 @@ export class Doc
         
         // verify input in object
         if (typeof input === 'object')
-        {
-            // NOTE: _splitNumberUnits always return number and units (default if none given)
-            input = { length: this._splitNumberUnits(input.length)[0], units: this._splitNumberUnits(input.length)[1] } as DocGraphicInputOrthoLine;
+        {   
+            // NOTE: _splitInputNumberUnits always return number and units (default if none given)
+            input = { length: this._splitInputNumberUnits(input.length)[0], units: this._splitInputNumberUnits(input.length)[1] } as DocGraphicInputOrthoLine;
         }
         else {
             // or a raw number or string
-            input = { length: this._splitNumberUnits(input)[0], units: this._splitNumberUnits(input)[1] } as DocGraphicInputOrthoLine;
+            input = { length: this._splitInputNumberUnits(input)[0], units: this._splitInputNumberUnits(input)[1] } as DocGraphicInputOrthoLine;
         }
-
-        // split length amount and possible units
-        input.length =  this._splitNumberUnits(input.length)[0];
-        input.units = this._splitNumberUnits(input.length)[1]; // will be default doc units (mm) is not given
 
         // styling
         if(!input.style){ input.style = {}}
+
+        // Style attributes can be in DocGraphicInputOrthoLine
+        thickness = thickness ?? input?.thickness
+        color = color ?? input?.color
+
         input.style.lineWidth = (thickness) 
             ? convertValueFromToUnit(
-                    this._splitNumberUnits(thickness)[0], 
-                    this._splitNumberUnits(thickness)[1], 
+                    this._splitInputNumberUnits(thickness)[0], 
+                    this._splitInputNumberUnits(thickness)[1], 
                     'pnt')  : STROKE_DEFAULT_WIDTH; // always in pnts
         input.style.strokeColor = color || STROKE_DEFAULT_COLOR;
 
-        const newGraphicContainer = new GraphicContainer((type === 'h') ? 'hline' : 'vline', input).on(this._activePage);
+        const newGraphicContainer = new GraphicContainer((type === 'h') ? 'hline' : 'vline', input)
+                                        .on(this._activePage);
+
         newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
@@ -535,6 +543,40 @@ export class Doc
 
     // TODO: more graphics: ellipse, triangle, poly etc
     
+    //// BLOCKS OF CONTAINERS ////
+
+    /** Place default title block
+     *  @param
+     */
+    titleblock(data?:TitleBlockInput)
+    {
+        const DEFAULT_SETTINGS = {
+            title : 'Untitled',
+            designer : 'Unknown',
+            logoUrl: 'https://cms.shopxyz.nl/uploads/archiyou_logo_header_1ad9be912f.png',
+            designLicense: 'CC BY-NC',
+            manualLicense: 'CC BY-NC',
+        }
+
+        if(!data){
+            throw new Error('Doc::titleblock: Please provide information { title, design, logoUrl, designLicense, manualLicense }');
+        }
+
+        const settings = { ...DEFAULT_SETTINGS, ...data } as TitleBlockInput;
+
+        this.image(settings.logoUrl)
+            .pivot(1,0) // right bottom
+            .position(1,0) // right bottom
+            .width('50mm')
+            .height('15mm')
+
+        this.hline({ thickness: '2mm', color: 'black', length: '80mm'})
+            .position(1, '20mm')
+        
+        
+
+
+    }
 
 
     //// DEFINE ACTIVE CONTAINER ////
@@ -569,12 +611,15 @@ export class Doc
     }
 
     /** Set Position of active Container
-     *   Possible arguments:  
-     *     - relative to page content area (0.5,0.5 => center)
+     *   @param x
+     *     - if 0 <= x <= 1 relative to page content area 0.5 center)
+     *     - if > 1 in default document units (mostly mm)
      *     - Alignment: topleft, bottom(center)
      *     - absolute with units ('10mm')
+     *     - or array [x,y]
+     *   @param y see x, but without array
      */
-    position(x:number|ContainerPositionLike, y?:number|ContainerPositionLike):Doc
+    position(x:number|ContainerPositionLike, y?:number|string):Doc
     {
         if(!this._activeContainer)
         {
@@ -586,13 +631,17 @@ export class Doc
         }
 
         // two parameters, combine into ContainerPositionRel array
-        const setPosition = (typeof x === 'number' && typeof y === 'number') 
-                        ? [x,y] as ContainerPositionRel
-                        : (typeof x === 'string' && typeof y === 'string')
-                            ? [x,y] as ContainerPositionAbs
-                            : x as ContainerPositionLike; // maybe already an array, let container.position handle it
-        
-        this._activeContainer.position(setPosition)    
+        if(typeof y === 'number' || typeof y === 'string')
+        {
+            this._activeContainer.position([x,y] as ContainerPositionLike);
+        }
+        else if(isContainerPositionLike(x))
+        {
+            this._activeContainer.position(x as ContainerPositionLike)    
+        }
+        else {
+            throw new Error(`Doc::position(): Invalid input: "[${x},${y}]". Use alignment: 'topright', relative coords [0.5,1], or ['10mm',0]`)
+        }
         
         return this;
     }
@@ -600,6 +649,8 @@ export class Doc
      /** Set Pivot of active Container
      *   - relative to page content area (0.5,0.5 => center)
      *   - ContainerAlignment: 'left', 'top'
+     *   
+     *      NOTE: We won't allow offsets with units ('10mm')
      */
     pivot(x:number|ContainerPositionLike|string|Array<number|number>, y?:number):Doc
     {
@@ -627,6 +678,9 @@ export class Doc
         {
             args.reverse();
         }
+
+        console.log('HLINE ARGS');
+        console.log(args);
 
         if (isContainerPositionLike(args))
         {
@@ -852,60 +906,105 @@ export class Doc
      /** Return width or height in relative coords of current Page and document units */
      _resolveValueWithUnitsString(s:ValueWithUnitsString, page:Page, side:PageSide):number 
      {
-         if(typeof s !== 'string'){ return null };
-         const m = s.match(/(\-*[\d\.]+)(mm|cm|inch|\"|pnt)$/);
-         if (m)
-         {
-             let num = parseFloat(m[1]); // value in units
-             let units = m[2];
-             // convert if units is '"" (short hand for inch)
-             if (units === '"') units = 'inch';
- 
-             // given unit is not the document unit
-             if(units !== this._unitsByDoc[this._activeDoc])
-             {
-                 num = convertValueFromToUnit(num, units as DocUnits, this._unitsByDoc[this._activeDoc]);
-             }
+        // if given number, fallback to page units (default: mm)
+        if(typeof s === 'number')
+        { 
+            if(isContainerPositionCoordRel(s))
+            {
+                s = (s * 100) + '%' // relative [0-1], convert to 100%
+            }
+            else {
+                s = s + this._units();
+            }
+        }
+        else if(typeof s !== 'string')
+        {
+            console.error(`Doc::_resolveValueWithUnitsString(): Invalid input given: ${s}`);   
+            return null;
+        }
 
-             // We have the num in doc units. Now make relative
-             let sideLength = page[`_${side}`];
-             let relativeValue = num / sideLength;
- 
-             // give a warning if it's out of the page
-             if(relativeValue > 1 || relativeValue < 0)
-             {
-                 console.warn(`Container::_resolveValueWithUnitsString: You supplied a value ('${s}') that is outside the page size! Check if this is correct!`)
-             }
- 
-             return relativeValue;
+        // if already relative (40%)
+        const percMatch = s.match(/(\-*[\d\.]+)(%)$/);
+
+        console.log('==== _resolveValueWithUnitsString ====');
+        console.log(percMatch);
+
+        if(percMatch)
+        {
+            const relNum = parseFloat(percMatch[1])/100; // back from 10% to 0.1
+            return relNum
+        }
+        
+        // if any absolute coordinate and unit
+        const m = s.match(/(\-*[\d\.]+)(mm|cm|inch|\"|pnt)$/);
+        if (m)
+        {
+            let num = parseFloat(m[1]); // value in units
+            let units = m[2];
+            // convert if units is '"" (short hand for inch)
+            if (units === '"') units = 'inch';
+
+            // given unit is not the document unit
+            if(units !== this._unitsByDoc[this._activeDoc])
+            {
+                num = convertValueFromToUnit(num, units as DocUnits, this._unitsByDoc[this._activeDoc]);
+            }
+
+            // We have the num in doc units. Now make relative
+            let sideLength = page[`_${side}`];
+            let relativeValue = num / sideLength;
+
+            // give a warning if it's out of the page
+            if(relativeValue > 1 || relativeValue < 0)
+            {
+                console.warn(`Container::_resolveValueWithUnitsString: You supplied a value ('${s}') that is outside the page size! Check if this is correct!`)
+            }
+
+            return relativeValue;
  
          }
          return null; 
      }
 
-     /** Split given string like 10mm to number and unit and do some checking */
-     _splitNumberUnits(s:string|number):[number,DocUnits]|null
+     /** Split given string like 10mm to number and unit and do some checking 
+      *     NOTE: We handle relative numbers ([0-1]) here too, in that case 
+     */
+     _splitInputNumberUnits(s:string|number):[number,DocUnitsWithPerc]|null
      {
-        if(typeof s === 'number') return [s, this._units()];
+        if(typeof s === 'number')
+        {
+            if(isContainerPositionCoordRel(s))
+            {
+                return [s*100, '%']; // convert 0.1 => 10%
+            }
+            else
+            {
+                // absolute numbers but without unit, we use the default doc unit (mm mostly)
+                return [s, this._units()];
+            }
+        } 
         if(typeof s !== 'string') return null;
         
-        let result:Array<number|DocUnits>;
-        ['mm', 'cm', 'inch', 'pnt'].every( unit => {
+        let result:[number,DocUnitsWithPerc];
+
+        ['mm', 'cm', 'inch', 'pnt','%'].every( unit => {
             if(s.includes(unit))
             {
-                result = [parseFloat(s.replace('unit', '')), unit as DocUnits]
+                result = [parseFloat(s.replace('unit', '')), unit as DocUnitsWithPerc]
                 return false;
             }
             return true;
         })
 
         if (result){ return result; }
+        
         // other attempt
         if (!result && isNumeric(s))
         {
             return [parseFloat(s), this._units()]; // return default doc units
         }
 
+        console.warn(`Doc::_splitInputNumberUnits(${s}): Could not split input to number and units!`)
         return null;        
      }
 

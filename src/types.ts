@@ -32,6 +32,7 @@ export const ALIGNMENTS_ADD_TO_SIDES = ['center','start','end'];
 
 export type ModelUnits = 'mm'|'cm'|'dm'|'m'|'km'|'inch'|'feet'|'yd'|'mi'; // For now they are for administration only
 export type Units = DocUnits | ModelUnits
+export type UnitsWithPerc = Units | '%'
 export type Coord = number|string
 export type MainAxis = 'x'|'y'|'z'
 export type Plane = 'xy' | 'xz' | 'yz'
@@ -427,9 +428,10 @@ export interface AutoDimSettings
 
 //// DOC ////
 
-export type DocUnits = 'mm'|'cm'|'inch'|'pnt'; 
-export type PercentageString = string // 100%, 0.5%, -10%
-export type ValueWithUnitsString = string
+export type DocUnits = 'mm'|'cm'|'inch'|'pnt' 
+export type DocUnitsWithPerc = DocUnits | '%' // Percent of page (side is dependent of measure)
+export type PercentageString = string // 100%, 5% etc.
+export type ValueWithUnitsString = string // string with number and DocUnitsWithPerc
 export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
 export type ContainerTableInput = string | DataRows
 
@@ -470,11 +472,15 @@ export interface PageData {
 export type ContainerType = 'view'|'image'|'text'|'textarea'|'table'|'graphic'
 export type ContainerHAlignment = 'left'|'center'|'right'
 export type ContainerVAlignment = 'top' | 'center' | 'bottom'
-export type ContainerAlignment = Array<ContainerHAlignment | ContainerVAlignment> // like [left,top]
+export type ContainerAlignment = [ContainerHAlignment,ContainerVAlignment] // like [left,top]
 export type ContainerSide = 'width'|'height'
 export type ZoomRelativeTo = 'container'|'world'
 export type ScaleInput = 'auto'|number;
 export type ContainerSizeRelativeTo = 'page' | 'page-content-area'; // page-content area is page without the padding on both sides
+
+export type ContainerPositionCoordRel = number // [0-1]
+export type ContainerPositionCoordAbs = number|string // >=1 or 10mm
+
 export type ContainerPositionRel= Array<number|number> // This is relative coords [ [0,1],[0,1]] from left bottom
 export type ContainerPositionAbs = Array<string|string> // '10mm', '20mm'
 export type ContainerPositionLike = ContainerPositionRel|ContainerAlignment|ContainerPositionAbs
@@ -580,8 +586,8 @@ export type DocGraphicType = 'rect'|'circle'|'ellipse'|'line'|'hline'|'vline'|'t
 // Default simple input
 export interface DocGraphicInputBase
 {
-    type:DocGraphicType
-    units?:DocUnits // default in mm
+    type?:DocGraphicType
+    units?:DocUnitsWithPerc // default in mm
     style?:DocPathStyle
     data?:any // TODO later: things to put inside graphic, like label number
 }
@@ -609,11 +615,10 @@ export interface DocGraphicInputLine extends DocGraphicInputBase
 
 export interface DocGraphicInputOrthoLine extends DocGraphicInputBase
 {
-    length:number
+    length:number|string // number in default units or with units
+    thickness:number|string
+    color:string
 }
-
-
-
 
 
 //// DOCS:PAGE:CONTAINER:VIEW ////
@@ -642,13 +647,22 @@ export interface SVGtoPDFtransform
 
 //// DOCS:PAGE:CONTAINER:TEXTAREA ////
 
-
-
 export interface TextAreaOptions
 {
     size?:number|string // saved in 'point' (like in Word) - units are also allowed but converted in options
     color?:string // always converted to hex
     align?:TextAreaAlign
+}
+
+//// DOCS:BLOCKS
+
+export interface TitleBlockInput
+{
+    title ?: string
+    designer ?: string
+    logoUrl ?: string // default: archiyou logo
+    designLicense ?: PublishLicense // license of the design
+    manualLicense ?: PublishLicense // license of the manual
 }
 
 //// INTERFACES FOR OUTPUTS ////
@@ -877,9 +891,6 @@ export interface CalcData
 
 export type ParamOperation = 'new'|'updated'|'same'|'deleted'
 
-//// ARRANGEMENT 2D ////
+//// PUBLISH TYPES ////
 
-export interface Arr2DPolygon {
-    area:number
-    points:Array<Point> // with z = 0
-}
+export type PublishLicense = 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'

@@ -5,7 +5,8 @@
  */
 
 
-import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, Param, PublishParam, isPublishParam, isParam} from './internal'
+import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, isDocUnitsWithPerc,
+        Param, PublishParam, isPublishParam, isParam, UnitsWithPerc} from './internal'
 
 //// PARAMS ////
 
@@ -270,14 +271,16 @@ export function intRange(start:string|number,end:string|number)
 }
 
 /** Convert a value between units of measure */
-export function convertValueFromToUnit(v:number, from:Units, to:Units):number
+export function convertValueFromToUnit(v:number, from:UnitsWithPerc, to:UnitsWithPerc, relativeToNum?:number):number
 {
     const INCH_TO_MM = 25.4;
     const MM_TO_INCH = 0.0393700787;
     const INCH_TO_PNT = 72;
 
     if( typeof v !== 'number'){ console.warn(`utils::convertValueFromToUnit(): Please supply a number!`); return null; }
-    if(!isDocUnits(from) || !isDocUnits(to)){ console.warn(`utils::convertValueFromToUnit(): Please supply valid from/to units ('mm', 'cm', 'inch'). Got "${from}"=>"${to}"`); return null; } 
+    
+    if((from === '%' || to === '%') && !relativeToNum ){ console.warn(`utils::convertValueFromToUnit(): Converting from/to % is not supported without a number to which we relate to!`); return null; } 
+    if(!isDocUnitsWithPerc(from) || !isDocUnitsWithPerc(to)){ console.warn(`utils::convertValueFromToUnit(): Please supply valid from/to units ('mm', 'cm', 'inch'). Got "${from}"=>"${to}"`); return null; } 
 
     if(from === to)
     {
@@ -288,24 +291,35 @@ export function convertValueFromToUnit(v:number, from:Units, to:Units):number
         if(to === 'mm'){ return v*INCH_TO_MM }
         if(to === 'cm'){ return v*INCH_TO_MM/10 }
         if(to === 'pnt'){ return v*INCH_TO_PNT }
+        if(to === '%'){ return v/relativeToNum*100 }
     }
     else if(from === 'cm')
     {
         if(to === 'mm'){ return v*10 }
         if(to === 'inch'){ return v*10*MM_TO_INCH }
         if(to === 'pnt'){ return v/10*MM_TO_INCH*INCH_TO_PNT }
+        if(to === '%'){ return v/relativeToNum*100 }
     }
     else if(from === 'mm')
     {
         if(to === 'cm'){ return v/10 }
         if(to === 'inch'){ return v*10*MM_TO_INCH }
         if(to === 'pnt'){ return v*MM_TO_INCH*INCH_TO_PNT }
+        if(to === '%'){ return v/relativeToNum*100 }
     }
     else if(from === 'pnt')
     {
         if(to === 'mm'){ return v/INCH_TO_PNT*INCH_TO_MM }
         if(to === 'cm'){ return v/INCH_TO_PNT*INCH_TO_MM/10 }
         if(to === 'inch'){ return v/INCH_TO_PNT }
+        if(to === '%'){ return v/relativeToNum*100 }
+    }
+    else if(from === '%')
+    {
+        if(to === 'mm'){ return v/100*relativeToNum }
+        if(to === 'cm'){ return v/100*relativeToNum }
+        if(to === 'pnt'){ return v/100*relativeToNum }
+        if(to === 'inch'){ return v/100*relativeToNum }
     }
 
     console.warn(`Doc::_convertValueFromToUnit(): Could not convert. Check values for from ("${from}") and to ("${to}")!`);

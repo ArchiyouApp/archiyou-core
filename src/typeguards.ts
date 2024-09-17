@@ -1,5 +1,6 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, 
-            VertexCollection, DimensionLineData, PipelineType, Beam  } from './internal'
+            VertexCollection, DimensionLineData, PipelineType, Beam,  
+            DocUnitsWithPerc} from './internal'
 
 import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
@@ -20,7 +21,7 @@ import { ParamType, Param, PublishParam } from './internal'
 import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
             ContainerHAlignment, ContainerVAlignment, MetricName,
-            ContainerTableInput, ContainerPositionLike
+            ContainerTableInput, ContainerPositionLike, ContainerPositionCoordRel, ContainerPositionCoordAbs
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
@@ -401,16 +402,32 @@ export function isContainerAlignment(o:any): o is ContainerAlignment
     return Array.isArray(o) && isContainerHAlignment(o[0]) && isContainerVAlignment(o[1])
 }
 
+/** A absolute container position coord: 10mm, 10(=default unit) */
+export function isContainerPositionCoordAbs(o:any): o is ContainerPositionCoordAbs
+{
+    return ((typeof o === 'string') && o.match(/mm|cm|inch|pnt/)) !== null // either string with units
+            || ((typeof o === 'number') && o > 1)
+}
+
+export function isContainerPositionCoordRel(o:any): o is ContainerPositionCoordRel
+{
+    return (typeof o === 'number' && (o >= 0.0 && o <= 1.0))
+}
+
 export function isContainerPositionRel(o:any): o is ContainerPositionRel
 {
-    return (Array.isArray(o) && o.length === 2 && o.every(e => typeof e === 'number'))
+    return (Array.isArray(o) 
+                && o.length === 2 
+                && o.every(e => isContainerPositionCoordRel(e)))
+            
 }
 
 export function isContainerPositionAbs(o:any): o is ContainerPositionAbs
 {
-    return  (Array.isArray(o) && o.length === 2 
-        && o.every(e => typeof e === 'string')) 
-        && o.every(e => e.match(/mm|cm|inch|pnt/) )
+    return  ( 
+            Array.isArray(o) && o.length === 2 
+            && o.every(e => isContainerPositionCoordAbs(e))
+        )
 }
 
 /** Things that can be turned into a ContainerPositionRel (Array<number|number>) */
@@ -420,6 +437,8 @@ export function isContainerPositionLike(o:any): o is ContainerPositionLike
         || isContainerAlignment(o) 
         || isContainerPositionAbs(o)
 }
+
+
 
 export function isScaleInput(o:any): o is ScaleInput {
     return (typeof o === 'string' && o === 'auto') || (typeof o === 'number')
@@ -457,6 +476,12 @@ export function isDocUnits(o:any): o is DocUnits
 {
     if(typeof o !== 'string'){ return false };
     return ['mm','cm','inch','pnt'].includes(o as string);
+}
+
+export function isDocUnitsWithPerc(o:any): o is DocUnitsWithPerc
+{
+    if(typeof o !== 'string'){ return false };
+    return ['mm','cm','inch','pnt','%'].includes(o as string);
 }
 
 export function isPercentageString(o:any): o is PercentageString 

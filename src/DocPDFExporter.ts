@@ -31,8 +31,7 @@ import { jsPDF, GState } from 'jspdf'
 import 'svg2pdf.js' // TODO: load dynamically?
 import autoTable from 'jspdf-autotable' // TODO: load dynamically?
 
-import { OutfitNormalByteString } from '../assets/fonts/Outfit-VariableFont_wght-normal'
-import { OutfitBoldByteString } from '../assets/fonts/Outfit-VariableFont_wght-bold'
+import { OutfitByteString } from '../assets/fonts/Outfit'
 
 
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
@@ -152,14 +151,10 @@ export class DocPDFExporter
             // Load custom fonts
             const addCustomFonts = function()
             {
-                this.addFileToVFS('OutfitNormal.ttf', OutfitNormalByteString);
-                this.addFileToVFS('OutfitBold.ttf', OutfitBoldByteString);
-                this.addFont('OutfitNormal.ttf', 'OutfitNormal', 'normal');
-                this.addFont('OutfitBold.ttf', 'OutfitBold', 'bold');
+                this.addFileToVFS('Outfit.ttf', OutfitByteString);
+                this.addFont('Outfit.ttf', 'Outfit', 'normal');
             }
 
-            console.log('==== JSPDF LOADED ====');
-            console.log(this._jsPDF)
             this._jsPDFDoc.API.events.push(['addFonts', addCustomFonts]);
 
             return this
@@ -272,7 +267,8 @@ export class DocPDFExporter
     /** Set defaults of a JsPDF document */
     setDocDefaults(d:jsPDF)
     {
-        d.setFont('OutfitNormal');
+        d.setFont('Outfit', 'normal');
+        console.log(d.getFontList())
     }
     
     /** Wait until the active Doc stream is finished and place resulting Blob inside cache for later export */

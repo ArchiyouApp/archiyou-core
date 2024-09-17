@@ -1,9 +1,9 @@
 import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPathStyle, PositionInUnits, isContainerPositionRel, isContainerPositionAbs, ContainerPositionRel } from './internal'
 
-import { ContainerType, ContainerHAlignment, ContainerVAlignment, ContainerAlignment, ContainerSide, ZoomRelativeTo, ScaleInput,
+import { ContainerType, ContainerHAlignment, ContainerVAlignment, ContainerAlignment, isContainerPositionLike, ZoomRelativeTo, ScaleInput,
     ContainerSizeRelativeTo, Position, ContainerPositionLike, ContainerData, Frame,
-    ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, isContainerPositionLike,
-    isScaleInput } from './internal'
+    ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, ContainerPositionCoordAbs, ContainerPositionCoordRel, isContainerPositionCoordAbs, isContainerPositionCoordRel,
+    isScaleInput, PageSide } from './internal'
 
 export class Container
 {
@@ -85,33 +85,34 @@ export class Container
     /** Set position with a ContainerAlignment or percentage of width and height [x,y] or absolute position with units */
     position(p:ContainerPositionLike):Container
     {
-        if(!isContainerPositionLike(p)){ throw new Error(`Container::pivot: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
+        if(!isContainerPositionLike(p)){ throw new Error(`Container::position: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
         
-        if(isContainerPositionRel(p))
-        {
-            this._position = p as Array<number|number>;
-            return this;
-        }
-        else if(isContainerAlignment(p))
-        {
-            this._position = this._containerAlignmentToPosition(p);
-            return this;
-        }
-        else if(isContainerPositionAbs(p))
-        {
-            this._position = [
-                this._page._resolveValueWithUnitsString(p[0], 'width'),
-                this._page._resolveValueWithUnitsString(p[1], 'height')
-            ]
-        } 
-        else {
-            throw new Error(`Doc::Container::position(): Invalid position. Try a page alignment like 'topleft' or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);
-        }
+        this._setPositionCoord(p[0], 'width');
+        this._setPositionCoord(p[1], 'height');
+        
+        return this;
+    }
+
+    _setPositionCoord(c:ContainerPositionCoordAbs|ContainerPositionCoordRel, side:PageSide):number
+    {
+        const p = (isContainerPositionCoordRel(c)) ? 
+                    c
+                    : isContainerHAlignment(c) ? this._containerHAlignmentToPositionRel(c) 
+                        : isContainerVAlignment(c) ? this._containerVAlignmentToPositionRel(c)
+                            : isContainerPositionCoordAbs(c) ? this._page?._resolveValueWithUnitsString(c, side) // page can not be there yet!
+                                : null
+
+        if(p === null){  throw new Error(`Doc::Container::position(): Invalid position coord: "${c}" (translated to ${p} relative). Try a page alignment like top,left or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);}
+
+        if(!this._position){ this._position = [.5,.5]; }
+
+        this._position[(side === 'width') ? 0 : 1] = p;
+        return p;
     }
 
     /** Set pivot with a ContainerAlignment ('top', 'topright') or percentage of width and height [x,y]  */
     pivot(p:ContainerPositionLike):Container
-    {
+    {   
         if(!isContainerPositionLike(p))
         { 
             throw new Error(`Container::pivot(): Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)
@@ -127,13 +128,10 @@ export class Container
         }
         else if(isContainerPositionAbs(p))
         {
-            this._pivot = [
-                this._page._resolveValueWithUnitsString(p[0], 'width'),
-                this._page._resolveValueWithUnitsString(p[1], 'height')
-            ]
+            throw new Error(`Doc::Container::pivot(${p}): Setting the pivot as absolute coords ['10mm','20mm] is not (yet) supported!`);
         } 
         else {
-            throw new Error(`Doc::Container::pivot(): Invalid pivot. Try a page alignment like 'topleft' or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);
+            throw new Error(`Doc::Container::pivot(${p}): Invalid pivot. Try a page alignment like 'topleft' or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);
         }
 
         return this;
@@ -225,21 +223,28 @@ export class Container
 
     //// UTILS ////
 
+    _containerHAlignmentToPositionRel(ax:ContainerHAlignment):number
+    {
+        if(!isContainerHAlignment(ax)){ throw new Error(`DocPageContainer::_containerHAlignmentToPositionRel: Please supply a valid ContainerHAlignment ['left','right','center']`) }
+        const ALIGNMENT_TO_WPERC = { 'center' : 0.5, 'left' : 0.0, 'right' : 1.0 }
+        return ALIGNMENT_TO_WPERC[ax] ?? 0.5;
+    }
+
+    _containerVAlignmentToPositionRel(ay:ContainerVAlignment):number
+    {
+        if(!isContainerVAlignment(ay)){ throw new Error(`DocPageContainer::_containerHAlignmentToPositionRel: Please supply a valid ContainerHAlignment ['left','right','center']`) }
+        const ALIGNMENT_TO_VPERC = { 'top' : 1.0, 'center' : 0.5, 'bottom' : 0.0 }
+        return ALIGNMENT_TO_VPERC[ay] ?? 0.5;
+    }
+
     _containerAlignmentToPosition(a:ContainerAlignment):Position
     {
         if(!isContainerAlignment(a)){ throw new Error(`DocPageContainer::_containerAlignmentToPosition: Please supply a valid ContainerAlignment like ['left','center']`) }
 
-        const ALIGNMENT_TO_WPERC = { 'center' : 0.5, 'left' : 0.0, 'right' : 1.0 }
-
-        const ALIGNMENT_TO_HPERC = { 'top' : 1.0, 'center' : 0.5, 'bottom' : 0.0 }
-
-        let hAlign = ALIGNMENT_TO_WPERC[a[0]];
-        let vAlign = ALIGNMENT_TO_HPERC[a[1]];
-
-        if(hAlign === undefined){ hAlign = 0.5; }
-        if(vAlign === undefined){ vAlign = 0.5; }
-
-        return [hAlign, vAlign] as Position
+        return [
+                    this._containerHAlignmentToPositionRel(a[0]), 
+                    this._containerVAlignmentToPositionRel(a[1])
+                ] as Position
     }
 
 }
