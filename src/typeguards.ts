@@ -493,7 +493,7 @@ export function isPercentageString(o:any): o is PercentageString
 export function isValueWithUnitsString(o:any): o is PercentageString 
 {
     if(typeof o !== 'string'){ return false };
-    return o.match(/\-*[\d\.]+mm|cm|inch|\"$/) !== null;
+    return o.match(/\-*[\d\.]+mm|cm|inch|\"|pnt$/) !== null;
 }
 
 export function isWidthHeightInput(o:any): o is WidthHeightInput

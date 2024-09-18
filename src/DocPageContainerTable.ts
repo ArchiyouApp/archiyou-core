@@ -21,7 +21,7 @@ export class TableContainer extends Container
 
     constructor(data:DataRows, options:TableContainerOptions)
     {
-        super('table');
+        super();
         this._type = 'table';
         this._data = data;
         this.setOptions(options);

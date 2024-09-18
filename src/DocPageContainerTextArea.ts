@@ -21,7 +21,7 @@ export class TextArea extends Container
 
     constructor(text:string, options:TextAreaOptions)
     {
-        super('textarea');
+        super();
         this._type = 'textarea';
         this._text = text;
         this.setOptions(options);

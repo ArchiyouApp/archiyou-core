@@ -3,7 +3,7 @@ import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPa
 import { ContainerType, ContainerHAlignment, ContainerVAlignment, ContainerAlignment, isContainerPositionLike, ZoomRelativeTo, ScaleInput,
     ContainerSizeRelativeTo, Position, ContainerPositionLike, ContainerData, Frame,
     ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, ContainerPositionCoordAbs, ContainerPositionCoordRel, isContainerPositionCoordAbs, isContainerPositionCoordRel,
-    isScaleInput, PageSide } from './internal'
+    isScaleInput, PageSide, ValueWithUnitsString } from './internal'
 
 export class Container
 {
@@ -36,9 +36,9 @@ export class Container
     _zoomLevel:ScaleInput;
     _zoomRelativeTo:ZoomRelativeTo;
 
-    constructor(name?:string) // Is name really needed here?
+    constructor() 
     {
-        this.name = name;
+        // Name is generated when added to page/doc
     }
 
     _setDefaults()
@@ -50,14 +50,31 @@ export class Container
         if(!this._position) this.position(this.POSITION_DEFAULT);
     }
 
+    /** Options set after container is placed on page */
+    _onPlaced(i?:any):any
+    {
+        // Overriden by child class
+    }
+
     on(page:Page):Container
     {
         this._page = page;
-        this._setDefaults();
+        this._setDefaults(); 
+
+        this.name = this._page._doc._generateContainerName(this._type); // For now, just use type to name the container
+        this._onPlaced(); // specific methods on child 
 
         page.add(this); // Add to Page
 
         return this;
+    }
+
+    checkOnPage()
+    {
+        if(!this._page)
+        { 
+            throw new Error(`DocPageContainer::checkOnPage(): Cannot set certain attributes if the Container is not on a page yet!`)
+        }
     }
 
     setName(n:string):string
@@ -66,25 +83,27 @@ export class Container
         return n;
     }
 
-    /** Set width of this Container. Either in percentage ([0-1]) of (page or content) width or in % or units */
+    /** Set width of this Container. Either in percentage of page area ([0-1]) or or units like 10mm, 20pnt */
     width(n:WidthHeightInput)
     {
+        this.checkOnPage();
         if(!isWidthHeightInput(n)){ throw new Error(`Container::height: Invalid input "${n}": Use a number, number with units ("30mm") or string like "40%"!`)};
         [this._width, this._widthRelativeTo] = this._page._doc._resolveWidthHeightInput(n, this._page, 'width');
         //console.info(`Container::width(): Set container width to ${this._width}`);
     }
 
-    /** Set height of this Container. Either in percentage ([0-1]) of width or in % or units */
+    /** Set height of this Container. Either in percentage of page area ([0-1]) or or units like 10mm, 20pnt */
     height(n:WidthHeightInput)
     {
+        this.checkOnPage();
         if(!isWidthHeightInput(n)){ throw new Error(`Container::height: Invalid input "${n}": Use a number, number with units ("30mm") or string like "40%"!`)};
         [this._height, this._heightRelativeTo] = this._page._doc._resolveWidthHeightInput(n, this._page, 'height');
-        //console.info(`Container::width(): Set container height to :${this._height}`);
     }
 
     /** Set position with a ContainerAlignment or percentage of width and height [x,y] or absolute position with units */
     position(p:ContainerPositionLike):Container
     {
+        this.checkOnPage();
         if(!isContainerPositionLike(p)){ throw new Error(`Container::position: Invalid input "${p}": Use [widthPerc,heightPerc] or ContainerAlignment ('center','topleft'etc)`)};
         
         this._setPositionCoord(p[0], 'width');
@@ -154,10 +173,10 @@ export class Container
     }
 
     /** Turn on border on this container. Use without param to use default style */
-    border(style?:DocPathStyle)
+    border(style?:string|DocPathStyle)
     {
         this._border = true;
-        this._borderStyle = style;
+        this._borderStyle = (typeof style === 'object') ? style : (typeof style === 'string') ? { strokeColor: style } as DocPathStyle : null; 
     }
 
     //// OUTPUT ////
@@ -177,6 +196,19 @@ export class Container
             this._page._height - 2*this._page._height*this._page._padding[1] : this._page._height
         return this._height * relToSize;
     }
+
+    /** Alias for page._resolveValueWithUnitsString with active page (if any) */
+    _resolveValueWithUnitsString(s:ValueWithUnitsString, side:PageSide):number|null
+    {
+        if(!this._page)
+        { 
+            console.warn(`DocPageContainer::_resolveValueWithUnitsString(): Container is not yet on page. Cannot make "${s}" relative`);
+            return null;
+        };
+
+        return this._page._resolveValueWithUnitsString(s, side)
+    }
+
 
     /** Export Data of Container */
     async toData(cache?:Record<string,any>):Promise<ContainerData>

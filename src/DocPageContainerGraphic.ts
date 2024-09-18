@@ -15,7 +15,7 @@ export class GraphicContainer extends Container
 
     constructor(type:DocGraphicType, input:DocGraphicInputBase|DocGraphicInputRect|DocGraphicInputCircle|DocGraphicInputLine)
     {
-        super(type || 'graphic');  // set name
+        super(); 
         this._type = 'graphic'; // main type
         this.setOptions({ 
                             ...input, 

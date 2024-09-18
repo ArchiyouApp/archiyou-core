@@ -174,6 +174,9 @@ export class Page
 
     _containerExists(name:string):boolean
     {
+        console.log('==== CONTAINER EXITS ====');
+        console.log(name)
+        console.log(this._containers.map(c => c.name));
         return this._containers.some( c => c.name === name);
     }
 

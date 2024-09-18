@@ -35,7 +35,7 @@ import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, Con
             ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
 import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
-    ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, 
+    ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer,
         isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
                 DocGraphicInputLine, DocGraphicInputOrthoLine, TitleBlockInput, isContainerPositionCoordRel
             } from './internal'
@@ -52,6 +52,7 @@ export class Doc
     PAGE_SIZE_DEFAULT:PageSize = 'A4';
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
     CONTENT_ALIGN_DEFAULT:ContainerAlignment = ['left', 'top'];
+    TEXT_SIZE_DEFAULT = '10mm';
 
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
@@ -343,7 +344,9 @@ export class Doc
     text(text:string|number, options?:TextOptions):Doc
     {
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
-        text = (typeof text !== 'string') ? text.toString() : text;    
+        text = (typeof text !== 'string') ? text.toString() : text;
+
+        
       
         const newTextContainer = new Text(text, options).on(this._activePage);
         this._activeContainer = newTextContainer;
@@ -378,7 +381,6 @@ export class Doc
                     : nameOrData as DataRows
 
         const newTableContainer = new TableContainer(dataRows, options).on(this._activePage);
-        newTableContainer.name = (typeof nameOrData === 'string') ? nameOrData : this._generateContainerName(newTableContainer);
 
         this._activeContainer = newTableContainer;
         
@@ -420,7 +422,6 @@ export class Doc
         }
 
         const newGraphicContainer = new GraphicContainer('rect', input).on(this._activePage);
-        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
         this.width(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.width).join(''), 'width'));
@@ -458,7 +459,6 @@ export class Doc
         
 
         const newGraphicContainer = new GraphicContainer('circle', input).on(this._activePage);
-        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
         this.width(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.radius*2).join(''), 'width'));
@@ -488,7 +488,11 @@ export class Doc
         if (typeof input === 'object')
         {   
             // NOTE: _splitInputNumberUnits always return number and units (default if none given)
-            input = { length: this._splitInputNumberUnits(input.length)[0], units: this._splitInputNumberUnits(input.length)[1] } as DocGraphicInputOrthoLine;
+            input = { 
+                        ...input, // take over attributes like thickness
+                        length: this._splitInputNumberUnits(input.length)[0], 
+                        units: this._splitInputNumberUnits(input.length)[1],
+                    } as DocGraphicInputOrthoLine;
         }
         else {
             // or a raw number or string
@@ -499,8 +503,12 @@ export class Doc
         if(!input.style){ input.style = {}}
 
         // Style attributes can be in DocGraphicInputOrthoLine
-        thickness = thickness ?? input?.thickness
-        color = color ?? input?.color
+        thickness = thickness ?? input?.thickness;
+        color = color ?? input?.color;
+
+        console.log('==== OLINE ====');
+        console.log(thickness)
+        console.log(input);
 
         input.style.lineWidth = (thickness) 
             ? convertValueFromToUnit(
@@ -512,7 +520,6 @@ export class Doc
         const newGraphicContainer = new GraphicContainer((type === 'h') ? 'hline' : 'vline', input)
                                         .on(this._activePage);
 
-        newGraphicContainer.name = this._generateContainerName(newGraphicContainer);
         this._activeContainer = newGraphicContainer;
 
         if(type === 'h')
@@ -679,9 +686,6 @@ export class Doc
             args.reverse();
         }
 
-        console.log('HLINE ARGS');
-        console.log(args);
-
         if (isContainerPositionLike(args))
         {
             this._activeContainer.pivot(args as ContainerPositionLike)    
@@ -815,37 +819,37 @@ export class Doc
     /* count containers of a type on active page 
                 and check how many are called table{x}, image{x} etc
                 and iterate count */
-    _generateContainerName(container:Container):string
+    _generateContainerName(containerOrName:string|Container):string
     {
-        const START_ITER_COUNT = 1;
-        
-        const type = container._type as ContainerType; // table, view etc
-        // Check if name is even present, else make its type the name
-        container.name = container.name || container._type;
-        
-        const containersWithAutoName = this._activePage._containers.filter( c => c._type === container._type 
-            && c.name?.includes(type) && c?.name !== type); // don't include simply 'table'
+        const START_ITER_COUNT = 0;
 
-        if(containersWithAutoName.length === 0)
+        const reqName = (isAnyPageContainer(containerOrName)) ? (containerOrName.name || containerOrName._type) : (typeof containerOrName === 'string') ? containerOrName as string : null;
+        
+        if (!reqName){ throw new Error(`Doc::_generateContainerName. Please supply a string or Container instance to get a name! Got: ${containerOrName}`); }
+
+        const containersWithSameName = this._activePage._containers.filter( c => c.name === reqName || c.name.match(new RegExp(`${reqName}[\\d]+$`))); // match exactly the same or name{NUM}
+
+        if(containersWithSameName.length === 0)
         {
-            return `${type}${START_ITER_COUNT}`;
+            return reqName;
         }
         else {
             // look for highest iterator
             let max = START_ITER_COUNT;
-            containersWithAutoName.forEach( c => 
+            containersWithSameName.forEach( c => 
             {
-                const nums = c.name.match(/[\d]+/)
+                const nums = c.name.match(/[\d]+$/)
                 if (nums)
                 {
                     const count = parseInt(nums[0]);
                     if(count > max)
                     {
                         max = count; 
-                    }
+                    }   
                 }
             });
-            return `${type}${(max+1).toString()}`; 
+            const reqNameClean = reqName.replace(/[\d]+$/, '')
+            return `${reqNameClean}${(max+1).toString()}`; 
         }
     }
 
@@ -883,8 +887,9 @@ export class Doc
          }
          else if(isValueWithUnitsString(n))
          {
-             // position like '10mm' is absolute to page (not to content)
-             return [this._resolveValueWithUnitsString(n, page, side), 'page' as ContainerSizeRelativeTo]; // absolute units are relative to page (because padding might change and thus size of content area)
+             // IMPORTANT: Even absolute coordinates (10mm) are relative to page content area - not page!
+             // TODO: Do we need this to be more implicit for the user?
+             return [this._resolveValueWithUnitsString(n, page, side), 'page-content-area' as ContainerSizeRelativeTo]; // absolute units are relative to page (because padding might change and thus size of content area)
          }
          
          return null;
@@ -925,9 +930,6 @@ export class Doc
 
         // if already relative (40%)
         const percMatch = s.match(/(\-*[\d\.]+)(%)$/);
-
-        console.log('==== _resolveValueWithUnitsString ====');
-        console.log(percMatch);
 
         if(percMatch)
         {

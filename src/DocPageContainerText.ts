@@ -2,24 +2,28 @@ import { Page, Container, ContainerData, ContainerContent , DocUnits, isDocUnits
 import { convertSizeUnitsToFontPoints } from './internal'
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-import { TextOptions } from './internal'
+import { TextOptions, ValueWithUnitsString } from './internal'
 
 export class Text extends Container
 {
     DEFAULT_SIZE = '7mm'; // converted to points
     DEFAULT_COLOR = 'black'; // converted to hex
-    DEFAULT_TEXT_PIVOT_POSITION = [0,1];
+    DEFAULT_TEXT_PIVOT_POSITION = [0,1]; // top left
+    DEFAULT_TEXT_POSITION = [0,1]; // top left
+    FONT_SIZE_TO_HEIGHT_FACTOR = 1.6; // height of container always is a bit bigger than font size
 
     _text:string;
-    _options:TextOptions = {}
+    _origOptions:TextOptions = {}; // saved, to check back later, when container is added to page
+    _options:TextOptions = {};
 
     constructor(text:string, options:TextOptions)
     {
-        super(text);
-        this._setDefaults();
+        super();
         this._type = 'text';
         this._text = text;
-        this.setOptions(options);
+
+        this._setDefaults();
+        this._origOptions = options;
     }
 
     /** with Text Container width/height is less important than position and size - reflect this in setting to null by default */
@@ -27,21 +31,32 @@ export class Text extends Container
     {
         this._width = null;
         this._height = null;
-        this.pivot(this.DEFAULT_TEXT_PIVOT_POSITION);
-        this.position(this.POSITION_DEFAULT);
+        this._pivot = this.DEFAULT_TEXT_PIVOT_POSITION;
+        this._position = this.DEFAULT_TEXT_POSITION;
     }
 
-    /** Set options and defaults */
-    setOptions(options:TextOptions = {})
+    /** Set options after added to page (overriden from parent class) */
+    _onPlaced(options?:TextOptions)
     {
-        this._setSize( (options?.size) ? options.size : this.DEFAULT_SIZE);
-        this._setColor((options?.color) ? options.color : this.DEFAULT_COLOR);
+        options = options ?? this._origOptions ?? {};
+
+        this._setSize(  options?.size ?? this.DEFAULT_SIZE);
+        this._setColor( options?.color ?? this.DEFAULT_COLOR);
+
+        // if on page, we can make height relative to font height
+        if(!this._height && this._options?.size && this._page)
+        {
+            // font height is container height is not set by user
+            this.height(`${(this._options.size as number) * this.FONT_SIZE_TO_HEIGHT_FACTOR}pnt`);
+        }
     }
     
-    /** Set size of text in traditional 'points'. Real doc units (mm,cm,inch) are converted to points */
+    /** Set size of text in traditional 'points'. Real doc units (mm,cm,inch) are converted to points 
+     *  NOTE: a measure relative to page height does not work here!
+    */
     _setSize(size:number|string)
     {
-        this._options.size = convertSizeUnitsToFontPoints(size);
+        this._options.size = convertSizeUnitsToFontPoints(size); 
     }
 
     /** Convert to Color hex with chroma */

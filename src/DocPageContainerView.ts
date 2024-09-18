@@ -10,9 +10,9 @@ export class View extends Container
     _dimension:any; // TODO
     _forceAll:boolean = false;
 
-    constructor(name:string)
+    constructor()
     {
-        super(name);
+        super(); // no name needed?
         this._type = 'view';
     }
 

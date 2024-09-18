@@ -306,6 +306,8 @@ export class DocPDFExporter
     {
         console.info(`DocPDFExporter::_placeContainer: Placing container "${c.name}" of type "${c.type}" on page "${p.name}"`)
 
+        this._placeContainerBasics(c,p);
+
         switch(c.type)
         {
             case 'text':
@@ -333,24 +335,46 @@ export class DocPDFExporter
         }
     }
 
-    
+    /** Any elements for all Containers like border */
+    _placeContainerBasics(c:ContainerData, p:PageData)
+    {
+        /*
+            NOTES:
+                - TODO: container width/height based on content
+
+        */
+
+        const DEFAULT_BORDER_STYLE = {  strokeColor: '#999999', lineWidth: 0.5 } as DocPathStyle
+
+        // Border rectangle border (mostly for debug for now)
+        if(c.border)
+        {
+            this._setPathStyle({ ...DEFAULT_BORDER_STYLE, ...(c.borderStyle || {}) });
+            const x = this.coordRelWidthToPoints(c.position[0] - ((c?.width) ? c.width*c.pivot[0] : 0), p);
+            const y = this.coordRelHeightToPoints(c.position[1] + ((c?.height) ? c.height*c.pivot[1] : 0), p);
+            const w = this.relWidthToPoints(c.width, p);
+            const h = this.relHeightToPoints(c.height, p);
+            this.activePDFDoc.rect(x,y,w,h, 'S');
+        }
+    }
 
     //// TEXT ////
     
     /** Place text on activePDFDoc and active page */
     _placeText(t:ContainerData, p:PageData)
     {
+        /* NOTE:
+            - If container width is not set we don't have a way to estimate text content yet! (unlike in HTML renderer)
+         */
+
         this.activePDFDoc.setFontSize(t?.content?.settings?.size); // in points already
 
-        // TODO: Make this calculation more elegant and clear
-        const x = this.coordRelWidthToPoints(t.position[0], p) 
-                    - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
-
+        const {x ,y } = this.containerToPDFPositionInPnts(t, p);
 
         this.activePDFDoc.text(
             t?.content?.data, 
             x, // from relative page coords to absolute PDF points
-            this.coordRelHeightToPoints(t.position[1], p),
+            y, 
             { // jsPDF text options
                 ...this._setTextOptions(t, p)
             }
@@ -389,6 +413,7 @@ export class DocPDFExporter
             - We use a reference to PageData here to avoid this.activePage while working with async methods
 
             TODO: Implement options.align[horizontal,vertical] - now default [left,top]
+            IMPORTANT: Transparency in PNG's render as gray! Use white backgrounds
             
         */
 
@@ -435,7 +460,7 @@ export class DocPDFExporter
                 // see: https://raw.githack.com/MrRio/jsPDF/master/docs/module-addImage.html
                 this.activePDFDoc.addImage(
                     img.content.data, // already saved in base64 format
-                    'JPEG', // format of file if filetype-recognition fails
+                    img.content.format.toUpperCase(), // format of file if filetype-recognition fails JPG,PNG etc
                     x, // in pnts
                     y, // in pnts
                     width,
@@ -529,20 +554,6 @@ export class DocPDFExporter
 
         // Draw annotations
         svgEdit.drawDimLinesToPDF(this);
-
-        // draw border around container
-        // TODO: check!
-        if (view.border)
-        {
-            const viewPositionPnts = this.containerToPDFPositionInPnts(view, p);
-            let d = this.activePDFDoc.rect(
-                viewPositionPnts.x,
-                viewPositionPnts.y,
-                this.relWidthToPoints(view.width, p),
-                this.relHeightToPoints(view.height, p),
-            ).stroke();
-            this._setPathStyle(view?.borderStyle)
-        }
 
         // Force putting to canvas
         this._drawFakePath();
