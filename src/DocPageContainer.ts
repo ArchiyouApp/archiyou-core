@@ -118,7 +118,7 @@ export class Container
                     c
                     : isContainerHAlignment(c) ? this._containerHAlignmentToPositionRel(c) 
                         : isContainerVAlignment(c) ? this._containerVAlignmentToPositionRel(c)
-                            : isContainerPositionCoordAbs(c) ? this._page?._resolveValueWithUnitsString(c, side) // page can not be there yet!
+                            : isContainerPositionCoordAbs(c) ? this._page?._resolveValueWithUnitsStringToRel(c, side) // page can not be there yet!
                                 : null
 
         if(p === null){  throw new Error(`Doc::Container::position(): Invalid position coord: "${c}" (translated to ${p} relative). Try a page alignment like top,left or coords relative ([0-1]) relative to page left bottom or absolute coordinates with units like 10mm`);}
@@ -197,16 +197,16 @@ export class Container
         return this._height * relToSize;
     }
 
-    /** Alias for page._resolveValueWithUnitsString with active page (if any) */
-    _resolveValueWithUnitsString(s:ValueWithUnitsString, side:PageSide):number|null
+    /** Alias for page._resolveValueWithUnitsStringToRel with active page (if any) */
+    _resolveValueWithUnitsStringToRel(s:ValueWithUnitsString, side:PageSide):number|null
     {
         if(!this._page)
         { 
-            console.warn(`DocPageContainer::_resolveValueWithUnitsString(): Container is not yet on page. Cannot make "${s}" relative`);
+            console.warn(`DocPageContainer::_resolveValueWithUnitsStringToRel(): Container is not yet on page. Cannot make "${s}" relative`);
             return null;
         };
 
-        return this._page._resolveValueWithUnitsString(s, side)
+        return this._page._resolveValueWithUnitsStringToRel(s, side)
     }
 
 

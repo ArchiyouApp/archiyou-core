@@ -37,7 +37,8 @@ import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, Con
 import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer,
         isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
-                DocGraphicInputLine, DocGraphicInputOrthoLine, TitleBlockInput, isContainerPositionCoordRel
+                DocGraphicInputLine, DocGraphicInputOrthoLine, isContainerPositionCoordRel,
+                ContainerBlock, TitleBlockInput, LabelBlockOptions
             } from './internal'
 
 import { convertValueFromToUnit, isNumeric } from './internal' // utils
@@ -62,6 +63,7 @@ export class Doc
     
     _docs:Array<string> = []; // multiple documents names (see them as 'files')
     _activeDoc:string; // name of active document
+    _lastBlock:ContainerBlock; // keep track of latest create block
 
     _pageSizeByDoc:{[key:string]:PageSize} = {};
     _pageOrientationByDoc:{[key:string]:PageOrientation} = {}; // default orientation
@@ -346,8 +348,6 @@ export class Doc
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
         text = (typeof text !== 'string') ? text.toString() : text;
 
-        
-      
         const newTextContainer = new Text(text, options).on(this._activePage);
         this._activeContainer = newTextContainer;
         return this;
@@ -424,8 +424,8 @@ export class Doc
         const newGraphicContainer = new GraphicContainer('rect', input).on(this._activePage);
         this._activeContainer = newGraphicContainer;
 
-        this.width(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.width).join(''), 'width'));
-        this.height(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.height).join(''), 'height'));
+        this.width(this._activePage._resolveValueWithUnitsStringToRel(this._splitInputNumberUnits(input.width).join(''), 'width'));
+        this.height(this._activePage._resolveValueWithUnitsStringToRel(this._splitInputNumberUnits(input.height).join(''), 'height'));
 
         return this;
     }
@@ -461,8 +461,8 @@ export class Doc
         const newGraphicContainer = new GraphicContainer('circle', input).on(this._activePage);
         this._activeContainer = newGraphicContainer;
 
-        this.width(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.radius*2).join(''), 'width'));
-        this.height(this._activePage._resolveValueWithUnitsString(this._splitInputNumberUnits(input.radius*2).join(''), 'height'));
+        this.width(this._activePage._resolveValueWithUnitsStringToRel(this._splitInputNumberUnits(input.radius*2).join(''), 'width'));
+        this.height(this._activePage._resolveValueWithUnitsStringToRel(this._splitInputNumberUnits(input.radius*2).join(''), 'height'));
 
         return this;
     }
@@ -506,9 +506,6 @@ export class Doc
         thickness = thickness ?? input?.thickness;
         color = color ?? input?.color;
 
-        console.log('==== OLINE ====');
-        console.log(thickness)
-        console.log(input);
 
         input.style.lineWidth = (thickness) 
             ? convertValueFromToUnit(
@@ -524,12 +521,12 @@ export class Doc
 
         if(type === 'h')
         { 
-            this.width(this._activePage._resolveValueWithUnitsString(input.length + input.units, 'width'));
-            this.height(this._activePage._resolveValueWithUnitsString(input.style.lineWidth + 'pnt', 'height'));
+            this.width(this._activePage._resolveValueWithUnitsStringToRel(input.length + input.units, 'width'));
+            this.height(this._activePage._resolveValueWithUnitsStringToRel(input.style.lineWidth + 'pnt', 'height'));
         }
         else {
-            this.height(this._activePage._resolveValueWithUnitsString(input.length + input.units, 'height'));
-            this.width(this._activePage._resolveValueWithUnitsString(input.style.lineWidth + 'pnt', 'width'));
+            this.height(this._activePage._resolveValueWithUnitsStringToRel(input.length + input.units, 'height'));
+            this.width(this._activePage._resolveValueWithUnitsStringToRel(input.style.lineWidth + 'pnt', 'width'));
         }
 
         this.pivot([0,1]); // default pivot left top instead of Graphic default center ([0.5,0.5])
@@ -557,10 +554,13 @@ export class Doc
      */
     titleblock(data?:TitleBlockInput)
     {
+        const TITLEBLOCK_WIDTH = '60mm';
+        const BLOCK_MARGIN = this._activePage._resolveValueWithUnitsStringToRel('1mm', 'height'); 
+
         const DEFAULT_SETTINGS = {
             title : 'Untitled',
             designer : 'Unknown',
-            logoUrl: 'https://cms.shopxyz.nl/uploads/archiyou_logo_header_1ad9be912f.png',
+            logoUrl: 'https://cms.shopxyz.nl/uploads/archiyou_logo_header_bgwhite_d35135524b.png',
             designLicense: 'CC BY-NC',
             manualLicense: 'CC BY-NC',
         }
@@ -571,20 +571,125 @@ export class Doc
 
         const settings = { ...DEFAULT_SETTINGS, ...data } as TitleBlockInput;
 
+        // logo
         this.image(settings.logoUrl)
             .pivot(1,0) // right bottom
             .position(1,0) // right bottom
-            .width('50mm')
-            .height('15mm')
+            .width('30mm')
+            .height('8mm')
 
-        this.hline({ thickness: '2mm', color: 'black', length: '80mm'})
-            .position(1, '20mm')
+        this.labelblock('metrics', 'EST cost: 100 EUR T: 100 W:200 H:200', { y: '11mm', width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        const metricsBlock = this.lastBlock();
+        this.labelblock('params', 'W:100 H:200 W:1000', { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        const paramsBlock = this.lastBlock();
+        this.labelblock(
+                        ['designer', 'design license', 'manual license'], 
+                        [ settings.designer, settings.designLicense, settings.manualLicense], 
+                        { y: paramsBlock.bbox[3] + BLOCK_MARGIN, textSize : '3.5mm', width: TITLEBLOCK_WIDTH });
+        const designBlock =  this.lastBlock();
         
-        
+        this.hline({ thickness: '2pnt', color: 'black', length: TITLEBLOCK_WIDTH})
+            .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2)
+            .pivot(1,0.5)
+        // header
+        this.text( data.title, { size: '8mm', bold: true })
+            .pivot(1,0)
+            .width(TITLEBLOCK_WIDTH)
+            .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2)
 
-
+        return this;
     }
 
+    /** Create a block with one or more label and one or more texts
+     *  The first label/text pair fills half of the container
+     *  Used mostly for titleblock
+     */
+    labelblock(labels:string|Array<string>, texts:string|Array<string>, options:LabelBlockOptions = {}):this
+    {
+        const MAX_ITEMS = 3; // max label/text pairs
+        const LABELBLOCK_MARGIN_BETWEEN = '1mm'
+        const LABELBLOCK_DEFAULTS = {
+            x: 1, // right of page
+            y: 0,
+            width: '80mm',
+            pivot: [1,0],
+            textSize: '2.5mm',
+            labelSize: '1.5mm',
+            numTextLines: 1,
+            margin: '1mm',
+            line: true,
+        } as LabelBlockOptions
+
+        // Take care of multiple text/label, but no more than MAX_ITEMS
+        labels = (typeof labels === 'string') ? [labels] : (Array.isArray(labels)) ? labels.slice(0,MAX_ITEMS) : null;
+        texts = (typeof texts === 'string') ? [texts] : (Array.isArray(texts)) ? texts.slice(0,MAX_ITEMS) : null;
+
+        if(!labels || !texts )
+        {
+            throw new Error(`Doc::labelblock(): Please supply at least one label(s) and text(s). And optional: { x, y, width, pivot, textSize, labelSize, numTextLines, margin, line }`)
+        }
+
+        options = { ...LABELBLOCK_DEFAULTS, ...options }
+
+        // prepare all info needed to start drawing
+        const blockWidthRel = this._activePage._resolveValueWithUnitsStringToRel(options.width, 'width');
+        const blockMarginRel = this._activePage._resolveValueWithUnitsStringToRel(options.margin, 'height');
+        const blockMarginBetweenRel = this._activePage._resolveValueWithUnitsStringToRel(LABELBLOCK_MARGIN_BETWEEN, 'height');
+        
+        const blockTextSizePnt = this.parseInputNumberUnitsConvertTo(options.textSize, 'pnt'); 
+        const blockLabelSizePnt = this.parseInputNumberUnitsConvertTo(options.labelSize, 'pnt'); 
+        const blockTextSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockTextSizePnt + 'pnt', 'height');
+        const blockLabelSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockLabelSizePnt + 'pnt', 'height');
+
+        const blockHeightRel = blockTextSizeRel + blockLabelSizeRel + 2*blockMarginRel + blockMarginBetweenRel;
+
+        const xRel =  this._activePage._resolveValueWithUnitsStringToRel(options.x, 'width');
+        const yRel = this._activePage._resolveValueWithUnitsStringToRel(options.y, 'height');
+
+        // We always draw locally from left,bottom: shift positions based on pivot
+        const blockXRel = xRel + (1-options.pivot[0])*blockWidthRel;
+        const blockYRel = yRel - options.pivot[1]*blockHeightRel;
+
+        this.hline({ thickness: '1pnt', color: 'black', length: blockWidthRel })
+            .pivot(1,1)    
+            .position(blockXRel, blockYRel)
+        
+        labels.forEach((label,i,arr) => 
+        {
+            this.text(label, { size: blockLabelSizePnt})
+            .width(blockWidthRel)
+            .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
+            .position(blockXRel, blockYRel+blockMarginRel+blockTextSizeRel*1.2+blockMarginBetweenRel); // NOTE: small factor to correct for bigger height
+
+            this.text(texts[i] || '', { size: blockTextSizePnt})
+            .width(blockWidthRel)
+            .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
+            .position(blockXRel, blockYRel+blockMarginRel)
+        })
+        
+       
+        this._lastBlock = {
+            x: blockXRel,
+            y: blockYRel,
+            width: blockWidthRel,
+            height: blockHeightRel,
+            pivot: options.pivot,
+            bbox: [
+                blockXRel -  blockWidthRel,
+                blockXRel,
+                blockYRel,
+                blockYRel + blockHeightRel
+            ]
+        }
+
+        return this // Return doc module to not break chaining. Use doc.lastBlock() to get block info
+    }
+
+    /** Get last created ContainerBlock */
+    lastBlock():ContainerBlock
+    {
+        return this._lastBlock
+    }
 
     //// DEFINE ACTIVE CONTAINER ////
 
@@ -889,7 +994,7 @@ export class Doc
          {
              // IMPORTANT: Even absolute coordinates (10mm) are relative to page content area - not page!
              // TODO: Do we need this to be more implicit for the user?
-             return [this._resolveValueWithUnitsString(n, page, side), 'page-content-area' as ContainerSizeRelativeTo]; // absolute units are relative to page (because padding might change and thus size of content area)
+             return [this._resolveValueWithUnitsStringToRel(n, page, side), 'page-content-area' as ContainerSizeRelativeTo]; // absolute units are relative to page (because padding might change and thus size of content area)
          }
          
          return null;
@@ -909,7 +1014,7 @@ export class Doc
      }
  
      /** Return width or height in relative coords of current Page and document units */
-     _resolveValueWithUnitsString(s:ValueWithUnitsString, page:Page, side:PageSide):number 
+     _resolveValueWithUnitsStringToRel(s:ValueWithUnitsString, page:Page, side:PageSide):number 
      {
         // if given number, fallback to page units (default: mm)
         if(typeof s === 'number')
@@ -924,7 +1029,7 @@ export class Doc
         }
         else if(typeof s !== 'string')
         {
-            console.error(`Doc::_resolveValueWithUnitsString(): Invalid input given: ${s}`);   
+            console.error(`Doc::_resolveValueWithUnitsStringToRel(): Invalid input given: ${s}`);   
             return null;
         }
 
@@ -959,7 +1064,7 @@ export class Doc
             // give a warning if it's out of the page
             if(relativeValue > 1 || relativeValue < 0)
             {
-                console.warn(`Container::_resolveValueWithUnitsString: You supplied a value ('${s}') that is outside the page size! Check if this is correct!`)
+                console.warn(`Container::_resolveValueWithUnitsStringToRel: You supplied a value ('${s}') that is outside the page size! Check if this is correct!`)
             }
 
             return relativeValue;
@@ -1010,6 +1115,15 @@ export class Doc
         return null;        
      }
 
+
+     parseInputNumberUnitsConvertTo(n:string|number, unit:DocUnitsWithPerc):number|null
+     {
+        const num = this._splitInputNumberUnits(n)[0];
+        const inUnit = this._splitInputNumberUnits(n)[1];
+
+        return convertValueFromToUnit(num, inUnit, unit)
+            
+     }
 }
 
 

@@ -138,11 +138,11 @@ export class Page
 
     //// UTILS ////
 
-    // Alias forwarding to doc._resolveValueWithUnitsString
+    // Alias forwarding to doc._resolveValueWithUnitsStringToRel
     /** Transform numeric value with units to relative position to page width or height */
-    _resolveValueWithUnitsString(s:ValueWithUnitsString, side:PageSide):number
+    _resolveValueWithUnitsStringToRel(s:ValueWithUnitsString, side:PageSide):number
     {
-        return this?._doc._resolveValueWithUnitsString(s,this,side);
+        return this?._doc._resolveValueWithUnitsStringToRel(s,this,side);
     }
 
 
@@ -174,9 +174,6 @@ export class Page
 
     _containerExists(name:string):boolean
     {
-        console.log('==== CONTAINER EXITS ====');
-        console.log(name)
-        console.log(this._containers.map(c => c.name));
         return this._containers.some( c => c.name === name);
     }
 

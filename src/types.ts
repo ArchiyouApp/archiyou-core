@@ -431,7 +431,7 @@ export interface AutoDimSettings
 export type DocUnits = 'mm'|'cm'|'inch'|'pnt' 
 export type DocUnitsWithPerc = DocUnits | '%' // Percent of page (side is dependent of measure)
 export type PercentageString = string // 100%, 5% etc.
-export type ValueWithUnitsString = string // string with number and DocUnitsWithPerc
+export type ValueWithUnitsString = number|string // string with number and DocUnitsWithPerc
 export type WidthHeightInput = number|PercentageString|ValueWithUnitsString;
 export type ContainerTableInput = string | DataRows
 
@@ -570,6 +570,7 @@ export interface TextOptions
     color?:string // always converted to hex
     width?:number // TODO: needed?
     height?:number // TODO: needed?
+    bold?:boolean
     underline?:boolean // TODO implement in renderer
     strike?:boolean // TODO implement in renderer   
     oblique?:boolean // TODO implement in renderer
@@ -656,6 +657,17 @@ export interface TextAreaOptions
 
 //// DOCS:BLOCKS
 
+/** Important data of created ContainerBlock */
+export interface ContainerBlock
+{
+    width:number // relative to page/content-area
+    height:number // relative
+    x:number // relative
+    y:number // relative
+    pivot:[number,number]
+    bbox?:[number,number,number,number] // left,right,bottom,top (in rel coords, original left bottom)
+}
+
 export interface TitleBlockInput
 {
     title ?: string
@@ -663,6 +675,19 @@ export interface TitleBlockInput
     logoUrl ?: string // default: archiyou logo
     designLicense ?: PublishLicense // license of the design
     manualLicense ?: PublishLicense // license of the manual
+}
+
+export interface LabelBlockOptions
+{
+    x?:string|number
+    y?:string|number
+    width?:string|number // 10mm, 5%, 0.5
+    pivot?:[number,number]
+    textSize?:string|number
+    labelSize?:string|number
+    numTextLines?:number // number of lines of text
+    margin?:number|string // between label/text and outer block
+    line?:boolean
 }
 
 //// INTERFACES FOR OUTPUTS ////

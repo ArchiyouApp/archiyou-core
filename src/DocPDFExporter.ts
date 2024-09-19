@@ -32,6 +32,7 @@ import 'svg2pdf.js' // TODO: load dynamically?
 import autoTable from 'jspdf-autotable' // TODO: load dynamically?
 
 import { OutfitByteString } from '../assets/fonts/Outfit'
+import { OutfitSemiBoldByteString } from '../assets/fonts/OutfitSemiBold'
 
 
 declare var WorkerGlobalScope: any; // avoid TS errors with possible unknown variable
@@ -44,6 +45,7 @@ export class DocPDFExporter
     
     TEXT_ALIGN_DEFAULT = 'left';
     TEXT_BASELINE_DEFAULT = 'top';
+    TEXT_FONT_DEFAULT = 'Outfit';
     
     TABLE_FONTSIZE_DEFAULT = 8;
     TABLE_BORDER_THICKNESS_MM = 0.1;
@@ -152,7 +154,9 @@ export class DocPDFExporter
             const addCustomFonts = function()
             {
                 this.addFileToVFS('Outfit.ttf', OutfitByteString);
+                this.addFileToVFS('OutfitBold.ttf', OutfitSemiBoldByteString); // we use semi bold as bold!
                 this.addFont('Outfit.ttf', 'Outfit', 'normal');
+                this.addFont('OutfitBold.ttf', 'Outfit', 'bold');
             }
 
             this._jsPDFDoc.API.events.push(['addFonts', addCustomFonts]);
@@ -267,8 +271,9 @@ export class DocPDFExporter
     /** Set defaults of a JsPDF document */
     setDocDefaults(d:jsPDF)
     {
-        d.setFont('Outfit', 'normal');
-        console.log(d.getFontList())
+        d.setFont(this.TEXT_FONT_DEFAULT, 'normal');
+        
+        console.info(`Doc::setDocDefaults(): Available fonts: ${d.getFontList()}`);
     }
     
     /** Wait until the active Doc stream is finished and place resulting Blob inside cache for later export */
@@ -370,6 +375,15 @@ export class DocPDFExporter
         this.activePDFDoc.setFontSize(t?.content?.settings?.size); // in points already
 
         const {x ,y } = this.containerToPDFPositionInPnts(t, p);
+
+        // Make text bold
+        if(t.content.settings.bold)
+        {
+            this.activePDFDoc.setFont(this.TEXT_FONT_DEFAULT, 'bold')
+        }
+        else {
+            this.activePDFDoc.setFont(this.TEXT_FONT_DEFAULT, 'normal'); // reset
+        }
 
         this.activePDFDoc.text(
             t?.content?.data, 

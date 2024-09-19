@@ -40,6 +40,8 @@ export class Text extends Container
     {
         options = options ?? this._origOptions ?? {};
 
+        this._options = options; // first set, then override some
+
         this._setSize(  options?.size ?? this.DEFAULT_SIZE);
         this._setColor( options?.color ?? this.DEFAULT_COLOR);
 

@@ -25,6 +25,11 @@ export function convertSizeUnitsToFontPoints(size:number|string):number
 
     if (typeof size === 'number')
     {
+        if(size <= 1)
+        {
+            // Mostly probably a relative size
+            throw new Error(`DocUtils::convertSizeUnitsToFontPoints(${size}): Relative font sizes are not supported! Use number pnts or something like 10mm, 0.5inch`)
+        }
         // assume size is already given in points
         return size;
     }
