@@ -11,6 +11,7 @@ import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPoin
         isMakeFaceInput, AnyShape, isAnyShape, Axis, isAxis, ThickenDirection, isThickenDirection,
         PointLikeOrAnyShape, isPointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection, AnyShapeOrSequence, isAnyShapeOrSequence,
         isAnyShapeCollection, AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, SelectionString, isSelectionString} from './internal'; // types
+import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
 
 import { flattenEntities, toRad, roundToTolerance } from './internal' // utils
 
@@ -290,7 +291,7 @@ export class Face extends Shape
 
         if (width == 0 || depth == 0 )
         {
-            console.error(`Face::makeRect: Please make sure the Rectangle has a width and depth! Given width="${width}" and height="${depth}`);
+            console.error(`Face::makeRect: Please make sure the Rectangle has a width and depth on XY plane! Given width="${width}" and height="${depth}`);
             return null;
         }
         
@@ -1125,6 +1126,23 @@ export class Face extends Shape
 
         let normal = this.normal();
         return AXIS.find( axisNormal => normal.round().equals(new Vector(axisNormal))) != undefined;
+    }
+
+    //// SHAPE ANNOTATIONS API ////
+
+    /** Simply generate dimension lines for all visible Edges in this Face */
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dimension(dim?:DimensionOptions):DimensionLine|Array<DimensionLine>
+    {
+        const dimLines = new ShapeCollection(this.edges().visible()).toArray().map( e => e.dimension(dim)) as Array<DimensionLine>
+        return dimLines.length ? dimLines[0] : dimLines;
+    }
+
+    /** Alias for dimension() */
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dim(dim?:DimensionOptions):DimensionLine|Array<DimensionLine>
+    {
+        return this.dimension(dim);
     }
 
     //// OUTPUT ////

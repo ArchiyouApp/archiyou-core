@@ -16,6 +16,7 @@ import { isCoordArray, PointLike, isPointLike,isCoord,Coord, Cursor, AnyShape,is
         AnyShapeSequence, isAnyShapeSequence, AnyShapeOrSequence, isAnyShapeOrSequence, isMakeWireInput, ThickenDirection, 
         isThickenDirection, MakeWireInput, ShapeType, isShapeType} from './internal' // see types
 import { checkInput, cacheOperation, protectOC, addResultShapesToScene } from './decorators'; // Direct import to avoid error with ts-node/jest
+import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
 import { flattenEntitiesToArray, toRad, toDeg } from './internal' // utils
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -1817,6 +1818,23 @@ export class Wire extends Shape
         
         return new ShapeCollection(intersections['Vertex']).add(combinedWireAndEdgesCollection);
            
+    }
+
+    //// SHAPE ANNOTATIONS API ////
+
+    /** Simply generate dimension lines for all visible Edges in this Face */
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dimension(dim?:DimensionOptions):DimensionLine|Array<DimensionLine>
+    {
+        const dimLines = new ShapeCollection(this.edges().visible()).toArray().map( e => e.dimension(dim)) as Array<DimensionLine>
+        return dimLines.length ? dimLines[0] : dimLines;
+    }
+
+    /** Alias for dimension() */
+    @checkInput([['DimensionOptions',null]], ['auto'])
+    dim(dim?:DimensionOptions):DimensionLine|Array<DimensionLine>
+    {
+        return this.dimension(dim);
     }
 
     //// UTILS ////

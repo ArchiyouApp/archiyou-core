@@ -1158,6 +1158,14 @@ export class Shape
         return this;
     }
 
+    /** Alias for rotateToLayFlat 
+     *  Rotates a Shape to lay flat on XY plane
+    */
+    layflat():this
+    {
+        return this.rotateToLayFlat('vertical', true);
+    }
+
     /** Flatten a Solid into a Face */
     // !!!! TMP METHOD !!!! Needs a lot of work
     _flattened():AnyShape
@@ -4063,7 +4071,7 @@ export class Shape
     //// SHAPE ANNOTATIONS API ////
 
     @checkInput([['DimensionOptions',null]], ['auto'])
-    dimension(dim?:DimensionOptions):IDimensionLine // TODO: unit typing
+    dimension(dim?:DimensionOptions):IDimensionLine|Array<IDimensionLine> // TODO: unit typing
     {
         throw new Error(`Shape::dimension(): No implementation of dimension method in Shape of type ${this.type()}!`);
     }

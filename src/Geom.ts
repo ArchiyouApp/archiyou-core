@@ -225,7 +225,7 @@ export class Geom
   @checkInput([[Number,50],[Number,100],[Number,360],['PointLike',[0,0,0]],['PointLike',[0,0,1]],[Boolean, false],[Number, null]], ['auto','auto','auto','Point','Vector', 'auto', 'auto'])
   Helix(radius?:number, height?:number, angle?:number, pivot?:PointLike, direction?:PointLike, lefthand?:boolean, coneSemiAngle?:number)
   {
-    let helix = new Wire().makeHelix(radius, height, angle, pivot, direction, lefthand, coneSemiAngle);
+    const helix = new Wire().makeHelix(radius, height, angle, pivot, direction, lefthand, coneSemiAngle);
     helix.addToScene();
     helix.name(this.getNextObjName('Helix')); // auto name
     
@@ -242,7 +242,7 @@ export class Geom
     /* Important: Sometimes we can get a Shell instead of a Face - for example when making a non-planar Face from Edges
         This geom.Face method is handy in that case, because we can change it before assignment
     */
-    let faceOrShell = face._toShellWhenOcShell();
+    const faceOrShell = face._toShellWhenOcShell();
     faceOrShell.addToScene();
     faceOrShell.name(this.getNextObjName('Face')); // auto name
     console.geom(`Geom::Face: Created a ${faceOrShell.type()} with ${faceOrShell.vertices().length} vertices`);
@@ -253,7 +253,7 @@ export class Geom
   @checkInput([ [Number, FACE_PLANE_WIDTH], [Number, FACE_PLANE_DEPTH], ['PointLike', FACE_PLANE_NORMAL], ['PointLike', FACE_PLANE_POSITION]], ['auto','auto',Vector, Point])
   Plane(width?:number, depth?:number, normal?:PointLike, position?:PointLike):Face
   {
-    let plane = new Face().makePlane(width, depth, position, normal); // NOTE: other way around. TODO: fix inconsistency
+    const plane = new Face().makePlane(width, depth, position, normal); // NOTE: other way around. TODO: fix inconsistency
     plane.addToScene();
     plane.name(this.getNextObjName('Plane')); // auto name
     console.geom(`Geom::Plane: Created a Plane Face with area ${plane.area()}`);
@@ -264,7 +264,7 @@ export class Geom
   @checkInput([ 'PointLike', 'PointLike' ], ['Point','Point'])
   PlaneBetween(from:PointLike, to:PointLike):Face
   {
-    let plane = new Face().makePlaneBetween(from as Vector, to as Vector);
+    const plane = new Face().makePlaneBetween(from as Vector, to as Vector);
     plane.addToScene();
     plane.name(this.getNextObjName('Plane')); // auto name
     console.geom(`Geom::Plane: Created a Plane Face with area ${plane.area()}`);
