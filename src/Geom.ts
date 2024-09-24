@@ -6,7 +6,7 @@
 import { PointLike, isPointLike, SelectionString,PointLikeSequence, isPointLikeSequence, MakeWireInput, isMakeWireInput,
         MakeFaceInput, isMakeFaceInput, Axis, isAxis, MakeShellInput, isMakeShellInput, MakeSolidInput, isMakeSolidInput,
         AnyShapeOrCollection, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings, ModelUnits, isModelUnits, DocUnits} from './internal' // types
-import { Vector, Point, Obj, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Bbox, ShapeCollection, VertexCollection, Sketch } from './internal'
+import { Vector, Point, Obj, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Bbox, OBbox, ShapeCollection, VertexCollection, Sketch } from './internal'
 import { SketchPlaneName, SketchPlane } from './internal' // Sketch
 import { Pipeline } from './internal'
 import { checkInput, asSketch } from './decorators'; // Direct import to avoid error in ts-node/jest
@@ -21,10 +21,6 @@ import {  SKETCH_FILLET_SIZE, SKETCH_CHAMFER_DISTANCE, SKETCH_CHAMFER_ANGLE } fr
 import { Annotator } from './internal';
 
 import { isNumeric, isBrowser, isWorker, roundToTolerance } from './utils';
-
-// import Arrangement2D from '../libs/arrangement-2d-js' // DISABLED FOR NOW
-const Arrangement2D = null
-import { Arr2DPolygon } from './internal'
 
 //// OWN DEFAULTS
 const DEFAULT_UNITS = 'mm';
@@ -64,6 +60,7 @@ export class Geom
     Vector.prototype._oc = this._oc;
     Point.prototype._oc = this._oc;
     Bbox.prototype._oc = this._oc;
+    OBbox.prototype._oc = this._oc;
     Shape.prototype._oc = this._oc; // set for all Shapes: this is inherited to Vertex, Edge etc
     ShapeCollection.prototype._oc = this._oc;
     Sketch.prototype._oc = this._oc;
@@ -86,7 +83,7 @@ export class Geom
     this.scene = new Obj().name("scene") as Obj; // create empty Collection
     this.setActiveLayer(this.scene);
 
-    this._loadArr2D(); // Load the arrangements-2d wasm module
+    //this._loadArr2D(); // Load the arrangements-2d wasm module - DISABLED FOR NOW
   }
 
   //// ADMIN METHODS ////
@@ -948,6 +945,7 @@ export class Geom
    *  NOTE: We place this in the libs directory because it gave problems in node_modules with transpilation
    *  TODO: We can probably make this work in node_modules
   */
+ /*
   async _loadArr2D()
   {
     if(isBrowser() || isWorker())
@@ -978,12 +976,14 @@ export class Geom
         this._Arr2D = await import(arrLibPath); // Use path as variable to keep Node happy
     }  
   }
+  */
 
   /** From 2D shapes consisting of Line Edges try to find closed polygons
    *  Using CGAL Arrangement2D
    *  @returns Arr2DPolygon { area, points } ordered by area descending
    *  NOTE: This is pretty fast. The following OC routines are not! 
    */
+  /*
   _getArrangementPolys(shapesOrPoints:ShapeCollection|Array<Point>, smallestArea?:number):Array<Arr2DPolygon>
   {
     const AREA_FILTER = 50 ;
@@ -1052,8 +1052,10 @@ export class Geom
     const polys = this._getArrangementPolys(shapesOrPoints);
     return new ShapeCollection(polys.map( p => new Wire().fromPoints(p.points)._toFace() ));
   }
+  */
 
   /** Arrange 2D Shapes into closed boundaries (Shells or Faces) */
+  /*
   arrange2DShapesToBoundaries(shapesOrPoints:ShapeCollection|Array<Point>):ShapeCollection
   {
       const faces = this.arrange2DShapesToFaces(shapesOrPoints);
@@ -1061,10 +1063,11 @@ export class Geom
 
       return shapes.filter(s => ['Shell','Face'].includes(s.type()) )
   }
-
+  */
   /** Arrange 2D Shapes and get the outer contours
    *  NOTE: To get outlines we force Faces into Shells and use outerWire to get the outer Wire
    */
+  /*
   arrange2DShapesToContours(shapesOrPoints:ShapeCollection|Array<Point>):ShapeCollection
   {
     try {
@@ -1100,7 +1103,7 @@ export class Geom
     }
     
   }
-
+  */
 
 }
   

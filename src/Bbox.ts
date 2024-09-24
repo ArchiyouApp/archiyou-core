@@ -5,7 +5,7 @@
  * */
 
 import { Point, Vector, Shape, Obj, Vertex, Edge, Face, Shell, Solid, ShapeCollection } from './internal'
-import { checkInput } from './decorators' // import directly because of error in ts-node
+import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
 
@@ -456,6 +456,15 @@ export class Bbox
 
         return this[AXIS_TO_SIDE[axis]]();
     }   
+
+    /** Get Shape from this Orientated Bounding Box */
+    shape():Edge|Face|Solid|null
+    {
+        // TODO: point or line?
+        return (this.is1D()) ? this.line() :
+                            (this.is2D()) ? this.rect() : (this.is3D()) 
+                                ? this.box() : null
+    }
 
     /** Make Line from 1D Bbox */
     line():Edge|null

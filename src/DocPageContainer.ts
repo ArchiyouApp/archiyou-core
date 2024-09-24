@@ -1,7 +1,7 @@
-import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, ModelUnits, DocPathStyle, PositionInUnits, isContainerPositionRel, isContainerPositionAbs, ContainerPositionRel } from './internal'
+import { Page, DocUnits, WidthHeightInput, isWidthHeightInput, DocPathStyle, isContainerPositionRel, isContainerPositionAbs, ContainerPositionRel } from './internal'
 
 import { ContainerType, ContainerHAlignment, ContainerVAlignment, ContainerAlignment, isContainerPositionLike, ZoomRelativeTo, ScaleInput,
-    ContainerSizeRelativeTo, Position, ContainerPositionLike, ContainerData, Frame,
+    ContainerSizeRelativeTo, ContainerPositionLike, ContainerData, Frame,
     ContainerContent,  isContainerHAlignment, isContainerVAlignment, isContainerAlignment, ContainerPositionCoordAbs, ContainerPositionCoordRel, isContainerPositionCoordAbs, isContainerPositionCoordRel,
     isScaleInput, PageSide, ValueWithUnitsString } from './internal'
 
@@ -77,10 +77,10 @@ export class Container
         }
     }
 
-    setName(n:string):string
+    setName(n:string):this
     {
-        this.name = n; 
-        return n;
+        if(n){ this.name = n;}
+        return this;
     }
 
     /** Set width of this Container. Either in percentage of page area ([0-1]) or or units like 10mm, 20pnt */
@@ -269,14 +269,14 @@ export class Container
         return ALIGNMENT_TO_VPERC[ay] ?? 0.5;
     }
 
-    _containerAlignmentToPosition(a:ContainerAlignment):Position
+    _containerAlignmentToPosition(a:ContainerAlignment):ContainerPositionRel
     {
         if(!isContainerAlignment(a)){ throw new Error(`DocPageContainer::_containerAlignmentToPosition: Please supply a valid ContainerAlignment like ['left','center']`) }
 
         return [
                     this._containerHAlignmentToPositionRel(a[0]), 
                     this._containerVAlignmentToPositionRel(a[1])
-                ] as Position
+                ] 
     }
 
 }

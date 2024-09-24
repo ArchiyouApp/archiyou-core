@@ -4,6 +4,7 @@
  *      !!!! Copy from App - TODO: clean up app part and use this one !!!!
  */
 
+import { Statement } from './internal'
 import { Parser, Options, Node } from 'acorn'
 import { ScriptVersion, ImportStatement } from './models'
 import { IO } from './IO'

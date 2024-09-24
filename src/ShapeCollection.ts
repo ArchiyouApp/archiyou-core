@@ -15,7 +15,7 @@
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, Arr2DPolygon, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
  import { LayoutOrderType, LayoutOptions, AutoDimSettings, MainAxis } from './internal'
 
@@ -2656,6 +2656,8 @@
                linePoints = linePoints.concat(segmPoints); // sets z=0
             })
 
+            /*
+            // DISABLED creating fills with Arrangements Library
             const arrPolys = this._geom._getArrangementPolys(linePoints, 10);
 
             // SVG Fills
@@ -2680,6 +2682,8 @@
                   return `<polygon class="contour-outline" points="${contourSvgPoints}" stroke-width="2" fill="none"/>`
                })
             }
+            
+            */
          }
 
          const svg = `<svg 

@@ -28,6 +28,8 @@ export * from './Sketch'
 export * from './Pipeline'
 export * from './Exporter'
 
+export * from './OBbox'
+
 export * from './Geom'
 export * from './workerUtils'
 export * from './Annotator'

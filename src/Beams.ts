@@ -246,8 +246,8 @@ export class Beam
     _getLengthFromShape():number
     {
         // Because a Beam is box-like we can simply use a orientated bounding box
-        const {width, depth, height} = this._shape._getOBbox();
-        return [width,depth,height].sort((a,b) => b - a)[0];
+        const obbox = this._shape.obbox();
+        return [obbox.width(),obbox.depth(),obbox.height()].sort((a,b) => b - a)[0];
     }
 
     /** Set position of the beam */

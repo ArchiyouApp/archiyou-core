@@ -133,7 +133,7 @@ export class DocViewSVGManager
             pdfViewWidthPnts / svgWidth :
             pdfViewHeightPnts / svgHeight;
 
-        const containerPositionPnts = pdfExporter.containerToPositionInPnts(view, page); // includes offsets for pivot
+        const containerPositionPnts = pdfExporter.containerToPDFPositionInPnts(view, page); // includes offsets for pivot
 
         // Content align: see what dimension is bound by Container (width or height) and then align along the other dimension
         const contentOffsetX = (boundBy === 'width' || !view.contentAlign || view.contentAlign[0] === 'left') 

@@ -315,12 +315,12 @@ export class Doc
 
     /** Add View Container to active Page */
     // TODO: auto name based on shapes
-    view(name:string, shapes?:ShapeCollection):Doc
+    view(name?:string, shapes?:ShapeCollection):Doc
     {
         if(typeof name !== 'string'){ throw new Error(`Doc::view: Please supply a name to the view!`);}
         this._checkPageIsActive();
         
-        const newViewContainer = new View(name).on(this._activePage);
+        const newViewContainer = new View().on(this._activePage).setName(name);
         this._activeContainer = newViewContainer;
         if(ShapeCollection.isShapeCollection(shapes))
         {

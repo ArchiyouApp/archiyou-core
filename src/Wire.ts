@@ -1822,7 +1822,9 @@ export class Wire extends Shape
 
     //// SHAPE ANNOTATIONS API ////
 
-    /** Simply generate dimension lines for all visible Edges in this Face */
+    /** Simply generate dimension lines for all visible Edges in this Face 
+     *  TODO: make sure offsets are right, skip same edges in boxes
+    */
     @checkInput([['DimensionOptions',null]], ['auto'])
     dimension(dim?:DimensionOptions):DimensionLine|Array<DimensionLine>
     {

@@ -29,7 +29,7 @@ import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
 import { Alignment, isAlignment, isShapeType, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
 import { Annotation, DimensionOptions, DimensionLine } from './internal'
-import { Obbox, BeamLikeDims } from './internal'
+import { OBbox, BeamLikeDims } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
 type IVertex = Vertex
@@ -540,8 +540,8 @@ export class Shape
         if (this.type() !== 'Solid')
             return false;
 
-        const obboxDims = this._getOBbox() as Obbox;
-        const obbox = new Solid().makeBox(obboxDims.width, obboxDims.depth, obboxDims.height);
+        const obboxDims = this.obbox() as OBbox;
+        const obbox = new Solid().makeBox(obboxDims.width(), obboxDims.depth(), obboxDims.height());
         return (this.volume() / obbox.volume() > 0.95) 
     }
 
@@ -549,8 +549,8 @@ export class Shape
     {
         if(this.beamLike())
         {
-            const bbox = this._getOBbox() as Obbox; // data of obbox() not Shape
-            const dimsSorted = [bbox.width, bbox.height, bbox.depth].sort((a,b) => a - b )
+            const bbox = this.obbox() as OBbox; // data of obbox() not Shape
+            const dimsSorted = [bbox.width(), bbox.height(), bbox.depth()].sort((a,b) => a - b )
             return {
                 small : dimsSorted[0],
                 mid : dimsSorted[1],
@@ -730,41 +730,10 @@ export class Shape
         }
     }
 
-    _getOBbox():Obbox
+    /** Calculate Orientated Bounding Box of Shape */
+    obbox():OBbox|null
     {
-        let ocOBbox = new this._oc.Bnd_OBB_1();
-        this._oc.BRepBndLib.prototype.constructor.AddOBB(this._ocShape, ocOBbox, true, false, false); // useTriangulation, isOptimal, theIsShapeToleranceUsed
-        
-        let obbox:Obbox = { 
-            center: new Point()._fromOcPoint(ocOBbox.Position().Location()),
-            width: roundToTolerance(ocOBbox.XHSize())*2,
-            depth: roundToTolerance(ocOBbox.YHSize())*2,
-            height: roundToTolerance(ocOBbox.ZHSize())*2,
-            xDirection: new Point()._fromOcXYZ(ocOBbox.XDirection()).toVector(),
-            yDirection: new Point()._fromOcXYZ(ocOBbox.YDirection()).toVector(),
-            zDirection: new Point()._fromOcXYZ(ocOBbox.ZDirection()).toVector(),
-        }
-
-        return obbox;
-    }
-
-    /** Calculate Orientated Bounding Box of Shape (returning a Solid or Face) 
-     *  NOT YET IMPLEMENTED
-    */
-    obbox():AnyShape
-    {
-        /**
-            OC docs:
-                - Bnd_OBB: https://dev.opencascade.org/doc/refman/html/class_bnd___o_b_b.html
-                - BRepBndLib: https://dev.opencascade.org/doc/refman/html/class_b_rep_bnd_lib.html
-         */
-        if(this._ocShape)
-        {
-            let obbox = this._getOBbox();
-            console.warn('Shape.obbox(): Not yet implemented!')
-
-            return null;
-        }
+        return new OBbox(this);
     }
 
     /** Calculate center of this Shape */
@@ -1089,18 +1058,18 @@ export class Shape
     rotateToAxesBbox():this
     { 
         // this.moveTo(0,0,0); // move to center
-        let obbox = this._getOBbox();
+        const obbox = this.obbox();
 
         this.alignByPoints(
             [
-                obbox.center, 
-                obbox.center.toVector().add(obbox.xDirection), 
-                obbox.center.toVector().add(obbox.zDirection)
+                obbox.center(), 
+                obbox.center().toVector().add(obbox.xDir()), 
+                obbox.center().toVector().add(obbox.zDir())
             ],
             [
-                obbox.center, 
-                obbox.center.moved(1), 
-                obbox.center.moved(0,0,1)
+                obbox.center(), 
+                obbox.center().moved(100), 
+                obbox.center().moved(0,0,100)
             ],
             
         )
@@ -4394,9 +4363,9 @@ export class Shape
             // This means that getEqualsTranslated() can return multiple if there are same Edges around ( for example in box geometries)
             const projEdge = projShapes.getEqualsTranslated(new ShapeCollection(projDimEdge)).first();
 
-            if (projEdge)
+            if (projEdge && projEdge.type() === 'Edge')
             {
-                const newProjDimLine = projEdge.dimension();
+                const newProjDimLine = (projEdge as Edge).dimension();
                 newProjDimLine.setValue(dimLine.value); // get value from old to new dimension line
                 newDimLines.push(newProjDimLine);
             }

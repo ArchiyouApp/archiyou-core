@@ -585,7 +585,7 @@ export class Vector extends Point
     /** Mirror current Vector and return a copy */
     mirrored(position?:PointLike, direction?:PointLike):Vector
     {
-        let v = this.copy();
+        const v = this.copy();
         v.mirror(position, direction);
         return v;
     }
@@ -600,7 +600,7 @@ export class Vector extends Point
         // IMPORTANT: probably right-hand rotation - for Y - axis this could cause problems 
 
         /** See OC gp_Pnt: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___pnt.html */
-        let ocAxis = new this._oc.gp_Ax1_2( (position as Point)._toOcPoint(), (direction as Vector)._toOcDir() ); // auto converted
+        const ocAxis = new this._oc.gp_Ax1_2( (position as Point)._toOcPoint(), (direction as Vector)._toOcDir() ); // auto converted
         this._ocVector.Rotate(ocAxis,toRad(angle));
         this._fromOcVec();
         return this;
@@ -613,7 +613,7 @@ export class Vector extends Point
     @checkInput( [Number, ['PointLike',[0,0,0]] , ['PointLike',[0,0,1]] ], [Number, 'Point', 'Vector'])    
     rotated(angle:number, position?:PointLike, direction?:PointLike):Vector
     {
-        let v = this.copy();
+        const v = this.copy();
         v.rotate(angle, position, direction);
         return v;
     }
