@@ -5,7 +5,7 @@
  *    
  */
 
-import { Point } from './internal'
+import { MainAxis, Point } from './internal'
 import { Vertex } from './internal'
 import { PointLike, isPointLike } from './internal' // see: types.ts
 import { checkInput } from './decorators' // decorators
@@ -247,6 +247,11 @@ export class Vector extends Point
         return this;
     }
 
+    setComponent(a:MainAxis, v:number)
+    {
+        return this[`set${a.toUpperCase()}`](v);
+    }
+
     //// COMPUTED PROPERTIES ////
 
     /** Return the magnitude/length of this Vector */
@@ -426,10 +431,10 @@ export class Vector extends Point
     }
 
     /** Multiple Vector with scalar (1D,2D,3D) and return current Vector 
-     *  We can multiple with one scalar or by axis with Array [x,y,z]
+     *  We can multiple with one number or by axis with Array [x,y,z]
     */
     @checkInput('PointLike', 'auto') // let through and figure out, because we need to detect single number or Vector input
-    multiply(scalar:PointLike, ...args):Vector // NOTE: args to signify that checkInput will gather them and avoid TS warnings
+    multiply(scalar:number|PointLike, ...args):Vector // NOTE: args to signify that checkInput will gather them and avoid TS warnings
     {
         /* OC does not offer scaling in multiple axis: do this manually
          
@@ -441,8 +446,8 @@ export class Vector extends Point
             Vector(1,1,1).multiply([30,0,0]) ==> Vector(30,0,0)
         */
         
-        let scalarVec = new Vector(scalar); // auto converted
-        let singleScalar = (typeof(scalar) === 'number') ? true : false;
+        const scalarVec = new Vector(scalar); // auto converted
+        const singleScalar = (typeof(scalar) === 'number') ? true : false;
 
         this._x *= scalarVec.x;
         this._y *= singleScalar ? scalarVec.x : scalarVec.y;
@@ -456,7 +461,7 @@ export class Vector extends Point
 
     /** Multiply Vector with scalar and return a copy of Vector */
     @checkInput('PointLike', 'auto')
-    multiplied(scalar:PointLike, ...args):Vector // NOTE: args to signify that checkInput will gather them and avoid TS warnings
+    multiplied(scalar:number|PointLike, ...args):Vector // NOTE: args to signify that checkInput will gather them and avoid TS warnings
     {
         let v:Vector = this.copy();
         v.multiply(scalar as Vector);
@@ -465,21 +470,21 @@ export class Vector extends Point
     
     /** Scale is an alias for multiply */
     @checkInput('PointLike', 'auto')
-    scale(scalar:PointLike, ...args):Vector 
+    scale(scalar:number|PointLike, ...args):Vector 
     {
         return this.multiply(scalar as Vector);
     }
 
     /** Scaled is an alias for multiplied */
     @checkInput('PointLike', 'auto')
-    scaled(scalar:PointLike, ...args):Vector 
+    scaled(scalar:number|PointLike, ...args):Vector 
     {
         return this.multiplied(scalar as Vector);
     }
 
     /** Divide Vector by scalar and return current Vector */
     @checkInput('PointLike', 'auto')
-    divide(scalar:PointLike, ...args):Vector
+    divide(scalar:number|PointLike, ...args):Vector
     {
         let scalarVec = new Vector(scalar); // auto converted by decorator
 
@@ -640,6 +645,16 @@ export class Vector extends Point
     swappedXY():Vector
     {
         return new Vector(this._y, this._x, this._z);
+    }
+
+    /** Get largest component along any (negative) axis */
+    largestAxis():MainAxis
+    {
+        return [
+            { c: 'x', n: Math.abs(this.x) },
+            { c: 'y', n: Math.abs(this.y) },
+            { c : 'z', n : Math.abs(this.z) }
+        ].sort( (a,b) => b.n - a.n)[0].c as MainAxis 
     }
 
     //// RELATIONS WITH OTHER VECTORS ////

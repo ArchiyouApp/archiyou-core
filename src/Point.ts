@@ -16,7 +16,7 @@
  */
 
 import { Vector, Vertex } from './internal'
-import { AXIS_TO_VECS, PointLike, isPointLike, isCoord, Coord, PolarCoord, Axis, isAxis, Cursor, 
+import { AXIS_TO_VECS, MainAxis, PointLike, isPointLike, isCoord, Coord, PolarCoord, Axis, isAxis, Cursor, 
     isAnyShapeOrCollection, AnyShapeOrCollection, isCursor, Plane } from './internal' // see types.ts
 import { isRelativeCartesianCoordString, parseRelativePolarCoordString, relativeCoordToNumber, roundToTolerance} from './internal' // utils
 import { addResultShapesToScene, checkInput } from './decorators' // decorators - using internal gives error
@@ -187,6 +187,13 @@ export class Point
     setZ(z:number):Point
     {
         this._z = z;
+        return this;
+    }
+
+    @checkInput(['MainAxis',Number],['auto', 'auto'])
+    setComponent(a:MainAxis, v:number):Point
+    {
+        this[`set${a.toUpperCase()}`](v)
         return this;
     }
 

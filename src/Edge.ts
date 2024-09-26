@@ -501,6 +501,12 @@ export class Edge extends Shape
         return directionVec;
     }
 
+    /** Alias for direction. Always returns normalized Vector */
+    dir():Vector
+    {
+        return this.direction(true)
+    }
+
     /** Get tangent (= direction ) at certain point on the Edge */
     @checkInput('PointLike', 'Point')
     tangent()
@@ -1150,19 +1156,16 @@ export class Edge extends Shape
     //// SHAPE ANNOTATIONS API ////
 
     @checkInput([['DimensionOptions',null]], ['auto'])
-    dimension(dim?:DimensionOptions):IDimensionLine
+    dimension(options?:DimensionOptions):IDimensionLine
     {
         // For Edges it is always unclear where to offset dimension to
         // For now we set offset away from origin. See Annotator
-        if(!dim){ dim = { units: null }}
-        dim.units = dim?.units || this._geom.units(); // make sure we have units
+        if(!options){ options = { units: null }}
+        options.units = options?.units || this._geom.units(); // make sure we have units
 
-        let dimLine = this._geom._annotator.dimensionLine(this.start(), this.end());
-        dimLine.setOptions(dim); // set offset, units, roundDecimals
+        const dimLine = this._geom._annotator.dimensionLine().fromShape(this, options);
         
         const mainShape = this._parent || this;
-        dimLine.link(mainShape); // if its a subshape select the main shape
-
         mainShape._addAnnotation(dimLine);
 
         return dimLine
@@ -1170,9 +1173,9 @@ export class Edge extends Shape
 
     /** Alias for dimension() */
     @checkInput([['DimensionOptions',null]], ['auto'])
-    dim(dim?:DimensionOptions):IDimensionLine
+    dim(options?:DimensionOptions):IDimensionLine
     {
-        return this.dimension(dim);
+        return this.dimension(options);
     }
 
 

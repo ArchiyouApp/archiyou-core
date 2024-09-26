@@ -219,6 +219,16 @@ export class Bbox
                     .filter(s => s !== 0)[0]; // 0 sizes (when Bbox is 2D/1D) are not used
     }
 
+    /** At what axis is the bbox the largest */
+    maxSizAxis():MainAxis
+    {
+        return [
+            { axis: 'x', size: this.width() },
+            { axis: 'y', size: this.depth() },
+            { axis: 'z', size: this.height() }
+        ].sort((a,b) => b.size - a.size )[0].axis as MainAxis
+    }
+
     /** Get frontal Face (3D) or Edge (2D) */
     front():Vertex|Edge|Face
     {
@@ -366,8 +376,6 @@ export class Bbox
         );
     }
 
-    // ==== TRANSFORMATIONS ====
-
     //// CALCULATED PROPERTIES ////
 
     /** Check if Bounding Box of zero size so a Point */
@@ -376,6 +384,23 @@ export class Bbox
         return (this.width() <= this._oc.SHAPE_TOLERANCE 
                     && this.depth() <= this._oc.SHAPE_TOLERANCE 
                     && this.height() <= this._oc.SHAPE_TOLERANCE);
+    }
+
+     /** Checks if sizes along axis are zero */
+     _sizesAreZero():Array<boolean|boolean|boolean>
+     {
+         const TOLERANCE = 0.4;
+         return [
+             (this.width() <= TOLERANCE + this._oc.SHAPE_TOLERANCE),
+             (this.depth() <= TOLERANCE + this._oc.SHAPE_TOLERANCE), 
+             (this.height() <= TOLERANCE + this._oc.SHAPE_TOLERANCE)
+         ];
+     }
+
+    /** Bbox has only one size dimension (the others are zero) */
+    is1D():boolean
+    {
+        return this._sizesAreZero().filter(a => a).length === 2
     }
     
     /** Check if Bounding Box is 2D */
@@ -391,22 +416,12 @@ export class Bbox
         
     }
 
-    /** Checks if sizes along axis are zero */
-    _sizesAreZero():Array<boolean|boolean|boolean>
+    is3D():boolean
     {
-        const TOLERANCE = 0.4;
-        return [
-            (this.width() <= TOLERANCE + this._oc.SHAPE_TOLERANCE),
-            (this.depth() <= TOLERANCE + this._oc.SHAPE_TOLERANCE), 
-            (this.height() <= TOLERANCE + this._oc.SHAPE_TOLERANCE)
-        ];
+        return this._sizesAreZero().filter(a => a).length === 0
     }
 
-    /** Bbox has only one size dimension (the others are zero) */
-    is1D():boolean
-    {
-        return this._sizesAreZero().filter(dim => dim).length === 2
-    }
+
 
     /** The axis that is missing in 2D bbox */
     axisMissingIn2D():MainAxis|null

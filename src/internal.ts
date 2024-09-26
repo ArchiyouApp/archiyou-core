@@ -32,6 +32,8 @@ export * from './OBbox'
 
 export * from './Geom'
 export * from './workerUtils'
+export * from './AnnotatorBaseAnnotation'
+export * from './AnnotatorDimensionLine'
 export * from './Annotator'
 export * from './IO'
 export * from './GLTFBuilder'

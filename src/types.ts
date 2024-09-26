@@ -39,7 +39,7 @@ export type Plane = 'xy' | 'xz' | 'yz'
 export type Axis =  'x' | '-x' | 'y' | '-y' | 'z' | '-z' | Plane // Axis and Planes
 export type Side = 'left'|'right'|'front'|'back'|'top'|'bottom'
 export type SketchPlaneName = Plane | Side
-export type CoordArray = Array<Coord>
+export type CoordArray = [Coord,Coord,Coord]
 export type PointLike = Coord|Array<Coord>|Vector|Point|Vertex // PointLike: All Datatypes that informationally could be seen as a Point
 export type PointLikeSequence = Array<PointLike>|ShapeCollection // PointLikeSequence: An array of PointLike types
 export type ShapeType = 'Vertex'|'Edge'|'Wire'|'Face'|'Shell'|'Solid'
@@ -385,12 +385,17 @@ export interface DimensionLineData
 {
     _id?:string, // internal id
     type:'dimensionLine'|'label', // TODO: more annotation types
-    start:Array<number|number|number>
-    end:Array<number|number|number>
-    dir:Array<number|number|number>
+    start:CoordArray // start point of line (ie the arrow)
+    end:CoordArray
+    targetStart:CoordArray
+    targetEnd:CoordArray
+    targetDir:CoordArray
+    dir:CoordArray
     value:number
     static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
     units?:string
+    offsetVec?:CoordArray
+    offsetLength?:number
     offset?:Array<number|number|number> // offset vector with length in model units
     interactive:boolean
     round?:boolean 
@@ -407,6 +412,7 @@ export interface DimensionOptions
 {
     units?:ModelUnits
     offset?:number // offsetLength (minus for other direction)
+    ortho?:boolean
     roundDecimals?:number // round to number decimals. Default is 0
 }
 

@@ -564,14 +564,9 @@ export class Shape
     /** is this Shape 2D */
     is2D():boolean
     {
-        if (!this.isEmpty() && this.valid())
-        {
-            return this.bbox().is2D();
-        }
-        else {
-            return null;
-        }
-        
+        return (!this.isEmpty() && this.valid())
+                ? this.bbox().is2D()
+                : false
     }
 
     /** is this Shape 2D on XY plane (used for SVG export for example) */
@@ -580,6 +575,13 @@ export class Shape
         // will be overriden by specific classes if they can be 2D
         console.warn(`Shape::is2DXY(): Shape can not be 2D: "${this.type()}"`)
         return false;
+    }
+
+    is3D():boolean
+    {
+        return (!this.isEmpty() && this.valid())
+        ? this.bbox().is3D()
+        : false
     }
 
     /** Test if a Shape is valid */
