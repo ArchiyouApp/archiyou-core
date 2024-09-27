@@ -4,7 +4,7 @@
  *          Is used also for selecting and aligning 
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, Shell, Solid, ShapeCollection } from './internal'
+import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection } from './internal'
 import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
@@ -268,6 +268,7 @@ export class Bbox
     /** Get one of the 8 Vertices of the Bbox 
      *  @param - a string like 'leftfront', 'bottomright'
      *  Order of sides does not matter
+     *  TODO: Old method. Need refactoring!
     */
     corner(where:string):Point // TODO: change to Point
     {
@@ -303,17 +304,31 @@ export class Bbox
         
         if(this.is2D())
         {
-            let x = this.bounds[SIDE_TO_BOUND[sides.x]];
-            let y = this.bounds[SIDE_TO_BOUND[sides.y]];
-            return new Point(x,y,0);
+            // NOTE: Bbox can be 2D on different planes (not only XY)
+            const axes2D = this.axes2D();
+
+            const componentsByAxis = {} as Record<MainAxis, number>;
+            axes2D.forEach((ax2D,i) => {
+                componentsByAxis[ax2D] = this.bounds[SIDE_TO_BOUND[sides[ax2D]]];
+            })
+            const flatAx = this.axisMissingIn2D();
+            
+            componentsByAxis[flatAx] = this.bounds[SIDE_TO_BOUND[sides[flatAx]]];
+
+            const p = new Point();
+            for( const [ax,c] of Object.entries(componentsByAxis))
+            {
+                p.setComponent(ax as MainAxis, c);
+            }
+            return p;
         }
         else 
         {
             // 3D Bbox assembles the 3 Faces and returns the Point shared by all 3
             // xmin, xmax, ymin, ymax, zmin, zmax
-            let x = this.bounds[SIDE_TO_BOUND[sides.x]];
-            let y = this.bounds[SIDE_TO_BOUND[sides.y]];
-            let z = this.bounds[SIDE_TO_BOUND[sides.z]];
+            const x = this.bounds[SIDE_TO_BOUND[sides.x]];
+            const y = this.bounds[SIDE_TO_BOUND[sides.y]];
+            const z = this.bounds[SIDE_TO_BOUND[sides.z]];
             
             return new Point(x,y,z);
         }
@@ -326,10 +341,6 @@ export class Bbox
         {
             return this.center()._toVertex();
         }
-        else if(this.is2D())
-        { 
-            return new Edge(this.corner('leftfront'), this.corner('rightback'));
-        }
         else {
             return new Edge(this.corner('leftfrontbottom'), this.corner('rightbacktop'));
         }
@@ -339,11 +350,11 @@ export class Bbox
     @checkInput('PointLike', 'Point')
     getPositionAtPerc(p:PointLike, ...args):Point
     {
-        let point = p as Point;
+        const point = p as Point;
 
-        let x = this.bounds[0] + this.width()*point.x;
-        let y = this.bounds[2] + this.depth()*point.y;
-        let z = this.bounds[4] + this.height()*point.z;
+        const x = this.bounds[0] + this.width()*point.x;
+        const y = this.bounds[2] + this.depth()*point.y;
+        const z = this.bounds[4] + this.height()*point.z;
 
         return new Point(x,y,z);
     }
@@ -351,7 +362,7 @@ export class Bbox
     /** Enlarge by offsetting current Bbox in all direction a given amount. Returns a new Bbox. */
     enlarged(amount:number):Bbox
     {
-        let amountVec = new Vector(amount,amount,amount);
+        const amountVec = new Vector(amount,amount,amount);
         // maintain 2D bbox
         if(this.is2D())
         {
@@ -439,6 +450,11 @@ export class Bbox
         else {
             return 'y';
         }
+    }
+
+    axes2D():Array<MainAxis>
+    {
+        return (['x','y','z'] as Array<MainAxis>).filter(a => a !== this.axisMissingIn2D())
     }
 
     /** Along what axis is this 1D Bbox */
@@ -634,10 +650,11 @@ export class Bbox
 
         if (other.type() == 'Vertex')
         {
+            // TODO: tolerance?
             let vertex = other as Vertex;
             return ( vertex.x >= this.bounds[0] && vertex.x <=  this.bounds[1] 
-            && vertex.y >= this.bounds[2] && vertex.x <=  this.bounds[3] 
-            && vertex.z >= this.bounds[4] && vertex.z <=  this.bounds[5])
+            && vertex.y >= this.bounds[2] && vertex.x <= this.bounds[3] 
+            && vertex.z >= this.bounds[4] && vertex.z <= this.bounds[5])
         }   
         else {
             return this._containsBbox(other.bbox());
@@ -681,10 +698,11 @@ export class Bbox
             return null;
         }
 
+        let sideShape:Vertex|Edge|Face;
         // zero size bbox ( for Vertex )
         if (this.isPoint())
         {
-            return this.center()._toVertex();
+            sideShape = this.center()._toVertex();
         }
 
         if(this.is1D())
@@ -693,28 +711,26 @@ export class Bbox
             // 1D Bbox size along x axis means Bbox has a side along y (front/back) and z (top/bottom)
             const bboxLine = this.line();
 
-            return (axis !== this.sizeAxis1D()) 
+            sideShape = (axis !== this.sizeAxis1D()) 
                     ? bboxLine
                     : bboxLine.directionMinMaxSelector(bboxLine.vertices(), axisWithDir).specific() as Vertex;
         }
 
         if(this.is2D())
         {
-            let bboxRect = this.rect(); // a Face plane 
-            if (axis.replace('-', '') === this.axisMissingIn2D())
-            {
-                return bboxRect;
-            }
-            else {
-                // one of the edge sides
-                return bboxRect.directionMinMaxSelector(bboxRect.edges(), axisWithDir).specific() as Vertex|Edge|Face;
-            }
+            const bboxRect = this.rect(); // a Face plane 
+            sideShape = (axis.replace('-', '') === this.axisMissingIn2D()) 
+                        ? bboxRect
+                        : bboxRect.directionMinMaxSelector(bboxRect.edges(), axisWithDir).specific() as Vertex|Edge|Face; // one of the edge sides
         }
         else {
             // 3D
-            let bboxSolid = this.box();
-            return bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axisWithDir).specific() as Vertex|Edge|Face;
+            const bboxSolid = this.box();
+            sideShape = bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axisWithDir).specific() as Vertex|Edge|Face;
         }   
+
+        sideShape._parent = this.shape(); // set parent shape so for example knows what the main bbox shape is
+        return sideShape;
     }
 
 

@@ -14,8 +14,9 @@ import chroma from 'chroma-js' // direct import like in documentation does not w
 
 import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_DEFAULT_OFFSET, EDGE_DEFAULT_THICKEN,
     EDGE_DEFAULT_POPULATE_NUM, EDGE_DEFAULT_EXTEND_AMOUNT, EDGE_DEFAULT_EXTEND_DIRECTION, EDGE_DEFAULT_ALIGNTO_FROM,
-    EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_SIZE
+    EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_ANGLE_SVG, EDGE_DEFAULT_SEGMENTS_SIZE
 } from './internal'
+
 import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
 import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, AnyShapeOrCollection,
         LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
@@ -1164,7 +1165,6 @@ export class Edge extends Shape
         options.units = options?.units || this._geom.units(); // make sure we have units
 
         const dimLine = this._geom._annotator.dimensionLine().fromShape(this, options);
-        
         const mainShape = this._parent || this;
         mainShape._addAnnotation(dimLine);
 
@@ -1211,7 +1211,7 @@ export class Edge extends Shape
         */
         
         let svgPathD = '' // d attribute of SVG Path
-        const segmPoints = this._segmentizeToPoints();
+        const segmPoints = this._segmentizeToPoints(EDGE_DEFAULT_SEGMENTS_ANGLE_SVG);
 
         segmPoints.forEach((point,i) =>
         {
@@ -1230,7 +1230,6 @@ export class Edge extends Shape
         const svgNodeStr = `<path d="${svgPathD}" ${this._getSvgPathAttributes()} fill="none" class="${this._getSvgClasses()}"/>`; 
 
         // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSvg() method
-
         return svgNodeStr; // return as string for now
     }
 

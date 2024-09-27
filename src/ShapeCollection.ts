@@ -955,6 +955,7 @@
          this.shapes.forEach((shape,i) => {
             if(i > 0)
             {
+               // This does not take in the shapes not tied to shapes
                let bbox = shape.bbox(withAnnotations);
                if(bbox)
                {
@@ -2588,17 +2589,21 @@
          return shapeEdges;
       }
 
+      /** Get Annotations tied to the shapes in this collection
+       *    IMPORTANT: For robustness we use all annotations that are in the bounding box of this ShapeCollection
+       *          not just the annotations that are directly tied to the Shapes within
+       *          This because annotations might be added using methods like bbox() 
+       */
       getAnnotations(onlyVisibleShapes:boolean=false):Array<Annotation>
       {
-         let annotations:Array<Annotation> = [];
-         this.forEach(shape => 
-         {
-            if(onlyVisibleShapes === false || (onlyVisibleShapes && shape.visible && shape.is2DXY())) // For now only 2D dimension lines
-            {
-               annotations = annotations.concat(shape.annotations)
-            }
-         })
-         return annotations;
+         const BBOX_MARGIN = 100; 
+
+         const allAnnotations = this._geom._annotator.getAnnotations();
+         let collectionBbox = this.bbox(true); // withAnnotations - but does not take into account annotations not tied to shapes!
+         collectionBbox = collectionBbox.enlarged(BBOX_MARGIN); // TMP FIX: make bbox larges to catch dimensions not tied to shapes
+
+         const annotationsInBbox = allAnnotations.filter(a => a.inBbox(collectionBbox) && ((onlyVisibleShapes) ? a?.shape?.visible : true) )  
+         return annotationsInBbox;
       }
 
       /** Export Shapes that are 2D and on XY plane to SVG 
@@ -2627,74 +2632,16 @@
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
          const withAnnotations = (options?.annotations === false ) ? false : true; // true is default
          let bbox = shapeEdges.bbox(withAnnotations)
-         
-         if (withAnnotations) // default is show annoations
-         {
-            const annotations = this.getAnnotations();
-            if(annotations.length > 0)
-            {
-               bbox = bbox.added(
-                     new ShapeCollection(this.getAnnotations().map(a => a.toShape().mirrorX(0))).bbox());
-            } 
-         }
-         // bbox = bbox.flippedY(); // flip for SVG coordinate system
 
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
-         // TODO: bbox is not including dimension lines
-
-         // Add some handy graphical entities, like contour to SVG to style it better
-         let svgPolysFill = [];
-         let svgPolysOutline = [];
-         if(options?.fills || options?.outlines)
-         {
-            let linePoints = [] as Array<Point>;
-            const SKIP_EDGE_TYPES = ['Ellipse', 'Circle']; // For now skip these Edge types because they gives problems
-            shapeEdges
-            .filter(e => !SKIP_EDGE_TYPES.includes(e.edgeType()))
-            .forEach((e,i) => {
-               const segmPoints = (e as Edge)._copy()._segmentizeToPoints(10,true);
-               linePoints = linePoints.concat(segmPoints); // sets z=0
-            })
-
-            /*
-            // DISABLED creating fills with Arrangements Library
-            const arrPolys = this._geom._getArrangementPolys(linePoints, 10);
-
-            // SVG Fills
-            if(options?.fills)
-            {
-               svgPolysFill = arrPolys.map(p => 
-               {
-                  const poly = p as Arr2DPolygon;
-                  const points = poly.points.map(pnt => `${pnt.x}, ${pnt.y}`).join(' ')
-                  return `<polygon class="contour-fill" points="${points}" stroke="none" fill="#FFF"/>`
-               })
-            }
-
-            // SVG outlines (SLOW!)
-            // TODO: find a better approach to get outer boundary of polygons. With OC routines is terrible slow!
-            if(options?.outlines)
-            {
-               const contourWires = new ShapeCollection(this._geom.arrange2DShapesToContours(linePoints)).filter(s => s.type() === 'Wire');
-
-               svgPolysOutline = contourWires.toArray().map(w => {
-                  const contourSvgPoints = w.vertices().toArray().map(v => `${(v as Vertex).x}, ${(v as Vertex).y}`).join(' ')
-                  return `<polygon class="contour-outline" points="${contourSvgPoints}" stroke-width="2" fill="none"/>`
-               })
-            }
-            
-            */
-         }
 
          const svg = `<svg 
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
                         viewBox="${svgRectBbox}"
                         _bbox="${svgRectBbox}" 
                         _worldUnits="${this._geom._units}" stroke="black">
-                        ${svgPolysFill.join('\n')}
                         ${svgPaths.join('\n\t')}
                         ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
-                        ${svgPolysOutline.join('\n')}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
 
@@ -2702,30 +2649,12 @@
       }
 
 
-      /** Add dimension lines that are tied to shapes in this Collection */
       _getDimensionLinesSvgElems():string
       {
-         const dimensionLines = this._geom._annotator.dimensionLines;
+         const svgElems = this.getAnnotations().map(a => a.toSvg())
+         const svgText = svgElems.join('\n')
 
-         let svgElems:Array<string> = [];
-
-         const flatXYShapes = new ShapeCollection(this.filter(s => s.is2DXY())); // filter can return a single Shape
-
-         flatXYShapes.forEach( s => 
-         {
-            // get the DimensionLine that is linked to current shape
-            const linkedDimensionLines = dimensionLines.filter( dl => dl.shape && dl.shape.same(s) )
-            linkedDimensionLines.forEach( d => 
-            {
-               svgElems.push(d.toSvg());
-            })
-         });
-
-         console.info(`ShapeCollection::_getDimensionLinesSvgElems(): Exported ${svgElems.length} dimension lines to SVG`)
-
-         let dimSvg = svgElems.join('\n');
-         return dimSvg;
-        
+         return svgText;
       }
       
  }

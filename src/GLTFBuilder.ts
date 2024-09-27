@@ -117,7 +117,7 @@ export class GLTFBuilder
                 // TODO: basic information like author?
                 scenegraph: ay.geom.scene.toGraph(),
                 gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
-                annotations: ay.geom._annotator.getAnnotations(),
+                annotations: ay.geom._annotator.getAnnotationsData(),
                 // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
                 messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
                 // Document data by document name in special format for AY doc viewers (PDF and web)

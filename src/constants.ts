@@ -62,6 +62,7 @@ export const EDGE_DEFAULT_EXTEND_DIRECTION = 'end';
 export const EDGE_DEFAULT_ALIGNTO_FROM = 'start';
 export const EDGE_DEFAULT_ALIGNTO_TO = 'end';
 export const EDGE_DEFAULT_SEGMENTS_ANGLE = 10; // in deg
+export const EDGE_DEFAULT_SEGMENTS_ANGLE_SVG = 2; // in deg, higher resolution
 export const EDGE_DEFAULT_SEGMENTS_SIZE = 100; // in units
 
 export const WIRE_RECT_WIDTH = 100;

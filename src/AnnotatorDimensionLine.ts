@@ -46,7 +46,7 @@ export class DimensionLine extends BaseAnnotation
 
     constructor(start:Point=null, end:Point=null, options?:DimensionOptions)
     {
-        super();
+        super('dimensionLine');
 
         if(start && end)
         {
@@ -350,28 +350,29 @@ export class DimensionLine extends BaseAnnotation
      *     if 3D the Dimension Line is projected to XY plane
      *     NOTE: we need to transform from Archiyou coordinate system to the SVG one (flip y)
      */
-    toSvg()
+    toSvg():string
     {   
-        const offsetLength = this.offsetLength;
-        const offsetVec = this.offsetVec.scaled(offsetLength as PointLike);
+        const lineStart = this._calculatePoint('start');
+        const lineEnd = this._calculatePoint('end');
+        const lineMid = lineStart.moved(lineEnd.toVector().subtracted(lineStart).scaled(0.5))
 
-        let lineStart = this.targetStart.added(offsetVec).toArray();
-        lineStart[1] = -lineStart[1]; // flip to svg y-axis
-        
-        let lineEnd = this.targetEnd.added(offsetVec).toArray();
-        lineEnd[1] = -lineEnd[1];
+        const lineStartArr = lineStart.toArray();
+        const lineEndArr =  lineEnd.toArray();
+        const lineMidArr =  lineMid.toArray();
 
-        let lineMid = this.targetMiddle().added(offsetVec).toArray();
-        lineMid[1] = -lineMid[1];
+        // flip y-axis for SVG coordinate system
+        lineStartArr[1] = -lineStartArr[1];
+        lineEndArr[1] = -lineEndArr[1];
+        lineMidArr[1] = -lineMidArr[1];
 
         let dimText = ((this.round) ? roundTo(this.value, this.roundDecimals) : this.value).toString();
         if (this.showUnits ) dimText += this.units;
 
         return `<g class="dimensionline">
-                ${this._makeSvgLinePath(lineStart,lineEnd)}
-                ${this._makeSvgArrow(lineStart)}
-                ${this._makeSvgArrow(lineEnd, true)}
-                ${this._makeSvgTextLabel(lineMid,dimText)}
+                ${this._makeSvgLinePath(lineStartArr,lineEndArr)}
+                ${this._makeSvgArrow(lineStartArr)}
+                ${this._makeSvgArrow(lineEndArr, true)}
+                ${this._makeSvgTextLabel(lineMidArr,dimText)}
             </g>
         `
     }

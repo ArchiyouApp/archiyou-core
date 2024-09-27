@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, BaseAnnotation  } from './internal'
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
 import { Console } from './Console'
 
@@ -378,13 +378,14 @@ export interface SelectorIndex
 
 /** Bring all annotations in one type */
 export type AnnotationType = 'base'|'dimensionLine' | 'label' // TODO MORE
-export type Annotation = DimensionLine  // TODO: more: label
+export type Annotation = BaseAnnotation|DimensionLine  // TODO: more: label
+export type AnnotationData = DimensionLineData // TODO
 
 /** Exporting DimensionLine instances as data */
 export interface DimensionLineData
 {
     _id?:string, // internal id
-    type:'dimensionLine'|'label', // TODO: more annotation types
+    _type?:AnnotationType
     start:CoordArray // start point of line (ie the arrow)
     end:CoordArray
     targetStart:CoordArray

@@ -9,7 +9,7 @@ import { Point, PointLike, Edge, Geom, DimensionOptions } from './internal'
 import { AnyShape } from './internal'
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
-import { AnnotationType, DimensionLineData, DimensionLine } from './internal'
+import { Annotation, AnnotationData, DimensionLine } from './internal'
 
 
 export class Annotator
@@ -82,9 +82,15 @@ export class Annotator
 
     }
 
-    /** Get all annotations in one Array. See interfaces like DimensionLineData */
-    getAnnotations():Array<DimensionLineData> // TODO: more types
+    getAnnotations():Array<Annotation>
     {
+        return this.dimensionLines
+    }    
+
+    /** Get all annotations in one Array. See interfaces like DimensionLineData */
+    getAnnotationsData():Array<AnnotationData> // TODO: more types
+    {
+        // TODO: gather all annotations in one array?
         let annotationsData = [];
         annotationsData = annotationsData.concat(this.dimensionLines.map(d => d.toData()));
 

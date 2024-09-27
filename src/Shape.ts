@@ -884,27 +884,27 @@ export class Shape
 
     /** Move Shape to specific x coordinate while keeping the other coords the same */
     @checkInput([['Number', 0], ['Alignment', 'center']],['auto', 'auto'])
-    moveToX(x:number, pivot:Alignment):this
+    moveToX(x:number, pivot?:Alignment):this
     {
-        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
+        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtAlignment(pivot);
         this.move(x - pivotPoint.x );
         return this;
     }
 
     /** Move Shape to specific y coordinate while keeping the other coords the same */
     @checkInput([['Number', 0], ['Alignment', 'center']],['auto', 'auto'])
-    moveToY(y:number, pivot:Alignment):this
+    moveToY(y:number, pivot?:Alignment):this
     {
-        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
+        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtAlignment(pivot);
         this.moveY(y - pivotPoint.y );
         return this;
     }
 
     /** Move Shape to specific z coordinate while keeping the other coords the same */
     @checkInput([['Number', 0], ['Alignment', 'center']],['auto', 'auto'])
-    moveToZ(z:number, pivot:Alignment):this
+    moveToZ(z:number, pivot?:Alignment):this
     {
-        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtSide(pivot);
+        const pivotPoint = (isPointLike(pivot)) ? new Point(pivot) : this.pointAtAlignment(pivot);
         this.moveZ(z - pivotPoint.z );
         return this;
     }
@@ -1032,7 +1032,7 @@ export class Shape
 
         if (typeof pivot === 'string' || pivot == null)
         {
-            pivotVec = this.pointAtSide(pivot as string).toVector();
+            pivotVec = this.pointAtAlignment(pivot as string).toVector();
         }
         else {
             pivotVec = new Vector(pivot);
@@ -1173,9 +1173,9 @@ export class Shape
             return this;
         }
 
-        let fp1 = (typeof fromPoints[0] == 'string') ? this.pointAtSide(fromPoints[0]) : (fromPoints[0]) ? new Vector().fromAll(fromPoints[0]) : null;
-        let fp2 = (typeof fromPoints[1] == 'string') ? this.pointAtSide(fromPoints[1]) : (fromPoints[1]) ? new Vector().fromAll(fromPoints[1]) : null;  // can be null
-        let fp3 = (typeof fromPoints[2] == 'string') ? this.pointAtSide(fromPoints[2]) : (fromPoints[2]) ? new Vector().fromAll(fromPoints[2]) : null; // can be null
+        let fp1 = (typeof fromPoints[0] == 'string') ? this.pointAtAlignment(fromPoints[0]) : (fromPoints[0]) ? new Vector().fromAll(fromPoints[0]) : null;
+        let fp2 = (typeof fromPoints[1] == 'string') ? this.pointAtAlignment(fromPoints[1]) : (fromPoints[1]) ? new Vector().fromAll(fromPoints[1]) : null;  // can be null
+        let fp3 = (typeof fromPoints[2] == 'string') ? this.pointAtAlignment(fromPoints[2]) : (fromPoints[2]) ? new Vector().fromAll(fromPoints[2]) : null; // can be null
 
         let tp1 = (toPoints[0]) ? new Vector().fromAll(toPoints[0]) : null;
         let tp2 = (toPoints[1]) ? new Vector().fromAll(toPoints[1]) : null; 
@@ -2593,7 +2593,7 @@ export class Shape
         }
 
         alignment = (alignment as string).toLowerCase();
-        let alignmentPerc = [...DEFAULT_ALIGNMENT];
+        const alignmentPerc = [...DEFAULT_ALIGNMENT];
 
         for (const [alignKey, alignConf] of Object.entries(ALIGNMENT_TO_AXIS_OFFSET))
         {
@@ -2610,23 +2610,23 @@ export class Shape
      @checkInput('PointLike', Vector) 
     _pointAtPerc(uvw:PointLike):Point
     {
-        let uvwv = uvw as Vector; // auto converted
+        const uvwv = uvw as Vector; // auto converted
+        const shapeBboxDiagonal:Vertex|Edge = this.bbox().diagonal();
 
-        let shapeBboxDiagonal:Vertex|Edge = this.bbox().diagonal();
-
-        let diagonalVec = (shapeBboxDiagonal instanceof Edge ) ? 
+        const diagonalVec = (shapeBboxDiagonal instanceof Edge ) ? 
                                 shapeBboxDiagonal.direction(): 
                                 new Vector(0,0,0);
 
-        let startVec = this.bbox().corner('leftfrontbottom').toVector(); // TODO
-        let pointAt = startVec.added( diagonalVec.scaled(uvwv)).toPoint();
+        const startVec = this.bbox().corner('leftfrontbottom').toVector();
+
+        const pointAt = startVec.added( diagonalVec.scaled(uvwv)).toPoint();
 
         return pointAt;
     }
 
     /** Get a Point at a specific alignment (topbottom, left etc) */
     @checkInput([['Alignment',SHAPE_ALIGNMENT_DEFAULT]], ['auto'])
-    pointAtSide(alignment:Alignment='center'):Point
+    pointAtAlignment(alignment:Alignment='center'):Point
     {
         // start and end on linear Shapes
         if ( ['start', 'end'].includes(alignment as string) && isLinearShape(this))
@@ -2634,7 +2634,7 @@ export class Shape
             return this[alignment as keyof AnyShape]().toPoint();
         }
         else {
-            let alignmentPerc:Array<number> = this._alignStringToAlignPerc(alignment);
+            const alignmentPerc:Array<number> = this._alignStringToAlignPerc(alignment);
             return this._pointAtPerc(alignmentPerc)
         }
     }
@@ -4047,9 +4047,10 @@ export class Shape
         throw new Error(`Shape::dimension(): No implementation of dimension method in Shape of type ${this.type()}!`);
     }
 
+    /** add dimension to annotations of this shape */
     _addAnnotation(a:Annotation):boolean
     {
-        // add dimension to annotations of this shape
+        
         // TODO: check for doubles etc
         this.annotations.push(a)
         return true;

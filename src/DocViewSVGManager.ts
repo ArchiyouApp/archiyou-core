@@ -27,7 +27,7 @@ export class DocViewSVGManager
     //// SETTINGS ////
     PATH_BASE_STYLE = {
             strokeColor: '#000000', 
-            lineWidth: 0.15
+            lineWidth: 1
         } as DocPathStyle
 
     DIMLINE_LINE_THICKNESS_MM = 0.05;
@@ -171,11 +171,12 @@ export class DocViewSVGManager
     toPDFDocShapePaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
     {
         // gather paths in such a way that we can directly apply them with jsPDF in native PDF coordinate space
-        const linePaths:Array<PDFLinePath> = new Array(); 
         const pathNodes = txml.filter(this._svgXML.children, (node) => 
                                     // NOTE: we can have other paths (for example for arrows)
                                     node.tagName === 'path' && node.attributes?.class.split(' ').includes('line')
                                     ) 
+
+        const linePaths:Array<PDFLinePath> = new Array(); 
 
         if(!pathNodes || pathNodes.length === 0)
         {
@@ -188,21 +189,13 @@ export class DocViewSVGManager
 
             pathNodes.forEach( node => 
             {
-                // There are only single lines in the commands: 'M4231 -1011 L 4231 -1188'
-                const line = this._pathCmdToLineData(node.attributes.d);  // [x1,y1,x2,y2]
-                if(line)
-                {
-                    let x1 = (line[0] + svgToPDFTransform.translateX)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateX + svgToPDFTransform.contentOffsetX; 
-                    let y1 = (line[1] + svgToPDFTransform.translateY)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateY + svgToPDFTransform.contentOffsetY;
-                    let x2 = (line[2] + svgToPDFTransform.translateX)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateX + svgToPDFTransform.contentOffsetX;
-                    let y2 = (line[3] + svgToPDFTransform.translateY)*svgToPDFTransform.scale + svgToPDFTransform.containerTranslateY + svgToPDFTransform.contentOffsetY;
-
-                    linePaths.push(
-                        {
-                            path: `M ${x1} ${y1} L${x2} ${y2}`,
-                            style: this.gatherPDFPathStyle(node), // this._pathClassesToPDFPathStyle(node.attributes?.class)
-                        });
-                }  
+                // There can be d attributes with single commands M L commands or multiple
+                // like single: 'M -25 20 L -25 -20' or 'M -25 20 L -24.33 22.5 L -22.5 24.33 L -20 25'
+                linePaths.push(
+                    {
+                        path: this._svgPathDToPDFPath(node.attributes.d, svgToPDFTransform),
+                        style: this.gatherPDFPathStyle(node), // this._pathClassesToPDFPathStyle(node.attributes?.class)
+                    });
             })
         }
         
@@ -318,20 +311,24 @@ export class DocViewSVGManager
         })
     }
 
-    
-    /** Given a SVG path for a Line (in format M 10 10 L 10 10), extract start and end coordinates  */
-    _pathCmdToLineData(d:string):Array<number|number|number|number>
-    {
-        const m = d.match(/M *([^ ]+) ([^ ]+) L *([^ ]+) ([\d\-]+)/); // some robustness for no spacing: M5 5 L10
+    /** Get d attribute of a SVG path and convert to PDF line path, this includes transformation of the coordinates and styling */
+    _svgPathDToPDFPath(d:string, transform: SVGtoPDFtransform):string
+    {        
+        // handle commands like 'M -25 20 L -25 -20' (single) or 'M -25 20 L -24.33 22.5 L -22.5 24.33 L -20 25' (multiple)
+        const ONLY_CODES = ['M', 'L'];
+        
+        const pathCmds = parseSVG(d);
+        let newPathStr = '';
+        pathCmds.forEach(cmd => {
+            if (ONLY_CODES.includes(cmd.code))
+            {
+                const x = (cmd.x + transform.translateX)*transform.scale + transform.containerTranslateX + transform.contentOffsetX; 
+                const y = (cmd.y + transform.translateY)*transform.scale + transform.containerTranslateY + transform.contentOffsetY;
+                newPathStr += `${cmd.code} ${x} ${y}`
+            }
+        })
 
-        if(Array.isArray(m))
-        {
-            m.shift();
-            return m.map(c => parseFloat(c))
-        }
-        else {
-            console.error(`DocViewSVGManager::_pathCmdToLineData: Failed to parse path as a Line: "${d}"`);
-        }
+        return newPathStr;
     }
 
     // Parsing dimension lines and draw directly on active pdfExporter.activePDFDoc
