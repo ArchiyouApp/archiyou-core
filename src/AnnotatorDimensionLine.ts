@@ -14,7 +14,7 @@ import {  Coord, MainAxis, PointLike, ModelUnits, DimensionLineData, DimensionOp
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
 import { BaseAnnotation } from './internal'
-import { roundToTolerance } from './internal' // utils
+import { roundTo, roundToTolerance } from './internal' // utils
 
 export class DimensionLine extends BaseAnnotation
 {
@@ -115,7 +115,7 @@ export class DimensionLine extends BaseAnnotation
     }
 
     /** Middle Point of this DimensionLine */
-    middle():Point
+    targetMiddle():Point
     {
         return new Edge(this.targetStart, this.targetEnd).middle()
     }
@@ -164,13 +164,14 @@ export class DimensionLine extends BaseAnnotation
             // Determine offset from a 2D/3D Shape: So the Shape can have an outside
             const mainShape = this?.shape?._parent || this?.shape;
             const insidePoint = (mainShape?.is2D() || mainShape?.is3D()) ? mainShape?.center() : new Point(0,0,0);
-            
-            let newOffsetVec = this.targetDir().crossed([0,0,1]).normalized();
-            
-            const d1 = insidePoint.move(newOffsetVec).distance(this.middle());
-            const d2 = insidePoint.move(newOffsetVec.reversed()).distance(this.middle());
 
-            // the same (with tolerance)
+            
+            let newOffsetVec = this.targetDir().crossed([0,0,1]);
+            
+            const d1 = insidePoint.moved(newOffsetVec).distance(this.targetMiddle());
+            const d2 = insidePoint.moved(newOffsetVec.reversed()).distance(this.targetMiddle());
+            
+            // Check if distances are very small (or zero), then we point -y
             const DISTANCE_TOLERANCE = 2;
             if (Math.abs(d1 - d2) < DISTANCE_TOLERANCE)
             {
@@ -178,8 +179,10 @@ export class DimensionLine extends BaseAnnotation
             }
             else if (d1 > d2) 
             {
-                newOffsetVec.reverse();
+                newOffsetVec.reverse(); // Make sure it points outside
             }
+
+            newOffsetVec.normalize();
 
             // If ortho the offset vector is parallel to one of the 3 axis (or reversed)
             // What axis to use can be set by user
@@ -358,7 +361,7 @@ export class DimensionLine extends BaseAnnotation
         let lineEnd = this.targetEnd.added(offsetVec).toArray();
         lineEnd[1] = -lineEnd[1];
 
-        let lineMid = this.middle().added(offsetVec).toArray();
+        let lineMid = this.targetMiddle().added(offsetVec).toArray();
         lineMid[1] = -lineMid[1];
 
         let dimText = ((this.round) ? roundTo(this.value, this.roundDecimals) : this.value).toString();
@@ -436,7 +439,7 @@ export class DimensionLine extends BaseAnnotation
                     class="annotation text" 
                     x="${atPoint.x}"
                     y="${atPoint.y}"
-                    text-anchor="middle"
+                    text-anchor="targetMiddle"
                     alignment-baseline="hanging"
                     font-size="${FONT_SIZE}"
                     style="fill:black;stroke-opacity:0;stroke-width:0"
