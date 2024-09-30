@@ -19,7 +19,7 @@ import { roundTo, roundToTolerance } from './internal' // utils
 export class DimensionLine extends BaseAnnotation
 {
     //// SETTINGS
-    DIMENSION_OFFSET_DEFAULT = 20; // in model units
+    DIMENSION_OFFSET_DEFAULT = 30; // in model units
     DIMENSION_TEXTSIZE_DEFAULT = 10;
     DIMENSION_ROUND_DEFAULT = true;
 
@@ -28,7 +28,7 @@ export class DimensionLine extends BaseAnnotation
     targetStart:Point; // point on Shape
     targetEnd:Point; // point on Shape
     shape:AnyShape = null; // the Shape the dimension is linked to - needed to know if we need to export dimension lines in toSvg()
-    value:number; // the value of the dimension line, can be static
+    //value:number; // the value of the dimension line, can be static - in BaseAnnotation
     static:boolean = false;
     units:ModelUnits = null;
     offsetVec:Vector; // Normalized Vector offset from Shape 

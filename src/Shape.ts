@@ -20,14 +20,15 @@ import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape
 import { PointLike,PointLikeOrAnyShape,Coord,AnyShape,AnyShapeOrCollection,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
 import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection } from './internal'
 
-import { Link, Selection, SelectionShapeTargetSetting, SelectorSetting, SelectorPointRange, SelectorAxisCoord, SelectorBbox,SelectorIndex } from './internal' // InternalModels
+import { Link, Selection, SelectionShapeTargetSetting, SelectorSetting, SelectorPointRange, SelectorAxisCoord, 
+            SelectorBbox,SelectorIndex } from './internal' // InternalModels
 import { ShapeAttributes, isShapeAttributes } from './internal' // attributes
 import { ObjStyle } from './internal'
 import { MeshShape, FaceMesh, EdgeMesh, VertexMesh } from './internal' // see: ExportModels
 import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
-import { Alignment, isAlignment, isShapeType, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
+import { Alignment, isAlignment, isShapeType, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
 import { Annotation, DimensionOptions, DimensionLine } from './internal'
 import { OBbox, BeamLikeDims } from './internal'
 
@@ -1057,74 +1058,60 @@ export class Shape
     }
 
     /** Rotate Shape so that its orientated bounding box is aligned with the axes */
-    rotateToAxesBbox():this
+    rotateToAxesOBbox():this
     { 
-        // this.moveTo(0,0,0); // move to center
-        const obbox = this.obbox();
+        // First rotate such the z-axis of OBbox aligns with global z-axis
+        this.rotateVecToVec(this.obbox().zDir(), [0,0,1], this.center());
+        // Then rotate to align x-axes
+        this.rotateVecToVec(this.obbox().xDir(), [1,0,0], this.center());
 
-        this.alignByPoints(
-            [
-                obbox.center(), 
-                obbox.center().toVector().add(obbox.xDir()), 
-                obbox.center().toVector().add(obbox.zDir())
-            ],
-            [
-                obbox.center(), 
-                obbox.center().moved(100), 
-                obbox.center().moved(0,0,100)
-            ],
-            
-        )
+        return this;
+    }
+
+    /** Try to align Shape with x (horizontal) or y axis (vertical) as much as possible */
+    @checkInput([['OrientationXY', 'vertical']], ['auto'])
+    rotateToOrthoXY(o?:OrientationXY)
+    {
+        /* We determine the primary axis of a Shape by different methods:
+            - using the largest dimension of bbox first, but might not result in best alignment to XY
+            - based on direction of edges. The primary edge direction is most numerous (and largest), 
+                secondary perpendicular to that (TODO)
+        */
+
+        this.rotateToAxesOBbox(); // Align Shape so Obbox is somewhat flat on XY plane
+
+        const PRIMARY_EDGE_SCORE = (e) => e.count * e.maxLength; // Simple score for now 
+
+        const edgesCountByDir = (this.edges().toArray() as Array<Edge>).map(e => {
+            return {
+                edge: e, length: e.length(),  dir: e.direction(true).abs().toArray().toString() // NOTE: direction as string to aggregate
+            }
+        })
+        .reduce((acc,curEdge) => {
+            acc[curEdge.dir] = { 
+                dir: curEdge.dir, 
+                maxLength : (acc[curEdge.dir]) ? acc[curEdge.dir].maxLength = (acc[curEdge.dir].maxLength < acc[curEdge.dir].length) ? acc[curEdge.dir].length : acc[curEdge.dir].maxLength : curEdge.length, 
+                count: (!acc[curEdge.dir]) ? 1 : acc[curEdge.dir].count += 1 }
+            return acc    
+        }, {})
+        
+        const edgesSorted = Object.values(edgesCountByDir).sort(
+            (e1,e2) => PRIMARY_EDGE_SCORE(e2) - PRIMARY_EDGE_SCORE(e1)); // primary sort: count, secondary: length
+
+        const primaryDir = new Vector((edgesSorted[0] as any).dir.split(','))
+
+        this.rotateVecToVec((o === 'horizontal') ? [1,0,0] : [0,1,0], primaryDir, this.center())
+    
         return this;
     }
 
     /** Rotate Shape to place flat on XY plane. Keeps x,y position */
-    @checkInput([['String', 'vertical'],['Boolean',true]], ['auto', 'auto'])
-    rotateToLayFlat(direction?:'horizontal'|'vertical', autoRotate?:boolean):this
+    @checkInput([['OrientationXY', 'vertical']], ['auto'])
+    rotateToLayFlat(o?:OrientationXY):this
     {
-        // autoRotate to align shape with Axes
-        if(autoRotate)
-        {
-            this.rotateToAxesBbox();
-        }
-        // now get bbox and find the largest face and lay it on the given plane
-        let biggestFace;
-        let biggestFaceArea = 0;
-
-        const shapeBbox = this.bbox().box() || this.bbox().rect(); // Shape can already be 2D
-
-        if(!shapeBbox)
-        {
-            console.error('Shape::rotateToLayFlat(): Failed. Returned original Shape.')
-            return this;
-        }
-
-        shapeBbox.faces().forEach(f =>
-        {
-            let area = f.area();
-            if(area > biggestFaceArea)
-            {
-                biggestFace = f;
-                biggestFaceArea = area;
-            }
-        })
-        if(!biggestFace)
-        {
-            throw new Error(`rotateToLayFlat::Could not find a Face to lay flat on!`)
-        }
-        
-        this.rotateVecToVec(biggestFace.normal(), new Vector(0,0,1),this.center());
-
-        // finally check alignment: horizontal or vertical
-        // keep x,y center
-        let bbox = this.bbox();
-        if( (direction == 'vertical' && bbox.width() > bbox.depth())
-                || (direction == 'horizontal' && bbox.width() < bbox.depth()))
-        {
-            this.rotateZ(90);
-        }
-        // move up to lie on XY plane
-        this.move(0,0,-bbox.bottom().center().z)
+        this.rotateToAxesOBbox();
+        this.rotateToOrthoXY(o); 
+        this.moveToZ(0); // also move on XY plane
 
         return this;
     }
@@ -1134,27 +1121,91 @@ export class Shape
     */
     layflat():this
     {
-        return this.rotateToLayFlat('vertical', true);
+        return this.rotateToLayFlat('vertical');
     }
 
-    /** Flatten a Solid into a Face */
-    // !!!! TMP METHOD !!!! Needs a lot of work
-    _flattened():AnyShape
+    /** Check if a Solid Shape can be seen as a simple extrusion and return the base Face */
+    _extrudedFace(side:SideZ='bottom'):this
     {
-        if(this.type() !== 'Solid')
-        {
-            console.warn(`Shape::flatten: Does not yet work on non-Solids! Returned original`);
-            return this._copy();
+        if(!this.is3D())
+        { 
+            console.warn(`Shape::_extrudedFace(): Shape is not 3D. Returned original`);
+            return this;
         }
 
-        const selected = this.select('F||bottom');
-        let bottomFace = ShapeCollection.isShapeCollection(selected) ? (selected as AnyShapeCollection).first() : selected as AnyShape;
+        // An extrusion can be detected by 2 Faces with same normal and size (use area for now, not width and height)
+        // If multiple (for example in a box shape) we pick the largest faces
         
-        if(bottomFace && bottomFace.type() === 'Face')
+        const facesData = this.faces()
+        .toArray()
+        .filter(f => (f as Face).isPlanar()) // only planar Faces are supported for now
+        .map( f => {
+            const face = f as Face;
+            const area = Math.round(face.area()); // round for some tolerance
+            const normal = face.normal().round();
+            return { 
+                    id: `${normal.abs()}-${area}`,
+                    face: f,
+                    normal: normal,
+                    area:  area  
+                }
+        });
+
+        const facesById = facesData.reduce((acc,curFaceData) => {
+            if(!acc[curFaceData.id]) 
+            {
+                acc[curFaceData.id] = { faces: [curFaceData.face], count: 1 }
+            }
+            else {
+                // update
+                acc[curFaceData.id].faces.push(curFaceData.face);
+                acc[curFaceData.id].count +=1;
+            }
+            return acc
+        }, {})
+
+        const faceGroups = Object.values(facesById)
+            .filter(fid => (fid as any).count > 1)
+            .sort((f1,f2) => {
+                const c1 = (f1 as any).count;
+                const c2 = (f2 as any).count;
+                return (c1 !== c2) 
+                    ?   c2 - c1 
+                    : (f2 as any).area - (f1 as any).area
+            })
+            
+        if(faceGroups.length === 0)
         {
-            return bottomFace._copy() as Face;
+            console.warn(`Shape::_extrudedFace(): Could not find a extrusion Face! Returned null`)
+            return null;
         }
-        return null;
+
+        // Get bottom or top Face
+        side = (['top','bottom'].includes(side)) ? side : 'bottom'
+        const selectedExtrudedFace = (faceGroups[0] as any).faces.sort( (f1,f2) => f1.center().z - f2.center().z)[(side === 'top') ? 1 : 0];
+
+        return selectedExtrudedFace.copy()
+    }
+
+    /** Flatten a Shape into a Face, autorotate and place on XY plane */
+    @checkInput([['OrientationXY', 'vertical']], ['auto'])
+    _flattened(o?:OrientationXY):AnyShape
+    {
+        this.rotateToOrthoXY(o);
+        const extrudeFace = this._extrudedFace();
+        if (extrudeFace){ 
+            return extrudeFace.moveToZ(0);
+        }
+        else {
+            console.warn(`Shape::_flattened(${o}): Not an extruded Shape. We simply return the bottom Face.`)
+            return new ShapeCollection(this.select('F||bottom')).first();
+        }
+    }
+
+    @checkInput([['OrientationXY', 'vertical']], ['auto'])
+    flatten(o?:OrientationXY)
+    {
+        this.replaceShape(this._flattened(o))
     }
 
     /** 
@@ -1244,13 +1295,13 @@ export class Shape
     @checkInput(['PointLike', 'PointLike', ['PointLike',[0,0,0]]], ['Vector', 'Vector', 'Vector']) // auto convert
     rotateVecToVec(from:PointLike, to:PointLike, pivot?:PointLike):this
     {
-        let fromVec= from as Vector; // auto converted
-        let toVec = to as Vector; 
-        let pivotVec = pivot as Vector;
+        const fromVec= from as Vector; // auto converted
+        const toVec = to as Vector; 
+        const pivotVec = pivot as Vector;
 
-        let ocQuaternion = new this._oc.gp_Quaternion_3(fromVec._ocVector, toVec._ocVector).Normalized();
+        const ocQuaternion = new this._oc.gp_Quaternion_3(fromVec._ocVector, toVec._ocVector).Normalized();
 
-        let ocTransformation = new this._oc.gp_Trsf_1();
+        const ocTransformation = new this._oc.gp_Trsf_1();
         ocTransformation.SetRotation_2( ocQuaternion ); // Rotation is done around the origin - so we need to first move the Shape from pivot to origin
 
         this.move(pivotVec.reversed());

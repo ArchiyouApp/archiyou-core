@@ -21,7 +21,8 @@ import { ParamType, Param, PublishParam } from './internal'
 import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
             ContainerHAlignment, ContainerVAlignment, MetricName,
-            ContainerTableInput, ContainerPositionLike, ContainerPositionCoordRel, ContainerPositionCoordAbs
+            ContainerTableInput, ContainerPositionLike, ContainerPositionCoordRel, ContainerPositionCoordAbs, 
+            OrientationXY
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
@@ -106,6 +107,11 @@ export function isAxis(o:any) : o is Axis
 export function isBboxAlignment(o:any) : o is BboxAlignment
 {
     return (typeof o === 'string') || Array.isArray(o); // TODO: better
+}
+
+export function isOrientationXY(o:any): o is OrientationXY
+{
+    return ['horizontal','vertical'].includes(o)
 }
 
 export function isPointLike(p: any=null) : p is PointLike

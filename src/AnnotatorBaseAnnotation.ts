@@ -6,6 +6,7 @@ import { AnnotationType } from './internal' // types
 export class BaseAnnotation
 {
     uuid:string;
+    value:string; // TODO: more generic
     _type:AnnotationType;
 
     constructor(type?:AnnotationType)

@@ -366,7 +366,7 @@ export class Vector extends Point
     }
     */
 
-    /** Return a new Vector with all its coordinates absolute */
+    /** Return a new Vector with all its coordinates positive */
     abs():Vector
     {
         return new Vector(Math.abs(this._x), Math.abs(this._y), Math.abs(this._z));
@@ -804,8 +804,8 @@ export class Vector extends Point
     @checkInput('PointLike', 'Vector') // convert input to Vector
     sharedPlanes(other:PointLike, ...args):Array<string>
     {
-        let otherVec = other as Vector; // auto converted by @checkInput
-        let planes = [];
+        const otherVec = other as Vector; // auto converted by @checkInput
+        const planes = [];
         if ( this._x == otherVec.x ) planes.push('x');
         if ( this._y == otherVec.y ) planes.push('y');
         if ( this._z == otherVec.z ) planes.push('z');

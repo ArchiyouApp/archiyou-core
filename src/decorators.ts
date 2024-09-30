@@ -13,7 +13,7 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
-            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,
+            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,isOrientationXY,
             isBeam, isBeamBaseLineAlignment } from './internal'
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
@@ -134,6 +134,14 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             check: isMainAxis,
             errorMessage: { possible: ['x','y', 'z'] }, // TODO: get from types
             transformInput: null, // no a target
+        },
+        'isOrientationXY' : 
+        {
+            name: 'OrientationXY',
+            obj: isOrientationXY,
+            check: isOrientationXY,
+            errorMessage: { possible: ['horizontal', 'vertical'] },
+            transformInput: null,
         },
         'isPivot' : {
             name: 'Pivot',
