@@ -28,7 +28,7 @@ export class DimensionLine extends BaseAnnotation
     targetStart:Point; // point on Shape
     targetEnd:Point; // point on Shape
     shape:AnyShape = null; // the Shape the dimension is linked to - needed to know if we need to export dimension lines in toSvg()
-    //value:number; // the value of the dimension line, can be static - in BaseAnnotation
+    value:number; // the value of the dimension line, can be static - in BaseAnnotation
     static:boolean = false;
     units:ModelUnits = null;
     offsetVec:Vector; // Normalized Vector offset from Shape 
@@ -44,13 +44,13 @@ export class DimensionLine extends BaseAnnotation
     showUnits:boolean = false;
     param:string = null; // name of bound parameter
 
-    constructor(start:Point=null, end:Point=null, options?:DimensionOptions)
+    constructor(start:PointLike=null, end:PointLike=null, options?:DimensionOptions)
     {
         super('dimensionLine');
 
         if(start && end)
         {
-            this.init(start, end, options)
+            this.init(start,end, options)
         }
         else {
             console.warn(`DimensionLine::constructor(): DimensionLine not initialized. Use methods init(start,end,options) or fromShape(shape, options) later!`)
@@ -59,6 +59,7 @@ export class DimensionLine extends BaseAnnotation
     }
 
     /** (Re)init dimension line */
+    @checkInput(['PointLike','PointLike', ['DimensionOptions', null]],['Point','Point','auto'])
     init(start:Point, end:Point, options?:DimensionOptions)
     {
         if(!start && !end){ throw new Error(`DimensionLine::init(): Please supply start and end Point!`); }
@@ -70,7 +71,7 @@ export class DimensionLine extends BaseAnnotation
         this.setOptions(options)
 
         this._calculateAutoOffsetLength();
-        this._calculateOffsetVec();
+        this._calculateOffsetVec(); // don't override from options
         this.value = this._getDynamicValue();
     }
 
@@ -92,7 +93,7 @@ export class DimensionLine extends BaseAnnotation
                 (!this.ortho) 
                     ? this.targetDir().length()
                     : this.dir().length()
-        )
+        );
     }
 
     type():AnnotationType
@@ -143,16 +144,22 @@ export class DimensionLine extends BaseAnnotation
             const linkedEdge = (this.shape as Edge);
             this.targetStart = linkedEdge.start().toPoint();
             this.targetEnd = linkedEdge.end().toPoint();
-            this._calculateOffsetVec();
-            this._calculateAutoOffsetLength();
+            this._calculateOffsetVec(true); // force overwrite
+            this._calculateAutoOffsetLength(); 
         }
     }
 
     /** Calculate the direction for offsetting from target  
      *  How to offset depends on dimension line type: normal, ortho
     */
-    _calculateOffsetVec():Vector
+    _calculateOffsetVec(overwrite:boolean=false):Vector
     {
+        // Don't overwrite if already set
+        if(this.offsetVec && !overwrite)
+        {
+            return this.offsetVec;
+        }
+
         // If dimension line is parallel to z-axis, make offset the x-axis
         if ( this.targetDir().isParallel([0,0,1]))
         {
@@ -279,6 +286,7 @@ export class DimensionLine extends BaseAnnotation
     {
         this.ortho = o?.ortho ?? false;
         this.offsetLength = o?.offset || this.offsetLength || this._calculateAutoOffsetLength();
+        this.offsetVec = o?.offsetVec || this.offsetVec || this._calculateOffsetVec();
         this.units = o?.units || this.units;
         this.roundDecimals = o?.roundDecimals || this.roundDecimals;
         // TODO: more: color, linethickness etc.

@@ -1166,7 +1166,7 @@ export class Edge extends Shape
 
         const dimLine = this._geom._annotator.dimensionLine().fromShape(this, options);
         const mainShape = this._parent || this;
-        mainShape._addAnnotation(dimLine);
+        mainShape.addAnnotations(dimLine);
 
         return dimLine
     }

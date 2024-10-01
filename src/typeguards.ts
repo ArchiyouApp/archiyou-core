@@ -13,7 +13,8 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           ModelUnits, 
           ShapeAttributes, 
           DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput,
-          BeamBaseLineAlignment
+          BeamBaseLineAlignment, 
+          AnnotationAutoDimStrategy
         } from './internal' // types
 
 import { ParamType, Param, PublishParam } from './internal'
@@ -316,6 +317,11 @@ export function isDimensionOptions(o:any): o is DimensionLineData
         && (o?.units && isModelUnits(o?.units))
         && (o?.offset && typeof o?.offset === 'number')
         && (o?.roundDecimals && typeof o?.roundDecimals === 'number')
+}
+
+export function isAnnotationAutoDimStrategy(o:any): o is AnnotationAutoDimStrategy
+{
+    return ['part', 'levels'].includes(o)
 }
 
 //// SELECTIONS ////

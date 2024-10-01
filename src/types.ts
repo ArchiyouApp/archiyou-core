@@ -384,6 +384,7 @@ export interface SelectorIndex
 export type AnnotationType = 'base'|'dimensionLine' | 'label' // TODO MORE
 export type Annotation = BaseAnnotation|DimensionLine  // TODO: more: label
 export type AnnotationData = DimensionLineData // TODO
+export type AnnotationAutoDimStrategy = 'part' | 'levels'
 
 /** Exporting DimensionLine instances as data */
 export interface DimensionLineData
@@ -417,7 +418,8 @@ export interface DimensionOptions
 {
     units?:ModelUnits
     offset?:number // offsetLength (minus for other direction)
-    ortho?:boolean
+    offsetVec?:Vector
+    ortho?:boolean|MainAxis
     roundDecimals?:number // round to number decimals. Default is 0
 }
 

@@ -13,7 +13,7 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
-            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,isOrientationXY,
+            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,isOrientationXY, isAnnotationAutoDimStrategy,
             isBeam, isBeamBaseLineAlignment } from './internal'
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
@@ -425,7 +425,15 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             name: 'DimensionOptions',
             obj: isDimensionOptions,
             check: isDimensionOptions,
-            errorMessage: { possible: ['DimensionOptions: { units:string }'] }, // TODO: more options
+            errorMessage: { possible: ['DimensionOptions: { units:string, offset:number, offsetVec:Vector, ortho:boolean, roundDecimals:int }'] }, 
+            transformInput: null,
+        },
+        'isAnnotationAutoDimStrategy' :
+        {
+            name: 'AnnotationAutoDimStrategy',
+            obj: isAnnotationAutoDimStrategy,
+            check: isAnnotationAutoDimStrategy,
+            errorMessage: { possible: ['part', 'levels'] }, 
             transformInput: null,
         },
         'isModelUnits':
@@ -703,7 +711,7 @@ function _generateCheckError(className:string, wrappedMethod:Function, wrappedMe
         checkArgs = (!Array.isArray(checkArgs)) ? [checkArgs] : checkArgs;
         // most of the time we get the arguments that failed
         let checkArgsStr = "";
-        checkArgs.forEach( (inp,i) => checkArgsStr += `${Array.isArray(inp) ? `[${inp}(type: ${ typeof(inp) == 'object' ? inp?.constructor.name : typeof(inp) })]` : `${inp} (type: ${ typeof(inp) == 'object' ? inp?.constructor.name : typeof(inp) })` }${(i != checkArgs.length - 1) ? ',' : ''}`);
+        checkArgs.forEach( (inp,i) => checkArgsStr += `${Array.isArray(inp) ? `["${inp}" (type: ${ typeof(inp) == 'object' ? inp?.constructor.name : typeof(inp) })]` : `"${inp}" (type: ${ typeof(inp) == 'object' ? inp?.constructor.name : typeof(inp) })` }${(i != checkArgs.length - 1) ? ',' : ''}`);
 
         let msgObj = decoratorTypeInfo.errorMessage;
 
@@ -713,11 +721,13 @@ function _generateCheckError(className:string, wrappedMethod:Function, wrappedMe
         }
         else {
             // This error is for the user and will be shown in the Editor
-            let parametersOfFunc = getFuncParamNames(wrappedMethod);
-            let errorAtParam = parametersOfFunc[inputCheckIndex];
+            const parametersOfFunc = getFuncParamNames(wrappedMethod);
+            const errorAtParam = parametersOfFunc[inputCheckIndex];
             let m = `INPUT ERROR
     at ${className}.${wrappedMethodName}(${parametersOfFunc.join(', ')})
-    wrong input for "${errorAtParam}" [${decoratorTypeInfo.name}]: ${checkArgsStr}
+    wrong input for argument: "${errorAtParam}"
+    need type "${decoratorTypeInfo.name}" 
+    but got ${checkArgsStr}
     valid inputs are: 
         - ${msgObj.possible.join('\n\t- ')}
         ${msgObj.hint || ''}`;

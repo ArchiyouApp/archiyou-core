@@ -18,7 +18,7 @@ import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POIN
  import { AXIS_TO_VECS } from './internal'
 import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
 import { PointLike,PointLikeOrAnyShape,Coord,AnyShape,AnyShapeOrCollection,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
-import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection } from './internal'
+import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection,  } from './internal'
 
 import { Link, Selection, SelectionShapeTargetSetting, SelectorSetting, SelectorPointRange, SelectorAxisCoord, 
             SelectorBbox,SelectorIndex } from './internal' // InternalModels
@@ -29,7 +29,7 @@ import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
 import { Alignment, isAlignment, isShapeType, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
-import { Annotation, DimensionOptions, DimensionLine } from './internal'
+import { BaseAnnotation, Annotation, DimensionOptions, DimensionLine } from './internal'
 import { OBbox, BeamLikeDims } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -1859,7 +1859,7 @@ export class Shape
     }
 
     /** Is exactly the same Shape based on its topology/geometry 
-     *  IMPORTANT: this will not always work!
+     *  TODO: This needs another look
     */
     @checkInput('PointLikeOrAnyShape', 'auto')
     equals(other:PointLikeOrAnyShape):boolean
@@ -1869,10 +1869,12 @@ export class Shape
         if (isPointLike(other))
         {
             otherShape = new Vertex(other as PointLike);
+            if(this.type() !== 'Vertex') return false;
+            return this.equals(otherShape);
         }
-        else {
-            otherShape = other as AnyShape; 
-        }
+        
+        otherShape = other as AnyShape; 
+        
         
         if(this.type() != otherShape.type()){ return false;}
 
@@ -4099,17 +4101,22 @@ export class Shape
     }
 
     /** add dimension to annotations of this shape */
-    _addAnnotation(a:Annotation):boolean
+    addAnnotations(a:Annotation|Array<Annotation>):boolean
     {
-        
         // TODO: check for doubles etc
-        this.annotations.push(a)
+        const annotations = (Array.isArray(a) ? a : [a]).filter(ann => BaseAnnotation.isAnnotation(ann) )
+        this.annotations = this.annotations.concat(annotations)
         return true;
     }
 
     _updateAnnotations()
     {
         this.annotations.forEach(a => a.update());
+    }
+
+    autoDim(options?:DimensionOptions)
+    {
+        this._geom._annotator.autoDim(this, options);
     }
 
     //// API to forward to _Obj ////

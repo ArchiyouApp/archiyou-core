@@ -6,13 +6,18 @@ import { AnnotationType } from './internal' // types
 export class BaseAnnotation
 {
     uuid:string;
-    value:string; // TODO: more generic
+    value:string|number;
     _type:AnnotationType;
 
     constructor(type?:AnnotationType)
     {
         this.uuid = uuidv4();
         this._type = type;
+    }
+
+    static isAnnotation(obj:any):boolean
+    {
+        return (typeof obj === 'object') && obj.hasOwnProperty('uuid') && obj.hasOwnProperty('_type');
     }
 
     /** Type of Annotation, reimplemented in extended classes */
@@ -24,6 +29,11 @@ export class BaseAnnotation
     toSvg():string|null
     {
         return null; // override by child class
+    }
+
+    update()
+    {
+        // override
     }
 
     toShape():AnyShape|null
