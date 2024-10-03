@@ -838,11 +838,13 @@ export class Make
 
         const partRowsAll = [];
 
+        console.info(`Make::partList(shapes, name): Got ${shapes.length} to make a part list with. If you name and group shapes the results will be better.`);
+
         shapes.forEachGroup((groupName,groupedShapes) =>
         {
             groupedShapes.forEach((shape) => 
             {
-                if(shape.beamLike())
+                if(shape.beamLike() && shape.visible())
                 {
                     // part (0), subpart (1), section (2), length (3), quantity (4)
                     const beamDims = shape.beamDims();

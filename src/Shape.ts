@@ -538,12 +538,14 @@ export class Shape
     /** If Shape is beam-like */
     beamLike():boolean
     {
+        const BEAM_VOLUME_PERC = 0.7;
+
         if (this.type() !== 'Solid')
             return false;
 
         const obboxDims = this.obbox() as OBbox;
         const obbox = new Solid().makeBox(obboxDims.width(), obboxDims.depth(), obboxDims.height());
-        return (this.volume() / obbox.volume() > 0.95) 
+        return (this.volume() / obbox.volume() >= BEAM_VOLUME_PERC) 
     }
 
     beamDims():BeamLikeDims
@@ -1068,6 +1070,15 @@ export class Shape
         return this;
     }
 
+    /** Rotate Shape to make normal of largest Face parallel to Z axis */
+    rotateToAlignLargestFaceToZ():this
+    {
+        const largestFace = this.faces().sort((a,b) => b.area() - a.area()).first() as Face;
+        if(!largestFace) return this;
+        this.rotateVecToVec(largestFace.normal(), [0,0,1], this.center());
+        return this;
+    }
+
     /** Try to align Shape with x (horizontal) or y axis (vertical) as much as possible */
     @checkInput([['OrientationXY', 'vertical']], ['auto'])
     rotateToOrthoXY(o?:OrientationXY)
@@ -1079,10 +1090,15 @@ export class Shape
         */
 
         this.rotateToAxesOBbox(); // Align Shape so Obbox is somewhat flat on XY plane
+        this.rotateToAlignLargestFaceToZ(); // To make sure the largest Face is parallel to XY plane
 
         const PRIMARY_EDGE_SCORE = (e) => e.count * e.maxLength; // Simple score for now 
 
-        const edgesCountByDir = (this.edges().toArray() as Array<Edge>).map(e => {
+        const edgesCountByDir = (this.edges()
+                                    // IMPORTANT: For what Edge types this actually makes sense. Sometimes Line Edges get corrupted to BSplineCurve
+                                    // so let's be careful filtering here
+                                    .toArray() as Array<Edge>)
+                                    .map(e => {
             return {
                 edge: e, length: e.length(),  dir: e.direction(true).abs().toArray().toString() // NOTE: direction as string to aggregate
             }
@@ -1098,9 +1114,10 @@ export class Shape
         const edgesSorted = Object.values(edgesCountByDir).sort(
             (e1,e2) => PRIMARY_EDGE_SCORE(e2) - PRIMARY_EDGE_SCORE(e1)); // primary sort: count, secondary: length
 
-        const primaryDir = new Vector((edgesSorted[0] as any).dir.split(','))
+        const primaryDir = new Vector((edgesSorted[0] as any).dir.split(','));
 
-        this.rotateVecToVec((o === 'horizontal') ? [1,0,0] : [0,1,0], primaryDir, this.center())
+        this.rotateVecToVec((o === 'horizontal') ? [1,0,0] : [0,1,0], primaryDir, this.center());
+
     
         return this;
     }
@@ -1154,7 +1171,10 @@ export class Shape
         const facesById = facesData.reduce((acc,curFaceData) => {
             if(!acc[curFaceData.id]) 
             {
-                acc[curFaceData.id] = { faces: [curFaceData.face], count: 1 }
+                acc[curFaceData.id] = { 
+                    count: 1,
+                    faces: [curFaceData.face],
+                    area: curFaceData.area } // pass area to, so we can sort on it later
             }
             else {
                 // update
@@ -1166,20 +1186,19 @@ export class Shape
 
         const faceGroups = Object.values(facesById)
             .filter(fid => (fid as any).count > 1)
-            .sort((f1,f2) => {
-                const c1 = (f1 as any).count;
-                const c2 = (f2 as any).count;
+            .sort((fg1,fg2) => {
+                const c1 = (fg1 as any).count;
+                const c2 = (fg2 as any).count;
                 return (c1 !== c2) 
                     ?   c2 - c1 
-                    : (f2 as any).area - (f1 as any).area
+                    : (fg2 as any).area - (fg1 as any).area
             })
-            
+
         if(faceGroups.length === 0)
         {
             console.warn(`Shape::_extrudedFace(): Could not find a extrusion Face! Returned null`)
             return null;
         }
-
         // Get bottom or top Face
         side = (['top','bottom'].includes(side)) ? side : 'bottom'
         const selectedExtrudedFace = (faceGroups[0] as any).faces.sort( (f1,f2) => f1.center().z - f2.center().z)[(side === 'top') ? 1 : 0];
@@ -1188,24 +1207,25 @@ export class Shape
     }
 
     /** Flatten a Shape into a Face, autorotate and place on XY plane */
+    @addResultShapesToScene
     @checkInput([['OrientationXY', 'vertical']], ['auto'])
-    _flattened(o?:OrientationXY):AnyShape
+    flattened(o?:OrientationXY):AnyShape
     {
-        this.rotateToOrthoXY(o);
         const extrudeFace = this._extrudedFace();
         if (extrudeFace){ 
             return extrudeFace.moveToZ(0);
         }
         else {
-            console.warn(`Shape::_flattened(${o}): Not an extruded Shape. We simply return the bottom Face.`)
+            console.warn(`Shape::flattened(${o}): Not an extruded Shape. We simply return the bottom Face.`)
             return new ShapeCollection(this.select('F||bottom')).first();
         }
     }
 
     @checkInput([['OrientationXY', 'vertical']], ['auto'])
-    flatten(o?:OrientationXY)
+    flatten(o?:OrientationXY):this
     {
-        this.replaceShape(this._flattened(o))
+        this.replaceShape(this.flattened(o));
+        return this;
     }
 
     /** 
@@ -1297,6 +1317,9 @@ export class Shape
     {
         const fromVec= from as Vector; // auto converted
         const toVec = to as Vector; 
+
+        if (fromVec.equals(toVec)){ return this; }; // Don't need to rotate
+
         const pivotVec = pivot as Vector;
 
         const ocQuaternion = new this._oc.gp_Quaternion_3(fromVec._ocVector, toVec._ocVector).Normalized();
@@ -4114,6 +4137,7 @@ export class Shape
         this.annotations.forEach(a => a.update());
     }
 
+    @checkInput([['DimensionOptions', null]], ['auto'] )
     autoDim(options?:DimensionOptions)
     {
         this._geom._annotator.autoDim(this, options);
@@ -4418,7 +4442,7 @@ export class Shape
         const newDimLines = [];
 
         dimLines.forEach( dimLine => {
-            const dimEdge = dimLine.toEdge();
+            const dimEdge = (dimLine as DimensionLine).toEdge();
             const projDimEdge = dimEdge._project(viewpoint, false).first();
             // IMPORTANT: results of projection can be translated anywhere (there is no consistency in world-position => projected-position)
             // This means that getEqualsTranslated() can return multiple if there are same Edges around ( for example in box geometries)

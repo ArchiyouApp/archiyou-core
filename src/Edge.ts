@@ -527,9 +527,11 @@ export class Edge extends Shape
             return this.direction();
         }
 
+        const paramAtPoint = this.getParamAt(point);
+
         let ocClProps = new this._oc.GeomLProp_CLProps_2(
             this._toOcCurveHandle(), 
-            this.getParamAt(point),
+            paramAtPoint,
             1, // 2 is needed for normal
             0.0001 // resolution
         );
@@ -703,6 +705,18 @@ export class Edge extends Shape
         
     }
 
+    /** Get start value of Edge parameter range */
+    paramStart():number
+    {
+        return this._toOcCurve().FirstParameter();
+    }
+
+    /** Get end value of Edge parameter range */
+    paramEnd():number
+    {
+        return this._toOcCurve().FirstParameter();
+    }
+
     /** 
      * Generate a Point at specific percentage of this Edge
      *  @param perc: number between 0 and 1
@@ -716,9 +730,9 @@ export class Edge extends Shape
             perc = (perc < 0) ? 0.0 : 1.0;
         }
         
-        let uMin = this._toOcCurve().FirstParameter();
-        let uMax = this._toOcCurve().LastParameter();
-        let atU =  uMin + perc * (uMax - uMin);
+        const uMin = this.paramStart();
+        const uMax = this.paramEnd();
+        const atU =  uMin + perc * (uMax - uMin);
         return this.pointAtParam(atU);
     }
     
@@ -966,8 +980,18 @@ export class Edge extends Shape
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_geom_a_p_i___project_point_on_curve.html
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_shape_analysis___curve.html
-        let ocProjectPoint = new this._oc.GeomAPI_ProjectPointOnCurve_2( (point as Point)._toOcPoint(), this._toOcCurveHandle());
-        return ocProjectPoint.LowerDistanceParameter();
+        try {
+            const ocProjectPoint = new this._oc.GeomAPI_ProjectPointOnCurve_2( (point as Point)._toOcPoint(), this._toOcCurveHandle());
+            return ocProjectPoint.LowerDistanceParameter();
+        }
+        catch (e)
+        {
+            console.error(`Edge::getParamAt(): Could not find param for Edge of type "${this.edgeType()}". This is probably a OpenCascade bug. Returned start parameter`);
+        }
+        finally {
+            return this.paramStart();
+        }
+        
     }
 
     /** Generate a Collection of a given number of Vertices equally spaced over this Edge including the start and end of the Edge */

@@ -47,7 +47,7 @@ export class DocPDFExporter
     TEXT_BASELINE_DEFAULT = 'top';
     TEXT_FONT_DEFAULT = 'Outfit';
     
-    TABLE_FONTSIZE_DEFAULT = 8;
+    TABLE_FONTSIZE_DEFAULT = 8; // in pnts
     TABLE_BORDER_THICKNESS_MM = 0.1;
     TABLE_PADDING_MM = 1;
 
@@ -645,18 +645,19 @@ export class DocPDFExporter
         }
 
         const settings = t?.content?.settings as TableContainerOptions;
-        const x = this.coordRelWidthToPoints(t.position[0], p) 
-                    - ((t?.width) ? t.pivot[0]/2 : 0); // correct for pivot if width is set
-        const y = this.coordRelHeightToPoints(t.position[1], p)
+
+        const { x, y } = this.containerToPDFPositionInPnts(t, p);
+
 
         autoTable(this.activePDFDoc,
             { 
                 theme: 'plain',
                 head: [Object.keys((t?.content?.data as DataRowsColumnValue)[0])],  // [[]]
                 body: t?.content?.data.map( r => Object.values(r)),
-                margin: x, 
+                margin: { left: x, right: 0, top: 0, bottom:0 }, 
                 startY: y, 
                 tableWidth: this.relWidthToPoints(t.width, p), 
+                pageBreak: 'avoid',
                 styles: {
                     fontSize:  settings?.fontsize ?? this.TABLE_FONTSIZE_DEFAULT, 
                     cellPadding: mmToPoints(this.TABLE_PADDING_MM),
@@ -723,6 +724,7 @@ export class DocPDFExporter
     {
         const pageHorizontalPadding = (transformWithPadding) ? ( (page.padding[0]||0) * page.width) : 0; // in page.DocUnits
         const pageContentWidth = convertValueFromToUnit(page.width - 2*pageHorizontalPadding, page.docUnits, 'mm'); // always to mm
+
         return mmToPoints(a*pageContentWidth + convertValueFromToUnit(pageHorizontalPadding, page.docUnits, 'mm'));
     }
 

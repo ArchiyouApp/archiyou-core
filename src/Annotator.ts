@@ -16,7 +16,7 @@ import { Annotation, AnnotationData, DimensionLine, AutoDimLevel, AutoDimSetting
 export class Annotator
 {
     //// SETTINGS ////
-    DIMENSION_BOX_OFFSET_DEFAULT = 10;
+    DIMENSION_BOX_OFFSET_DEFAULT = 20;
     
     //// END SETTINGS ////
 
@@ -155,10 +155,12 @@ export class Annotator
      * @param shapes Shape or ShapeCollection to dimension
      * @returns ShapeCollection
      */
-    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
+    @checkInput(['AnyShapeOrCollection', ['DimensionOptions', null]], ['ShapeCollection', 'auto'])
     autoDimPart(shapes:ShapeCollection, options?:DimensionOptions):ShapeCollection
     {
-        const OFFSET_PER_LEVEL = 10;
+        const OFFSET_PER_LEVEL = 20;
+        const DIMENSION_MIN_DISTANCE = 1;
+
         // Take some settings from optional settings
         const dimLevelOffset = options?.offset || OFFSET_PER_LEVEL;
         const dimUnits = options?.units;
@@ -168,8 +170,8 @@ export class Annotator
         if(!part.is2D()){ throw new Error('Annotator.autoDimPart(): Please make sure you have a 2D part on the XY plane!');}
 
         // Level 1: stock size (bbox)
-        part.bbox().back().dimension({ offset: dimLevelOffset * 2, units: dimUnits });
-        part.bbox().left().dimension({ offset: dimLevelOffset * 2, units: dimUnits });
+        part.bbox().back().dimension({ offset: dimLevelOffset * 3, units: dimUnits });
+        part.bbox().left().dimension({ offset: dimLevelOffset * 3, units: dimUnits });
         
         // Level 2: edges on and parallel to sides of bbox
         const bboxSideEdges = part.bbox().rect().edges();
@@ -211,17 +213,20 @@ export class Annotator
                 {
                     if(i !== 0) // skip first
                     {
-                        const dim = this.dimensionLine(
-                            arr[i-1] as PointLike,
-                            v as PointLike, 
-                            { 
-                                offsetVec: sideDimOffsetVec, 
-                                offset: dimLevelOffset * 1, 
-                                units: dimUnits,
-                                ortho: sideAlongAxis // always orthogonal
-                            });
-                        part.addAnnotations(dim);
-                        dimEdgesOnSides.add(new Edge().makeLine(arr[i-1] as Vertex, v as Vertex)); // keep track of what dim lines we made
+                        if(v.distance(arr[i-1]) >= DIMENSION_MIN_DISTANCE)
+                        {
+                            const dim = this.dimensionLine(
+                                arr[i-1] as PointLike,
+                                v as PointLike, 
+                                { 
+                                    offsetVec: sideDimOffsetVec, 
+                                    offset: dimLevelOffset * 2, 
+                                    units: dimUnits,
+                                    ortho: sideAlongAxis // always orthogonal
+                                });
+                            part.addAnnotations(dim);
+                            dimEdgesOnSides.add(new Edge().makeLine(arr[i-1] as Vertex, v as Vertex)); // keep track of what dim lines we made
+                        }
                     }
                 })
             }
@@ -251,7 +256,7 @@ export class Annotator
         
         Object.values(remainingEdgesByDirLength).forEach((e,i) =>
         {
-            const dim = this.dimensionLine().fromShape(e as Edge, { offset: OFFSET_PER_LEVEL });
+            const dim = this.dimensionLine().fromShape(e as Edge, { offset: OFFSET_PER_LEVEL * 1  }); // offset inside shape
             part.addAnnotations(dim);
         });
 

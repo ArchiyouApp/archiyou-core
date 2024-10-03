@@ -391,6 +391,7 @@ export class OBbox
     /** returns a Box Shape for this Bbox if not 2D, otherwise null */
     box():Solid|null
     {
+        // NOTE: not always robust!
         return new Face().fromVertices(this.corners().slice(0,4)).extrude(this.height())
     }   
 

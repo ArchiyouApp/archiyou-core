@@ -248,7 +248,10 @@
          return this.getGroup(name);
       }
 
-      /** Iterate over Shapes by group, ungrouped Shapes are grouped together */
+      /** Iterate over Shapes by group, ungrouped Shapes are grouped together 
+       *    NOTE: for grouping within ShapeCollection see ShapeCollection addGroup()
+       *    This is not the same as the global group() function that makes a ShapeCollection
+      */
       forEachGroup(func:(groupName:string, groupedShapes:ShapeCollection) => void)
       {
          const allGroupedShapes = new ShapeCollection();
@@ -2132,7 +2135,7 @@
             // autoRotate (default)
             workShape = (options?.autoRotate == undefined || options?.autoRotate) ? workShape.rotateToLayFlat() : workShape;
             // flatten if given as option
-            workShape = (options?.flatten) ? workShape._flattened() : workShape;
+            workShape = (options?.flatten) ? workShape.flattened() : workShape;
 
             switch (order)
             {
@@ -2195,7 +2198,7 @@
          const boxes = this.toArray().map( (shape,i) => 
          {
             let s = (autoRotate) ? shape._copy().rotateToLayFlat() : shape;
-            s = (flatten) ? s._flattened() : s;
+            s = (flatten) ? s.flattened() : s;
             return this._makeBinPackBox(s, boxMargin, i)
          });
 
@@ -2234,7 +2237,7 @@
                { 
                   let newWorkShape = workShape._copy(); // IMPORTANT: don't add to scene - flattened leaves this copy around
                   newWorkShape = (autoRotate) ? newWorkShape.rotateToLayFlat() : newWorkShape;
-                  newWorkShape = (flatten) ? newWorkShape._flattened() : newWorkShape;
+                  newWorkShape = (flatten) ? newWorkShape.flattened() : newWorkShape;
                   
                   toShapeCollection.addGroup('cut', newWorkShape);
                   workShape = newWorkShape;
