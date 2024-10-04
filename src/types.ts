@@ -52,7 +52,7 @@ export type PointLikeOrAnyShape = PointLike|AnyShape
 export type AnyShape = Shape|Vertex|Edge|Wire|Face|Shell|Solid // Single Shape, excluding ShapeCollection
 export type AnyShapeCollection = ShapeCollection|VertexCollection
 export type AnyShapeSequence = AnyShapeCollection|Array<AnyShape> 
-export type AnyShapeOrCollection = AnyShape|ShapeCollection // All Shapes and ShapeCollections
+export type AnyShapeOrCollection = AnyShape|AnyShapeSequence // All Shapes and ShapeCollections
 export type AnyShapeOrSequence = AnyShape|AnyShapeSequence
 export type PointLikeOrVertexCollection = PointLike|VertexCollection
 export type PointLikeOrAnyShapeOrCollection = PointLike|AnyShape|AnyShapeCollection
@@ -391,16 +391,16 @@ export interface DimensionLineData
 {
     _id?:string, // internal id
     _type?:AnnotationType
-    start:CoordArray // start point of line (ie the arrow)
-    end:CoordArray
-    targetStart:CoordArray
-    targetEnd:CoordArray
-    targetDir:CoordArray
-    dir:CoordArray
+    start:[number,number,number] // start point of line (ie the arrow)
+    end:[number,number,number]
+    targetStart:[number,number,number]
+    targetEnd:[number,number,number]
+    targetDir:[number,number,number]
+    dir:[number,number,number]
     value:number
     static?:boolean // if value can be calculated from distance between start-end or is static (for example after projection)
     units?:string
-    offsetVec?:CoordArray
+    offsetVec?:[number,number,number]
     offsetLength?:number
     offset?:Array<number|number|number> // offset vector with length in model units
     interactive:boolean

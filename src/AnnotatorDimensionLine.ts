@@ -58,14 +58,20 @@ export class DimensionLine extends BaseAnnotation
 
     }
 
+    /** Check if a given object is a DimensionLine  */
+    static isDimensionLine(o:any):boolean
+    {
+        return (typeof o === 'object') && o?._type == 'DimensionLine'
+    }
+
     /** (Re)init dimension line */
     @checkInput(['PointLike','PointLike', ['DimensionOptions', null]],['Point','Point','auto'])
-    init(start:Point, end:Point, options?:DimensionOptions)
+    init(start:PointLike, end:PointLike, options?:DimensionOptions):this
     {
         if(!start && !end){ throw new Error(`DimensionLine::init(): Please supply start and end Point!`); }
 
-        this.targetStart = start;
-        this.targetEnd = end;
+        this.targetStart = start as Point; // auto converted
+        this.targetEnd = end as Point;
 
         this._initialized = true;
         this.setOptions(options)
@@ -73,19 +79,21 @@ export class DimensionLine extends BaseAnnotation
         this._calculateAutoOffsetLength();
         this._calculateOffsetVec(); // don't override from options
         this.value = this._getDynamicValue();
+
+        return this;
     }
 
     /** Link to Shape so we can export DimensionLine with the shapes */
-    fromShape(shape:Edge, options?:DimensionOptions):DimensionLine
+    fromShape(shape:Edge, options?:DimensionOptions):this
     {
         if(!Shape.isShape(shape)){ throw new Error(`DimensionLine::init(): Please supply a Shape`); }
         if(shape.type() !== 'Edge'){ throw new Error(`DimensionLine::init(): Please supply a Edge. Other Shapes are not yet supported!`); }
         
         this.shape = shape as Edge;
-        this.init(shape.start().toPoint(), shape.end().toPoint(), options)
+        return this.init(shape.start().toPoint(), shape.end().toPoint(), options)
 
-        return this;
     }
+
 
     _getDynamicValue():number
     {
@@ -323,6 +331,46 @@ export class DimensionLine extends BaseAnnotation
     targetEdge():Edge 
     {
         return new Edge().makeLine(this.targetStart, this.targetEnd);
+    }
+
+    //// RELATIONS WITH OTHER DIMENSION LINES ////
+
+    /* Generate an id to compare with other dimension lines */
+    sameId(flags:Record<string,boolean>={}):string|null
+    {
+        /* 
+            TODO: DimensionLines that are parallel to each other based on positioning is not taken into account!
+                For now we see dimensionlines with same offset and length as same. This is a problem!
+        */
+
+        const DEFAULT_FLAGS = {
+                compareOffsetAbs : true,
+                compareOffsetLength : false ,
+                compareRoundValue: true,
+                compareWithShape: true,
+            }
+
+        flags = { ...DEFAULT_FLAGS, ...flags }
+
+        let ov = this.offsetVec.copy();
+
+        if(flags.compareOffsetAbs) ov = ov.abs();
+        
+        const l = (flags.compareOffsetLength) ? this.offsetLength : 1;
+        const v = (flags.compareRoundValue) ? Math.round(this.value) : this.value;
+        const sId = (flags.compareWithShape) ? (this.shape?._hashcode() || this.uuid) : '';
+
+        return `${ov}-${l}-${v}-${sId}`;
+    }
+
+    isSame(other:DimensionLine, flags:Record<string,boolean>={}):boolean
+    {
+       if(!DimensionLine.isDimensionLine(other)){ return false; }
+
+       const id1 = this.sameId(flags);
+       const id2 = other.sameId(flags);
+
+       return id1 === id2;
     }
 
     //// EXPORT ////

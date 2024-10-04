@@ -26,23 +26,36 @@ export class BaseAnnotation
         return this._type;
     }
 
+    update()
+    {
+        // override
+    }
+
+    sameId():string|null
+    {
+        // override
+        return null;
+    }
+
+    //// OPERATIONS ////
+
+    inBbox(bbox:Bbox):boolean
+    {
+        return bbox.contains(this.toShape())
+    }
+
+    //// EXPORTS ////
+
     toSvg():string|null
     {
         return null; // override by child class
     }
 
-    update()
-    {
-        // override
-    }
 
     toShape():AnyShape|null
     {
         return null; // override by child class
     }
 
-    inBbox(bbox:Bbox):boolean
-    {
-        return bbox.contains(this.toShape())
-    }
+
 }

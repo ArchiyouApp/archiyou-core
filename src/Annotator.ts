@@ -5,12 +5,14 @@
  *      Only on output they might be turned into real Shapes like text Faces etc.
  */ 
 
-import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Geom, DimensionOptions, ShapeCollection, AnyShapeOrCollection } from './internal'
+import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Geom, DimensionOptions, ShapeCollection, AnyShapeOrCollection, BaseAnnotation } from './internal'
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
 import { Annotation, AnnotationData, DimensionLine, AutoDimLevel, AutoDimSettings, AnnotationAutoDimStrategy, 
             MainAxis } from './internal'
+
+import { roundTo } from './internal' // utils
 
 
 export class Annotator
@@ -23,7 +25,7 @@ export class Annotator
     _oc; // is set in constructor prototype when Geom once OC is loaded - IMPORTANT: Don't assign here!
     _geom:Geom; // also set on Pipeline prototype when making Geom
     name:string;
-    dimensionLines:Array<DimensionLine> = [];
+    annotations:Array<Annotation> = [];
     // labels:Array<Label> = []; // TODO
 
     constructor()
@@ -31,13 +33,19 @@ export class Annotator
         // TODO
     }
 
-    /** Make dimension line */
+    /** Make dimension line. Is added to list automatically */
     @checkInput([['PointLike',null],['PointLike',null]],['auto','auto'])
-    dimensionLine(start?:PointLike, end?:PointLike, options?:DimensionOptions)
+    dimensionLine(start?:PointLike, end?:PointLike, options?:DimensionOptions, autoAdd:boolean=true)
     {
         const newDimension = new DimensionLine(start as Point,end as Point, options); // start and end can be null
-        this.dimensionLines.push(newDimension);
+        if(autoAdd){ this.annotations.push(newDimension);}
         return newDimension;
+    }
+
+    /** Make a Dimension Line without adding to list yet! */
+    makeDimensionLine(start?:PointLike, end?:PointLike, options?:DimensionOptions)
+    {
+        return this.dimensionLine(start,end,options,false);
     }
 
     /** Create dimension lines for bounding box of Shape */
@@ -76,7 +84,7 @@ export class Annotator
                     let offsetVec = offsetVecDiag.normalize().scaled(this.DIMENSION_BOX_OFFSET_DEFAULT);
                     
                     dim.setOffsetVec(offsetVec);
-                    this.dimensionLines.push(dim);
+                    this.annotations.push(dim);
                 }
             }
         })
@@ -85,15 +93,30 @@ export class Annotator
 
     getAnnotations():Array<Annotation>
     {
-        return this.dimensionLines
+        // TODO: make more generic
+        return this.annotations
     }    
+
+    addAnnotations(annotations:Array<Annotation>):this
+    {
+        if(!Array.isArray(annotations)){ return this; }
+        const checkedAnnotations = annotations.filter( a => BaseAnnotation.isAnnotation(a));
+        this.annotations = this.annotations.concat(checkedAnnotations as Array<DimensionLine>) as Array<DimensionLine>; // NOTE: avoid doubles with Annotator.unique()
+    }
+
+    setAnnotations(annotations:Array<Annotation>):this
+    {
+        if(!Array.isArray(annotations)){ return this; }
+        const checkedAnnotations = annotations.filter( a => BaseAnnotation.isAnnotation(a));
+        this.annotations = checkedAnnotations;
+    }
 
     /** Get all annotations in one Array. See interfaces like DimensionLineData */
     getAnnotationsData():Array<AnnotationData> // TODO: more types
     {
         // TODO: gather all annotations in one array?
         let annotationsData = [];
-        annotationsData = annotationsData.concat(this.dimensionLines.map(d => d.toData()));
+        annotationsData = annotationsData.concat(this.annotations.map(d => d.toData()));
 
         return annotationsData;
     }
@@ -101,7 +124,7 @@ export class Annotator
     /** Reset annotations */
     reset()
     {
-        this.dimensionLines = [];
+        this.annotations = [];
     }
 
     //// GENERATE DIMENSIONS ON SHAPES ////
@@ -158,51 +181,68 @@ export class Annotator
     @checkInput(['AnyShapeOrCollection', ['DimensionOptions', null]], ['ShapeCollection', 'auto'])
     autoDimPart(shapes:ShapeCollection, options?:DimensionOptions):ShapeCollection
     {
-        const OFFSET_PER_LEVEL = 20;
+        const OFFSET_PER_LEVEL = 10;
         const DIMENSION_MIN_DISTANCE = 1;
+        const LEVEL_COORD_ROUND_DECIMALS = 0; // round to full units
+        const SIDE_VERTICES_UNIQUE_TOLERANCE = 1;
 
         // Take some settings from optional settings
         const dimLevelOffset = options?.offset || OFFSET_PER_LEVEL;
         const dimUnits = options?.units;
         
         const part = shapes.first();
+        const newAnnotations = [] as Array<Annotation>;
 
         if(!part.is2D()){ throw new Error('Annotator.autoDimPart(): Please make sure you have a 2D part on the XY plane!');}
 
         // Level 1: stock size (bbox)
-        part.bbox().back().dimension({ offset: dimLevelOffset * 3, units: dimUnits });
-        part.bbox().left().dimension({ offset: dimLevelOffset * 3, units: dimUnits });
+        newAnnotations.push(part.bbox().back().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
+        newAnnotations.push(part.bbox().left().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
+
         
         // Level 2: edges on and parallel to sides of bbox
         const bboxSideEdges = part.bbox().rect().edges();
-        const dimEdgesOnSides = new ShapeCollection();
+        const sideEdgesUsed = new ShapeCollection();
 
         bboxSideEdges.forEach((sideEdge,i) => 
         {
             const sideDir = sideEdge.direction().normalized().round().abs();
             const sideDir90 = sideDir.copy().rotateZ(90).abs();
+            
+            const sideAlongAxis = (sideDir.equals([1,0,0])) ? 'x' : (sideDir.equals([0,1,0])) ? 'y' : false;
+            const sideIsOrtho = !!sideAlongAxis;
+            const levelCoordAxis = (sideIsOrtho) ? (sideAlongAxis === 'x') ? 'y' : 'x' : null; // dimension level coord that stays same
+            const levelCoordValue = roundTo(sideEdge.center()[levelCoordAxis],LEVEL_COORD_ROUND_DECIMALS);
+
+            // These are the original edges on the sides of the part (this can also be only with one vertex)
             const sideEdges = part.edges()
                             .intersecting(sideEdge)
                             .filter(e => {
-                                return !(e as Edge).direction().normalize().abs().round().equals(sideDir90)
+                                return !(e as Edge).direction().normalize().abs().round().equals(sideDir90) // no perpendicular
+                                    && (!e.direction().isOrtho() || (e.direction().isOrtho() && roundTo(e.center()[levelCoordAxis], LEVEL_COORD_ROUND_DECIMALS) === levelCoordValue)) // ortho edges need to be on side, other we allow
                             });
-            const sideDimOffsetVec = sideEdge.center().toVector().subtracted(part.bbox().center()).normalize();
+            // We keep track of those, so we don't use them twice
+            sideEdgesUsed.addUnique(sideEdges);
 
-            const sideAlongAxis = (sideDir.equals([1,0,0])) ? 'x' : 'y';
-            const levelCoordAxis = (sideAlongAxis === 'x') ? 'y' : 'x'; // dimension level coord that stays same
-            const levelCoordValue = sideEdge.center()[levelCoordAxis]
+            const sideDimOffsetVec = sideEdge.center().toVector().subtracted(part.bbox().center()).normalize();
             
             // Generate dimension lines along sides
             const dimLevelVertices = sideEdges
                     .vertices()
                     .add(sideEdge.start(), sideEdge.end())
-                    .filter( v => v[levelCoordAxis] = levelCoordValue )
-                    .unique()
+                    .unique(SIDE_VERTICES_UNIQUE_TOLERANCE) // again: tolerance to be more robust!
                      // make sure we don't include points that are not on level
+                    .filter(v => roundTo(v[levelCoordAxis],LEVEL_COORD_ROUND_DECIMALS) === levelCoordValue)
                     .sort((v1,v2) => {
-                        // sort x,y ascending
-                        if(v1.x !== v2.x ){ return v1.x - v2.x }
-                        else { return v1.y - v2.y };
+                        // sort x,y ascending. 
+                        // IMPORTANT: deal with inaccuracies here too!
+                        if(roundTo(v1.x,LEVEL_COORD_ROUND_DECIMALS) !== roundTo(v2.x,LEVEL_COORD_ROUND_DECIMALS))
+                        { 
+                            return v1.x - v2.x 
+                        }
+                        else { 
+                            return roundTo(v1.y, LEVEL_COORD_ROUND_DECIMALS) - roundTo(v2.y, LEVEL_COORD_ROUND_DECIMALS) 
+                        };
                     })
                     .toArray();
 
@@ -215,50 +255,44 @@ export class Annotator
                     {
                         if(v.distance(arr[i-1]) >= DIMENSION_MIN_DISTANCE)
                         {
-                            const dim = this.dimensionLine(
+                            const dim = this.makeDimensionLine(
                                 arr[i-1] as PointLike,
                                 v as PointLike, 
                                 { 
                                     offsetVec: sideDimOffsetVec, 
-                                    offset: dimLevelOffset * 2, 
+                                    offset: dimLevelOffset * 1, 
                                     units: dimUnits,
                                     ortho: sideAlongAxis // always orthogonal
                                 });
-                            part.addAnnotations(dim);
-                            dimEdgesOnSides.add(new Edge().makeLine(arr[i-1] as Vertex, v as Vertex)); // keep track of what dim lines we made
+                            newAnnotations.push(dim)
                         }
                     }
                 })
             }
         })
-        // Level 3 - remaining Edges by direction and length
-        const remainingEdges = part.edges().filter(e => !dimEdgesOnSides.has(e));
-        const edgesOnSidesByDirLength = dimEdgesOnSides.toArray().reduce((acc,curEdge) => {
-            const n = (curEdge as Edge).direction().normalized().round().abs();
-            const l = Math.round((curEdge as Edge).length());
-            const id = `${n}-${l}`;
-            acc[id] = curEdge; 
-            return acc;
-        }, {});
 
-        const remainingEdgesByDirLength = remainingEdges
-            .toArray()
-            .reduce((acc,curEdge) => {
-                const n = (curEdge as Edge).direction().normalized().round().abs();
-                const l = Math.round((curEdge as Edge).length());
-                const id = `${n}-${l}`;
-                if(!edgesOnSidesByDirLength[id]) // Not already done for Edge
-                {
-                    acc[id] = curEdge; // TOOD: order these edges
-                }
-                return acc;
-            }, {})
         
-        Object.values(remainingEdgesByDirLength).forEach((e,i) =>
+        // Level 3 - remaining Edges by direction and length
+        const remainingEdges = part.edges()
+                                .filter(e => !sideEdgesUsed.has(e)); 
+                                    //&& bboxSideEdges.every(bboxEdge => !e.intersects(bboxEdge)));  
+    
+        remainingEdges.forEach((e,i) =>
         {
-            const dim = this.dimensionLine().fromShape(e as Edge, { offset: OFFSET_PER_LEVEL * 1  }); // offset inside shape
-            part.addAnnotations(dim);
+            const dim = this.makeDimensionLine().fromShape(e as Edge, { offset: OFFSET_PER_LEVEL * 1  });
+            newAnnotations.push(dim)
         });
+        
+        // Check all annotations one last time and make sure they are unique
+        /* 
+            The unique method is not yet working. We need to make a distiction 
+            between dimension line target shape and parent shape so we can correctly identify
+            rename fromShape() to fromEdge() etc
+        */
+        const uniqueAnnotations = this.unique(newAnnotations);
+        part.addAnnotations(uniqueAnnotations);
+        this.addAnnotations(uniqueAnnotations); // Add to list 
+        this.removeSameAtSmallDistance(OFFSET_PER_LEVEL); // Also remove dimensions lines that are too close too each other
 
         return shapes;
     }
@@ -376,7 +410,6 @@ export class Annotator
                                                 roundDecimals: 0,
                                             }
                                         )
-                        
                         autoDimLines.push(dimLine);
                     }
                 }
@@ -384,5 +417,74 @@ export class Annotator
         })
 
         return autoDimLines;
+    }
+
+    //// MANAGING MULTIPLE ANNOTATIONS 
+
+    /** Filter out the same annotations
+     *  See isSame for config flags
+     */
+    unique(annotations:Array<Annotation>, flags:Record<string,any> = {}):Array<Annotation>
+    {
+        if(!Array.isArray(annotations))
+        {
+            console.error(`Annotator::unique(annotations): Please supply annotations in Array!`);
+            return annotations;
+        }
+
+        const annotationsById = annotations
+                                    .filter(a => BaseAnnotation.isAnnotation(a))
+                                    .reduce((acc,a) => {
+                                        const id = a.sameId(flags);
+                                        if(!acc[id]) acc[id] = a; // first only
+                                        return acc;
+                                    }, {} as Record<string,Annotation>); // NOTE: first ones are keps                                
+        const uniqueAnnotations = Object.values(annotationsById);
+        console.info(`Annotator::filterOutSame(annotations): Returned ${uniqueAnnotations.length}/${annotations.length} unique annotations!`)
+
+        return uniqueAnnotations;
+    }
+
+    /** Remove annotations that have same value and are close to each other */
+    removeSameAtSmallDistance(d:number, sameFlags:Record<string,any>={}):this
+    {
+        // Annotations grouped by same id
+        const annotationsGroups = this.getAnnotations()
+                                        .reduce((acc,a) => 
+                                        {
+                                                const sameId = a.sameId({ ...sameFlags, compareWithShape: false }); // exclude shape
+                                                (!acc[sameId]) ? acc[sameId] = [a] : acc[sameId].push(a);
+                                                return acc;
+                                        }, {});
+
+        const selectedAnnotations = [] as Array<Annotation>;
+        
+        Object.keys(annotationsGroups).forEach( id => 
+        {
+            const groupedAnnotations = annotationsGroups[id];
+            if(groupedAnnotations.length === 1)
+            {
+                selectedAnnotations.push(groupedAnnotations[0]); // add single - this goes through
+            }
+            else {
+                // consider the same annotations (without shape) and check distance
+                const fa = groupedAnnotations[0];
+                selectedAnnotations.push(fa); // first goes through
+                groupedAnnotations.forEach((a,i) => {
+                    if(i > 0)
+                    {
+                        if(fa.toShape().distance(a.toShape()) > d )
+                        {
+                            selectedAnnotations.push(a);
+                        }
+                    }
+                })
+            }
+        })
+
+        console.info(`Annotator::removeSameAtSmallDistance(): Removed ${this.getAnnotations().length - selectedAnnotations.length}/${this.getAnnotations().length} annotations within distance ${d}`);
+        
+        this.setAnnotations(selectedAnnotations);
+        return this;
     }
 }

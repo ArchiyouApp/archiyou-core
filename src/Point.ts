@@ -249,7 +249,7 @@ export class Point
         return new this._oc.gp_Dir_2(p._toOcVector());
     }
 
-    toArray():Array<number>
+    toArray():[number,number,number]
     {
         return [this._x, this._y, this._z];
     }
@@ -359,9 +359,19 @@ export class Point
     {
         other = other as Point;
         const tolerance = this._oc.SHAPE_TOLERANCE; // TODO: use methods on OC?
-        return Math.abs(this._x - other._x) < tolerance && 
-               Math.abs(this._y - other._y) < tolerance && 
-               Math.abs(this._z - other._z) < tolerance;
+        return Math.abs(this._x - other._x) <= tolerance && 
+               Math.abs(this._y - other._y) <= tolerance && 
+               Math.abs(this._z - other._z) <= tolerance;
+    }
+
+    /** Test if given PointLike entity has equivalent geometry with a tolerance */
+    @checkInput(['PointLike', ['Number', 1]], ['Point', 'auto'])
+    equalsTolerance(other:PointLike, tolerance:number)
+    {
+        const p = other as Point; // auto converted
+        return Math.abs(this._x - p._x) <= tolerance && 
+               Math.abs(this._y - p._y) <= tolerance && 
+               Math.abs(this._z - p._z) <= tolerance;
     }
 
     @checkInput('PointLike', 'auto')

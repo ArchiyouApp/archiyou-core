@@ -648,7 +648,7 @@ export class DocPDFExporter
 
         const { x, y } = this.containerToPDFPositionInPnts(t, p);
 
-
+        // see: https://github.com/simonbengtsson/jsPDF-AutoTable
         autoTable(this.activePDFDoc,
             { 
                 theme: 'plain',

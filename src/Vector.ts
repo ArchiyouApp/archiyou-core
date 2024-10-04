@@ -187,7 +187,7 @@ export class Vector extends Point
         return new Vertex(this._x, this._y, this._z);
     }
 
-    toArray()
+    toArray():[number,number,number]
     {
         return [this._x,this._y,this._z];
     }
@@ -655,6 +655,13 @@ export class Vector extends Point
             { c: 'y', n: Math.abs(this.y) },
             { c : 'z', n : Math.abs(this.z) }
         ].sort( (a,b) => b.n - a.n)[0].c as MainAxis 
+    }
+    
+    isOrtho():boolean
+    {
+        const n = this.normalized().abs();
+        if(n.toArray().every(c => c === 0)){ return false }; // [0,0,0] not ortho
+        return n.toArray().every(c => c === 1 || c === 0)
     }
 
     //// RELATIONS WITH OTHER VECTORS ////

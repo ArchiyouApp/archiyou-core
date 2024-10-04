@@ -388,12 +388,22 @@
       }
 
       /** Add Shape to ShapeCollection */
-      add(shapes?:AnyShapeOrCollection|Array<AnyShapeOrCollection>, ...args):AnyShapeCollection
+      @checkInput('AnyShapeOrCollection', 'ShapeCollection')
+      add(shapes?:AnyShapeOrCollection, ...args):this
       {
          this._addEntities([shapes, ...args])
          this._setFakeArrayKeys();
 
          return this;
+      }
+
+      /** Add Shape to ShapeCollection but not if it is already in it */
+      @checkInput('AnyShapeOrCollection', 'ShapeCollection')
+      addUnique(shapes?:ShapeCollection, ...args):this
+      {
+         const hashes = this.shapes.map(s => s._hashcode());
+         const newShapes = shapes.toArray().filter(s => !hashes.includes(s._hashcode()))
+         this.add(newShapes);
       }
 
       /** Remove Shapes from ShapeCollection */
@@ -1675,9 +1685,12 @@
          return this;
       }
 
-      /** Force unique Geometry based on the isEqual method ( not hash ) */
-      unique():ShapeCollection 
+      /** Force unique Geometry based on the equals() method ( not hash ) */
+      @checkInput([['Number',null]], ['auto'])
+      unique(tolerance?:number):ShapeCollection 
       {
+         const UNIQUE_TOLERANCE = 0.1; // OC tolerance is 0.001 (see _oc.SHAPE_TOLERANCE)
+         tolerance = tolerance || UNIQUE_TOLERANCE;
          // first use distinct to filter out Shapes with same hash
          const shapes = this.distinct();
          const usedShapes = new ShapeCollection(); // list of shapes already matched
@@ -1688,7 +1701,8 @@
             if (!usedShapes.includes(curShape))
             {
                uniqueShapes.push(curShape);
-               const equalShapes = shapes.filter( testShape => curShape.equals(testShape) ); // Includes curShape
+               // with tolerance!
+               const equalShapes = shapes.filter( testShape => curShape.equals(testShape, tolerance) ); // Includes curShape
                usedShapes.add(equalShapes); // remove equals shapes from consideration
             }
          })

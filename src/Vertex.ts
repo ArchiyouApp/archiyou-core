@@ -280,23 +280,6 @@ export class Vertex extends Shape
         return new Vertex( roundToTolerance(this._x), roundToTolerance(this._y), roundToTolerance(this._z) );
     }
 
-    //// METHODS WITH OTHER SHAPES ////
-    
-    /** Test if given entity has equivalent geometry as current Vertex 
-     *  We use the basic tolerance by using Vertex.rounded()
-    */
-    @checkInput('PointLikeOrAnyShapeOrCollection', 'Vertex')
-    equals(other:PointLikeOrAnyShapeOrCollection, ...args):boolean // consistency with Shape.equals
-    {
-        if (isPointLike(other))
-        {
-            // Point.equals() takes care of tolerance
-            return this.toPoint().equals( (other as Vertex).toPoint() );
-        }
-        
-        return false
-    }
-
     //// SPECIAL OPERATIONS ////
 
     /*

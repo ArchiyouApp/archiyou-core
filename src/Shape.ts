@@ -1882,24 +1882,23 @@ export class Shape
     }
 
     /** Is exactly the same Shape based on its topology/geometry 
-     *  TODO: This needs another look
+     *  TODO: Especially for complex Shapes this needs another look!
+     *  NOTE: Shape.equals() is the main method, no children override it!
     */
-    @checkInput('PointLikeOrAnyShape', 'auto')
-    equals(other:PointLikeOrAnyShape):boolean
+    @checkInput(['PointLikeOrAnyShape', ['Number', null]], ['auto', 'auto'])
+    equals(other:PointLikeOrAnyShape, tolerance?:number):boolean
     {
+        tolerance = tolerance || this._oc.SHAPE_TOLERANCE;
+
         let otherShape:AnyShape;
 
         if (isPointLike(other))
         {
-            otherShape = new Vertex(other as PointLike);
             if(this.type() !== 'Vertex') return false;
-            return this.equals(otherShape);
+            return new Point(other).equalsTolerance((this as any as Vertex).toPoint(), tolerance)
         }
         
-        otherShape = other as AnyShape; 
-        
-        
-        if(this.type() != otherShape.type()){ return false;}
+        if(this.type() != otherShape?.type()){ return false;}
 
         const vertices = this.vertices().all(); 
         const otherVertices = otherShape.vertices().all();
@@ -1909,6 +1908,7 @@ export class Shape
             return false;
         }
         
+        // TODO: tolerance
         else {
             for (let c = 0; c < vertices.length; c++)
             {
