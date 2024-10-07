@@ -4770,7 +4770,7 @@ export class Shape
     }
 
     /** Export 2D Shape to SVG */
-    toSvg(options?:toSVGOptions):string
+    toSvg(options:toSVGOptions = { all: false, annotations: true}):string
     {
         // for now use ShapeCollection.toSvg()
         // NOTE: this method will be overwriten in Edge

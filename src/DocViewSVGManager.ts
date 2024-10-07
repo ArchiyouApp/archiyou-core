@@ -10,7 +10,7 @@
 
 */
 
-import { CLASS_TO_STYLE, Container, SVGtoPDFtransform } from './internal' // constants.s
+import { CLASS_TO_STYLE, DOC_DIMENSION_LINES_TEXT_HEIGHT, SVGtoPDFtransform } from './internal' // constants.ts
 
 import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
 import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
@@ -34,9 +34,9 @@ export class DocViewSVGManager
     DIMLINE_ARROW_SVG_WIDTH = 10; // incoming arrow width in svg units (see also svg::_worldUnits ) - width is always relative to arrow pointing up
     DIMLINE_ARROW_PDF_WIDTH_MM = 5; 
     DIMLINE_IS_SMALL_FACTOR_TIMES_TEXT_WIDTH = 3; // what is considered a small dimension line (in WIDTH) - different rendering than activated
-    DIMLINE_TEXT_WIDTH_MM = 8; // max text width
+    DIMLINE_TEXT_SIZE_MM = DOC_DIMENSION_LINES_TEXT_HEIGHT; // height of character
+    DIMLINE_TEXT_WIDTH_MM = DOC_DIMENSION_LINES_TEXT_HEIGHT*3; // max text width
     DIMLINE_TEXT_BACKGROUND_COLOR = '#FFFFFF';
-    DIMLINE_TEXT_SIZE_MM = 3; // height of character
     DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE = 2;
 
     //// END SETTINGS ////
@@ -468,6 +468,8 @@ export class DocViewSVGManager
     _drawDimLineText(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
     {
         const textNode = txml.filter(dimLineNode.children, node => node.tagName === 'text')[0];
+        const textNodeData = (textNode.attributes?.data) ? JSON.parse(textNode.attributes.data.replaceAll("'",'"')) : {};
+
         let x = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.x), 'x');
         let y = this._svgCoordToPDFcoord(this._svgToPDFTransform, parseFloat(textNode.attributes.y), 'y');
         const textValue = textNode.children[0];
@@ -500,13 +502,16 @@ export class DocViewSVGManager
                 y = offsettedY;
             }
         }
-    
+        
+        const textAngle = textNodeData?.angle || 0;
+
         // Background rectangle
+        // TODO: rotate background too!
         if (this.DIMLINE_TEXT_BACKGROUND_COLOR)
         {
             //const bgMaxWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
             const bgWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM); // Factor to make smaller, because width of letter is not 
-            const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.3; // Some factor to extend background a bit
+            const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.1; // Some factor to extend background a bit
             pdfExporter?.activePDFDoc
                     .fill()
                     .setFillColor(this.DIMLINE_TEXT_BACKGROUND_COLOR) // DEBUGGING 
@@ -521,15 +526,25 @@ export class DocViewSVGManager
         
         // Text
         pdfExporter?.activePDFDoc?.setFontSize(mmToPoints(this.DIMLINE_TEXT_SIZE_MM))
+        const { w, h } = pdfExporter?.activePDFDoc?.getTextDimensions(textValue);
+        // TODO: make offset depending on w,h and rotation angle
+        const correctRotationOffsetX = h*Math.sin(Math.abs(textAngle)*Math.PI/180); 
+        const correctRotationOffsetY = h/2*Math.sin(Math.abs(textAngle)*Math.PI/180); 
+
+        console.log(correctRotationOffsetX);
+        console.log(correctRotationOffsetY);
+
         pdfExporter?.activePDFDoc?.fill().stroke().setFillColor('#000000');
         pdfExporter?.activePDFDoc?.text(
             textValue,
-            x, // baseline and align take care of centering
-            y,
+            x + correctRotationOffsetX, // baseline and align take care of centering
+            y + correctRotationOffsetY, // Fix center, rotation is around top, not middle baseline
             {
                 maxWidth: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
                 align: 'center', // horizontal align
-                baseline: 'middle'
+                baseline: 'middle',
+                angle: textAngle,
+                rotationDirection: 0, // clockwise - but angle is always [0,-90]
             })   
     }
 

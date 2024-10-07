@@ -1188,7 +1188,7 @@ export class Edge extends Shape
         if(!options){ options = { units: null }}
         options.units = options?.units || this._geom.units(); // make sure we have units
 
-        const dimLine = this._geom._annotator.dimensionLine().fromShape(this, options);
+        const dimLine = this._geom._annotator.dimensionLine().fromEdge(this, options);
         const mainShape = this._parent || this;
         mainShape.addAnnotations(dimLine);
 

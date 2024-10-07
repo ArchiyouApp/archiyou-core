@@ -20,14 +20,14 @@ export class DimensionLine extends BaseAnnotation
 {
     //// SETTINGS
     DIMENSION_OFFSET_DEFAULT = 30; // in model units
-    DIMENSION_TEXTSIZE_DEFAULT = 10;
     DIMENSION_ROUND_DEFAULT = true;
 
     // NOTE: line start and end is calculated when exporting toData()
     _initialized:boolean = false;
     targetStart:Point; // point on Shape
     targetEnd:Point; // point on Shape
-    shape:AnyShape = null; // the Shape the dimension is linked to - needed to know if we need to export dimension lines in toSvg()
+    targetShape:AnyShape = null; // the (sub)shape (mostly an Edge) the dimension line is directly generated from
+    mainShape:AnyShape = null; // the main parent Shape this dimension belongs to
     value:number; // the value of the dimension line, can be static - in BaseAnnotation
     static:boolean = false;
     units:ModelUnits = null;
@@ -53,7 +53,7 @@ export class DimensionLine extends BaseAnnotation
             this.init(start,end, options)
         }
         else {
-            console.warn(`DimensionLine::constructor(): DimensionLine not initialized. Use methods init(start,end,options) or fromShape(shape, options) later!`)
+            console.warn(`DimensionLine::constructor(): DimensionLine not initialized. Use methods init(start,end,options) or fromEdge(shape, options) later!`)
         }
 
     }
@@ -83,15 +83,44 @@ export class DimensionLine extends BaseAnnotation
         return this;
     }
 
-    /** Link to Shape so we can export DimensionLine with the shapes */
-    fromShape(shape:Edge, options?:DimensionOptions):this
+    /** Generate a dimension line from this Edge */
+    fromEdge(edge:Edge, options?:DimensionOptions):this
     {
-        if(!Shape.isShape(shape)){ throw new Error(`DimensionLine::init(): Please supply a Shape`); }
-        if(shape.type() !== 'Edge'){ throw new Error(`DimensionLine::init(): Please supply a Edge. Other Shapes are not yet supported!`); }
+        if(!Shape.isShape(edge)){ throw new Error(`DimensionLine::init(): Please supply an Edge Shape`); }
+        if(edge.type() !== 'Edge'){ throw new Error(`DimensionLine::init(): Please supply a Edge. Other Shapes are not yet supported!`); }
         
-        this.shape = shape as Edge;
-        return this.init(shape.start().toPoint(), shape.end().toPoint(), options)
+        this.targetShape = edge;
+        this.mainShape = this._getParentShape(edge); // set main Shape
+        return this.init(edge.start().toPoint(), edge.end().toPoint(), options)
+    }
 
+    /** Link this Annotation to given Shape 
+     *  This helps with more advanced dimensioning */
+    link(shape:AnyShape):this
+    {
+        this.mainShape = this._getParentShape(shape); // Make sure we always got the top Shape
+        // recalculate for offset based on main shape
+        this._calculateAutoOffsetLength(); 
+        this._calculateOffsetVec();
+        return this;
+    }
+
+    /** Recurse parents to find main parent Shape of given shape */
+    _getParentShape(shape:AnyShape):AnyShape|null
+    {
+        if(!Shape.isShape(shape))
+        { 
+            console.warn(`AnnotatorDimensionLine::_getParentShape(): Could not find a parent Shape. Did you supply a Shape to start recursion?`);
+            return null;
+        }
+
+        if(shape._parent)
+        {
+            return this._getParentShape(shape._parent)
+        }
+        else {
+            return shape;
+        }
     }
 
 
@@ -177,10 +206,8 @@ export class DimensionLine extends BaseAnnotation
         else 
         {
             // Determine offset from a 2D/3D Shape: So the Shape can have an outside
-            const mainShape = this?.shape?._parent || this?.shape;
-            const insidePoint = (mainShape?.is2D() || mainShape?.is3D()) ? mainShape?.center() : new Point(0,0,0);
+            const insidePoint = (this.mainShape?.is2D() || this.mainShape?.is3D()) ? this.mainShape?.center() : new Point(0,0,0);
 
-            
             let newOffsetVec = this.targetDir().crossed([0,0,1]);
             
             const d1 = insidePoint.moved(newOffsetVec).distance(this.targetMiddle());
@@ -346,21 +373,23 @@ export class DimensionLine extends BaseAnnotation
         const DEFAULT_FLAGS = {
                 compareOffsetAbs : true,
                 compareOffsetLength : false ,
-                compareRoundValue: true,
+                compareValue: true,
                 compareWithShape: true,
+                compareProjYAxis: true, // y coord of projection of offset Vector from position
             }
 
         flags = { ...DEFAULT_FLAGS, ...flags }
 
-        let ov = this.offsetVec.copy();
+        let ov = this.offsetVec.rounded();
 
         if(flags.compareOffsetAbs) ov = ov.abs();
         
         const l = (flags.compareOffsetLength) ? this.offsetLength : 1;
-        const v = (flags.compareRoundValue) ? Math.round(this.value) : this.value;
-        const sId = (flags.compareWithShape) ? (this.shape?._hashcode() || this.uuid) : '';
+        const v = (flags.compareValue) ? Math.round(this.value) : ''; // round to full units by default
+        const sId = (flags.compareWithShape) ? (this.mainShape?._hashcode() || this.uuid) : '';
+        const y = (flags.compareProjYAxis) ? Math.round(this._projYAxis()) : ''
 
-        return `${ov}-${l}-${v}-${sId}`;
+        return `${ov}-${l}-${v}-${sId}-${y}`;
     }
 
     isSame(other:DimensionLine, flags:Record<string,boolean>={}):boolean
@@ -371,6 +400,19 @@ export class DimensionLine extends BaseAnnotation
        const id2 = other.sameId(flags);
 
        return id1 === id2;
+    }
+
+    /** To distinguish between Dimension Lines we can calculate the y coord of the offset projected from the position  */
+    _projYAxis():number
+    {
+        return (this.offsetVec.abs().rounded().angleXY() === 90)
+            ? 0 // exception
+            : (this.offsetVec.abs().rounded().angleXY() === 0)
+                ? Math.abs(this.targetMiddle().y)
+                : (this.offsetVec.rounded().x === 0)
+                    ? 0 
+                    : (this.targetMiddle().toVector().abs().subtracted(
+                        this.offsetVec.abs().scaled(this.targetMiddle().toVector().abs().x / this.offsetVec.abs().x)).rounded()).y
     }
 
     //// EXPORT ////
@@ -487,20 +529,27 @@ export class DimensionLine extends BaseAnnotation
        
         /* IMPORTANT: because SVG are mostly in mm the difference between font size 
             and the sizes of these drawings must not be too great the text boundingbox might 
-            be so small that we loose accuracy. FONT_SIZE 100 mostly works well!
+            be so small that we loose accuracy.
         */
-        const FONT_SIZE = '100.0';  
+        const TMP_FONT_SIZE = '1';  
         const atPoint = at as Point;
+        
+        // NOTE: We rotate later in specific rendering method (html, PDF) for maximum control
+        // We place data on element itself in attribute data
+        const angle = 90 - this.offsetVec.rounded().abs().angleXY(); // range [0,90] - NOTE: we reverse for SVG
 
+        
         return `<text 
-                    class="annotation text" 
-                    x="${atPoint.x}"
-                    y="${atPoint.y}"
-                    text-anchor="targetMiddle"
-                    alignment-baseline="hanging"
-                    font-size="${FONT_SIZE}"
-                    style="fill:black;stroke-opacity:0;stroke-width:0"
-                    dominant-baseline="central">${text}</text>`
+                        class="annotation text" 
+                        text-anchor="middle"
+                        alignment-baseline="middle"
+                        font-size="${TMP_FONT_SIZE}"
+                        style="fill:black;stroke-opacity:0;stroke-width:0"
+                        x="${atPoint.x}"
+                        y="${atPoint.y}"
+                        data="{ 'angle': ${-angle} }"
+                        dominant-baseline="central">${text}
+                    </text>`; // NOTE: data in JSON format with "'"! TODO: Make this more elegant!
     }
     // NOTE: do very little styling here to be able to easily style with CSS. Only stroke-width is good to set (default is 1, 0.5 sets it apart from Shapes)
 }

@@ -8,7 +8,7 @@
 import { MainAxis, Point } from './internal'
 import { Vertex } from './internal'
 import { PointLike, isPointLike } from './internal' // see: types.ts
-import { checkInput } from './decorators' // decorators
+import { addResultShapesToScene, checkInput } from './decorators' // decorators
 import { toDeg, toRad, roundToTolerance } from './internal' // utils
 
 
@@ -132,7 +132,7 @@ export class Vector extends Point
         this._y = this._ocVector.Y();
         this._z = this._ocVector.Z();
         
-        this.round();
+        // NOTE: Don't round automatically because Vectors need more accuracy than Shapes
 
         return this;
     }
@@ -182,6 +182,7 @@ export class Vector extends Point
         return new Point(this._x, this._y, this._z);
     }
 
+    @addResultShapesToScene
     toVertex()
     {
         return new Vertex(this._x, this._y, this._z);

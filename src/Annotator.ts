@@ -264,6 +264,7 @@ export class Annotator
                                     units: dimUnits,
                                     ortho: sideAlongAxis // always orthogonal
                                 });
+                            dim.link(part); // link to part as main shape
                             newAnnotations.push(dim)
                         }
                     }
@@ -279,16 +280,11 @@ export class Annotator
     
         remainingEdges.forEach((e,i) =>
         {
-            const dim = this.makeDimensionLine().fromShape(e as Edge, { offset: OFFSET_PER_LEVEL * 1  });
+            const dim = this.makeDimensionLine().fromEdge(e as Edge, { offset: OFFSET_PER_LEVEL * 1  });
             newAnnotations.push(dim)
         });
         
         // Check all annotations one last time and make sure they are unique
-        /* 
-            The unique method is not yet working. We need to make a distiction 
-            between dimension line target shape and parent shape so we can correctly identify
-            rename fromShape() to fromEdge() etc
-        */
         const uniqueAnnotations = this.unique(newAnnotations);
         part.addAnnotations(uniqueAnnotations);
         this.addAnnotations(uniqueAnnotations); // Add to list 
@@ -439,6 +435,7 @@ export class Annotator
                                         if(!acc[id]) acc[id] = a; // first only
                                         return acc;
                                     }, {} as Record<string,Annotation>); // NOTE: first ones are keps                                
+
         const uniqueAnnotations = Object.values(annotationsById);
         console.info(`Annotator::filterOutSame(annotations): Returned ${uniqueAnnotations.length}/${annotations.length} unique annotations!`)
 

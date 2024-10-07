@@ -966,12 +966,12 @@
       {
          if(this.length == 0) return null;
 
-         let combinedBbox = this.first().bbox();
+         let combinedBbox = this.first().bbox(withAnnotations);
          this.shapes.forEach((shape,i) => {
             if(i > 0)
             {
                // This does not take in the shapes not tied to shapes
-               let bbox = shape.bbox(withAnnotations);
+               const bbox = shape.bbox(withAnnotations);
                if(bbox)
                {
                   combinedBbox = combinedBbox.added(bbox);
@@ -2536,14 +2536,12 @@
        *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
        *    TODO: run these algorithms apart from OC
       */
-      toSvg(options:toSVGOptions = { all: false, annotations: true, fills:true, outlines:false }):string
+      toSvg(options:toSVGOptions = { all: false, annotations: true}):string
       {
          let shapeEdges = this._get2DXYShapeEdges(options?.all);
          
          if (shapeEdges.length == 0){ return null;}
-
-         // NOTE: SVG has reversed y-axis
-         shapeEdges = shapeEdges.map(s => s._mirroredX(0)); 
+         shapeEdges = shapeEdges.map(s => s._mirroredX(0));  // NOTE: SVG has reversed y-axis
 
          // Edges to SVG paths
          let svgPaths:Array<string> = [];
@@ -2552,10 +2550,10 @@
             svgPaths.push(edge.toSvg());
          })
 
+         
+         const withAnnotations = options?.annotations ?? true; // true is default
+         const bbox = this.bbox(withAnnotations);
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
-         const withAnnotations = (options?.annotations === false ) ? false : true; // true is default
-         let bbox = shapeEdges.bbox(withAnnotations)
-
          const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
 
          const svg = `<svg 
