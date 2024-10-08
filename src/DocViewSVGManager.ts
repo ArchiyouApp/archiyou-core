@@ -414,9 +414,9 @@ export class DocViewSVGManager
 
         pdfExporter?.activePDFDoc
             .setDrawColor('#000000')
+            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
             .moveTo(dimLineCoords[0], dimLineCoords[1])
             .lineTo(dimLineCoords[2], dimLineCoords[3])
-            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM)) // Is this working?
             .stroke();
 
         return dimLineCoords;
@@ -584,7 +584,7 @@ export class DocViewSVGManager
         
         pdfExporter.activePDFDoc.setDrawColor('#000000')
         drawContext.beginPath();
-        // IMPORTANT: when scale, strok width is scaled too, correct this!
+        // IMPORTANT: when scale, stroke width is scaled too, correct this!
         const scale = localTransforms.scale ?? 1.0;
         drawContext.lineWidth = mmToPoints(this.DIMLINE_LINE_THICKNESS_MM) * 1/scale;
         // TODO: other styling here. Where is Stroke color?
