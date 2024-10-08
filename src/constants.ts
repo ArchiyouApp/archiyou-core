@@ -115,7 +115,7 @@ export const FACE_FILLET_RADIUS = 5;
 export const FACE_CHAMFER_DISTANCE = 10;
 export const FACE_CHAMFER_ANGLE = 45;
 
-export const DOC_DIMENSION_LINES_TEXT_HEIGHT = 4; // in mm
+export const DOC_DIMENSION_LINES_TEXT_HEIGHT = 3; // in mm
 
 //// MESH QUALITY OUTPUT SETTINGS ////
 

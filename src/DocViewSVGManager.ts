@@ -413,10 +413,10 @@ export class DocViewSVGManager
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
         pdfExporter?.activePDFDoc
-            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
             .setDrawColor('#000000')
             .moveTo(dimLineCoords[0], dimLineCoords[1])
             .lineTo(dimLineCoords[2], dimLineCoords[3])
+            .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM)) // Is this working?
             .stroke();
 
         return dimLineCoords;
@@ -460,7 +460,7 @@ export class DocViewSVGManager
                 {
                     translate: translateCoords,
                     rotate: rotateAngle,  
-                    scale: arrowScale,
+                    scale: arrowScale, // IMPROTANT: stroke width is also scaled here
                 }); // path
         })
     }
@@ -492,7 +492,6 @@ export class DocViewSVGManager
 
                 // Draw offset line
                 pdfExporter?.activePDFDoc
-                    .setFillColor('black')
                     .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
                     .moveTo(x, y)
                     .lineTo(offsettedX, offsettedY)
@@ -561,7 +560,7 @@ export class DocViewSVGManager
         }
 
         const drawContext = doc.context2d;
-        drawContext.setTransform(1, 0, 0, 1, 0 ,0); // reset transformations
+        drawContext.setTransform(1,0,0,1,0,0); // To be sure: reset transformations first
 
         // Using jsPDF.context2d for transformations. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html
         if(localTransforms) // Start transforming
@@ -585,7 +584,9 @@ export class DocViewSVGManager
         
         pdfExporter.activePDFDoc.setDrawColor('#000000')
         drawContext.beginPath();
-        drawContext.lineWidth = mmToPoints(this.DIMLINE_LINE_THICKNESS_MM);
+        // IMPORTANT: when scale, strok width is scaled too, correct this!
+        const scale = localTransforms.scale ?? 1.0;
+        drawContext.lineWidth = mmToPoints(this.DIMLINE_LINE_THICKNESS_MM) * 1/scale;
         // TODO: other styling here. Where is Stroke color?
     
         // Draw path by issuing SVG commands
