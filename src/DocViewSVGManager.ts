@@ -18,7 +18,7 @@ import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
 import { PageData, ContainerData, DocPDFExporter } from './internal'
 import { DocPathStyle, PDFLinePath } from './internal'
 
-import { convertValueFromToUnit, mmToPoints } from './utils'
+import { convertValueFromToUnit, mmToPoints, toRad } from './utils'
 
 import parseSVG from "svg-path-parser"; // https://github.com/hughsk/svg-path-parser
 
@@ -35,7 +35,7 @@ export class DocViewSVGManager
     DIMLINE_ARROW_PDF_WIDTH_MM = 5; 
     DIMLINE_IS_SMALL_FACTOR_TIMES_TEXT_WIDTH = 3; // what is considered a small dimension line (in WIDTH) - different rendering than activated
     DIMLINE_TEXT_SIZE_MM = DOC_DIMENSION_LINES_TEXT_HEIGHT; // height of character
-    DIMLINE_TEXT_WIDTH_MM = DOC_DIMENSION_LINES_TEXT_HEIGHT*3; // max text width
+    DIMLINE_TEXT_MAX_WIDTH_MM = DOC_DIMENSION_LINES_TEXT_HEIGHT*3; // max text width
     DIMLINE_TEXT_BACKGROUND_COLOR = '#FFFFFF';
     DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE = 2;
 
@@ -412,11 +412,12 @@ export class DocViewSVGManager
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
-        pdfExporter?.activePDFDoc?.stroke()
+        pdfExporter?.activePDFDoc
             .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
             .setDrawColor('#000000')
             .moveTo(dimLineCoords[0], dimLineCoords[1])
             .lineTo(dimLineCoords[2], dimLineCoords[3])
+            .stroke();
 
         return dimLineCoords;
     }
@@ -490,11 +491,12 @@ export class DocViewSVGManager
                 const offsettedY = y + offsetVec[1]; 
 
                 // Draw offset line
-                pdfExporter?.activePDFDoc?.stroke()
+                pdfExporter?.activePDFDoc
                     .setFillColor('black')
                     .setLineWidth(mmToPoints(this.DIMLINE_LINE_THICKNESS_MM))
                     .moveTo(x, y)
                     .lineTo(offsettedX, offsettedY)
+                    .stroke() // IMPORTANT: stroke executes the graphic commands
                     
                 
                 // update text position
@@ -503,49 +505,42 @@ export class DocViewSVGManager
             }
         }
         
-        const textAngle = textNodeData?.angle || 0;
+        // Place rotated text and its background rect
+        const textAngleDeg = textNodeData?.angle || 0;
+        const textAngleRad = toRad(textAngleDeg);
+
+        pdfExporter?.activePDFDoc?.setFontSize(mmToPoints(this.DIMLINE_TEXT_SIZE_MM)); // Set font size first then get text dimensions
+        let { w:textWidth, h:textHeight } = pdfExporter?.activePDFDoc?.getTextDimensions(textValue);
+        textWidth *= 1.1; // small margin
+
+        const drawContext = pdfExporter.activePDFDoc.context2d;
+        drawContext.translate(x,y); // move context origin to center of container
+        drawContext.rotate(textAngleRad);
 
         // Background rectangle
-        // TODO: rotate background too!
         if (this.DIMLINE_TEXT_BACKGROUND_COLOR)
-        {
-            //const bgMaxWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM);
-            const bgWidth = mmToPoints(this.DIMLINE_TEXT_WIDTH_MM); // Factor to make smaller, because width of letter is not 
-            const bgHeight = mmToPoints(this.DIMLINE_TEXT_SIZE_MM)*1.1; // Some factor to extend background a bit
-            pdfExporter?.activePDFDoc
-                    .fill()
-                    .setFillColor(this.DIMLINE_TEXT_BACKGROUND_COLOR) // DEBUGGING 
-                    .rect(  // see: https://raw.githack.com/MrRio/jsPDF/master/docs/jsPDF.html#rect
-                        x - bgWidth/2,
-                        y - bgHeight/2, 
-                        bgWidth, 
-                        bgHeight,
-                        'F' // set fill instead of stroke (default)
-                    )
+        {   
+            // NOTE: We need to draw stuff on drawContext instead on Document because we need the transformation!
+            drawContext.fillStyle = this.DIMLINE_TEXT_BACKGROUND_COLOR;
+            drawContext.fillRect( // NOTE: rect is not working
+                    0 - textWidth/2, // with translate the origin is already at x
+                    0 - textHeight/2, 
+                    textWidth,  // small margin
+                    textHeight
+                )
         }
         
         // Text
-        pdfExporter?.activePDFDoc?.setFontSize(mmToPoints(this.DIMLINE_TEXT_SIZE_MM))
-        const { w, h } = pdfExporter?.activePDFDoc?.getTextDimensions(textValue);
-        // TODO: make offset depending on w,h and rotation angle
-        const correctRotationOffsetX = h*Math.sin(Math.abs(textAngle)*Math.PI/180); 
-        const correctRotationOffsetY = h/2*Math.sin(Math.abs(textAngle)*Math.PI/180); 
-
-        console.log(correctRotationOffsetX);
-        console.log(correctRotationOffsetY);
-
-        pdfExporter?.activePDFDoc?.fill().stroke().setFillColor('#000000');
-        pdfExporter?.activePDFDoc?.text(
+        drawContext.fillStyle = '#000000';
+        drawContext.fillText(
             textValue,
-            x + correctRotationOffsetX, // baseline and align take care of centering
-            y + correctRotationOffsetY, // Fix center, rotation is around top, not middle baseline
-            {
-                maxWidth: mmToPoints(this.DIMLINE_TEXT_WIDTH_MM),
-                align: 'center', // horizontal align
-                baseline: 'middle',
-                angle: textAngle,
-                rotationDirection: 0, // clockwise - but angle is always [0,-90]
-            })   
+            0 - textWidth/2,  // default text pivot is [left,bottom] in jsPDF coord system with origin at lefttop
+            0 + textHeight/2 - textHeight*0.1, // small correction
+            mmToPoints(this.DIMLINE_TEXT_MAX_WIDTH_MM) // max width
+        )
+
+        // after drawing, return to original context
+        drawContext.setTransform(1,0,1,0,0,0);
     }
 
     /** Draw a raw SVG path d datastring to PDF after transforming 
@@ -565,27 +560,30 @@ export class DocViewSVGManager
             throw new Error(`DocViewSVGManager::_drawSVGPathToPDF: Please supply activePDFDoc (jsPDF) instance`)
         }
 
+        const drawContext = doc.context2d;
+        drawContext.setTransform(1, 0, 0, 1, 0 ,0); // reset transformations
+
         // Using jsPDF.context2d for transformations. See: https://raw.githack.com/MrRio/jsPDF/master/docs/module-context2d.html
         if(localTransforms) // Start transforming
         {   
             /** Translate contains the coordinate (offset from origin) of the end/start of dimension line */
             if(localTransforms?.translate)
             { 
-                doc.context2d.translate(localTransforms.translate[0], localTransforms.translate[1])
+                drawContext.translate(localTransforms.translate[0], localTransforms.translate[1])
             }
             /* An SVG path arrow is originally located at [0,0], then transformed into position */
             if(localTransforms?.rotate)
             { 
-                doc.context2d.rotate(localTransforms.rotate*Math.PI/180); // coordinate system origin is already translated. JsPDF needs radians
+                drawContext.rotate(localTransforms.rotate*Math.PI/180); // coordinate system origin is already translated. JsPDF needs radians
             }
             if(localTransforms?.scale !== undefined)
             { 
-                doc.context2d.scale(localTransforms.scale,localTransforms.scale) // coordinate system origin is already translated
+                drawContext.scale(localTransforms.scale,localTransforms.scale) // coordinate system origin is already translated
             }
             
         }
         
-        const drawContext = doc.context2d;
+        pdfExporter.activePDFDoc.setDrawColor('#000000')
         drawContext.beginPath();
         drawContext.lineWidth = mmToPoints(this.DIMLINE_LINE_THICKNESS_MM);
         // TODO: other styling here. Where is Stroke color?
