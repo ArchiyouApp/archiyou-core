@@ -714,7 +714,7 @@ export class Edge extends Shape
     /** Get end value of Edge parameter range */
     paramEnd():number
     {
-        return this._toOcCurve().FirstParameter();
+        return this._toOcCurve().LastParameter();
     }
 
     /** 
@@ -883,7 +883,7 @@ export class Edge extends Shape
     @checkInput(['AnyShape', ['LinearShapeTail', null]], ['auto', 'auto'])
     extendTo(other:AnyShape, direction?:LinearShapeTail):this
     {
-        const EXTEND_NON_CIRCULAR_PERC_DISTANCE = 2;
+        const TEST_EXTEND_NON_CIRCULAR_PERC_DISTANCE = 2;
 
         direction = direction || (
                         (this.end().distance(other) < this.start().distance(other)) 
@@ -901,25 +901,35 @@ export class Edge extends Shape
         }
 
         const extendedTestShape =  (!this.isCircular()) 
-                                ? this._extended(distance*EXTEND_NON_CIRCULAR_PERC_DISTANCE, direction)
+                                ? this._extended(distance*TEST_EXTEND_NON_CIRCULAR_PERC_DISTANCE, direction)
                                 : this._maxCircularShape();
-        
+    
         const testIntersection = extendedTestShape._intersection(other);
 
         if(!testIntersection)
         { 
             console.warn(`Edge::extendTo: Can't extend to Shape because they never intersect!`)
-            return null; 
+            return this; 
         }
         
         const testIntVertex = (testIntersection.type() === 'Vertex') 
                                 ? (testIntersection as Vertex)
                                 : testIntersection.vertices()
-                                    .sort((v1,v2) => v1.distance(extendAtVertex) - v2.distance(extendAtVertex)).first() as Vertex
+                                    .sort((v1,v2) => v1.distance(extendAtVertex) - v2.distance(extendAtVertex)).first() as Vertex // pick Vertex closest (if multiple)
 
         // NOTE: using BRepBuilderAPI_MakeEdge_26 with Points is not robust, use with params instead
+        const paramStart = this.getParamAt(extendFromVertex);
+        const paramEnd = this.getParamAt(testIntVertex)
+
+        if(paramStart === paramEnd)
+        {
+            console.error(`Edge::extendTo(): Extended Vertex is same as starting Vertex. This should not happen! Check any complex Edge! Returned original`);
+            return this;
+        }
+
         const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(
-                this._toOcCurveHandle(), this.getParamAt(extendFromVertex), this.getParamAt(testIntVertex));
+                this._toOcCurveHandle(), paramStart, paramEnd);
+
         this._fromOcEdge(ocEdgeCreator.Edge())
         ocEdgeCreator.delete(); // OC destructor
 
@@ -929,7 +939,6 @@ export class Edge extends Shape
         {
             this.move(extendFromVertex.toVector().subtracted(extendFromVertexAfter));
         }
-
         return this;
     }
 
@@ -976,7 +985,7 @@ export class Edge extends Shape
 
     /** Get parameter (U) on Edge for given Point. If not on Edge will pick closest */ 
     @checkInput('PointLike', 'Point')
-    getParamAt(point:PointLike):number
+    getParamAt(point:PointLike):number|null
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_geom_a_p_i___project_point_on_curve.html
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_shape_analysis___curve.html
@@ -987,11 +996,8 @@ export class Edge extends Shape
         catch (e)
         {
             console.error(`Edge::getParamAt(): Could not find param for Edge of type "${this.edgeType()}". This is probably a OpenCascade bug. Returned start parameter`);
-        }
-        finally {
             return this.paramStart();
         }
-        
     }
 
     /** Generate a Collection of a given number of Vertices equally spaced over this Edge including the start and end of the Edge */
