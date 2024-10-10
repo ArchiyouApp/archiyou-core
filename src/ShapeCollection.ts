@@ -1171,7 +1171,7 @@
       /** Shape API 
        *   IMPORTANT: ShapeCollection.select() should probably be run in the context 
        *       of the collection, not of individual shapes. Improving this can greatly improve
-       *       chaining like box().select('E||Z').select('E<<X')
+       *       chaining like box().select('E||Z').select('E<<X') - where the last select is in context of collection
       */
       select(selectString:string=null):ShapeCollection
       {
