@@ -277,10 +277,11 @@ export class Annotator
         const remainingEdges = part.edges()
                                 .filter(e => !sideEdgesUsed.has(e)); 
                                     //&& bboxSideEdges.every(bboxEdge => !e.intersects(bboxEdge)));  
-    
+
         remainingEdges.forEach((e,i) =>
         {
-            const dim = this.makeDimensionLine().fromEdge(e as Edge, { offset: OFFSET_PER_LEVEL * 1  });
+            const dim = this.makeDimensionLine()
+                            .fromEdge(e as Edge, { offset: OFFSET_PER_LEVEL * 1  })
             newAnnotations.push(dim)
         });
         

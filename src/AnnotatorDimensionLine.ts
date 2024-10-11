@@ -101,7 +101,7 @@ export class DimensionLine extends BaseAnnotation
         this.mainShape = this._getParentShape(shape); // Make sure we always got the top Shape
         // recalculate for offset based on main shape
         this._calculateAutoOffsetLength(); 
-        this._calculateOffsetVec();
+        this._calculateOffsetVec(true);
         return this;
     }
 

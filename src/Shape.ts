@@ -807,7 +807,8 @@ export class Shape
         let newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as this;
         
         newShape._copyAttributes(this); 
-        newShape._parent = this._parent; // also take over _parent
+        
+        // NOTE: Don't take over the parent - TODO: introduce other admin of copy parents
 
         if(addToScene)
         {
