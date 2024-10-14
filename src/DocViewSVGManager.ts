@@ -111,15 +111,16 @@ export class DocViewSVGManager
         // TODO: this is needed when zoomLevel is calculated later (now we simply fill the container no matter what the svg model units)
         const svgUnits = this._svgXML.attributes['worldUnits'] || 'mm'; // default is mm
 
-        const svgLeft = parseFloat(this._svgXML.attributes['bbox'].split(' ')[0]);
-        const svgTop = parseFloat(this._svgXML.attributes['bbox'].split(' ')[1]);
-        const svgWidth = parseFloat(this._svgXML.attributes['bbox'].split(' ')[2]);
-        const svgHeight = parseFloat(this._svgXML.attributes['bbox'].split(' ')[3]);
+        // NOTE: viewBox is SVG coordinate system, bbox model coordinate system
+        const svgLeft = parseFloat(this._svgXML.attributes['viewBox'].split(' ')[0]);
+        const svgTop = parseFloat(this._svgXML.attributes['viewBox'].split(' ')[1]);
+        const svgWidth = parseFloat(this._svgXML.attributes['viewBox'].split(' ')[2]);
+        const svgHeight = parseFloat(this._svgXML.attributes['viewBox'].split(' ')[3]);
 
         const pdfViewWidthPnts = pdfExporter.relWidthToPoints(view.width, page);
         const pdfViewHeightPnts = pdfExporter.relHeightToPoints(view.height, page);
-        const pdfViewOffsetXPnts = pdfExporter.coordRelWidthToPoints(view.position[0], page, true);
-        const pdfViewOffsetYPnts = pdfExporter.coordRelHeightToPoints(view.position[1], page, true);
+        //const pdfViewOffsetXPnts = pdfExporter.coordRelWidthToPoints(view.position[0], page, true);
+        //const pdfViewOffsetYPnts = pdfExporter.coordRelHeightToPoints(view.position[1], page, true);
 
         const pdfViewRatio = pdfViewWidthPnts/pdfViewHeightPnts;
         const svgRatio = svgWidth/svgHeight;
@@ -324,6 +325,9 @@ export class DocViewSVGManager
             {
                 const x = (cmd.x + transform.translateX)*transform.scale + transform.containerTranslateX + transform.contentOffsetX; 
                 const y = (cmd.y + transform.translateY)*transform.scale + transform.containerTranslateY + transform.contentOffsetY;
+                
+                console.log(`${cmd.y} => ${y}`)
+
                 newPathStr += `${cmd.code} ${x} ${y}`
             }
         })

@@ -168,6 +168,110 @@ export interface ExportGLTFOptions
 }   
 
 
+/** Archiyou-specific information in GLTF */
+export interface ArchiyouData
+{
+    scenegraph: SceneGraphNode
+    gizmos: Array<Gizmo>,
+    annotations: Array<DimensionLineData>, 
+    docs: {[key:string]:DocData} // all documents in data and serialized content
+    errors?: Array<StatementResult>, // only needed for internal use in the future
+    messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
+    tables?:{[key:string]:any}, // raw data tables
+}
+
+/** Saved Scripts by Version */
+export interface ScriptVersion 
+{
+    id? : string,
+    file_id? : string,
+    user_id? : string,
+    user_name? : string,
+    file_name? : string,
+    prev_version_id? : string,
+    created_at? : string,
+    updated_at? : string,
+    params? : Array<Param>,
+    code : string,
+    shared?: boolean,
+    shared_version_tag?:string,
+    shared_auto_sync? : boolean,
+    shared_category?: string,
+    shared_description?: string
+}
+
+export type EngineStateStatus = 'init' | 'loaded' | 'executing' | 'executed'
+
+export interface EngineState
+{
+    engine: 'cloud' | 'local',
+    status?: EngineStateStatus,  // TODO: error/succes??
+    executionTime?: number|undefined, // duration in ms
+    statements?: Array<StatementResult>
+}
+
+export interface MeshingQuality
+{
+
+}
+
+/** Settings on what to compute in a ExecutionRequest */
+export interface ExecutionRequestCompute
+{
+    doc:boolean
+    pipelines:boolean
+}
+
+export interface ExecutionRequest
+{
+    script: ScriptVersion,
+    mode: 'main'|'local', // executing in main or in some component (for example keep meshes local or not)
+    compute: ExecutionRequestCompute
+    meshingQuality: MeshingQualitySettings,
+    outputFormat?: 'buffer'|'glb'|'svg', // null = default
+    outputOptions?: ExportGLTFOptions|ExportSVGOptions // TODO: more options per output
+    onDone?: ((result:ComputeResult) => any),
+}
+
+
+export interface ComputeTask
+{
+    uuid?: string,
+    type: string,  // execute, execute+export?
+    user_id? : string,
+    broker_id? : string,
+    client_id?: string,
+    created_at?: Date,
+    params? : Array<Param>,
+    code: string
+}
+
+export interface ComputeResult
+{
+    uuid: string,
+    user_id : string,
+    broker_id : string,
+    task: ComputeTask,
+    created_at: Date,
+    meshes?: Array<MeshShape>, // individual ShapeMeshes: TO BE FASED OUT!
+    meshBuffer?: MeshShapeBuffer,
+    meshGLB?:ArrayBuffer, // raw GLB file in buffer
+    svg?:string, // SVG output is any
+    scenegraph: SceneGraphNode
+    statements: Array<StatementResult>
+    errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
+    messages?: Array<ConsoleMessage>,
+    gizmos?: Array<Gizmo>,
+    annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
+    duration: number
+    docs?:{[key:string]:DocData} // Data for generating docs
+    pipelines: Array<string>,
+    tables?: Record<string, any>, // TS type TODO
+    metrics?: Record<string, any>, // TS type TODO
+    info?:ArchiyouAppInfo, // general metadata 
+}
+
+
 //// PARAMS ////
 
 // NOTE: We put these in the core library because of the ParamManager 
@@ -697,6 +801,7 @@ export interface LabelBlockOptions
     width?:string|number // 10mm, 5%, 0.5
     pivot?:[number,number]
     textSize?:string|number
+    secondaryTextSize?:string|number
     labelSize?:string|number
     numTextLines?:number // number of lines of text
     margin?:number|string // between label/text and outer block
@@ -878,7 +983,7 @@ export type MetricName = 'cost_material' | 'cost_labor' | 'production_time' | 'p
 /** Metric is a element that outputs data in some way */
 export interface Metric {
     name: MetricName // standardized name of Metric
-    label: string // Label to be shown to user
+    label: string // Label to be LACE VIEW SVshown to user
     type:'text'|'bar'|'line'|'radar' // TODO: more
     data: number|string|Array<number|string> // raw data (either value, array<value> or array<object>)
     options: TextMetricOptions // some options per type of Metric

@@ -99,6 +99,7 @@ export class DimensionLine extends BaseAnnotation
     link(shape:AnyShape):this
     {
         this.mainShape = this._getParentShape(shape); // Make sure we always got the top Shape
+
         // recalculate for offset based on main shape
         this._calculateAutoOffsetLength(); 
         this._calculateOffsetVec(true);
@@ -138,10 +139,10 @@ export class DimensionLine extends BaseAnnotation
         return 'dimensionLine';
     }
 
-    /** Vector from target start to end */
+    /** Vector from target start to end, not normalized */
     targetDir():Vector
     {
-        return this.targetEnd.toVector().subtract(this.targetStart)
+        return this.targetEnd.toVector().subtracted(this.targetStart)
     }
 
     /** Vector from dimension line start to end */
@@ -210,16 +211,11 @@ export class DimensionLine extends BaseAnnotation
 
             let newOffsetVec = this.targetDir().crossed([0,0,1]);
             
-            const d1 = insidePoint.moved(newOffsetVec).distance(this.targetMiddle());
-            const d2 = insidePoint.moved(newOffsetVec.reversed()).distance(this.targetMiddle());
-            
-            // Check if distances are very small (or zero), then we point -y
-            const DISTANCE_TOLERANCE = 2;
-            if (Math.abs(d1 - d2) < DISTANCE_TOLERANCE)
-            {
-                if (newOffsetVec.y > 0){ newOffsetVec.reverse(); } // TEMP HACK: preference for -y
-            }
-            else if (d1 > d2) 
+            const d1 = this.targetMiddle().moved(newOffsetVec).distance(insidePoint);
+            const d2 = this.targetMiddle().moved(newOffsetVec.reversed()).distance(insidePoint);
+
+            // Basic: newwOffsetVec points away from center
+            if (d1 < d2) 
             {
                 newOffsetVec.reverse(); // Make sure it points outside
             }
@@ -230,7 +226,7 @@ export class DimensionLine extends BaseAnnotation
             // What axis to use can be set by user
             // We first determine what axis the Shape occupy (1D/2D/3D) 
             // If no axis given by user we pick the one that has the biggest measurement
-            if(this.ortho)
+            if(this.ortho) // true, or 'x'  or 'y' 
             {
                 const dimLineHasAxes = this.targetEdge().bbox().hasAxes();
                 const shapeBiggestAxis = this.targetEdge().bbox().maxSizAxis();
@@ -241,10 +237,12 @@ export class DimensionLine extends BaseAnnotation
                                                 ? this.ortho
                                                 : shapeBiggestAxis;
                 const orthoOffsetAxis = ['x','y','z'].find(a => a !== this._orthoAxis ) as MainAxis
-                const orthoOffsetVec = new Vector(0,0,0).setComponent(orthoOffsetAxis, 1)
 
-                if(newOffsetVec[orthoOffsetAxis] < 0){ orthoOffsetVec.reverse() } // Reuse the inside/outside analysis above
-                
+                const orthoOffsetVec = new Vector(0,0,0)
+                                        .setComponent(orthoOffsetAxis, 
+                                            (newOffsetVec[orthoOffsetAxis] >= 0) ? 1 : -1
+                                        );
+        
                 newOffsetVec = orthoOffsetVec;
                 
             }

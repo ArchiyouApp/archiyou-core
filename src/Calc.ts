@@ -152,7 +152,7 @@
     //// METRIC BOARD ////
 
     /** Export metrics */
-    metrics():{[key:string]:Metric}
+    metrics():Record<string,Metric>
     {
         return this._metrics;
     }   

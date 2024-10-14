@@ -578,9 +578,10 @@ export class Doc
             .width('30mm')
             .height('8mm')
 
-        this.labelblock('metrics', 'EST cost: 100 EUR T: 100 W:200 H:200', { y: '11mm', width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        
+        this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
         const metricsBlock = this.lastBlock();
-        this.labelblock('params', 'W:100 H:200 W:1000', { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        this.labelblock('params', this._getParamSummary(), { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
         const paramsBlock = this.lastBlock();
         this.labelblock(
                         ['designer', 'design license', 'manual license'], 
@@ -595,9 +596,71 @@ export class Doc
         this.text( data.title, { size: '8mm', bold: true })
             .pivot(1,0)
             .width(TITLEBLOCK_WIDTH)
-            .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2)
+            .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2);
+
+        
 
         return this;
+    }
+
+    _getParamSummary():string
+    {
+        const PARAM_SPLIT_CHARS = ['_','-', ' ']; // at which chars to split the param name
+        const PARAM_NAME_MAXCHAR = 4;
+        const PARAM_IS_VALUE_CHAR = ':'
+        const PARAM_SEPERATOR_CHAR = ' '
+
+        const params = this?._ay?.worker?.lastExecutionRequest?.script?.params; // TODO: publishScript too?
+        if (!params)
+        {
+            return 'no parameters'
+        }
+        
+        return params.map(p => {
+            // Shorten name of param like BEAM_WIDTH = BW, SEAT-HEIGHT => SH
+            const paramNameParts = this._splitStringRecurse([p.name], PARAM_SPLIT_CHARS);
+            const paramSummaryName = paramNameParts.slice(0,PARAM_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
+            return `${paramSummaryName}${PARAM_IS_VALUE_CHAR}${p.value}`;
+        }).join(PARAM_SEPERATOR_CHAR)
+           
+    }
+
+    _getMetricSummary():string
+    {
+        const METRIC_SPLIT_CHARS = ['_','-', ' ']; // at which chars to split the param name
+        const METRIC_NAME_MAXCHAR = 4;
+        const METRIC_IS_VALUE_CHAR = ':'
+        const METRIC_SEPERATOR_CHAR = ' '
+
+        const metrics = Object.values(this?._ay?.calc?.metrics()); // TODO: publishScript too?
+        if (!metrics)
+        {
+            return 'no metrics'
+        }
+        
+        return metrics.map(m => {
+            const metricNameParts = this._splitStringRecurse([m.label||m.name], METRIC_SPLIT_CHARS);
+            const metricSummaryName = metricNameParts.slice(0,METRIC_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
+            return `${metricSummaryName}${METRIC_IS_VALUE_CHAR}${m.data} ${m?.options?.unit ?? ''}`;
+        }).join(METRIC_SEPERATOR_CHAR)
+    }
+
+    _splitStringRecurse(strings:Array<string>, splitChars:Array<string>):Array<string>
+    {
+        if(Array.isArray(splitChars) && splitChars.length > 0)
+        {
+            let newStrings = [];
+            strings.forEach(s => {
+                    newStrings = newStrings.concat(s.split(splitChars[0]))
+                }
+            ); // remain flat
+            if (splitChars.length > 1)
+            {
+                newStrings = this._splitStringRecurse(newStrings, splitChars.slice(1))
+            }
+
+            return newStrings
+        }
     }
 
     /** Create a block with one or more label and one or more texts
@@ -614,6 +677,7 @@ export class Doc
             width: '80mm',
             pivot: [1,0],
             textSize: '2.5mm',
+            secondaryTextSize: '2mm',
             labelSize: '1.5mm',
             numTextLines: 1,
             margin: '1mm',
@@ -637,6 +701,7 @@ export class Doc
         const blockMarginBetweenRel = this._activePage._resolveValueWithUnitsStringToRel(LABELBLOCK_MARGIN_BETWEEN, 'height');
         
         const blockTextSizePnt = this.parseInputNumberUnitsConvertTo(options.textSize, 'pnt'); 
+        const blockSecondaryTextSizePnt = this.parseInputNumberUnitsConvertTo(options.secondaryTextSize, 'pnt'); 
         const blockLabelSizePnt = this.parseInputNumberUnitsConvertTo(options.labelSize, 'pnt'); 
         const blockTextSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockTextSizePnt + 'pnt', 'height');
         const blockLabelSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockLabelSizePnt + 'pnt', 'height');
@@ -661,10 +726,10 @@ export class Doc
             .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
             .position(blockXRel, blockYRel+blockMarginRel+blockTextSizeRel*1.2+blockMarginBetweenRel); // NOTE: small factor to correct for bigger height
 
-            this.text(texts[i] || '', { size: blockTextSizePnt})
-            .width(blockWidthRel)
-            .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
-            .position(blockXRel, blockYRel+blockMarginRel)
+            this.text(texts[i] || '', { size: (i === 0) ? blockTextSizePnt : blockSecondaryTextSizePnt }) // Secondary texts are smaller
+                .width(blockWidthRel)
+                .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
+                .position(blockXRel, blockYRel+blockMarginRel)
         })
         
        

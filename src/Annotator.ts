@@ -188,6 +188,7 @@ export class Annotator
 
         // Take some settings from optional settings
         const dimLevelOffset = options?.offset || OFFSET_PER_LEVEL;
+
         const dimUnits = options?.units;
         
         const part = shapes.first();
@@ -196,8 +197,8 @@ export class Annotator
         if(!part.is2D()){ throw new Error('Annotator.autoDimPart(): Please make sure you have a 2D part on the XY plane!');}
 
         // Level 1: stock size (bbox)
-        newAnnotations.push(part.bbox().back().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
-        newAnnotations.push(part.bbox().left().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
+        newAnnotations.push(part.bbox(false).back().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
+        newAnnotations.push(part.bbox(false).left().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
 
         
         // Level 2: edges on and parallel to sides of bbox
@@ -281,7 +282,7 @@ export class Annotator
         remainingEdges.forEach((e,i) =>
         {
             const dim = this.makeDimensionLine()
-                            .fromEdge(e as Edge, { offset: OFFSET_PER_LEVEL * 1  })
+                            .fromEdge(e as Edge, { offset: dimLevelOffset * 1  })
             newAnnotations.push(dim)
         });
         
@@ -289,7 +290,7 @@ export class Annotator
         const uniqueAnnotations = this.unique(newAnnotations);
         part.addAnnotations(uniqueAnnotations);
         this.addAnnotations(uniqueAnnotations); // Add to list 
-        this.removeSameAtSmallDistance(OFFSET_PER_LEVEL); // Also remove dimensions lines that are too close too each other
+        this.removeSameAtSmallDistance(dimLevelOffset); // Also remove dimensions lines that are too close too each other
 
         return shapes;
     }

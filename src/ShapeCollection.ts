@@ -2542,10 +2542,12 @@
       */
       toSvg(options:toSVGOptions = { all: false, annotations: true}):string
       {
+         const BBOX_ANNOTATION_MARGIN = 10; // Add small margin on all sides to exported bboxes (SVG and world) - mostly for texts on dimension lines
+
          let shapeEdges = this._get2DXYShapeEdges(options?.all);
          
          if (shapeEdges.length == 0){ return null;}
-         shapeEdges = shapeEdges.map(s => s._mirroredX(0));  // NOTE: SVG has reversed y-axis
+         shapeEdges = shapeEdges.map(s => s._mirroredX(0));  // IMPORTANT: SVG has reversed y-axis
 
          // Edges to SVG paths
          let svgPaths:Array<string> = [];
@@ -2553,17 +2555,20 @@
          {
             svgPaths.push(edge.toSvg());
          })
-
          
          const withAnnotations = options?.annotations ?? true; // true is default
-         const bbox = this.bbox(withAnnotations);
+         const bboxWorld = this.bbox( withAnnotations);
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
-         const svgRectBbox = `${bbox.bounds[0]} ${bbox.bounds[2]} ${bbox.width()} ${bbox.depth()}`; // in format 'x y width height' 
+         const bboxWidth = bboxWorld.width()+2*BBOX_ANNOTATION_MARGIN;
+         const bboxHeight = bboxWorld.depth()+2*BBOX_ANNOTATION_MARGIN;
+
+         const svgWorldBbox = `${bboxWorld.minX()-BBOX_ANNOTATION_MARGIN} ${bboxWorld.minY()-BBOX_ANNOTATION_MARGIN} ${bboxWidth} ${bboxHeight}`; // in format 'x y width height' 
+         const svgViewBbox = `${bboxWorld.minX()-BBOX_ANNOTATION_MARGIN} ${-bboxWorld.maxY()-BBOX_ANNOTATION_MARGIN} ${bboxWidth} ${bboxHeight}`;  // Mirrored! minY => -maxY
 
          const svg = `<svg 
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-                        viewBox="${svgRectBbox}"
-                        _bbox="${svgRectBbox}" 
+                        viewBox="${svgViewBbox}"
+                        _bbox="${svgWorldBbox}" 
                         _worldUnits="${this._geom._units}" stroke="black">
                         ${svgPaths.join('\n\t')}
                         ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}

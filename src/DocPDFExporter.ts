@@ -48,7 +48,7 @@ export class DocPDFExporter
     TEXT_FONT_DEFAULT = 'Outfit';
     
     TABLE_FONTSIZE_DEFAULT = 8; // in pnts
-    TABLE_BORDER_THICKNESS_MM = 0.1;
+    TABLE_BORDER_THICKNESS_MM = 0.1; // in mm
     TABLE_PADDING_MM = 1;
 
     
@@ -535,12 +535,15 @@ export class DocPDFExporter
     /** Place View SVG on page 
      *     
      *      - view.content.data contains raw SVG string (<svg _bbox="..." _worldUnits='mm'><path .. >... )
-     *      - TODO: Implement view.zoomLevel, view.zoomRelativeTo etc. - NOW: only automatic filling of viewport/container
+     *      
+     *      - TODO: 
+     *          * Implement protection against making drawings bigger than page, resulting in weird pages etc
+     *          * Implement view.zoomLevel, view.zoomRelativeTo etc. - NOW: only automatic filling of viewport/container
+     * 
      * 
     */
     _placeViewSVG(view:ContainerData, p:PageData)
     {
-        
         const svgEdit = new DocViewSVGManager();
         if (!svgEdit.parse(view))
         { 
@@ -563,8 +566,6 @@ export class DocPDFExporter
                 this.activePDFDoc.path(pathLines);
             })            
         }
-        
-        //this.activePDFDoc.restoreGraphicsState(); // restore Gstate - Not working
 
         // Draw annotations
         svgEdit.drawDimLinesToPDF(this);
@@ -647,6 +648,7 @@ export class DocPDFExporter
         const settings = t?.content?.settings as TableContainerOptions;
 
         const { x, y } = this.containerToPDFPositionInPnts(t, p);
+        const width = this.relWidthToPoints(t.width, p);
 
         // see: https://github.com/simonbengtsson/jsPDF-AutoTable
         autoTable(this.activePDFDoc,
@@ -656,15 +658,18 @@ export class DocPDFExporter
                 body: t?.content?.data.map( r => Object.values(r)),
                 margin: { left: x, right: 0, top: 0, bottom:0 }, 
                 startY: y, 
-                tableWidth: this.relWidthToPoints(t.width, p), 
+                tableWidth: width, 
                 pageBreak: 'avoid',
                 styles: {
                     fontSize:  settings?.fontsize ?? this.TABLE_FONTSIZE_DEFAULT, 
                     cellPadding: mmToPoints(this.TABLE_PADDING_MM),
-                    lineWidth: mmToPoints(this.TABLE_BORDER_THICKNESS_MM)
+                    lineWidth: mmToPoints(this.TABLE_BORDER_THICKNESS_MM),
+                    lineColor: '#000000',
                 }
             }
         )
+
+    
         
     }
 
