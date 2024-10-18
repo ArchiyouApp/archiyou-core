@@ -16,7 +16,7 @@
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
  import type { Annotation, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
- import { flattenEntitiesToArray, flattenEntities } from './internal'  // utils
+ import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
  import { LayoutOrderType, LayoutOptions, AutoDimSettings, MainAxis } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
@@ -566,6 +566,30 @@
          this.move(0,0,distance)
          return this;
       }
+      
+      /** Move shapes to given x coordinate */
+      @checkInput(Number, 'auto')
+      moveToX(x:number):this
+      {
+         this.shapes.forEach(s => s.moveToX(x));
+         return this;
+      }
+
+      /** Move shapes to given x coordinate */
+      @checkInput(Number, 'auto')
+      moveToY(y:number):this
+      {
+         this.shapes.forEach(s => s.moveToY(y));
+         return this;
+      }
+
+      /** Move shapes to given x coordinate */
+      @checkInput(Number, 'auto')
+      moveToZ(z:number):this
+      {
+         this.shapes.forEach(s => s.moveToZ(z));
+         return this;
+      }
 
       /** Shape API */
       @checkInput([ [Number,0],[Number,0], [Number,0], ['Pivot', 'center']], [Number,Number,Number,'auto']) // IMPORTANT: not able to directly convert Pivot to Vector because pivot needs current Shape (can that be accessed in decorator?)
@@ -958,6 +982,20 @@
                return (this.first().bbox()) ? this.first().bbox().center() : null; 
             default:
                return this.bbox().center();
+         }
+      }
+
+      /** Check if all Shapes in this collection are 2D and on the same plane */
+      is2D()
+      {
+         if(!this.shapes.every(s => s.is2D()))
+         {
+            return false
+         }
+         else {
+            // check same axis
+            const firstShape2DAxisMissing = this.first().bbox().axisMissingIn2D();
+            return this.shapes.every(s => s.bbox().axisMissingIn2D() === firstShape2DAxisMissing);
          }
       }
 
@@ -2139,6 +2177,24 @@
       // TODO: .color, .
 
       //// LAYOUTING ALGORITHMS ////
+
+      /** Flatten all Shapes into new Shapes, align to fixed depth and return new ShapeCollection */
+      flattened():AnyShapeCollection
+      {
+         const flattened = this.map( s => s.flattened());       
+         if(flattened.is2D())
+         {
+            // make sure all 2D faces are on the same depth plane
+            const depthAxis2D = flattened.first().bbox().axisMissingIn2D();
+            console.log(depthAxis2D);
+            if(depthAxis2D)
+            {
+               flattened.forEach( s => s[`moveTo${depthAxis2D.toUpperCase()}`](0)); // just move to 0 for robustness
+            }
+         }
+
+         return flattened;
+      }
 
       /** Layout Shapes on XY plane within a given Layout order */
       @checkInput([ ['String','binpack'], ['Boolean', true], ['LayoutOptions', null]], ['String','auto','auto'])

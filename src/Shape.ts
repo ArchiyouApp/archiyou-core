@@ -1207,14 +1207,13 @@ export class Shape
         return selectedExtrudedFace.copy()
     }
 
-    /** Flatten a Shape into a Face, autorotate and place on XY plane */
+    /** Flatten a Shape into a Face without altering the position */
     @addResultShapesToScene
-    @checkInput([['OrientationXY', 'vertical']], ['auto'])
-    flattened(o?:OrientationXY):AnyShape
+    flattened():AnyShape
     {
         const extrudeFace = this._extrudedFace();
         if (extrudeFace){ 
-            return extrudeFace.moveToZ(0);
+            return extrudeFace.copy();
         }
         else {
             console.warn(`Shape::flattened(${o}): Not an extruded Shape. We simply return the bottom Face.`)
@@ -1222,10 +1221,9 @@ export class Shape
         }
     }
 
-    @checkInput([['OrientationXY', 'vertical']], ['auto'])
-    flatten(o?:OrientationXY):this
+    flatten():this
     {
-        this.replaceShape(this.flattened(o));
+        this.replaceShape(this.flattened());
         return this;
     }
 
