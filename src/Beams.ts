@@ -130,9 +130,9 @@ export class Beams
 
         this.beams.forEach((b,i) => 
             {
-                console.log(`--- BEAM ${b._type} serial=${b._serial} with ${b._relations.length} relations`);
+                console.info(`--- BEAM ${b._type} serial=${b._serial} with ${b._relations.length} relations`);
                 b._relations.forEach((r,i) => {
-                    console.log(`RELATION: ${r.type}`)
+                    console.info(`RELATION: ${r.type}`)
                 })
             }        
         )

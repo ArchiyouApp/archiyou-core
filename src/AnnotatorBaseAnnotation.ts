@@ -57,5 +57,10 @@ export class BaseAnnotation
         return null; // override by child class
     }
 
+    toData():any
+    {
+        // overwritten
+    }
+
 
 }

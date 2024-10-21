@@ -1016,6 +1016,9 @@
                }
             }
          })
+         // Extra: enlarge bbox with possible Annotations within or nearby
+         this._geom._annotator.getAnnotationsInBbox(combinedBbox).forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+
 
          return combinedBbox;
       }
@@ -2116,6 +2119,14 @@
          this.forEach( shape => shape.dashed());
          return this;
       }
+
+      /** Assign lineWidth to all Shapes in collection  */
+      @checkInput(Number, 'auto')
+      lineWidth(lw:number):this
+      {
+         this.forEach( shape => shape.lineWidth(lw));
+         return this;
+      }
       
       /** Shape API - Style all Shapes in Collection */
       @checkInput('ObjStyle', 'auto')
@@ -2613,7 +2624,7 @@
          })
          
          const withAnnotations = options?.annotations ?? true; // true is default
-         const bboxWorld = this.bbox( withAnnotations);
+         const bboxWorld = this.bbox(withAnnotations);
          // NOTE: origin for SVG is in topleft corner (so different than world coordinates and doc space)
          const bboxWidth = bboxWorld.width()+2*BBOX_ANNOTATION_MARGIN;
          const bboxHeight = bboxWorld.depth()+2*BBOX_ANNOTATION_MARGIN;

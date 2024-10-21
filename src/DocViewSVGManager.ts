@@ -44,6 +44,7 @@ export class DocViewSVGManager
     _svg:string
     _svgXML:TXmlNode
     _svgToPDFTransform:SVGtoPDFtransform // save important svg to pdf information for later use
+    _docActivePage:PageData;
     
 
     constructor(view?:ContainerData)
@@ -108,6 +109,8 @@ export class DocViewSVGManager
     /** Information that is needed to transform SVG shape content to PDF */
     toPDFDocTransform(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData): SVGtoPDFtransform
     {
+        this._docActivePage = page; // set this so we can use it later
+
         // TODO: this is needed when zoomLevel is calculated later (now we simply fill the container no matter what the svg model units)
         const svgUnits = this._svgXML.attributes['worldUnits'] || 'mm'; // default is mm
 
@@ -195,7 +198,7 @@ export class DocViewSVGManager
                 linePaths.push(
                     {
                         path: this._svgPathDToPDFPath(node.attributes.d, svgToPDFTransform),
-                        style: this.gatherPDFPathStyle(node), // this._pathClassesToPDFPathStyle(node.attributes?.class)
+                        style: this.gatherPDFPathStyleFromSVG(node), // this._svgPathClassesToPDFPathStyle(node.attributes?.class)
                     });
             })
         }
@@ -210,31 +213,39 @@ export class DocViewSVGManager
      *  Classes have priority over object styling because it allowes the user to quickly override 
      *  styling without going into the script
      */
-    gatherPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
+    gatherPDFPathStyleFromSVG(svgPathNode:TXmlNode):DocPathStyle
     {
         return {
             ...this.PATH_BASE_STYLE, // start with minimum styling
-            ...this._pathClassesToPDFPathStyle(svgPathNode), // Override style PDF paths based on class on svg path
-            ...this._pathAttributesToPDFPathStyle(svgPathNode), // SVG path attributes are set on individual shapes. These have priority of class styling
+            ...this._svgPathClassesToPDFPathStyle(svgPathNode), // Override style PDF paths based on class on svg path
+            ...this._svgPathAttributesToPDFPathStyle(svgPathNode), // SVG path attributes are set on individual shapes. These have priority of class styling
         }
     }
 
-    _pathAttributesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
+    _svgPathAttributesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
     {
+        const svgUnits = this._svgXML.attributes['worldUnits'] || 'mm'; // default is mm
+
         const PATH_STYLE_ATTR_TO_PDF = {
-            stroke : 'strokeColor',
-            'stroke-dasharray' : 'lineDashPattern',
-            'stroke-width' : 'strokeWidth',
-            'stroke-opacity' : 'strokeOpacity'
+            stroke : { to: 'strokeColor' },
+            'stroke-dasharray' : { to: 'lineDashPattern'} ,
+            'stroke-width' : { to: 'lineWidth', 
+                                // IMPORTANT: SVG units are world/model units, for PDF we need to convert to PDF document units (default is 'mm' for both)
+                                transform: (val) => convertValueFromToUnit(val, svgUnits ?? 'mm', this._docActivePage.docUnits ?? 'mm')  }, 
+            'stroke-opacity' : { to: 'lineOpacity' }
         }
 
         const style = {} as DocPathStyle;
 
-        Object.keys(PATH_STYLE_ATTR_TO_PDF).forEach( pathAttr => {
+        Object.keys(PATH_STYLE_ATTR_TO_PDF)
+        .forEach( pathAttr => {
             if(svgPathNode?.attributes[pathAttr])
             {
-                const pdfStylePropName = PATH_STYLE_ATTR_TO_PDF[pathAttr];
-                style[pdfStylePropName] = svgPathNode?.attributes[pathAttr];
+                const pdfStylePropName = PATH_STYLE_ATTR_TO_PDF[pathAttr].to;
+                const pdfStyleValueTransformFn =  PATH_STYLE_ATTR_TO_PDF[pathAttr]?.transform;
+                style[pdfStylePropName] = (!pdfStyleValueTransformFn) 
+                                                ? svgPathNode?.attributes[pathAttr]
+                                                : pdfStyleValueTransformFn(svgPathNode?.attributes[pathAttr]);
             }
         })
 
@@ -254,7 +265,7 @@ export class DocViewSVGManager
      * 
      *  Classes are applied in order (last has priority)
     */
-    _pathClassesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
+    _svgPathClassesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
     {
         const classesStr = svgPathNode?.attributes['class'];
 
@@ -271,7 +282,7 @@ export class DocViewSVGManager
             const classStyle = CLASS_TO_STYLE[className];
             if(!classStyle)
             {
-                console.warn(`DocViewSVGManager::_pathClassesToPDFPathStyle: Encountered unknown style: ${className}`)
+                console.warn(`DocViewSVGManager::_svgPathClassesToPDFPathStyle: Encountered unknown style: ${className}`)
             }
             else {
                 // apply style of this class
@@ -325,9 +336,6 @@ export class DocViewSVGManager
             {
                 const x = (cmd.x + transform.translateX)*transform.scale + transform.containerTranslateX + transform.contentOffsetX; 
                 const y = (cmd.y + transform.translateY)*transform.scale + transform.containerTranslateY + transform.contentOffsetY;
-                
-                console.log(`${cmd.y} => ${y}`)
-
                 newPathStr += `${cmd.code} ${x} ${y}`
             }
         })

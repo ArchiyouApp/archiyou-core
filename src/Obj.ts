@@ -69,6 +69,7 @@ export class Obj
     /** Try to get as many properties for easy introspection */
     _setProps()
     {
+        // NOTE: We don't init a default style for every Obj because it will try to get it from a parent obj (layer)
         this.shapeType();
         this.isLayer();
     }
@@ -100,8 +101,8 @@ export class Obj
         return this.style({ line: { dashed: true }} as ObjStyle );
     }
 
-    /** set strokeWidth (keeps existing styling) */
-    strokeWidth(n:number):Obj
+    /** set strokeWidth in mm while keeping the rest of existing styling */
+    lineWidth(n:number):Obj
     {
         return this.style({ line: { width: n }} as ObjStyle );
     }
@@ -147,7 +148,7 @@ export class Obj
 
 
     /** Compile different parameters into a ObjStyle instance */
-    _compileStyle(newStyle:ObjStyle|BaseStyle):ObjStyle // NOTE: needs be to be any, not Object
+    _compileStyle(newStyle?:ObjStyle|BaseStyle):ObjStyle // NOTE: needs be to be any, not Object
     {
         let newObjStyle = { ...this.DEFAULT_OBJ_STYLE, ...(this._style || {}) };
      

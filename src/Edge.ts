@@ -23,7 +23,7 @@ import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, Any
 import { roundToTolerance } from './internal'
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
 import { WIRE_LOFTED_SOLID } from './internal'
-import { toRad } from './internal';
+import { toRad, convertValueFromToUnit } from './internal';
 import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -48,7 +48,10 @@ export class Edge extends Shape
     */
 
     //// SETTINGS ////
-    TO_SVG_DASH_SIZE = 5
+    TO_SVG_DASH_SIZE_DEFAULT = 5
+    TO_SVG_LINE_WIDTH_DEFAULT = 0.25; 
+    TO_SVG_LINE_COLOR_DEFAULT = 'black'
+    TO_SVG_OPACTIY_DEFAULT = 1;
 
     /** Creates a simple Line Edge, use new Edge().makeCicle etc for others */
     constructor(start?:any, end?:any) // NOTE: decorators cannot be applied to constructors
@@ -1266,32 +1269,47 @@ export class Edge extends Shape
     /** get SVG attributes from style properties of Shape */
     _getSvgPathAttributes():string
     {
+        /* 
+            NOTES ON SVG EXPORT
+            - Because of 'vector-effect="non-scaling-stroke"',  units of SVG are the same as model units in Geom._units  (set by Geom.units() and by default mm )
+            - so when exporting SVG attributes with units we need to convert mm (default lineWidth unit) to the model units
+            - we set all attributes here, either set by user or default. So the renderers have consistent styling to work with
+        */
+
+        const modelUnits = this._geom._units;
+
         const STYLE_TO_ATTR = [
-            { geom: 'line', prop: 'color', attr: 'stroke', transform : (val) => chroma(val).hex() },
-            { geom: 'line', prop: 'dashed', attr: 'stroke-dasharray', transform : (val) => this.TO_SVG_DASH_SIZE },
-            { geom: 'line', prop: 'width', attr: 'stroke-width' , transform : (val) => val },
-            { geom: 'line', prop: 'opacity', attr: 'stroke-opacity' , transform : (val) => val },
+            { geom: 'line', prop: 'color', attr: 'stroke', transform : (val) => (val) ? chroma(val).hex() : this.TO_SVG_LINE_COLOR_DEFAULT },
+            { geom: 'line', prop: 'dashed', attr: 'stroke-dasharray', transform : (val) => (val) ? convertValueFromToUnit(val ?? this.TO_SVG_DASH_SIZE_DEFAULT , 'mm', modelUnits) : null },
+            { geom: 'line', prop: 'width', attr: 'stroke-width' , transform : (val) => convertValueFromToUnit(val ?? this.TO_SVG_LINE_WIDTH_DEFAULT, 'mm', modelUnits) },
+            { geom: 'line', prop: 'opacity', attr: 'stroke-opacity' , transform : (val) => val ?? this.TO_SVG_OPACTIY_DEFAULT },
         ]
 
         let svgAttrs = {};
 
-        const style = this?._obj?._style || this?._parent?._obj?._style as ObjStyle;
+        // Get style from Edge obj container itself, or of its parent Shape or the parent of the object (most likely a layer)
+        const style = (this?._obj?._style 
+                            || this?._parent?._obj?._style 
+                            || this?._obj?._parent?._style
+                            || this?._parent?._obj?._parent?._style 
+                            || { point: {}, line: {}, fill: {} }) as ObjStyle; // empty style if none can be found
 
         if(!style)
         {
-            console.warn(`Edge::_getSvgPathAttributes(): This Edge (or it's _parent main Shape) is not in the Scene. There is no style available!`);
+            console.warn(`Edge::_getSvgPathAttributes(): There is no style available! This Edge (or it's _parent main Shape) is not in the Scene. `);
         }
         else {
             STYLE_TO_ATTR.forEach( t => 
             {
-                const geom = style[t.geom];
-                if(geom)
-                {
-                    const val = geom[t.prop] || null;
-                    if (val !== null)
-                    {
-                        svgAttrs[t.attr] = t.transform(val)
-                    }
+                // NOTE: always execute (even if val is nullish) so we can set defaults
+                const geomStyle = style[t.geom];
+                const val = (geomStyle) ? geomStyle[t.prop] || null : null;
+                const svgValue = t.transform(val);
+                if(svgValue){
+                    svgAttrs[t.attr] = svgValue
+                } 
+                else {
+                    console.warn(`Edge::_getSvgPathAttributes(): Skipped attribute ${t.geom}->${t.prop} because svg value was null!`);
                 }
             })
         }

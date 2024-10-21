@@ -18,11 +18,11 @@
  *          
  */
 
-import { PageSize, convertValueFromToUnit } from './internal'
+import { PageSize } from './internal'
 import { PageData, ContainerData, Page } from './internal'
 import { DocViewSVGManager } from './DocViewSVGManager'
 
-import { arrayBufferToBase64, mmToPoints, pointsToMm } from './utils'
+import { arrayBufferToBase64, convertValueFromToUnit, mmToPoints, pointsToMm } from './utils'
 
 import { Container, DataRows, DataRowsColumnValue, DocData, DocPathStyle, SVGtoPDFtransform, TableContainerOptions } from './internal' // Doc
 import { PDFLinePath } from './internal' // types
@@ -51,7 +51,6 @@ export class DocPDFExporter
     TABLE_BORDER_THICKNESS_MM = 0.1; // in mm
     TABLE_PADDING_MM = 1;
 
-    
 
     //// END SETTINGS
 
@@ -557,13 +556,14 @@ export class DocPDFExporter
         // NOTE: activePDFDoc.saveGraphicsState() / activePDFDoc.restoreGraphicsState() are malfunctioning here
         if(pdfLinePaths)
         {
-            this.activePDFDoc.stroke();
             pdfLinePaths.forEach( path => {
+                this.activePDFDoc.stroke(); // execute commands that might be left un-executed
                 // draw line onto PDF document
                 this._setPathStyle(path.style);
                 // jsPDF needs Line paths as [{op: m|l, c: [x,y] }]
                 const pathLines = svgEdit._pdfLinePathToJsPDFPathLines(path);
                 this.activePDFDoc.path(pathLines);
+                this.activePDFDoc.stroke(); // do real draw with current style
             })            
         }
 
@@ -584,7 +584,7 @@ export class DocPDFExporter
         this.activePDFDoc.rect(0,0,0,0);
     }
 
-    /** Set styling before drawing anything */
+    /** Set PDF styling before drawing anything */
     _setPathStyle(style?:DocPathStyle):jsPDF // doc: PDFDocument
     {
         // Convert special props that need to be get in GState instead directly on jsPDF doc in activePDFDoc
@@ -607,9 +607,9 @@ export class DocPDFExporter
 
         for (const [styleProp,val] of Object.entries(style))
         {
-            // We have to a Gstate property (strokeOpacity and fillOpacity)
             if(Object.keys(STYLE_PROPS_TO_GSTATE).includes(styleProp))
             {
+                // We have to a Gstate property (strokeOpacity and fillOpacity)
                 const gState = {};
                 gState[STYLE_PROPS_TO_GSTATE[styleProp]] = val;
                 this.activePDFDoc.setGState(new GState(gState));

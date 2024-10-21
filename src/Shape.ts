@@ -316,9 +316,9 @@ export class Shape
 
     /** Set stroke width of lines of Shape */
     @checkInput(Number, 'auto')
-    strokeWidth(n:number):this
+    lineWidth(n:number):this
     {
-        this.object().strokeWidth(n);
+        this.object().lineWidth(n);
         return this;
     }
 
@@ -724,7 +724,8 @@ export class Shape
             let newBbox = new Bbox();
             this._oc.BRepBndLib.AddOptimal(this._ocShape, newBbox._ocBbox, true, false); // useTriangulation, useShapeTolerance
             newBbox.updateFromOcBbox();
-    
+            
+            // NOTE: only Annotations linked to this Shape are included in calculation!
             if(withAnnotations && this.annotations.length > 0)
             {
                 const annotationShapes = new ShapeCollection(this.annotations.map(a => a.toShape()));
@@ -4148,7 +4149,6 @@ export class Shape
     addToScene(force:boolean=false):Shape
     {
         // TODO: avoid double adding to scene?
-
         this._geom.addToActiveLayer(this.object());
 
         return this;

@@ -273,6 +273,12 @@ export function intRange(start:string|number,end:string|number)
 /** Convert a value between units of measure */
 export function convertValueFromToUnit(v:number, from:UnitsWithPerc, to:UnitsWithPerc, relativeToNum?:number):number
 {
+    // convert incoming string if numeric
+    if (typeof v === 'string' && isNumeric(v))
+    {
+        v = parseFloat(v);
+    }
+
     const INCH_TO_MM = 25.4;
     const MM_TO_INCH = 0.0393700787;
     const INCH_TO_PNT = 72;

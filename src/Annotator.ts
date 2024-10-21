@@ -5,7 +5,8 @@
  *      Only on output they might be turned into real Shapes like text Faces etc.
  */ 
 
-import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Geom, DimensionOptions, ShapeCollection, AnyShapeOrCollection, BaseAnnotation } from './internal'
+import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Geom, DimensionOptions, 
+            ShapeCollection, AnyShapeOrCollection, BaseAnnotation, Bbox } from './internal'
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
@@ -95,7 +96,14 @@ export class Annotator
     {
         // TODO: make more generic
         return this.annotations
-    }    
+    }
+    
+    getAnnotationsInBbox(bbox:Bbox, margin?:number):Array<Annotation>
+    {
+        const MAX_DISTANCE = 30;
+        const selectionBbox = bbox.enlarged(margin ?? MAX_DISTANCE);
+        return this.annotations.filter(a => selectionBbox.contains(a.toShape()));
+    }
 
     addAnnotations(annotations:Array<Annotation>):this
     {
