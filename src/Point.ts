@@ -15,7 +15,7 @@
  *        - Vector and Vertex extend the Point class
  */
 
-import { Vector, Vertex } from './internal'
+import { Vector, Vertex, ShapeCollection} from './internal'
 import { AXIS_TO_VECS, MainAxis, PointLike, isPointLike, isCoord, Coord, PolarCoord, Axis, isAxis, Cursor, 
     isAnyShapeOrCollection, AnyShapeOrCollection, isCursor, Plane } from './internal' // see types.ts
 import { isRelativeCartesianCoordString, parseRelativePolarCoordString, relativeCoordToNumber, roundToTolerance} from './internal' // utils
@@ -450,18 +450,20 @@ export class Point
         return pointAbsCoords;
     }
 
-    /** Calculate orthogonal projections from this Point to Edges/Wires of a given Shape 
+    /** Calculate orthogonal projections from this Point to Edges/Wires of a given Shape or ShapeCollection
         A projected Point from an original Point to a Curve is the point on a other Shape
         where the line between the two points is perpendicular to the Curve at the projected Point
     */
-    @checkInput('AnyShapeOrCollection', 'auto')
+    @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     project(to:AnyShapeOrCollection):Array<Point>
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_geom_a_p_i___project_point_on_curve.html
         // We make it simple and just use the Edges as Curves in a generic shape to compute projection points
+        const toOperantsCollection = to as ShapeCollection; // autoconverted
+        const toOperants = (toOperantsCollection.count() === 1) ? toOperantsCollection.first() : toOperantsCollection;
 
-        let projectedPoints:Array<Point> = [];
-        to.edges().forEach( curEdge => // NOTE: is Shape is a Vertex there will be no edges()
+        const projectedPoints:Array<Point> = [];
+        toOperants.edges().forEach( curEdge => // NOTE: is Shape is a Vertex there will be no edges()
         {
             let umin, umax;
             [umin,umax] = curEdge.getParamMinMax();

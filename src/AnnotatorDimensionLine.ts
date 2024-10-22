@@ -177,9 +177,9 @@ export class DimensionLine extends BaseAnnotation
     */
     updatePosition()
     {
-        if(this.shape && this.shape.type() === 'Edge')
+        if(this.targetShape && this.targetShape.type() === 'Edge')
         {
-            const linkedEdge = (this.shape as Edge);
+            const linkedEdge = (this.targetShape as Edge);
             this.targetStart = linkedEdge.start().toPoint();
             this.targetEnd = linkedEdge.end().toPoint();
             this._calculateOffsetVec(true); // force overwrite

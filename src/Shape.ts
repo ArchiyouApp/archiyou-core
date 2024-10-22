@@ -15,12 +15,12 @@ import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POIN
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
             SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
 
- import { AXIS_TO_VECS } from './internal'
 import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
-import { PointLike,PointLikeOrAnyShape,Coord,AnyShape,AnyShapeOrCollection,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
+import { PointLike,PointLikeOrAnyShape,AnyShape,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
 import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection,  } from './internal'
+import { ShapeClone } from './internal'
 
-import { Link, Selection, SelectionShapeTargetSetting, SelectorSetting, SelectorPointRange, SelectorAxisCoord, 
+import { Link,SelectorPointRange, SelectorAxisCoord, 
             SelectorBbox,SelectorIndex } from './internal' // InternalModels
 import { ShapeAttributes, isShapeAttributes } from './internal' // attributes
 import { ObjStyle } from './internal'
@@ -28,7 +28,7 @@ import { MeshShape, FaceMesh, EdgeMesh, VertexMesh } from './internal' // see: E
 import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
-import { Alignment, isAlignment, isShapeType, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
+import { Alignment, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
 import { BaseAnnotation, Annotation, DimensionOptions, DimensionLine } from './internal'
 import { OBbox, BeamLikeDims } from './internal'
 
@@ -48,6 +48,7 @@ export class Shape
     _ocShape:any = null; // instance of OC Shape subclass: Vertex, Edge, Wire etc. - NOTE: we have to set a value here: otherwise it will not be set 
     _ocId:string = null;
     _isTmp:boolean = false; // Flag to signify if a Shape is temporary (for example for construction)
+    _cloned:ShapeClone|null = null;
     
     attributes:ShapeAttributes = {}; // data attributes that can be added to Shapes (NOT STYLING)
     annotations:Array<Annotation> = []; // array of annotations associated with this Shape
@@ -345,29 +346,27 @@ export class Shape
         let allEdgesClosed = new Wire().fromEdges(this.edges()).close().edges();
 
         let prevEdgeVec = allEdgesClosed[0].direction();
-        let prevNormal;
-        let normal;
+        let prevNormal:Vector;
+        let normal:Vector;
         for (let i = 1; i < allEdgesClosed.length - 1; i++)
         {
             try { // protect against cross products of same Vectors or zero length Vectors
                 
-                let nextEdgeVec = allEdgesClosed[i+1].direction();
+                const nextEdgeVec = allEdgesClosed[i+1].direction();
                 
                 normal = prevEdgeVec.crossed(nextEdgeVec).normalized().round().abs();
 
-                if(prevNormal)
+                if(prevNormal && !normal.equals(prevNormal))
                 {
-                    if (!normal.equals(prevNormal))
-                    {
-                        // immediately when a normal is not the same: quit - there is no clear workplane
-                        return null;
-                    }
+                    // immediately when a normal is not the same: quit - there is no clear workplane
+                    return null;
                 }
 
                 prevNormal = normal;
 
             }
-            catch(e){
+            catch(e)
+            {
                 // TODO
             }
         }
@@ -793,30 +792,51 @@ export class Shape
     /** Copy the Shape and add it to the Scene (private) */
     _copy(): this
     {
-        const newShape = this.copy(false);
-        return newShape;
+        return this.copy(false);
     }
 
     /** Copy the Shape and add it to the Scene */
-    // @addResultShapesToScene
     copy(addToScene:boolean=true):this
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_builder_a_p_i___copy.html
         // Copying does take 10-15ms for even simple geometries like Boxes!
-        let ocBuilderCopy = new this._oc.BRepBuilderAPI_Copy_1();
+        const ocBuilderCopy = new this._oc.BRepBuilderAPI_Copy_1();
         ocBuilderCopy.Perform(this._ocShape, true, false); // TopoDS_Shape &S, copyGeom=Standard_True, copyMesh=Standard_False
-        let newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as this;
+        const newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as this;
         
         newShape._copyAttributes(this); 
         
-        // NOTE: Don't take over the parent - TODO: introduce other admin of copy parents
+        // NOTE: Don't take over the parent
+        if(addToScene){ newShape.addToScene(); }
 
-        if(addToScene)
-        {
-            newShape.addToScene();
-        }
+        ocBuilderCopy.delete(); // clean up
 
         return newShape;
+    }
+
+    /** Return clone of this Shape */
+    clone():AnyShape
+    {
+        const newShape = this.copy();
+        newShape._cloned = { from: this, transformations: [] }
+        return newShape;
+    }
+
+    isClone():boolean
+    {
+        return !!this._cloned
+    }
+
+    /** Remove cloning properties */
+    cancelCloning()
+    {
+        console.warn(`Shape::cancelCloning(): Cancelled cloning due to unsupported transformation.`)
+        this._cloned = undefined;
+    }
+
+    clonedFrom():AnyShape
+    {
+        return this?._cloned?.from
     }
 
     /** Move Shape to a position by offsetting all Geometry with a Vector */
@@ -1217,7 +1237,7 @@ export class Shape
             return extrudeFace.copy();
         }
         else {
-            console.warn(`Shape::flattened(${o}): Not an extruded Shape. We simply return the bottom Face.`)
+            console.warn(`Shape::flattened(): Not an extruded Shape. We simply return the bottom Face.`)
             return new ShapeCollection(this.select('F||bottom')).first();
         }
     }
@@ -1273,14 +1293,6 @@ export class Shape
             let fv = fp2.toVector().subtracted(fp1);
             let tv = tp2.toVector().subtracted(tp1);
 
-            /*
-            let angles = fv.rotationsTo(tv); // Get Euler rotations
-
-            this.rotateEuler(angles[0],angles[1],angles[2],tp1); // we rotate around the first destination point
-            // update gizmo if 3D
-            if (gizmo) gizmo.rotateEuler(angles[0],angles[1],angles[2],tp1);
-            */
-
             this.rotateVecToVec(fv,tv,tp1);
             if (gizmo) gizmo.rotateVecToVec(fv, tv, tp1);
         }
@@ -1305,7 +1317,6 @@ export class Shape
     }   
 
     /** Same as alignByPoint but returns a copy and does not affect original */
-    // TODO: @checkInput
     alignedByPoints(fromPoints:Array<Vector|Vertex|Point|Array<number>>, toPoints:Array<Vector|Vertex|Point|Array<number>>):this
     {
         return this.copy().alignByPoints(fromPoints, toPoints)
@@ -1334,7 +1345,6 @@ export class Shape
         // and move back
         this.move(pivotVec);
 
-
         return this;
     }
 
@@ -1361,13 +1371,11 @@ export class Shape
 
         ocMirrorTransform.SetMirror_3( new this._oc.gp_Ax2_3(ocMirrorOrigin, ocMirrorPlaneNormal));
 
-        let newShape = new Shape()._fromOcShape(new this._oc.BRepBuilderAPI_Transform_2(this._ocShape, ocMirrorTransform, true).Shape()) as AnyShape; // cast needed
+        const newShape = new Shape()._fromOcShape(new this._oc.BRepBuilderAPI_Transform_2(this._ocShape, ocMirrorTransform, true).Shape()) as AnyShape; // cast needed
         
         newShape._copyAttributes(this); // copy attributes over
-        newShape._parent = this._parent; // also take over _parent
 
         return newShape as this;
-
     }
 
     @addResultShapesToScene
@@ -1382,8 +1390,10 @@ export class Shape
     mirrorX(offset?:number):this
     {
         const mirroredShape = this._mirroredX(offset); 
-        this.replaceShape(mirroredShape);
-        return mirroredShape;
+        // Mirroring always remains the same Shape type: just update _ocShape
+        this._ocShape = mirroredShape._ocShape;
+        this.cancelCloning(); // BUG with cloning and mirror
+        return this;
     }
 
     /** Create mirrored copy in X plane (x=0) with its center as pivot or given offset along x-axis */
@@ -1404,9 +1414,12 @@ export class Shape
     @checkInput([[Number,null]], 'auto')
     mirrorY(offset?:number):this
     {
-        let mirroredShape = this._mirroredY(offset); 
-        this.replaceShape(mirroredShape);
-        return mirroredShape;
+        const mirroredShape = this._mirroredY(offset); 
+        // Mirroring always remains the same Shape type: just update _ocShape
+        this._ocShape = mirroredShape._ocShape;
+        this.cancelCloning(); // BUG with cloning and mirror
+
+        return this;
     }
 
     /** Create mirror copy of Shape in Y plane (y=0) with its center as pivot or given offset along y-axis */
@@ -1427,9 +1440,11 @@ export class Shape
     @checkInput([[Number,null]], 'auto')
     mirrorZ(offset?:number):this
     {
-        let mirroredShape = this._mirroredZ(offset); 
-        this.replaceShape(mirroredShape);
-        return mirroredShape;
+        const mirroredShape = this._mirroredZ(offset); 
+        // Mirroring always remains the same Shape type: just update _ocShape
+        this._ocShape = mirroredShape._ocShape;
+        this.cancelCloning(); // BUG with cloning and mirror
+        return this;
     }
 
     /** Create mirror copy of Shape in Z plane (z=0) with its center as pivot or given offset along z-axis */
@@ -1698,37 +1713,44 @@ export class Shape
             let ocResult = ocBuilder.Shape(); 
             let tmpResult = new Shape()._fromOcShape(ocResult);
 
-            if (excludeFaces && tmpResult.type() === 'Solid')
+            if(Shape.isShape(tmpResult))
             {
-                return tmpResult as Solid;
-            }
-            else // Either as offsetted Solid or Shell
-            {   
-                let offsettedShell = tmpResult.shells()[0]._copy() as Shell;
-                let origShell = this.shells()[0]._copy();
-
-                let newOcShape:any;
-                // watertight Solid: resulted offsetted Shape inside or outside of original
-                if(tmpResult.type() == 'Solid')
+                tmpResult = tmpResult as AnyShape;
+                if (excludeFaces && tmpResult.type() === 'Solid')
                 {
-                    if (amount > 0)
-                    {
-                        newOcShape = new this._oc.BRepBuilderAPI_MakeSolid_4(offsettedShell._ocShape, origShell._ocShape).Shape();
-                    }
-                    else {
-                        newOcShape = new this._oc.BRepBuilderAPI_MakeSolid_4(origShell._ocShape, offsettedShell._ocShape).Shape();
-                    }
-                    let newShape = new Shape()._fromOcShape(newOcShape) as Solid;
-                    if (newShape.type() == 'Solid')
-                    {
-                        newShape._fix(); // needed
-                        return newShape as Solid;
-                    }
+                    return tmpResult as Solid;
                 }
+                else // Either as offsetted Solid or Shell
+                {   
+                    let offsettedShell = tmpResult.shells()[0]._copy() as Shell;
+                    let origShell = this.shells()[0]._copy();
 
-                // tmpResult was a Shell. Try to make a Solid by bridging the original Shell and the offsetted one
-                // We do some extra effort to make into a Solid
-                return origShell._bridge(offsettedShell);
+                    let newOcShape:any;
+                    // watertight Solid: resulted offsetted Shape inside or outside of original
+                    if(tmpResult.type() == 'Solid')
+                    {
+                        if (amount > 0)
+                        {
+                            newOcShape = new this._oc.BRepBuilderAPI_MakeSolid_4(offsettedShell._ocShape, origShell._ocShape).Shape();
+                        }
+                        else {
+                            newOcShape = new this._oc.BRepBuilderAPI_MakeSolid_4(origShell._ocShape, offsettedShell._ocShape).Shape();
+                        }
+                        let newShape = new Shape()._fromOcShape(newOcShape) as Solid;
+                        if (newShape.type() == 'Solid')
+                        {
+                            newShape._fix(); // needed
+                            return newShape as Solid;
+                        }
+                    }
+
+                    // tmpResult was a Shell. Try to make a Solid by bridging the original Shell and the offsetted one
+                    // We do some extra effort to make into a Solid
+                    return origShell._bridge(offsettedShell);
+                }
+            }
+            else {
+                throw new Error(`Shape::_shelled: Failed to generate a single Shelled Shape!`);
             }
         }
         else {
@@ -1811,9 +1833,9 @@ export class Shape
         let newOcShape = ocMakeRevol.Shape();
         let revolvedShape = new Shape()._fromOcShape(newOcShape);
 
-        // NOTE: Often the result is a Shellm which intuitively should be a Solid to the user
+        // NOTE: Often the result is a Shell which intuitively should be a Solid to the user
         // Try to upgrade
-        if(revolvedShape.type() === 'Shell')
+        if(Shape.isShape(revolvedShape) && (revolvedShape as AnyShape).type() === 'Shell')
         {
             const solidRevolvedShape = (revolvedShape as Shell)._toSolid();
             revolvedShape = solidRevolvedShape || revolvedShape; // upgraded to Solid if not null
@@ -1890,36 +1912,29 @@ export class Shape
     {
         tolerance = tolerance || this._oc.SHAPE_TOLERANCE;
 
-        let otherShape:AnyShape;
-
         if (isPointLike(other))
         {
             if(this.type() !== 'Vertex') return false;
             return new Point(other).equalsTolerance((this as any as Vertex).toPoint(), tolerance)
         }
-        
-        if(this.type() != otherShape?.type()){ return false;}
 
-        const vertices = this.vertices().all(); 
-        const otherVertices = otherShape.vertices().all();
+        const otherShape = other as AnyShape;
+        
+        if(this.type() !== otherShape?.type()){ return false;}
+
+        const vertices = this.vertices().toArray();
+        const otherVertices = otherShape.vertices().toArray();
         
         if (vertices.length != otherVertices.length)
         {
             return false;
         }
-        
-        // TODO: tolerance
         else {
-            for (let c = 0; c < vertices.length; c++)
-            {
-                let v1 = vertices[c];
-                let vertexIsPresent = otherVertices.find( v => v1.equals(v as Vertex)) != null
-                if (!vertexIsPresent)
+            return vertices.every(v1 => 
                 {
-                    return false;
-                }
-            }
-            return true;
+                    const vertexIsPresent = otherVertices.find( v2 => v1.equals(v2 as Vertex, tolerance)) != null
+                    return vertexIsPresent
+            })
         }
        
     }
@@ -2005,7 +2020,7 @@ export class Shape
         if(this.distance(otherShape) == 0)
         {
             console.warn(`Shape::_closestLinks: The two Shapes are touching! Used the center of intersection geometry`)
-            let touchPoint = this.closest(other as AnyShapeOrCollection);
+            let touchPoint = this.closest(other);
             let link:Link = {
                 from: touchPoint,
                 to: touchPoint,
@@ -2048,8 +2063,8 @@ export class Shape
                 let link:Link = {
                     from: new Point()._fromOcPoint(shapeDistanceCalculator.PointOnShape1(i+1)),
                     to: new Point()._fromOcPoint(shapeDistanceCalculator.PointOnShape2(i+1)),
-                    fromSupport: new Shape()._fromOcShape(shapeDistanceCalculator.SupportOnShape1(i+1)).specific() as Vertex|Edge|Face,
-                    toSupport: new Shape()._fromOcShape(shapeDistanceCalculator.SupportOnShape2(i+1)).specific() as Vertex|Edge|Face,
+                    fromSupport: (new Shape()._fromOcShape(shapeDistanceCalculator.SupportOnShape1(i+1)) as AnyShape).specific() as Vertex|Edge|Face,
+                    toSupport: (new Shape()._fromOcShape(shapeDistanceCalculator.SupportOnShape2(i+1)) as AnyShape).specific() as Vertex|Edge|Face,
                     fromParams: [fromU, fromV],
                     toParams: [toU, toV],
                     distance: shapeDistanceCalculator.Value()
@@ -2135,10 +2150,10 @@ export class Shape
 
     /** Get closest Point on the other Shape */
     @checkInput('AnyShapeOrCollection', 'auto')
-    closest(other:AnyShapeOrCollection):Point
+    closest(other:PointLikeOrAnyShapeOrCollection):Point
     {
         // if intersecting
-        let intersections = this._intersections(other);
+        const intersections = this._intersections(other);
         if (intersections != null)
         {
             let closestShape = intersections.first(); 
@@ -2280,26 +2295,30 @@ export class Shape
     @checkInput('AnyShapeOrCollection', 'auto')
     _unioned(other:AnyShapeOrCollection):AnyShapeOrCollection|null
     {
+        if (!other)
+        {
+                console.error(`Shape::unioned: Error checking operants for Faces. Returned original!`)
+                return null;
+        }
+
         // NOTE: Face Face operations don't work (anymore) - even with solidifying the operants: now use a own method
         if(ShapeCollection.isShapeCollection(other))
         {
             return (other as ShapeCollection)._unioned(this)
         }
-        
-        // Don't try to union if Shapes don't touch
-        let otherShape:AnyShape = other as AnyShape;
-        if(this.distance(otherShape) > this._oc.SHAPE_TOLERANCE)
+     
+        // Don't try to union if operants don't touch
+        if(this.distance(other as PointLikeOrAnyShapeOrCollection) > this._oc.SHAPE_TOLERANCE)
         {
             console.error(`Shape::_unioned(): Given other Shape does not touch current one! Returned null`)
             return null;
         }
-
         
-        if(this.type() == 'Face' && other.type() == 'Face')
+        if(this.type() == 'Face' && (other as AnyShape).type() == 'Face')
         {
             // check normals
-            let thisFace = this as any as Face;
-            let otherFace = other as Face;
+            const thisFace = this as any as Face;
+            const otherFace = other as Face;
             if (thisFace.isPlanar() && otherFace.isPlanar())
             {
                 if( thisFace.normal().reversed().equals(otherFace.normal()))
@@ -2309,41 +2328,41 @@ export class Shape
                 }
             }
         }
-        else if (this.type() != 'Face' && other.type() == 'Face')
+        else if (this.type() != 'Face' && (other as AnyShape).type() == 'Face')
         {
-            otherShape = this._solidifyOperantFaces(new ShapeCollection(other)).first(); 
+            other = this._solidifyOperantFaces(new ShapeCollection(other)).first(); 
         }
+        
+        // Now start fusing
+        const fuser = new this._oc.BRepAlgoAPI_Fuse_3(this._ocShape, 
+                                                (other as AnyShape)._ocShape, 
+                                                new this._oc.Message_ProgressRange_1());
 
-        if (!otherShape)
-        {
-            console.error(`Shape::unioned: Error checking operants for Faces. Returned original!`)
-            return null;
-        }
-
-        let fuser = new this._oc.BRepAlgoAPI_Fuse_3(this._ocShape, otherShape._ocShape, new this._oc.Message_ProgressRange_1());
         fuser.SetFuzzyValue(0.001);
         fuser.Build(new this._oc.Message_ProgressRange_1());
-        let combined = fuser.Shape();
 
-        let s = new Shape()._fromOcShape(combined)
-        if (!s)
+        let fuseResult = new Shape()._fromOcShape(fuser.Shape())
+        if (!fuseResult)
         {
             console.warn(`Shape::unioned: No correct result for union! Returned original Shape`);
             return this;
         }
         
-        s = s.specific(); // can be a Shape or ShapeCollection
+        if(Shape.isShape(fuseResult) || ShapeCollection.isShapeCollection(fuseResult))
+        {
+            fuseResult = (fuseResult as any).specific(); // can be a Shape or ShapeCollection
+        }
         
         // test the result
-        if (isAnyShape(s))
+        if (isAnyShape(fuseResult))
         {
-            return (s as AnyShape)._unifyDomain();
+            return (fuseResult as AnyShape)._unifyDomain();
         }
         else {
             // 1 or multiple Shapes
-            if( (s as ShapeCollection).count() > 1)
+            if( (fuseResult as ShapeCollection).count() > 1)
             {
-                const shapeCollection = s as ShapeCollection;
+                const shapeCollection = fuseResult as ShapeCollection;
                 console.warn(`Shape::union: Union resulted in multiple Shapes: trying to sew!`);
                 const sewedShape = shapeCollection._sewed();
 
@@ -2358,7 +2377,7 @@ export class Shape
                 }
                 
                 // Replace original Shape or ShapeCollection
-                return sewedShape.checkDowngrade(); // avoid Shells with one Face
+                return (sewedShape as AnyShapeOrCollection).checkDowngrade(); // avoid Shells with one Face
             }
         }
 
@@ -2825,7 +2844,7 @@ export class Shape
         }
 
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_algo_a_p_i___section.html#a5980af65e4ecfd71403072430555eaf4
-        let ocSectionBuilder = new this._oc.BRepAlgoAPI_Section_3(this._ocShape, other._ocShape, false); // PerformNow
+        const ocSectionBuilder = new this._oc.BRepAlgoAPI_Section_3(this._ocShape, other._ocShape, false); // PerformNow
         ocSectionBuilder.SetNonDestructive(true);
         ocSectionBuilder.SetFuzzyValue(0.1);
         ocSectionBuilder.Build(new this._oc.Message_ProgressRange_1());
@@ -2838,11 +2857,8 @@ export class Shape
 
         */
 
-        let ocShape = ocSectionBuilder.Shape();
-        let intersected = new Shape()._fromOcShape(ocShape); // _fromOcShape: can return AnyShape or ShapeCollection or null
-
+        const intersected = new Shape()._fromOcShape(ocSectionBuilder.Shape()); // _fromOcShape: can return AnyShape or ShapeCollection or null
         return (intersected == null) ? null : new ShapeCollection(intersected); // even a ShapeCollection as arg is flattened
-
     }
 
     /** Calculate intersection between Shapes ( from Face onward ) based on Common algoritm */
@@ -2855,18 +2871,15 @@ export class Shape
             return null;
         }
 
-        let intersectedCommon = new this._oc.BRepAlgoAPI_Common_3(this._ocShape, other._ocShape, new this._oc.Message_ProgressRange_1());
+        const intersectedCommon = new this._oc.BRepAlgoAPI_Common_3(this._ocShape, (other as AnyShape)._ocShape, new this._oc.Message_ProgressRange_1());
         intersectedCommon.SetOperation( this._oc.BOPAlgo_Operation.prototype.constructor.BOPAlgo_COMMON );
         intersectedCommon.SetFuzzyValue(0.1);
         intersectedCommon.Build(new this._oc.Message_ProgressRange_1());
 
-        let ocShape = intersectedCommon.Shape();
-        let intersected = new Shape()._fromOcShape(ocShape); // can be a single Shape or ShapeCollection or null
-
+        const intersected = new Shape()._fromOcShape(intersectedCommon.Shape()); // can be a single Shape or ShapeCollection or null
 
         // It looks like this also does not work if intersection of Faces is a Vertex or Edges: backup with the Section method
-        return (intersected === null) ? this._intersectionsSection(other) : new ShapeCollection(intersected);
-        
+        return (intersected === null) ? this._intersectionsSection(other) : new ShapeCollection(intersected);        
     }
 
     /** Tests if two Shape overlap: meaning the two Shapes have at least on Vertex in common  */
@@ -4494,8 +4507,8 @@ export class Shape
             }
             else 
             {   
-                let ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
-                let ocTangDef = new this._oc.GCPnts_TangentialDeflection_2(ocAdaptorCurve, 
+                const ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
+                const ocTangDef = new this._oc.GCPnts_TangentialDeflection_2(ocAdaptorCurve, 
                     quality?.linearDeflection || MESHING_MAX_DEVIATION, 
                     quality?.angularDeflection || MESHING_ANGULAR_DEFLECTION, 
                     quality?.edgeMinimalPoints || MESHING_MINIMUM_POINTS, 
@@ -4505,7 +4518,7 @@ export class Shape
                 vertexCoords = new Array(ocTangDef.NbPoints() * 3);
                 for(let j = 0; j < ocTangDef.NbPoints(); j++) 
                 {
-                    let ocVertex = ocTangDef.Value(j+1).Transformed(ocLocation.Transformation()); // world coords
+                    const ocVertex = ocTangDef.Value(j+1).Transformed(ocLocation.Transformation()); // world coords
                     vertexCoords[(j * 3) + 0] = ocVertex.X();
                     vertexCoords[(j * 3) + 1] = ocVertex.Y();
                     vertexCoords[(j * 3) + 2] = ocVertex.Z();
@@ -4523,33 +4536,58 @@ export class Shape
         return meshEdges;
     }
 
+    /** Do some sanity tests on original when this Shape is cloned */
+    _checkCloned():boolean
+    {
+        return this._cloned
+                && Shape.isShape(this._cloned?.from)
+                && this.vertices().length === this._cloned.from.vertices().length
+    }
+
     /** Output triangulated Mesh of Faces of this Shape */
     toMeshFaces(quality:MeshingQualitySettings): Array<FaceMesh>
     {
         // OC Faces to meshed Faces:
 
-        // taken from: https://github.com/zalo/CascadeStudio/blob/master/js/CADWorker/CascadeStudioShapeToMesh.js
-
         /* OC Docs:
             - BREPMesh_IncrementalMesh Docs: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_b_rep_mesh___incremental_mesh.html
             - BRep_Tool: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_b_rep___tool.html
             - Poly_Connect: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_poly___connect.html
+        
+            
+        /*
+            Here the core of the meshing takes place - it converts the Shape into a Mesh. 
+             Data is placed on the Faces of the Shape and retrieved by BRep_Tool.Triangulation(face)
+            By cloning we can greatly reduce the calculations here
+            This works by registering the cloning with Shape.clone() and then when meshing fall back to original 
+                Shape, which is probably already is meshed. We use the fact that OpenCascade already keeps 
+                topology mostly the same and just applies transformations for operations like move, rotate and mirror
+            So for a cloned object we 
         */
-
-        const ocMesher = new this._oc.BRepMesh_IncrementalMesh_2(
-            this._ocShape, 
-            quality?.linearDeflection || MESHING_MAX_DEVIATION, 
-            false, 
-            quality?.angularDeflection || MESHING_ANGULAR_DEFLECTION,
-            false);  // NOTE: this is needed to start triangulation
+        let meshedShape = this as AnyShape;
+        let ocMesher = null;
+        if(this._cloned && this._checkCloned())
+        {
+            meshedShape = this._cloned.from;
+        }
+        else {
+            ocMesher = new this._oc.BRepMesh_IncrementalMesh_2(
+                this._ocShape, 
+                quality?.linearDeflection || MESHING_MAX_DEVIATION, 
+                false, 
+                quality?.angularDeflection || MESHING_ANGULAR_DEFLECTION,
+                false);  // NOTE: this is needed to start triangulation
+        }
 
         let meshFaces: Array<FaceMesh> = [];
 
-        this.faces().forEach( (curFace, curFaceIndex) => 
+        meshedShape.faces().forEach( (curFace, curFaceIndex) => 
         {
-            let ocLocation = new this._oc.TopLoc_Location_1();
-            let ocTriangulation = new this._oc.BRep_Tool.prototype.constructor.Triangulation(curFace._ocShape, ocLocation, 0); // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_poly___triangulation.html 
-            // TODO: Poly_MeshPurpose.Poly_MeshPurpose_NONE
+            const ocLocation = new this._oc.TopLoc_Location_1();
+
+            let ocTriangulation = new this._oc.BRep_Tool.Triangulation(curFace._ocShape, ocLocation, 0); // Poly_MeshPurpose.Poly_MeshPurpose_NONE
+            const faceTransformation = ocLocation.Transformation();
+            const clonedShapeTransformation = (this._cloned) ? this._ocShape.Location_1().Transformation() : null;
 
             if (ocTriangulation.IsNull()) 
             { 
@@ -4557,7 +4595,9 @@ export class Shape
             }
             else 
             {
-                let faceMesh = {
+                //ocTriangulation = ocTriangulation.get().Copy(); // copy
+
+                const faceMesh = {
                     ocId: curFace._ocId,
                     objId : this._obj.id,
                     vertices: [],
@@ -4568,14 +4608,23 @@ export class Shape
                     indexInShape: curFaceIndex,
                 };
     
-                let ocPolyConnect = new this._oc.Poly_Connect_2(ocTriangulation);
-                const numNodes = ocTriangulation.get().NbNodes();
-    
-                //// Write vertex buffer ////
+                const numNodes = ocTriangulation.get().NbNodes();    
+                // Write vertex buffer ////
                 faceMesh.vertices = new Array(numNodes * 3);
                 for(let i = 0; i < numNodes; i++) 
                 {
-                    let p = ocTriangulation.get().Node(i+1).Transformed(ocLocation.Transformation());
+                    let p = ocTriangulation.get().Node(i+1); // gp_Pnt
+                    // NOTE: One of the transformations is enough (either just the face, or for main cloned Shape )
+                    if(clonedShapeTransformation)
+                    { 
+                        // TODO: Still problem with Shapes that are mirorred - can't transform correctly. 
+                        // For now cloning is cancelled when doing these operations
+                        p.Transform(clonedShapeTransformation);
+                    }
+                    else {
+                        p.Transform(faceTransformation);
+                    }
+                    
                     faceMesh.vertices[(i * 3) + 0] = p.X();
                     faceMesh.vertices[(i * 3) + 1] = p.Y();
                     faceMesh.vertices[(i * 3) + 2] = p.Z();
@@ -4618,10 +4667,6 @@ export class Shape
                         
                         x = ((x - UMin)/(UMax - UMin));
                         y = ((y - VMin)/(VMax - VMin));
-                        
-                        // Flip if Face is orientated not Forward
-                        // !!!! DISABLED !!!!
-                        // if (faceOrientation != 0) { x = 1.0 - x; } // this._oc.TopAbs_FORWARD = 0
             
                         faceMesh.uvCoords[(i * 2) + 0] = x;
                         faceMesh.uvCoords[(i * 2) + 1] = y;
@@ -4629,34 +4674,34 @@ export class Shape
 
                 }
             
-                //// Face Vertex normals ////
+                // Face Vertex normals
 
                 // We create a TColgp_Array10fDir here, which is a subclass of NCollection_Array1
                 // Which has a constructor documented here: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_n_collection___array1.html
-                let myNormal = new this._oc.TColgp_Array1OfDir_2(1, numNodes); // see: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___dir.html
-                let ocTriangulateTool = this._oc.StdPrs_ToolTriangulatedShape.prototype.constructor; // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_std_prs___tool_triangulated_shape.html
+                const myNormal = new this._oc.TColgp_Array1OfDir_2(1, numNodes); // see: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___dir.html
+                const ocTriangulateTool = this._oc.StdPrs_ToolTriangulatedShape.prototype.constructor; // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_std_prs___tool_triangulated_shape.html
+                const ocPolyConnect = new this._oc.Poly_Connect_2(ocTriangulation); // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_poly___triangulation.html 
                 ocTriangulateTool.Normal(curFace._ocShape, ocPolyConnect, myNormal);
                 faceMesh.normals = new Array(myNormal.Length() * 3);
 
                 for(let i = 0; i < myNormal.Length(); i++)
                 {
-                    let d = myNormal.Value(i + 1).Transformed(ocLocation.Transformation());
+                    let p = myNormal.Value(i + 1);
 
-                    /*
-                    // Fix reversed orientation of Face
-                    if(faceOrientation == 1) // not FORWARD
-                    {
-                        //console.info(`Shape::toMeshShape: Flipped Vertex Normal for this Face because orientation is not FORWARD`);
-                        d = d.Reversed(); // reverse normal
+                    if(clonedShapeTransformation)
+                    { 
+                            p.Transform(clonedShapeTransformation);
                     }
-                    */
+                    else {
+                            p.Transform(faceTransformation);
+                    }
 
-                    faceMesh.normals[(i * 3)+ 0] = d.X();
-                    faceMesh.normals[(i * 3)+ 1] = d.Y();
-                    faceMesh.normals[(i * 3)+ 2] = d.Z();
+                    faceMesh.normals[(i * 3)+ 0] = p.X();
+                    faceMesh.normals[(i * 3)+ 1] = p.Y();
+                    faceMesh.normals[(i * 3)+ 2] = p.Z();
                 }
             
-                //// Face triangles ////
+                // Face triangles
 
                 let triangles = ocTriangulation.get().Triangles();
                 faceMesh.triangleIndices = new Array(triangles.Length() * 3);
@@ -4696,7 +4741,7 @@ export class Shape
         }); // end faces iteration
 
         // clean up
-        ocMesher.delete()
+        ocMesher?.delete()
 
         return meshFaces;
     }
@@ -4717,7 +4762,7 @@ export class Shape
             return null;
         }
     
-        let shapeMesh:MeshShape = { 
+        const shapeMesh:MeshShape = { 
             objId: this._obj.id,
             vertices: this.toMeshVertices(),
             edges: this.toMeshEdges(quality),

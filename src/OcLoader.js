@@ -11,12 +11,14 @@
 */
 
 import ocFullJS from "../libs/archiyou-opencascade/archiyou-opencascade.js";
+import ocFullJSFast from "../libs/archiyou-opencascade/archiyou-opencascade-fast.js";
 
 import { Geom } from './Geom'
 
 export default class OcLoader
 {
   //// SETTINGS ////
+  USE_FAST = true;
   SHAPE_TOLERANCE = 0.001;
   RUN_TEST = false;
 
@@ -55,12 +57,12 @@ export default class OcLoader
   {  
     // taken from official OC.js approach and added dynamic wasm loading to keep Node happy
     const initOpenCascade = ({
-      mainJS = ocFullJS,
+      mainJS = (this.USE_FAST) ? ocFullJSFast : ocFullJS,
       worker = undefined,
       } = {}) => {
       return new Promise((resolve, reject) => 
       {
-        import('../libs/archiyou-opencascade/archiyou-opencascade.wasm')
+        import(`../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`)
         .then( async wasmModule => 
         {
           let mainWasm = wasmModule.default;

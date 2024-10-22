@@ -25,7 +25,7 @@ test("Obj", () =>
     expect(b.object()._style.point.color).toEqual(32768);
     expect(b.object()._style.line.color).toEqual(32768);
     expect(b.object()._style.fill.color).toEqual(32768);
-    b.strokeWidth(10);
+    b.lineWidth(10);
     expect(b.object()._style.line.width).toEqual(10);
     b.dashed();
     expect(b.object()._style.line.dashed).toEqual(true);

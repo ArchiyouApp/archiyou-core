@@ -54,10 +54,10 @@ export class Shell extends Shape
         
     }
 
-    @checkInput('MakeShellInput', 'auto')
+    @checkInput('MakeShellInput', 'ShapeCollection')
     fromAll(entities:MakeShellInput): Shell
     {
-        let shapes = entities as ShapeCollection; // auto converted
+        const shapes = entities as ShapeCollection; // auto converted
 
         if (shapes.getShapesByType('Face').length >= 1)
         {
@@ -123,7 +123,7 @@ export class Shell extends Shape
                 return this._fromOcShell(ocSewResult).checkAndFix() as Shell;
             }
             else {
-                const nonShellShape = this._fromOcShape(ocSewResult) as AnyShapeOrCollection
+                const nonShellShape = this._fromOcShape(ocSewResult);
                 console.warn(`Shell::fromFaces(): Combining ${facesCollection.length} Faces resulted in result type "${nonShellShape.type()}"`)
                 return nonShellShape;
             }
@@ -471,16 +471,21 @@ export class Shell extends Shape
     {        
         let result = this._offsetted(amount);
 
+        if (ShapeCollection.isShapeCollection(result))
+        {
+            console.warn(`Shell:_bridgeThickened: offset resulted in multiple Shapes. Took first`);
+            result = (result as ShapeCollection).first();
+        }
+
         // !!!! OC does not produce Solids with this algorithm. CadQuery uses BRepOffset_MakeOffset() which is not available in opencascade.js
         // This is a workaround by finding two outerwires for the original shell and offsetted shell, then create extra Shell for sides by lofting the two outer wires
         if (result.type() == 'Shell')
         {
             // We get an offset Shell in the result
-            let newSolid = this._bridge(result as Shell);
-            return newSolid;
+            return  this._bridge(result as Shell);
         }
         else {
-            console.error(`Shell:thickened: Offsetted failed in thicken operation. Check validity of given Shell!`);
+            console.error(`Shell:_bridgeThickened: Offsetted failed in thicken operation. Check validity of given Shell!`);
             return null;
         }
             

@@ -18,9 +18,7 @@ test("AlignByPoint2", () =>
     let b1 = geom.Box(100,50,10).alignByPoints(
         ['leftfrontbottom','rightfrontbottom'], 
         [[0,0,0],[1,1,0]]); 
-    expect(b1.edges()[1].direction().normalized().toArray()[0]).toEqual(-0.707);
-    expect(b1.edges()[1].direction().normalized().toArray()[1]).toEqual(0.707);
-    expect(b1.edges()[1].direction().normalized().toArray()[2]).toEqual(0);
+    expect(b1.edges()[1].direction().normalized().round().toArray()).toEqual([-0.707, 0.707, 0]);
 });
 
 
@@ -29,8 +27,6 @@ test("AlignByPoint3", () =>
     let b2 = geom.Box(100,50,10).alignByPoints(
         ['leftfrontbottom','rightfrontbottom','rightbackbottom'], 
         [[0,0,0],[1,0,0],[0,1,1]]);
-    expect(b2.faces()[2].normal().toArray()[0]).toEqual(-0);
-    expect(b2.faces()[2].normal().toArray()[1]).toEqual(-0.707);
-    expect(b2.faces()[2].normal().toArray()[2]).toEqual(-0.707);
+    expect(b2.faces()[2].normal().round().toArray()).toEqual([-0, -0.707, -0.707]);
     
 });

@@ -10,14 +10,14 @@
  */
 
  import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
-         ShapeType, AnyShape, isAnyShape, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
+         ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
          Pivot,AnyShapeSequence, Alignment, Bbox, Side} from './internal' // see types
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, AutoDimLevel, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
- import { LayoutOrderType, LayoutOptions, AutoDimSettings, MainAxis } from './internal'
+ import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, MainAxis } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
@@ -389,7 +389,7 @@
 
       /** Add Shape to ShapeCollection */
       @checkInput('AnyShapeOrCollection', 'ShapeCollection')
-      add(shapes?:AnyShapeOrCollection, ...args):this
+      add(shapes?:AnyShapeOrSequence, ...args):this
       {
          this._addEntities([shapes, ...args])
          this._setFakeArrayKeys();
@@ -404,6 +404,7 @@
          const hashes = this.shapes.map(s => s._hashcode());
          const newShapes = shapes.toArray().filter(s => !hashes.includes(s._hashcode()))
          this.add(newShapes);
+         return this;
       }
 
       /** Remove Shapes from ShapeCollection */
@@ -678,17 +679,20 @@
       }
 
       /** Shape API - Align Shapecollection to other Shape or ShapeCollection */
-      @checkInput(['AnyShapeOrCollection',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
+      @checkInput(['AnyShapeOrCollection',['Pivot','center'],['Alignment', 'center']],['ShapeCollection','auto','auto'])
       align(other:AnyShapeOrCollection, pivot?:Pivot, alignment?:Alignment):AnyShapeOrCollection
       {
+         const otherCollection = other as ShapeCollection; // autoconverted
+         const others = (otherCollection.count() === 1) ? otherCollection.first() : otherCollection;
+
          // pivot using bbox() of ShapeCollection
          const pivotAlignPerc:Array<number> = (this.bbox().box() || this.bbox().rect())._alignPerc(pivot)
-         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(other)) ? 
-                                             (other.bbox().box() || other.bbox().rect())._alignPerc(alignment) :
+         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(others)) ? 
+                                             (others.bbox().box() || others.bbox().rect())._alignPerc(alignment) :
                                              (other as Shape)._alignPerc(alignment)
          
          const fromPosition = this.bbox().getPositionAtPerc(pivotAlignPerc).toVector();
-         const toPosition = other.bbox().getPositionAtPerc(alignmentPerc).toVector();
+         const toPosition = others.bbox().getPositionAtPerc(alignmentPerc).toVector();
 
          this.move(toPosition.subtracted(fromPosition)); //.move(pivotOffsetVec);
 
@@ -946,6 +950,11 @@
          return new ShapeCollection(this.shapes);
       }
 
+      clone():ShapeCollection
+      {
+         return new ShapeCollection(this.shapes.map(s => s.clone()));
+      }
+
       /** Shape API */
       type():string
       {
@@ -1155,7 +1164,7 @@
          return null;
       }
 
-      /** Shape API */
+      /** Shape API:  Get alle Edges of Shapes */
       vertices():ShapeCollection
       {
          let allVerts = new ShapeCollection();
@@ -1163,7 +1172,7 @@
          return allVerts;
       }
 
-      /** Shape API */
+      /** Shape API: Get alle Edges of Shapes */
       edges():ShapeCollection
       {
          let allEdges = new ShapeCollection();
@@ -1171,7 +1180,7 @@
          return allEdges;
       }
 
-      /** Shape API */
+      /** Shape API: Get all Wires of Shapes in this Collection */
       wires():ShapeCollection
       {
          let allWires = new ShapeCollection();
@@ -1179,7 +1188,7 @@
          return allWires;
       }
 
-      /** Shape API */
+      /** Shape API: Get all Faces of Shapes */
       faces():ShapeCollection
       {
          let allFaces = new ShapeCollection();
@@ -1187,7 +1196,7 @@
          return allFaces;
       }
       
-      /** Shape API */
+      /** Shape API: Get all Shells of Shapes */
       shells():ShapeCollection
       {
          let allShells = new ShapeCollection();
@@ -1195,7 +1204,7 @@
          return allShells;
       }
 
-      /** Shape API */
+      /** Shape API: Get all Solids of Shapes */
       solids():ShapeCollection
       {
          let allSolids = new ShapeCollection();
@@ -1389,7 +1398,6 @@
          return this?.shapes?.length || 0;
       }
 
-      // TODO
       specific()
       {
          /* To match API of Shape */
@@ -1903,16 +1911,19 @@
       }
 
       /** Test if the collections are the same */
-      @checkInput('AnyShapeOrCollection', 'auto')
+      @checkInput('AnyShapeOrCollection', 'ShapeCollection')
       equals(other:AnyShapeOrCollection):boolean
       {
-         if(!ShapeCollection.isShapeCollection(other))
+         const otherCollection = other as ShapeCollection; // autoconverted
+         const others = (otherCollection.count() === 1) ? otherCollection.first() : otherCollection;
+
+         if(!ShapeCollection.isShapeCollection(others))
          {
             console.warn(`ShapeCollection::equals(): Other operant is a Shape. Returned false`)
             return false;
          }
 
-         if (this.count() != other.count())
+         if (this.count() != others.count())
          {
             return false;
          }
@@ -2393,14 +2404,14 @@
       }
 
       /** Make (semi) automatic dimension lines through the Shapes of this collection at levels (in percentage of total size) along MainAxis within bbox
-       *    @param options:AutoDimSettings
+       *    @param options:DimensionLevelSettings
        *    {
        *       levels: Array< Record<MainAxis,number>
        *       minDistance: number (0-1)
        *    }
        * 
       */
-      autoDim(settings?:AutoDimSettings):ShapeCollection
+      autoDim(settings?:DimensionLevelSettings):ShapeCollection
       {
          // TODO: How to tie annotations to ShapeCollection?
          this._geom._annotator.autoDim(this);

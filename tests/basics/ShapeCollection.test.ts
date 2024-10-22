@@ -33,6 +33,8 @@ test("fakeKeyIndices", () =>
 {
     const g1 = geom.group(geom.Box(10),geom.Box(20));
     const g2 = g1.shallowCopy();
+    console.log(g1[0]);
+    console.log(g2[0]);
     expect(g2[0].equals(g1[0])).toEqual(true);
 });
 

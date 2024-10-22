@@ -10,8 +10,8 @@ import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Geom, DimensionOption
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
-import { Annotation, AnnotationData, DimensionLine, AutoDimLevel, AutoDimSettings, AnnotationAutoDimStrategy, 
-            MainAxis } from './internal'
+import { Annotation, AnnotationData, DimensionLine, DimensionLevelSettings, AnnotationAutoDimStrategy, 
+            MainAxis, DimensionLevel } from './internal'
 
 import { roundTo } from './internal' // utils
 
@@ -138,16 +138,16 @@ export class Annotator
     //// GENERATE DIMENSIONS ON SHAPES ////
 
     @checkInput(['AnyShapeOrCollection', ['DimensionOptions', null], ['AnnotationAutoDimStrategy', null]], ['ShapeCollection', 'auto','auto'])
-    autoDim(shapes:ShapeCollection, options?:DimensionOptions, strategy?:AnnotationAutoDimStrategy)
+    autoDim(shapes:ShapeCollection, options?:DimensionOptions|DimensionLevelSettings, strategy?:AnnotationAutoDimStrategy)
     {
         strategy = strategy || this._getAutoDimStrategy(shapes);
         
         switch (strategy)
         {
             case 'part':
-                return this.autoDimPart(shapes, options);
+                return this.autoDimPart(shapes, options as DimensionOptions);
             case 'levels':
-                return this.autoDimLevels(shapes, options);
+                return this.autoDimLevels(shapes, options as DimensionLevelSettings);
             default:
                 console.error(`Annotator::autoDim(shapes,strategy): No automatic strategy found. Please supply one (like 'part' or 'levels') as argument`);
                 return null;
@@ -312,7 +312,7 @@ export class Annotator
      * 
      */
     @checkInput(['AnyShapeOrCollection','AutoDimSettings','DimensionOptions'], ['ShapeCollection', 'auto', 'auto'])
-    autoDimLevels(collection:ShapeCollection, settings?:AutoDimSettings, options?:DimensionOptions):Array<DimensionLine>
+    autoDimLevels(collection:ShapeCollection, settings?:DimensionLevelSettings):Array<DimensionLine>
     {
         const BBOX_MARGIN = 10;
         const SECTION_PLANE_DEPTH = 2;
@@ -327,7 +327,7 @@ export class Annotator
         // For every level make a section shape, gather intersection points and draw dimension lines
         settings.levels.forEach((lvl,i) => 
         {
-            lvl = lvl as AutoDimLevel;
+            lvl = lvl as DimensionLevel;
             const levelAxis = lvl?.axis
             let levelCoord = lvl?.at; // percentage of size along levelAxis
             // NOTE: if coordType not given, We take it that if the level is given < 1.0 it is meant relative

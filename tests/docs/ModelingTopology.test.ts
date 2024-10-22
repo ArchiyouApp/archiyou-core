@@ -90,8 +90,8 @@ test("ModelingTopologyExtruding", () =>
 test("ModelingTopologyExtruding", () => 
 {
     expect(Math.round(geom.Vertex(0,0,0).extrude(100,[-1,1,1]).length())).toEqual(100); // inaccuracy!
-    expect(geom.Edge([100,0,0],[100,200,0]).extrude(-100, [0,-1,-1]).bbox().height()).toEqual(70.7);
-    expect(geom.Wire([300,0,0],[400,100,0],[200,100,0]).close().extrude(100, [-0.5,0,1]).bbox().height()).toEqual(89.4);
+    expect(geom.Edge([100,0,0],[100,200,0]).extrude(-100, [0,-1,-1]).bbox().height()).toEqual(70.711);
+    expect(geom.Wire([300,0,0],[400,100,0],[200,100,0]).close().extrude(100, [-0.5,0,1]).bbox().height()).toEqual(89.443);
     expect(geom.Rect(10,100).twistExtrude(100,360).type()).toEqual('Solid')
 })
 

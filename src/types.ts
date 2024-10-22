@@ -52,8 +52,8 @@ export type PointLikeOrAnyShape = PointLike|AnyShape
 export type AnyShape = Shape|Vertex|Edge|Wire|Face|Shell|Solid // Single Shape, excluding ShapeCollection
 export type AnyShapeCollection = ShapeCollection|VertexCollection
 export type AnyShapeSequence = AnyShapeCollection|Array<AnyShape> 
-export type AnyShapeOrCollection = AnyShape|AnyShapeSequence // All Shapes and ShapeCollections
-export type AnyShapeOrSequence = AnyShape|AnyShapeSequence
+export type AnyShapeOrCollection = AnyShape|AnyShapeCollection
+export type AnyShapeOrSequence = AnyShape|AnyShapeSequence // Both Shapes, ShapeCollection or Arrays of Shapes
 export type PointLikeOrVertexCollection = PointLike|VertexCollection
 export type PointLikeOrAnyShapeOrCollection = PointLike|AnyShape|AnyShapeCollection
 export type ColorInput = string|number
@@ -482,6 +482,14 @@ export interface SelectorIndex
     indices?: Array<number>, // indices of Subshapes
 }
 
+//// SHAPE CLONING ////
+
+export interface ShapeClone
+{
+    from: AnyShape
+    transformations:Array<any> // TODO
+}
+
 //// ANNOTATIONS ////
 
 /** Bring all annotations in one type */
@@ -527,7 +535,7 @@ export interface DimensionOptions
     roundDecimals?:number // round to number decimals. Default is 0
 }
 
-export interface AutoDimLevel
+export interface DimensionLevel
 {
     axis:MainAxis
     at: number // coordinate on given axis, relative or absolute
@@ -538,9 +546,9 @@ export interface AutoDimLevel
     showLine?:boolean // show DEBUG line
 }
 
-export interface AutoDimSettings
+export interface DimensionLevelSettings
 {
-    levels: Array<AutoDimLevel>
+    levels: Array<DimensionLevel>
 }
 
 //// DOC ////

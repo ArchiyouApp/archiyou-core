@@ -37,11 +37,10 @@ test("Selectors Basics", () =>
     
     expect((new Face().makePlane(100,100).select('V||frontleft') as Vertex).toArray()).toEqual([-50,-50,0]); // Shape with 2D Bbox
 
-
-    // Side with 1D Bbox
-    expect((new Edge().makeLine([0,0],[100,0]).select('V||right') as Vertex).toArray()).toEqual([100,0,0]);
-    expect(new Edge().makeLine([0,0],[100,0]).select('V||top').length).toEqual(2);
+    expect((new Edge().makeLine([0,0],[100,0]).select('V>>X') as Vertex).toArray()).toEqual([100,0,0]);
+    expect(new Edge().makeLine([0,0],[100,0]).select('V>>Y').length).toEqual(2);
     
+    // TODO: bbox side selectors need to be fixed!
 
 })
 

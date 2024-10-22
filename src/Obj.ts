@@ -419,12 +419,12 @@ export class Obj
      *  @param newShape Can be both a Shape and ShapeCollection - that will be converted by ShapeCollection()
      * 
      * */
-    _updateShapes(newShape:Shape|Vertex|Edge|Wire|Face|Shell|Solid|ShapeCollection)
+    _updateShapes(shapes:AnyShapeOrCollection)
     {
-        if ( new Shape().isShape(newShape) )
+        if ( new Shape().isShape(shapes) )
         {
             // console.geom(`Obj::_updateShapes: from type "${this._shapes.type()}" to "${newShape.type()}"`);
-            this._shapes = new ShapeCollection(newShape);
+            this._shapes = new ShapeCollection(shapes);
             this._shapes.setObj(this); // place reference of current Obj into new Shape
         }
     }

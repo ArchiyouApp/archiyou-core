@@ -454,7 +454,7 @@ export class Solid extends Shape
          }
          else if(isSelectionString(edges))
          {
-             let selectionString = edges as SelectionString;
+             const selectionString = edges as SelectionString;
  
              let selectedShapes = new ShapeCollection(this.select(selectionString));
              if (selectedShapes == null)
