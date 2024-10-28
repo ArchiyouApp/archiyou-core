@@ -41,7 +41,7 @@ export class DocPDFExporter
 {
     //// SETTINGS ////
 
-    DEBUG = false; // test raw PDFkit output
+    DEBUG = false; 
     
     TEXT_ALIGN_DEFAULT = 'left';
     TEXT_BASELINE_DEFAULT = 'top';
@@ -117,7 +117,7 @@ export class DocPDFExporter
         if(!this.DEBUG)
         {
             const blobs = await this.run(data);
-            if (this.isBrowser()) this._saveBlobToBrowserFile(); // Start file save in browser
+            if (this.isBrowser()){ this._saveBlobToBrowserFile() }; // Start file save in browser
             return blobs;
         }
         else {
@@ -125,7 +125,7 @@ export class DocPDFExporter
         }
     }
 
-    /** Load PdfKit as module dynamically */
+    /** Load jsPDF as module dynamically */
     async loadJsPDF():Promise<DocPDFExporter> 
     {
         // If jsPDF already loaded
@@ -168,12 +168,12 @@ export class DocPDFExporter
 
     handleFailedImport(e)
     {
-        console.error(`DocPDFExporter:loadPDFKit: Could not load module 'pdfkit'. ERROR: "${e}". Make sure it is added to the project. PdfExporter will not work!`)
+        console.error(`DocPDFExporter:loadJsPDF: Could not load module 'jspdf'. ERROR: "${e}". Make sure it is added to the project. PdfExporter will not work!`)
     }
 
     handleSuccesImport()
     {
-        console.info(`DocPDFExporter:loadPDFKit: PDFKit loaded!`)
+        console.info(`DocPDFExporter:loadJsPDF: loadJsPDF loaded!`)
         this._hasJsPDF = true;
     }
 
@@ -318,7 +318,7 @@ export class DocPDFExporter
                 this._placeText(c, p)
                 break;
             case 'textarea':
-                this._placeText(c, p); // TextArea is the same in PDFKit
+                this._placeText(c, p); 
                 break;
             case 'view':
                 this._placeViewSVG(c, p)
@@ -414,10 +414,9 @@ export class DocPDFExporter
 
     //// IMAGE ////
 
-    /** First load the SVG or Bitmap image and then supply its buffer to pdfkit */
+    /** First load the SVG or Bitmap image and then supply its buffer to jspdf */
     async _placeImage(img:ContainerData, p:PageData)
     {
-        // see docs: http://pdfkit.org/docs/images.html
         /* 
             NOTES:
             - jsPDF places images with [left,top] as pivot and y-axis in [left,top]    
@@ -650,8 +649,11 @@ export class DocPDFExporter
         const { x, y } = this.containerToPDFPositionInPnts(t, p);
         const width = this.relWidthToPoints(t.width, p);
 
+        // In Node context autoTable might be the entire module
+        const autoTableFunc = (typeof autoTable === 'function') ? autoTable : (autoTable as any).default
+        
         // see: https://github.com/simonbengtsson/jsPDF-AutoTable
-        autoTable(this.activePDFDoc,
+        autoTableFunc(this.activePDFDoc,
             { 
                 theme: 'plain',
                 head: [Object.keys((t?.content?.data as DataRowsColumnValue)[0])],  // [[]]
@@ -724,7 +726,7 @@ export class DocPDFExporter
         return (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
     }
 
-    /** Convert relative page coordinate width to absolute PDF point coord of PDFKit system, also taking horizontal padding into account  */
+    /** Convert relative page coordinate width to absolute PDF point coord of jsPDF system, also taking horizontal padding into account  */
     coordRelWidthToPoints(a:number, page:PageData, transformWithPadding:boolean=true):number
     {
         const pageHorizontalPadding = (transformWithPadding) ? ( (page.padding[0]||0) * page.width) : 0; // in page.DocUnits
@@ -733,7 +735,7 @@ export class DocPDFExporter
         return mmToPoints(a*pageContentWidth + convertValueFromToUnit(pageHorizontalPadding, page.docUnits, 'mm'));
     }
 
-    /** Convert relative page coordinate height to absolute PDF point coord of PDFKit system,  also taking vertical padding into account */
+    /** Convert relative page coordinate height to absolute PDF point coord of jsPDF system,  also taking vertical padding into account */
     coordRelHeightToPoints(a:number, page:PageData, transformWithPadding:boolean=true):number
     {
         const pageVerticalPadding = (transformWithPadding) ? ( (page.padding[1]||0) * page.height) : 0; // in page.docUnits
@@ -741,7 +743,7 @@ export class DocPDFExporter
 
         const coordInPoints = this.pageHeightPoints()
                     - mmToPoints(a*pageContentHeight) 
-                    - mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in pdfkit space for padding
+                    - mmToPoints(convertValueFromToUnit(pageVerticalPadding, page.docUnits, 'mm')) // correct in jspdf space for padding
 
         return coordInPoints;
     }
@@ -767,7 +769,7 @@ export class DocPDFExporter
         return mmToPoints(convertValueFromToUnit(this.activePage.height, this.activePage.docUnits, 'mm'));
     }
 
-    /** Convert Container position data to x,y in PDF points, including taking take of pivot position and Page.padding. In PDFkit coord system
+    /** Convert Container position data to x,y in PDF points, including taking take of pivot position and Page.padding. In jspdf coord system
      *      NOTES: 
      *          - All incoming ContainerData data (position, width, height) is relative to page size
     */
@@ -840,7 +842,6 @@ export class DocPDFExporter
 
     //// SVG UTILS ////
 
-    /** Transform contentAlign on View to pdfkit-svg option preserveAspectRatio */
     getSVGPreserveAspectRatioOption(view?:ContainerData)
     {
         const DEFAULT = 'xMinYMin meet'; // NOTE: origin is [left,top]

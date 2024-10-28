@@ -5,7 +5,7 @@
  *      (TODO: refactoring in progress)
  */
 
-import { Statement } from '~/src/internal'
+import { Statement } from './internal'
 
 /** Define a Param: both as a structure and an instance */
 export interface Param
