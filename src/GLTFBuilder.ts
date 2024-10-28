@@ -121,10 +121,10 @@ export class GLTFBuilder
                 // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
                 messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
                 // Document data by document name in special format for AY doc viewers (PDF and web)
-                docs: (settings?.docs !== false) ? ay.doc.toData(settings?.docs) : {},  // TODO: toData is async: problem?
+                docs: (settings?.docs !== false) ? (ay?.doc?.toData(settings?.docs) || {}) : {},  // TODO: toData is async: problem?
                 pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
-                metrics: (settings?.metrics !== false) ? ay.calc.metrics() : {},
-                tables: (settings?.tables !== false) ? ay.calc.toTableData() : {}, // danfojs-nodejs has problems. Disable on node for now
+                metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
+                tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
                 /* TODO: pipeline
                     Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                     something like:
