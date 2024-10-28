@@ -41,6 +41,7 @@
     async loadDanfo():Promise<any> // TODO TS typing
     {   
         // detect context of JS
+        const DANFO_MODULE = 'danfojs';
         const isBrowser = typeof window === 'object'
         let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
         const isNode = !isWorker && !isBrowser;
@@ -48,7 +49,7 @@
         if(isWorker || isBrowser)
         {
             console.log('==== LOAD DANFO FOR BROWSER/WORKER ====')
-            this._danfo = await import('danfojs')
+            this._danfo = await import(DANFO_MODULE)
         }
         else {
             console.log('==== LOAD DANFO FOR NODE ====')

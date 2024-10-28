@@ -377,6 +377,7 @@ export class Shape
     /** 
      *   Some operations on Shape actually create new Shape types: For example Shape.intersections(other)
      *   To Updating those in place we use the Obj container of the Shape 
+     *   IMPORTANT: This is still confusing because existing references in script scope are not updated!!
      */
     @checkInput('AnyShapeOrCollection', 'auto')
     replaceShape(newShapes:AnyShapeOrCollection):AnyShapeOrCollection
@@ -1225,27 +1226,26 @@ export class Shape
         side = (['top','bottom'].includes(side)) ? side : 'bottom'
         const selectedExtrudedFace = (faceGroups[0] as any).faces.sort( (f1,f2) => f1.center().z - f2.center().z)[(side === 'top') ? 1 : 0];
 
-        return selectedExtrudedFace.copy()
+        return selectedExtrudedFace._copy()
     }
 
-    /** Flatten a Shape into a Face without altering the position */
-    @addResultShapesToScene
-    flattened():AnyShape
+    /** Flatten a Shape into a copy of a Face without altering the position */
+    _flattened():AnyShape
     {
         const extrudeFace = this._extrudedFace();
         if (extrudeFace){ 
-            return extrudeFace.copy();
+            return extrudeFace
         }
         else {
             console.warn(`Shape::flattened(): Not an extruded Shape. We simply return the bottom Face.`)
-            return new ShapeCollection(this.select('F||bottom')).first();
+            return new ShapeCollection(this.select('F||bottom'))?.first();
         }
     }
 
-    flatten():this
+    @addResultShapesToScene
+    flattened():AnyShape
     {
-        this.replaceShape(this.flattened());
-        return this;
+        return this._flattened();
     }
 
     /** 
