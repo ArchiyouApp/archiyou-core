@@ -2288,13 +2288,15 @@
 
          const autoRotate = options?.autoRotate ?? DEFAULT_AUTOROTATE;
          const flatten = options?.flatten ?? DEFAULT_FLATTEN;
+         
          if(autoRotate || flatten){ copy = true };
 
          const boxMargin = (options?.margin !== undefined) ? options.margin : BOX_MARGIN_DEFAULT;
          const boxes = this.toArray().map( (shape,i) => 
          {
-            let s = (autoRotate) ? shape._copy().rotateToLayFlat() : shape;
-            s = (flatten) ? s.flattened() : s;
+            let s = (copy) ? shape._copy() : shape;
+            if(autoRotate) s.rotateToLayFlat(); 
+            if(flatten) s = s._flattened(); 
             return this._makeBinPackBox(s, boxMargin, i)
          });
 
