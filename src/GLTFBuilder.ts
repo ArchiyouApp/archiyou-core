@@ -108,35 +108,43 @@ export class GLTFBuilder
         }
         else {
             // Open ArrayBuffer and write extra data
-            this.doc = await io.readBinary(new Uint8Array(gltfContent)); // Force Uint8Array from ArrayBuffer
-            let asset = this.doc.getRoot().getAsset();
+            try 
+            {
+                this.doc = await io.readBinary(new Uint8Array(gltfContent)); // Force Uint8Array from ArrayBuffer
+                let asset = this.doc.getRoot().getAsset();
 
-            asset.generator = 'Archiyou';
-            asset.extras = {};
-            asset.extras.archiyou = {
-                // TODO: basic information like author?
-                scenegraph: ay.geom.scene.toGraph(),
-                gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
-                annotations: ay.geom._annotator.getAnnotationsData(),
-                // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
-                messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
-                // Document data by document name in special format for AY doc viewers (PDF and web)
-                docs: (settings?.docs !== false) ? (ay?.doc?.toData(settings?.docs) || {}) : {},  // TODO: toData is async: problem?
-                pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
-                metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
-                tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
-                /* TODO: pipeline
-                    Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
-                    something like:
-                    pipelineModels: {
-                        'cnc' : { 'glb' : { ... }, 'dxf' : { .... }},
-                        '3dprint' : { 'glb : { ... }, 'stl' : { ...} }
-                    }
-                */
-            } as ArchiyouData
-            
-            let buffer = io.writeBinary(this.doc); 
-            return buffer; 
+                asset.generator = 'Archiyou';
+                asset.extras = {};
+                asset.extras.archiyou = {
+                    // TODO: basic information like author?
+                    scenegraph: ay.geom.scene.toGraph(),
+                    gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
+                    annotations: ay.geom._annotator.getAnnotationsData(),
+                    // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
+                    messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
+                    // Document data by document name in special format for AY doc viewers (PDF and web)
+                    docs: (settings?.docs !== false) ? (ay?.doc?.toData(settings?.docs) || {}) : {},  // TODO: toData is async: problem?
+                    pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
+                    metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
+                    tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
+                    /* TODO: pipeline
+                        Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
+                        something like:
+                        pipelineModels: {
+                            'cnc' : { 'glb' : { ... }, 'dxf' : { .... }},
+                            '3dprint' : { 'glb : { ... }, 'stl' : { ...} }
+                        }
+                    */
+                } as ArchiyouData
+                
+                let buffer = io.writeBinary(this.doc); 
+                return buffer; 
+            }   
+            catch(e)
+            {
+                console.error(`GLTFBuilder::addArchiyouData(): Error "${e}". Returned original`)
+                return gltfContent
+            }
         }
     }
 
