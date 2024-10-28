@@ -112,7 +112,7 @@ export class Exporter
         });
     }
 
-    exportToStl():ArrayBuffer
+    exportToStl():Uint8Array
     {
         // !!!! TODO: is seperate triangulation needed? !!!!
         /* See OC docs: 
@@ -126,9 +126,9 @@ export class Exporter
                                         this._parent.geom.all().filter(s => s.visible())).toOcCompound();
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
-        let ocStlWriter = new oc.StlAPI_Writer();
+        const ocStlWriter = new oc.StlAPI_Writer();
         ocStlWriter.ASCIIMode = false; // binary
-        let result = ocStlWriter.Write(sceneCompoundShape, filename, new oc.Message_ProgressRange_1()); // Shape, stream content, ASCI or not
+        const result = ocStlWriter.Write(sceneCompoundShape, filename, new oc.Message_ProgressRange_1()); // Shape, stream content, ASCI or not
 
         if (!result)
         {
@@ -136,9 +136,9 @@ export class Exporter
             return null;
         }
         else {
-            let stlFileBinary = oc.FS.readFile("/" + filename, { encoding:"binary" });
+            const stlFileBinary = oc.FS.readFile("/" + filename, { encoding:"binary" });
             oc.FS.unlink("/" + filename);
-            return stlFileBinary.buffer;
+            return stlFileBinary?.buffer;
         }
         
     }
@@ -168,7 +168,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|string>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array|string>
     {
         const oc = this._parent.geom._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
@@ -184,7 +184,8 @@ export class Exporter
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
         
-        new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))).forEach(entity => {
+        new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())))
+        .forEach(entity => {
             if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
             {
                 const shape = entity as AnyShape;
@@ -265,7 +266,7 @@ export class Exporter
     }
 
     /** Export GLTF (binary or text) to the browser window */
-    async exportToGLTFWindow(content:ArrayBuffer|string)
+    async exportToGLTFWindow(content:Uint8Array|string)
     {
         const fileHandle = (typeof content === 'string') ? 
                     await this.getNewFileHandle("GLTF files", "text/plain", "gltf") :
@@ -285,7 +286,7 @@ export class Exporter
         return buffer;
     }
 
-    async exportToGLTFAnimationWindow(content:ArrayBuffer)
+    async exportToGLTFAnimationWindow(content:Uint8Array)
     {
         const fileHandle = await this.getNewFileHandle("GLTF files", "application/octet-stream", "glb");
         this.writeFile(fileHandle, content).then(() => 

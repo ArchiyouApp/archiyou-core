@@ -1,3 +1,8 @@
+/**
+ *  Module for loading and parsing external data sources
+ * 
+ */
+
 import { Geom } from "./Geom";
 import { AnyShape, ShapeCollection, Sketch } from "./internal";
 
