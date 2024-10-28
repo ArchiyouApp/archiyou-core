@@ -1229,7 +1229,7 @@ export class Shape
         return selectedExtrudedFace._copy()
     }
 
-    /** Flatten a Shape into a Face without altering the position */
+    /** Flatten a Shape into a copy of a Face without altering the position */
     _flattened():AnyShape
     {
         const extrudeFace = this._extrudedFace();
