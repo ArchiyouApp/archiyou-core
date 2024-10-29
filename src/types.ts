@@ -163,6 +163,7 @@ export interface ExportGLTFOptions
     binary?: boolean
     quality?: MeshingQualitySettings
     archiyouFormat?: boolean // use Archiyou format
+    archiyouOutput?:ArchiyouOutputSettings
     includePointsAndLines?: boolean // export loose points and edges 
     extraShapesAsPointLines?: boolean // for visualization purposes seperate points and lines
 }   

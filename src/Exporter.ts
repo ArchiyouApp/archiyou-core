@@ -1,6 +1,9 @@
-import { MeshingQualitySettings, Shape, AnyShape, ShapeCollection} from './internal'
-import { ExportGLTFOptions } from './internal'
+import { Shape, AnyShape, ShapeCollection} from './internal'
+
+import { ExportGLTFOptions, MeshingQualitySettings} from './internal'
+
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
+
 import { GLTFBuilder } from './GLTFBuilder';
 
 import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
@@ -43,6 +46,7 @@ export class Exporter
     DEFAULT_GLTF_OPTIONS = {
         binary: true,
         archiyouFormat: true,
+        archiyouOutput: { metrics: true, tables: true, docs: true, pipelines:true, formats: true, messages: true },
         includePointsAndLines: true,
         extraShapesAsPointLines: true,
         messages: [],
@@ -252,7 +256,7 @@ export class Exporter
         if(options?.archiyouFormat)
         {
             // add special Archiyou data to GLTF
-            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, {}); 
+            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, options?.archiyouOutput || {}); 
         }
 
         // extra vertices and lines for specific visualization styles
