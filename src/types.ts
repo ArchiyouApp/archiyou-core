@@ -225,13 +225,14 @@ export interface ExecutionRequestCompute
 
 export interface ExecutionRequest
 {
-    script: ScriptVersion,
-    mode: 'main'|'local', // executing in main or in some component (for example keep meshes local or not)
+    script: ScriptVersion
+    createdAtString:string
+    mode: 'main'|'local' // executing in main or in some component (for example keep meshes local or not)
     compute: ExecutionRequestCompute
     meshingQuality: MeshingQualitySettings,
-    outputFormat?: 'buffer'|'glb'|'svg', // null = default
+    outputFormat?: 'buffer'|'glb'|'svg' // null = default
     outputOptions?: ExportGLTFOptions|ExportSVGOptions // TODO: more options per output
-    onDone?: ((result:ComputeResult) => any),
+    onDone?: ((result:ComputeResult) => any)
 }
 
 

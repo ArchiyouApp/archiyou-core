@@ -550,11 +550,12 @@ export class Doc
     //// BLOCKS OF CONTAINERS ////
 
     /** Place default title block
-     *  @param
+     *  @param data:TitleBlockInput
      */
     titleblock(data?:TitleBlockInput)
     {
-        const TITLEBLOCK_WIDTH = '60mm';
+        const TITLE_BLOCK_NUM = 60;
+        const TITLEBLOCK_WIDTH = `${TITLE_BLOCK_NUM}mm`;
         const BLOCK_MARGIN = this._activePage._resolveValueWithUnitsStringToRel('1mm', 'height'); 
 
         const DEFAULT_SETTINGS = {
@@ -577,6 +578,13 @@ export class Doc
             .position(1,0) // right bottom
             .width('30mm')
             .height('8mm')
+
+        // Version info left of image
+        this.text(this._getVersionSummary(), { size: '2mm'})
+            .width(`${TITLE_BLOCK_NUM/2}mm`)
+            .height('3mm')
+            .pivot(1,0)
+            .position([`${297-30}mm`, '6mm'] as ContainerPositionAbs); // bit hacky
 
         
         this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
@@ -643,6 +651,25 @@ export class Doc
             const metricSummaryName = metricNameParts.slice(0,METRIC_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
             return `${metricSummaryName}${METRIC_IS_VALUE_CHAR}${m.data} ${m?.options?.unit ?? ''}`;
         }).join(METRIC_SEPERATOR_CHAR)
+    }
+
+    /** Get version in different contexts
+     *  In editor we use ScriptVersion->PublishScript instances
+     *  In compute worker PublishScript
+     */
+    _getVersion():string
+    {
+        const version = this?._ay?.worker?.lastExecutionRequest?.script?.published_as?.version // editor app
+            || this?._ay?.worker?.lastExecutionRequest?.script?.version // compute worker context
+            || '0'
+
+        return `v${version}`
+    }
+
+    /** Get version string like 'v1.0 at 10-20-2025 */
+    _getVersionSummary():string
+    {
+        return `${this._getVersion()} at ${this?._ay?.worker?.lastExecutionRequest?.createdAtString || '' }`;
     }
 
     _splitStringRecurse(strings:Array<string>, splitChars:Array<string>):Array<string>
@@ -732,7 +759,6 @@ export class Doc
                 .position(blockXRel, blockYRel+blockMarginRel)
         })
         
-       
         this._lastBlock = {
             x: blockXRel,
             y: blockYRel,
