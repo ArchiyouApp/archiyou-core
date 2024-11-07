@@ -43,6 +43,15 @@ import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUni
 
 import { convertValueFromToUnit, isNumeric } from './internal' // utils
 
+//// LOCAL INTEFACES ////
+
+interface DocPipeline
+{
+    fn:() => any
+    done: boolean
+}
+
+
 //// MAIN CLASS ////
 
 export class Doc
@@ -69,7 +78,7 @@ export class Doc
     _pageOrientationByDoc:{[key:string]:PageOrientation} = {}; // default orientation
     _pagesByDoc:{[key:string]:Array<Page>} = {};
     _unitsByDoc:{[key:string]:DocUnits} = {};
-    _pipelinesByDoc:{[key:string]:() => void} = {}; 
+    _pipelinesByDoc:{[key:string]:DocPipeline} = {};  // by doc name : { fn: fn, done:bool }, see DocPipeline
 
     _activePage:Page
     _activeContainer:AnyPageContainer
@@ -122,6 +131,7 @@ export class Doc
         this._pagesByDoc = {};
         this._unitsByDoc = {};
         this._activeDoc = null;
+        this._pipelinesByDoc = {};
     }
 
     _setDefaults():Doc
@@ -138,9 +148,15 @@ export class Doc
     */
     executePipelines(include:Array<string> = [], exclude:Array<string> = [])
     {
-        for (const [docName,pipelineFn] of Object.entries(this._pipelinesByDoc))
+        for (const [docName,pipelineData] of Object.entries(this._pipelinesByDoc))
         {
+            const pipeline = pipelineData as DocPipeline
+            const pipelineFn = pipeline.fn;
+            const pipelineDone = pipeline.done;
+
             if (
+                    !pipelineDone // avoid double execution
+                    &&
                     typeof pipelineFn === 'function' && 
                     (include.length === 0 || include.includes(docName)) &&
                     (exclude.length === 0 || !exclude.includes(docName))
@@ -149,6 +165,7 @@ export class Doc
                 try {
                     console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
                     this._ay.worker.funcs.executeFunc(pipelineFn)
+                    pipeline.done = true; // set done
                 }
                 catch(e){
                     console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: Error: "${e}"`);
@@ -275,7 +292,7 @@ export class Doc
 
         if(typeof fn !== 'function'){ throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active document!`); }
 
-        this._pipelinesByDoc[this._activeDoc] = fn;
+        this._pipelinesByDoc[this._activeDoc] = { fn: fn, done: false } as DocPipeline;
 
         return this;
     }
