@@ -13,7 +13,7 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
-            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,isOrientationXY, isAnnotationAutoDimStrategy,
+            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions, isDimensionLevelSettings, isOrientationXY, isAnnotationAutoDimStrategy,
             isBeam, isBeamBaseLineAlignment } from './internal'
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
@@ -420,6 +420,14 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             errorMessage: { possible: ['LayoutOptions: { margin: number, flatten: boolean, stock: string, groupSame: boolean }'] }, // TODO
             transformInput: null,
         },
+        'isAnnotationAutoDimStrategy' :
+        {
+            name: 'AnnotationAutoDimStrategy',
+            obj: isAnnotationAutoDimStrategy,
+            check: isAnnotationAutoDimStrategy,
+            errorMessage: { possible: ['part', 'levels'] }, 
+            transformInput: null,
+        },
         'isDimensionOptions':
         {
             name: 'DimensionOptions',
@@ -428,12 +436,12 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             errorMessage: { possible: ['DimensionOptions: { units:string, offset:number, offsetVec:Vector, ortho:boolean, roundDecimals:int }'] }, 
             transformInput: null,
         },
-        'isAnnotationAutoDimStrategy' :
+        'isDimensionLevelSettings':
         {
-            name: 'AnnotationAutoDimStrategy',
-            obj: isAnnotationAutoDimStrategy,
-            check: isAnnotationAutoDimStrategy,
-            errorMessage: { possible: ['part', 'levels'] }, 
+            name: 'DimensionLevelSettings',
+            obj: isDimensionLevelSettings,
+            check: isDimensionLevelSettings,
+            errorMessage: { possible: ['DimensionLevelSettings: [{ axis:mainAxis, at:number, coordType?:relative|absolute, align?:min|max|auto, minDistance?:number, offset?:number } ]'] }, 
             transformInput: null,
         },
         'isModelUnits':
