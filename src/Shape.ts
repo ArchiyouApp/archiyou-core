@@ -1093,6 +1093,7 @@ export class Shape
         return this;
     }
 
+
     /** Rotate Shape to make normal of largest Face parallel to Z axis */
     rotateToAlignLargestFaceToZ():this
     {
@@ -1143,6 +1144,13 @@ export class Shape
 
     
         return this;
+    }
+
+    /** Rotate Shape to align as much as possible to axis
+        Alias for rotateToOrthoXY */
+    autoRotate():this
+    {
+        return this.rotateToOrthoXY();
     }
 
     /** Rotate Shape to place flat on XY plane. Keeps x,y position */
@@ -3060,9 +3068,11 @@ export class Shape
         offsetsPoint.y = offsetsPoint.y || 1;
         offsetsPoint.z = offsetsPoint.z || 1;
 
-        let xArrColl = this._array1D(sizesPoint.x, new Vector(1,0,0).scaled(offsetsPoint.x) );
-        let yArrColl = xArrColl._array1D(sizesPoint.y, new Vector(0,1,0).scaled(offsetsPoint.y) );
-        let zArrColl = new ShapeCollection([xArrColl, yArrColl])._array1D(sizesPoint.z, new Vector(0,0,1).scaled(offsetsPoint.z) );
+        const xArrColl = this._array1D(sizesPoint.x, new Vector(1,0,0).scaled(offsetsPoint.x) );
+        const yArrColl = xArrColl._array1D(sizesPoint.y, new Vector(0,1,0).scaled(offsetsPoint.y) );
+        const zArrColl = new ShapeCollection([xArrColl, yArrColl])._array1D(sizesPoint.z, new Vector(0,0,1).scaled(offsetsPoint.z) );
+
+        // TODO: make sure we have the right order!
 
         return new ShapeCollection(zArrColl); // combine all directions
 
@@ -3072,11 +3082,11 @@ export class Shape
     @checkInput([ Number, 'PointLike' ], [Number, 'Vector'])
     _array1D(size:number, offset:PointLike):AnyShapeCollection
     {
-        let shapes = new ShapeCollection();
+        const shapes = new ShapeCollection();
         shapes.add(this) // Don't include original Shape (start at index 1), but do add to array
         for(let i = 1; i < size; i++) 
         {
-            let newShape = this.moved( (offset as Vector).scaled(i)); // offset is auto converted
+            const newShape = this.moved( (offset as Vector).scaled(i)); // offset is auto converted
             shapes.add(newShape);
         }
 

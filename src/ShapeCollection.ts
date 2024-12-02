@@ -17,7 +17,7 @@
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
  import type { Annotation, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
- import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, MainAxis } from './internal'
+ import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, AnnotationAutoDimStrategy } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
@@ -1025,9 +1025,12 @@
                }
             }
          })
-         // Extra: enlarge bbox with possible Annotations within or nearby
-         this._geom._annotator.getAnnotationsInBbox(combinedBbox).forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
-
+         
+         if(withAnnotations)
+         {
+            // Extra: enlarge bbox with possible Annotations within or nearby
+            this._geom._annotator.getAnnotationsInBbox(combinedBbox).forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+         }
 
          return combinedBbox;
       }
@@ -2092,7 +2095,9 @@
          return this._unioned(other);
       }
 
-      /** Shape API - Try to union all shapes in Collection */
+      /** Shape API - Try to union all shapes in Collection 
+       *   TODO: test and make more robust for a variety of Shapes in a Collection
+      */
       @addResultShapesToScene
       union():this
       {
@@ -2413,10 +2418,10 @@
        *    }
        * 
       */
-      autoDim(settings?:DimensionLevelSettings):ShapeCollection
+      autoDim(settings?:DimensionLevelSettings, strategy?:AnnotationAutoDimStrategy):ShapeCollection
       {
          // TODO: How to tie annotations to ShapeCollection?
-         this._geom._annotator.autoDim(this);
+         this._geom._annotator.autoDim(this, settings, strategy);
 
          return this;
       }

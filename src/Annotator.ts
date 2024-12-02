@@ -189,7 +189,7 @@ export class Annotator
     @checkInput(['AnyShapeOrCollection', ['DimensionOptions', null]], ['ShapeCollection', 'auto'])
     autoDimPart(shapes:ShapeCollection, options?:DimensionOptions):ShapeCollection
     {
-        const OFFSET_PER_LEVEL = 10;
+        const OFFSET_PER_LEVEL = 15;
         const DIMENSION_MIN_DISTANCE = 1;
         const LEVEL_COORD_ROUND_DECIMALS = 0; // round to full units
         const SIDE_VERTICES_UNIQUE_TOLERANCE = 1;
@@ -269,7 +269,7 @@ export class Annotator
                                 v as PointLike, 
                                 { 
                                     offsetVec: sideDimOffsetVec, 
-                                    offset: dimLevelOffset * 1, 
+                                    offset: dimLevelOffset * 2, 
                                     units: dimUnits,
                                     ortho: sideAlongAxis // always orthogonal
                                 });
@@ -311,7 +311,7 @@ export class Annotator
      *    }
      * 
      */
-    @checkInput(['AnyShapeOrCollection','AutoDimSettings','DimensionOptions'], ['ShapeCollection', 'auto', 'auto'])
+    @checkInput(['AnyShapeOrCollection','DimensionLevelSettings'], ['ShapeCollection', 'auto'])
     autoDimLevels(collection:ShapeCollection, settings?:DimensionLevelSettings):Array<DimensionLine>
     {
         const BBOX_MARGIN = 10;
@@ -321,7 +321,7 @@ export class Annotator
 
         if(!settings || !Array.isArray(settings?.levels)){ throw new Error('Annotator.autoDimLevels(options): No autoDim settings given. Please supply levels ({ axis:x|y|z, at:number }]). Level options are minDistance, coordType, and offset')}
 
-        const collectionBbox = collection.bbox();
+        const collectionBbox = collection.bbox(false); // No annotations here!
         const autoDimLines = [];
 
         // For every level make a section shape, gather intersection points and draw dimension lines
@@ -330,8 +330,10 @@ export class Annotator
             lvl = lvl as DimensionLevel;
             const levelAxis = lvl?.axis
             let levelCoord = lvl?.at; // percentage of size along levelAxis
-            // NOTE: if coordType not given, We take it that if the level is given < 1.0 it is meant relative
-            const levelCoordType = lvl?.coordType || ((levelCoord < 1 || levelCoord > -1 ) ? 'relative' : 'absolute');
+            
+            // NOTE: if coordType not given, We take it that if the level is given < 1.0 it is meant absolute
+            const levelCoordType = lvl?.coordType || ((levelCoord < 1 || levelCoord > -1 ) ? 'absolute' : 'relative');
+            
             if(levelCoordType === 'relative')
             {
                 levelCoord = (levelCoord > 1.0) ? 1.0 : levelCoord; 
@@ -379,17 +381,26 @@ export class Annotator
             
             // Now make the dimension lines at a given coord (parallel to section line) based on align ('min','max,'auto') and offset
             let dimLinesLevelCoord = sectionLineLevelCoord;
-            if (lvl?.align === 'auto')
+            if ((lvl?.align ?? true) || lvl?.align === 'auto')
             {
-                dimLinesLevelCoord = (levelCoord <= 0.5) ? collectionBbox['min'+levelAxis.toUpperCase()]() : collectionBbox['max'+levelAxis.toUpperCase()]()
+                // section line on side of bbox at levelAxis that is closest to given lvl.at
+                const minSide = collectionBbox['min'+levelAxis.toUpperCase()]();
+                const maxSide = collectionBbox['max'+levelAxis.toUpperCase()]();
+                dimLinesLevelCoord = Math.abs(lvl.at - minSide) <  Math.abs(lvl.at - maxSide) ? minSide : maxSide;
             }
-            if(['min','max'].includes(lvl?.align))
+            else if(['min','max'].includes(lvl?.align))
             {
                 dimLinesLevelCoord = collectionBbox[lvl.align+levelAxis.toUpperCase()]() 
             }
+
             const minDistance = lvl?.minDistance || DEFAULT_MIN_DISTANCE;
-            let dimLineOffset = lvl?.offset || DIMENSION_LINE_OFFSET_FROM_BBOX;
-            dimLineOffset = (lvl?.align === 'min' || levelCoord <= 0.5) ? dimLineOffset : dimLineOffset *-1; // flip offset direction
+            // Determine offset Vector based on line and collection: Should always point outwards of collection
+            const offsetVec = sectionLine.normal()
+            if( collection.center().distance(sectionLine.center().moved(offsetVec)) 
+                    < collection.center().distance(sectionLine.center().moved(offsetVec.reversed())))
+            {
+                offsetVec.reverse(); 
+            }
 
             intersectionPointsAlongRangeAxis.forEach((v,i,arr) => 
             {
@@ -412,7 +423,8 @@ export class Annotator
                                             dimLineStartPoint,
                                             dimLineEndPoint,
                                             {  
-                                                offset: dimLineOffset, 
+                                                offset: lvl?.offset || DIMENSION_LINE_OFFSET_FROM_BBOX, 
+                                                offsetVec: offsetVec,
                                                 roundDecimals: 0,
                                             }
                                         )
