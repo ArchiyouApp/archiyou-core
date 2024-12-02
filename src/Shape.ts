@@ -1093,6 +1093,7 @@ export class Shape
         return this;
     }
 
+
     /** Rotate Shape to make normal of largest Face parallel to Z axis */
     rotateToAlignLargestFaceToZ():this
     {
@@ -1143,6 +1144,13 @@ export class Shape
 
     
         return this;
+    }
+
+    /** Rotate Shape to align as much as possible to axis
+        Alias for rotateToOrthoXY */
+    autoRotate():this
+    {
+        return this.rotateToOrthoXY();
     }
 
     /** Rotate Shape to place flat on XY plane. Keeps x,y position */

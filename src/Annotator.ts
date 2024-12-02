@@ -189,7 +189,7 @@ export class Annotator
     @checkInput(['AnyShapeOrCollection', ['DimensionOptions', null]], ['ShapeCollection', 'auto'])
     autoDimPart(shapes:ShapeCollection, options?:DimensionOptions):ShapeCollection
     {
-        const OFFSET_PER_LEVEL = 10;
+        const OFFSET_PER_LEVEL = 15;
         const DIMENSION_MIN_DISTANCE = 1;
         const LEVEL_COORD_ROUND_DECIMALS = 0; // round to full units
         const SIDE_VERTICES_UNIQUE_TOLERANCE = 1;
@@ -269,7 +269,7 @@ export class Annotator
                                 v as PointLike, 
                                 { 
                                     offsetVec: sideDimOffsetVec, 
-                                    offset: dimLevelOffset * 1, 
+                                    offset: dimLevelOffset * 2, 
                                     units: dimUnits,
                                     ortho: sideAlongAxis // always orthogonal
                                 });
