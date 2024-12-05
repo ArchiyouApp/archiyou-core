@@ -601,7 +601,7 @@ export class Doc
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2)
             .pivot(1,0.5)
         // header
-        this.text( data.title, { size: '8mm', bold: true })
+        this.text( data?.title || DEFAULT_SETTINGS.title, { size: '8mm', bold: true })
             .pivot(1,0)
             .width(TITLEBLOCK_WIDTH)
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2);
