@@ -23,10 +23,10 @@
  *  
  * */
 
-import { ParamManager } from "./internal";
+import { ParamManager, ParamOperation } from "./internal";
 import { Param, PublishParam } from "./internal";
 
-import { deepEqual } from 'deep-equal'
+import deepEqual from 'deep-is'
 
 export class ParamManagerOperator
 {   
@@ -46,6 +46,7 @@ export class ParamManagerOperator
     originalParam:Param
     targetParam:Param
     manager: ParamManager
+    operation:ParamOperation // new, update, delete
 
     constructor(manager:ParamManager, p?:Param)
     {
@@ -57,6 +58,13 @@ export class ParamManagerOperator
         this.manager = manager;
 
         this._setParamProps(); // set properties of targetParam on this Controller
+    }
+
+    //// GETTERS/SETTERS ////
+
+    setOperation(op:ParamOperation)
+    {
+        this.operation = op;
     }
 
     //// OPERATORS ON PARAM ////
@@ -94,44 +102,49 @@ export class ParamManagerOperator
     visible()
     {
         this.targetParam.visible = true;
+        this.setOperation('updated');
     }
 
     /** Directly make Param invisible */
     hide()
     {
         this.targetParam.visible = false;
+        this.setOperation('updated');
     }
 
     /** Directly enable Param */
     enable()
     {
-        this.targetParam.visible = true;
+        this.targetParam.enabled = true;
+        this.setOperation('updated');
     }
 
     /** Directly disable Param */
     disable()
     {
-        this.targetParam.visible = false;
+        this.targetParam.enabled = false;
+        this.setOperation('updated');
     }
 
-    /** Add behaviour that controls visible attribute of this Param
-    *      @example $PARAMS.SOMEPARAM.visibleIf((param, all) => all.OTHERPARAM.value === true )
-    */
-    visibleIf(test:(curParam:Param, params?:Record<string, Param>) => boolean )
+    /** Conditional visibility */
+    visibleIf(b:boolean)
     {
-        this.targetParam._behaviours['visible'] = test;
+        if(b) this.visible();
+        else this.hide();
     }
 
     /** Set behaviour that controls enable flag of this Param */
-    enableIf(test:(curParam:Param, params?:Record<string, Param>) => boolean )
+    enableIf(b:boolean)
     {
-        this.targetParam._behaviours['enable'] = test;
+        if(b) this.enable();
+        else this.disable();
     }
     
     /** Set behaviour that controls value attribute of this Param */    
     valueOn(fn:(curParam:Param, params?:Record<string, Param>) => boolean)
     {
-        this.targetParam._behaviours['value '] = fn;
+        // Disabled behaviours
+        //this.targetParam._behaviours['value '] = fn;
     }
 
     //// TODO: delete
@@ -151,9 +164,11 @@ export class ParamManagerOperator
     //// COMPARE WITH ORIGINAL PARAM ////
     
     /** Compare target Param with original one */
-    changedParam():boolean
+    paramChanged():boolean
     {
-        return !deepEqual(this.paramToData(this.originalParam), this.paramToData(this.targetParam))
+        return (this.operation !== 'new')
+        ? !deepEqual(this.paramToData(this.originalParam), this.paramToData(this.targetParam))
+        : true;
     }
 
     //// BEHAVIOURS BASED ON PROGRAMMATIC CONTROLS ////
@@ -190,7 +205,7 @@ export class ParamManagerOperator
     
     //// IO ////
 
-    paramToData(param):PublishParam
+    paramToData(param:Param):PublishParam
     {
         const behaviourData = {};
         for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
