@@ -45,6 +45,7 @@ export class ParamManagerOperator
     name:string
     originalParam:Param
     targetParam:Param
+    value:any // reference to targetParam.value
     manager: ParamManager
     operation:ParamOperation // new, update, delete
 
@@ -115,6 +116,7 @@ export class ParamManagerOperator
     /** Directly enable Param */
     enable()
     {
+        console.info(`ParamManagerOperator::enable(): Enabled param "${this.targetParam.name}"`)
         this.targetParam.enabled = true;
         this.setOperation('updated');
     }
@@ -122,6 +124,7 @@ export class ParamManagerOperator
     /** Directly disable Param */
     disable()
     {
+        console.info(`ParamManagerOperator::disable(): Disabled "${this.targetParam.name}"`)
         this.targetParam.enabled = false;
         this.setOperation('updated');
     }
@@ -155,10 +158,14 @@ export class ParamManagerOperator
     /** Forward properties on this controller to target Param obj */
     _setParamProps()
     {
+        /*
         for (const [k,v] of Object.entries(this.targetParam))
         {
             this[k] = this.targetParam[k];
         }
+        */
+        // only place reference to value
+        this.value = this.targetParam.value;
     }
 
     //// COMPARE WITH ORIGINAL PARAM ////

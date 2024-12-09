@@ -427,7 +427,8 @@ export class Annotator
                                                 offsetVec: offsetVec,
                                                 roundDecimals: 0,
                                             }
-                                        )
+                                        ).link(collection);
+
                         autoDimLines.push(dimLine);
                     }
                 }

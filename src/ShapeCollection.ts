@@ -48,6 +48,7 @@
       _oc:any; // Don't set to null!
       _geom:any; // Set on init of Geom
       _obj:Obj = null; // Obj container
+      _parent:AnyShapeOrCollection;
       shapes:Array<AnyShape> = []; // No ShapeCollection here
       _groups:{[key:string]:Array<AnyShape>} = {}; // mechanism to define groups within ShapeCollection (experimental)
 
@@ -67,6 +68,7 @@
 
       /** Try to convert anything to a ShapeCollection */
       // We use an incremental way of iterating over collections (Arrays, ShapeCollections), testing the entities and adding them
+      // IMPORTANT TODO: if new ShapeCollection from existing one - what to do with taking over attributes? 
       @checkInput('MakeShapeCollectionInput', 'auto') // no conversion of types
       fromAll(entities?:MakeShapeCollectionInput):AnyShapeCollection
       {
@@ -1008,6 +1010,12 @@
          }
       }
 
+      /* If this ShapeCollection is 3D */
+      is3D():boolean
+      {
+         return this.bbox().is3D()
+      }
+
       /** Shape API - get combined bbox of all Shapes in Collection */
       bbox(withAnnotations:boolean=false):Bbox|null
       {
@@ -1028,9 +1036,18 @@
          
          if(withAnnotations)
          {
+            // Add Annotations linked to Collection
+            this.getAnnotations().forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+            
             // Extra: enlarge bbox with possible Annotations within or nearby
-            this._geom._annotator.getAnnotationsInBbox(combinedBbox).forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+            /*
+            this._geom._annotator.getAnnotationsInBbox(combinedBbox)
+                  .forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+            */
          }
+
+         // link this collection to Bbox so it can link annotations
+         combinedBbox.setParent(this);
 
          return combinedBbox;
       }
@@ -2405,7 +2422,8 @@
       addAnnotations(a:Annotation|Array<Annotation>):this
       {
         // TODO: check for doubles etc
-        const annotations = (Array.isArray(a) ? a : [a]).filter(ann => BaseAnnotation.isAnnotation(ann) )
+        const annotations = (Array.isArray(a) ? a : [a])
+                              .filter(ann => BaseAnnotation.isAnnotation(ann) )
         this.annotations = this.annotations.concat(annotations)
         return this;
       }
@@ -2601,21 +2619,19 @@
          return shapeEdges;
       }
 
-      /** Get Annotations tied to the shapes in this collection
-       *    IMPORTANT: For robustness we use all annotations that are in the bounding box of this ShapeCollection
-       *          not just the annotations that are directly tied to the Shapes within
-       *          This because annotations might be added using methods like bbox() 
-       */
+      /** Get Annotations tied to the collection or sub Shapes  */
       getAnnotations(onlyVisibleShapes:boolean=false):Array<Annotation>
       {
-         const BBOX_MARGIN = 100; 
+         const shapeAnnotations = this.shapes.reduce((agg,s) => 
+         {
+               agg = (onlyVisibleShapes && s.visible()) ? agg.concat(s.annotations) : agg.concat(s.annotations)
+               return agg  
+         },[]);
 
-         const allAnnotations = this._geom._annotator.getAnnotations();
-         let collectionBbox = this.bbox(true); // withAnnotations - but does not take into account annotations not tied to shapes!
-         collectionBbox = collectionBbox.enlarged(BBOX_MARGIN); // TMP FIX: make bbox larges to catch dimensions not tied to shapes
+         console.log('==== GET ANNOTATIONS ====');
+         console.log(shapeAnnotations);
 
-         const annotationsInBbox = allAnnotations.filter(a => a.inBbox(collectionBbox) && ((onlyVisibleShapes) ? a?.shape?.visible : true) )  
-         return annotationsInBbox;
+         return [...this.annotations, ...shapeAnnotations];
       }
 
       /** Export Shapes that are 2D and on XY plane to SVG 
@@ -2625,8 +2641,12 @@
        *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
        *    TODO: run these algorithms apart from OC
       */
-      toSvg(options:toSVGOptions = { all: false, annotations: true}):string
+      toSvg(options?:toSVGOptions):string
       {
+         const DEFAULT_OPTIONS = { all: false, annotations: true };
+
+         options = { ...DEFAULT_OPTIONS, ...(options ?? {}) };
+
          const BBOX_ANNOTATION_MARGIN = 10; // Add small margin on all sides to exported bboxes (SVG and world) - mostly for texts on dimension lines
 
          let shapeEdges = this._get2DXYShapeEdges(options?.all);
@@ -2656,7 +2676,7 @@
                         _bbox="${svgWorldBbox}" 
                         _worldUnits="${this._geom._units}" stroke="black">
                         ${svgPaths.join('\n\t')}
-                        ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
+                        ${ (withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
 

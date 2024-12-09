@@ -4,7 +4,7 @@
  *          Is used also for selecting and aligning 
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection } from './internal'
+import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection, AnyShapeOrCollection } from './internal'
 import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
@@ -20,6 +20,7 @@ export class Bbox
     _oc:any;
     _geom:any;
     _ocBbox:any = null;
+    _parent:AnyShapeOrCollection;
 
     position:Point;
     bounds:Array<number> = null; // [xmin,xmax, ymin,ymax, zmin, zmax]
@@ -37,7 +38,14 @@ export class Bbox
         {
             this.create(min,max);
         }
+    }
 
+    /** Link to Shape or ShapeCollection
+     *  Used to keep track of _parent chain for Bbox subshapes
+     */
+    setParent(p:AnyShapeOrCollection)
+    {
+        this._parent = p
     }
 
     @checkInput(['PointLike', 'PointLike'], ['Vector', 'Vector'])
@@ -488,7 +496,7 @@ export class Bbox
         return this[AXIS_TO_SIDE[axis]]();
     }   
 
-    /** Get Shape from this Orientated Bounding Box */
+    /** Get Shape from this Bounding Box */
     shape():Edge|Face|Solid|null
     {
         // TODO: point or line?
@@ -729,7 +737,7 @@ export class Bbox
             sideShape = bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axisWithDir).specific() as Vertex|Edge|Face;
         }   
 
-        sideShape._parent = this.shape(); // set parent shape so for example knows what the main bbox shape is
+        sideShape._parent = this._parent ?? this.shape(); // set parent shape so for example knows what the main bbox shape is
         return sideShape;
     }
 

@@ -1198,8 +1198,6 @@ export class Edge extends Shape
         options.units = options?.units || this._geom.units(); // make sure we have units
 
         const dimLine = this._geom._annotator.dimensionLine().fromEdge(this, options);
-        const mainShape = this._parent || this;
-        mainShape.addAnnotations(dimLine);
 
         return dimLine
     }
@@ -1305,7 +1303,8 @@ export class Edge extends Shape
                 const geomStyle = style[t.geom];
                 const val = (geomStyle) ? geomStyle[t.prop] || null : null;
                 const svgValue = t.transform(val);
-                if(svgValue){
+                if(svgValue)
+                {
                     svgAttrs[t.attr] = svgValue
                 } 
                 else {
