@@ -252,18 +252,18 @@ export class Exporter
             }
         }
 
+        // extra vertices and lines for specific visualization styles
+        if (options?.extraShapesAsPointLines)
+            {
+                const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
+                gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
+            }
+
         // Add special archiyou data in GLTF asset.extras section
         if(options?.archiyouFormat)
         {
             // add special Archiyou data to GLTF
             gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, options?.archiyouOutput || {}); 
-        }
-
-        // extra vertices and lines for specific visualization styles
-        if (options?.extraShapesAsPointLines)
-        {
-            const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
-            gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
         }
 
         return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
