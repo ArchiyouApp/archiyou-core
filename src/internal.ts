@@ -67,6 +67,7 @@ export * from './Db'
 export * from './Calc'
 
 export * from './ParamManager'
+export * from './ParamManagerOperator'
 
 
 export * from './Make'

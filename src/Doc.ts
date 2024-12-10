@@ -603,22 +603,24 @@ export class Doc
             .pivot(1,0)
             .position([`${297-30}mm`, '6mm'] as ContainerPositionAbs); // bit hacky
 
-        
-        this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        // Metric labelblock
+        this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH, numTextLines: 2 }); // TODO: dynamic param readout
         const metricsBlock = this.lastBlock();
-        this.labelblock('params', this._getParamSummary(), { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        // Param labelblock
+        this.labelblock('params', this._getParamSummary(), { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH, numTextLines: 2 }); // TODO: dynamic param readout
         const paramsBlock = this.lastBlock();
+        // Info labelblock
         this.labelblock(
                         ['designer', 'design license', 'manual license'], 
                         [ settings.designer, settings.designLicense, settings.manualLicense], 
-                        { y: paramsBlock.bbox[3] + BLOCK_MARGIN, textSize : '3.5mm', width: TITLEBLOCK_WIDTH });
+                        { y: paramsBlock.bbox[3] + BLOCK_MARGIN, textSize : '3.5mm', width: TITLEBLOCK_WIDTH, numTextLines: 1 });
         const designBlock =  this.lastBlock();
         
         this.hline({ thickness: '2pnt', color: 'black', length: TITLEBLOCK_WIDTH})
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2)
             .pivot(1,0.5)
         // header
-        this.text( data.title, { size: '8mm', bold: true })
+        this.text( data?.title || DEFAULT_SETTINGS.title, { size: '8mm', bold: true })
             .pivot(1,0)
             .width(TITLEBLOCK_WIDTH)
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2);
@@ -750,7 +752,7 @@ export class Doc
         const blockTextSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockTextSizePnt + 'pnt', 'height');
         const blockLabelSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockLabelSizePnt + 'pnt', 'height');
 
-        const blockHeightRel = blockTextSizeRel + blockLabelSizeRel + 2*blockMarginRel + blockMarginBetweenRel;
+        const blockHeightRel = blockTextSizeRel*(options?.numTextLines ?? 1) + blockLabelSizeRel + 2*blockMarginRel + blockMarginBetweenRel;
 
         const xRel =  this._activePage._resolveValueWithUnitsStringToRel(options.x, 'width');
         const yRel = this._activePage._resolveValueWithUnitsStringToRel(options.y, 'height');
@@ -765,15 +767,17 @@ export class Doc
         
         labels.forEach((label,i,arr) => 
         {
+            // label
             this.text(label, { size: blockLabelSizePnt})
             .width(blockWidthRel)
             .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
-            .position(blockXRel, blockYRel+blockMarginRel+blockTextSizeRel*1.2+blockMarginBetweenRel); // NOTE: small factor to correct for bigger height
+            .position(blockXRel, blockYRel+blockMarginRel+blockTextSizeRel*options?.numTextLines*1.1+blockMarginBetweenRel); // NOTE: small factor to correct for bigger height
 
+            // main text
             this.text(texts[i] || '', { size: (i === 0) ? blockTextSizePnt : blockSecondaryTextSizePnt }) // Secondary texts are smaller
                 .width(blockWidthRel)
                 .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
-                .position(blockXRel, blockYRel+blockMarginRel)
+                .position(blockXRel, blockYRel+blockMarginRel+((options?.numTextLines-1)*blockTextSizeRel))
         })
         
         this._lastBlock = {

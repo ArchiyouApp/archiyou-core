@@ -303,7 +303,7 @@ export class Annotator
         return shapes;
     }
 
-    /** Make (semi) automatic dimension lines through the Shapes of this collection at levels (in percentage of total size) along MainAxis within bbox
+    /** Make (semi) automatic dimension lines through the Shapes of this collection at levels (in percentage of total size or absolute coords) along MainAxis within bbox
      *    @param options:AutoDimSettings
      *    {
      *       levels: Array< Record<MainAxis,number>
@@ -328,39 +328,59 @@ export class Annotator
         settings.levels.forEach((lvl,i) => 
         {
             lvl = lvl as DimensionLevel;
-            const levelAxis = lvl?.axis
+
+            const levelAxis = lvl?.axis // axis of dimension cutting line
             let levelCoord = lvl?.at; // percentage of size along levelAxis
             
-            // NOTE: if coordType not given, We take it that if the level is given < 1.0 it is meant absolute
-            const levelCoordType = lvl?.coordType || ((levelCoord < 1 || levelCoord > -1 ) ? 'absolute' : 'relative');
+            // NOTE: if coordType not given, We take it that if the level is given in 0 < coord > 1.0 it is absolute
+            const levelCoordType = !lvl?.coordType && ((levelCoord < 0 || levelCoord > 1 ) ? 'absolute' : 'relative');
+
+            console.log('==== LEVEL ====');
+            console.log(levelCoordType);
+            console.log(levelAxis); 
             
             if(levelCoordType === 'relative')
             {
                 levelCoord = (levelCoord > 1.0) ? 1.0 : levelCoord; 
-                levelCoord = (levelCoord < 0) ? 0 : levelCoord;
+                levelCoord = (levelCoord < 0) ? 0.0 : levelCoord;
             }
             
             const bboxSize = collectionBbox.sizeAlongAxis(levelAxis);
-            const rangeAxis = (['x','y','z'] as Array<MainAxis>).find((a) => a !== levelAxis && collectionBbox.axisMissingIn2D() !== a);
-            const sectionLineDepthAxis = (['x','y','z'] as Array<MainAxis>).find(a => a !== levelAxis && a !== rangeAxis);
+            const rangeAxis = (['x','y','z'] as Array<MainAxis>).find((a) => a !== levelAxis && collectionBbox.axisMissingIn2D() !== a); // dimension section line along this axis
+
+            console.log(rangeAxis);
+
+            const sectionLineDepthAxis = (['x','y','z'] as Array<MainAxis>).find(a => a !== levelAxis && a !== rangeAxis); // this axis is not really in play
             const sectionLineRangeStart = collectionBbox.min()[rangeAxis] - BBOX_MARGIN;
             const sectionLineRangeEnd = collectionBbox.max()[rangeAxis] + BBOX_MARGIN;
             const sectionLineStart = new Point(0,0,0)['set'+rangeAxis.toUpperCase()](sectionLineRangeStart);
             const sectionLineEnd = new Point(0,0,0)['set'+rangeAxis.toUpperCase()](sectionLineRangeEnd);
-            const sectionLineLevelCoord = (levelCoordType === 'relative') ? collectionBbox.minAtAxis(levelAxis) + levelCoord*bboxSize : levelCoord;
-            const sectionLine = new Edge().makeLine(sectionLineStart,sectionLineEnd)
-                                            ['move'+levelAxis.toUpperCase()](sectionLineLevelCoord)
+            const sectionLineLevelCoord = (levelCoordType === 'relative') 
+                                                ? collectionBbox.minAtAxis(levelAxis) + levelCoord*bboxSize 
+                                                : levelCoord;
+
+            console.log('LEVEL COORD')
+            console.log(levelCoord);
+            console.log(collectionBbox.minAtAxis(levelAxis))
+            console.log(levelCoord*bboxSize)
+            console.log(sectionLineLevelCoord);
+
+            const sectionLine = new Edge().makeLine(sectionLineStart,sectionLineEnd) // set basic section line 
+                                            ['move'+levelAxis.toUpperCase()](sectionLineLevelCoord); // move line to level coord
+
+            sectionLine.addToScene().color('red')
 
             if(lvl?.showLine){ sectionLine.color('red').addToScene() };
             // to deal with accurary issues we use a section plane
             const sectionPlaneNormal = new Vector(0,0,0)['set'+sectionLineDepthAxis.toUpperCase()](1);
             const sectionPlane = sectionLine._extruded(SECTION_PLANE_DEPTH, sectionPlaneNormal)
                                     ['move'+sectionLineDepthAxis.toUpperCase()](-SECTION_PLANE_DEPTH/2);
+
             // now get unique intersection points of all shapes
             const intersectionPointsAlongRangeAxis = []
             const intersections = collection._intersections(sectionPlane);
 
-            if(!intersections.length)
+            if(intersections.length === 0)
             {
                 console.warn(`ShapeCollection::autoDim(): level "${levelAxis}=${levelCoord}" [${levelCoordType}] Did not cut any Shapes!`)
             }
@@ -383,10 +403,10 @@ export class Annotator
             let dimLinesLevelCoord = sectionLineLevelCoord;
             if ((lvl?.align ?? true) || lvl?.align === 'auto')
             {
-                // section line on side of bbox at levelAxis that is closest to given lvl.at
+                // section line on side of bbox at levelAxis that is closest to given sectionLineLevelCoord
                 const minSide = collectionBbox['min'+levelAxis.toUpperCase()]();
                 const maxSide = collectionBbox['max'+levelAxis.toUpperCase()]();
-                dimLinesLevelCoord = Math.abs(lvl.at - minSide) <  Math.abs(lvl.at - maxSide) ? minSide : maxSide;
+                dimLinesLevelCoord = Math.abs(sectionLineLevelCoord - minSide) <  Math.abs(sectionLineLevelCoord - maxSide) ? minSide : maxSide;
             }
             else if(['min','max'].includes(lvl?.align))
             {
@@ -427,7 +447,8 @@ export class Annotator
                                                 offsetVec: offsetVec,
                                                 roundDecimals: 0,
                                             }
-                                        )
+                                        ).link(collection);
+
                         autoDimLines.push(dimLine);
                     }
                 }

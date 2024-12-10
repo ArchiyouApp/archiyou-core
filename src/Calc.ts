@@ -114,7 +114,7 @@
     */
     table(name:string, data?:DataRows, columns?:Array<string>):Calc|Table
     {   
-        this.autoInit();
+        //this.autoInit(); // Not needed: Danfo is disabled
 
         if(!name){ throw new Error(`Calc::table: Please supply a table name`); }
 
@@ -169,34 +169,14 @@
             console.warn(`Calc::metric: Your metric "${name}" is not part of official ones: ${METRICS.join(', ')}`);
         }
 
-        this.autoInit();
-
-        // data is reference to some table location
-        let parsedData;
-        if(typeof data === 'string')
-        {
-            try {
-                let tableLocation = this._resolveTableLocation(data as string);
-                parsedData = tableLocation.data;
-            }
-            catch(e)
-            {
-                // could not parse as table location somehow
-            }
-        }
-
-        // we assume it is a direct value if parsing failed or data is not a string
-        if(!parsedData)
-        {
-            parsedData = data;
-        }
+        //this.autoInit(); // Disabled because we don't need Danfo
 
         // make metric data structure
-        let metric = {  
+        const metric = {  
                 name: name,
                 label: options?.label || name,
                 type: 'text', // only text is implemented now
-                data: parsedData,
+                data: data,
                 options: options
         } as Metric
 
@@ -205,6 +185,15 @@
         return metric;
 
     } 
+
+    /** Convert metrics to own table */
+    metricsToTable():Table
+    {
+        return this.table('metrics', 
+            Object.values(this._metrics).map(m => { return [m?.label || m.name, m.data] }),
+            ['name', 'value']
+        ) as Table
+    }
 
     //// UTILS ////
 

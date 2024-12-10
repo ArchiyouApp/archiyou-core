@@ -44,7 +44,7 @@ export class Shape
     _oc:any; // avoids TS errors in filling CLASSNAME_TO_SHAPE_ENUM
     _geom:any;
     _obj:Obj; // Obj container this Shape belongs to
-    _parent:Shape; // With selecting subshapes we keep the reference to parent    
+    _parent:AnyShapeOrCollection; // With selecting subshapes we keep the reference to parent    
     _ocShape:any = null; // instance of OC Shape subclass: Vertex, Edge, Wire etc. - NOTE: we have to set a value here: otherwise it will not be set 
     _ocId:string = null;
     _isTmp:boolean = false; // Flag to signify if a Shape is temporary (for example for construction)

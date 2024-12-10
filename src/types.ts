@@ -271,6 +271,7 @@ export interface ComputeResult
     tables?: Record<string, any>, // TS type TODO
     metrics?: Record<string, any>, // TS type TODO
     info?:ArchiyouAppInfo, // general metadata 
+    managedParams?:Record<ParamOperation, Array<PublishParam>>
 }
 
 
@@ -304,7 +305,7 @@ export interface Param
     length?: number // for ParamInputText, ParamInputList    
     units?:ModelUnits
     // internal data for ParamManager
-    _manageOperation?: ParamOperation
+    // _manageOperation?: ParamOperation // Not used
     _definedProgrammatically?: boolean // this Param is defined programmatically in script
     // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
     _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
@@ -539,7 +540,7 @@ export interface DimensionOptions
 
 export interface DimensionLevel
 {
-    axis:MainAxis
+    axis:MainAxis // axis of dimension cut line
     at: number // coordinate on given axis, relative or absolute
     coordType?: 'relative' | 'absolute' // auto determine
     align?: 'min'|'auto'|'max' // align dimension lines to Shape/Collection
@@ -1042,7 +1043,7 @@ export interface CalcData
 //// PARAM MANAGER ////
 // NOTE: See above for general types around Params
 
-export type ParamOperation = 'new'|'updated'|'same'|'deleted'
+export type ParamOperation = 'new'|'updated'|'deleted'
 
 //// PUBLISH TYPES ////
 
