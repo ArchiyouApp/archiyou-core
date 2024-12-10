@@ -127,6 +127,7 @@ export class GLTFBuilder
                     pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
                     metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
                     tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
+                    managedParams: ay?.paramManager?.getChangedParamsByOperation(),
                     /* TODO: pipeline
                         Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
                         something like:
@@ -135,8 +136,11 @@ export class GLTFBuilder
                             '3dprint' : { 'glb : { ... }, 'stl' : { ...} }
                         }
                     */
-                    managedParams: ay?.paramManager?.getChangedParamsByOperation(),
+                    
                 } as ArchiyouData
+
+                console.log('==== EXPORT GLTF AY =====');
+                console.log(JSON.stringify(ay?.paramManager?.getChangedParamsByOperation()));
                 
                 let buffer = io.writeBinary(this.doc); 
                 return buffer; 
