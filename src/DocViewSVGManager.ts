@@ -399,9 +399,16 @@ export class DocViewSVGManager
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
+
         if(!dimLineCoords) return null;
 
         const vec = [dimLineCoords[2]-dimLineCoords[0], dimLineCoords[3]-dimLineCoords[1]] as [number,number];
+
+        console.log('==== SVG DIM LINE OFFSET VEC - dim line vec ===')
+        console.log(dimLineNode);
+        console.log(dimLineCoords)
+        console.log(vec);
+        console.log(this._rotateVec(vec, 90, length));
         
         return this._rotateVec(vec, 90, length)
     }
@@ -409,12 +416,13 @@ export class DocViewSVGManager
     /** Rotate a Vector a given angle around the origin and give it a certain length */
     _rotateVec(v:[number,number], angle:number, length:number=1):[number,number]
     {
+        // see: https://matthew-brett.github.io/teaching/rotation_2d.html
         const r = Math.sqrt(Math.pow(v[0],2) + Math.pow(v[1],2)); 
         const angleRad = angle * Math.PI / 180;
-        return [
-            r * Math.cos(angleRad) / r * length, // normalize and then scale 
-            r * Math.sin(angleRad) / r * length 
-        ] as [number,number]
+        const v2x = v[0]*Math.cos(angleRad) - v[1]*Math.sin(angleRad);
+        const v2y = v[0]*Math.sin(angleRad) + v[1]*Math.cos(angleRad);
+        // normalize to given length
+        return [v2x/r*length, v2y/r*length]
     }
 
     /** Draw the line element of a dimLineNode to PDFdocument 
@@ -435,7 +443,6 @@ export class DocViewSVGManager
     }
 
     /** Draw the line nodes of a dimeLineNode to PDFDocument 
-     * 
      *  When dimension line is small, the arrows are flipped ( <--> to >--< )
     */
     _drawDimLineArrows(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
@@ -490,8 +497,14 @@ export class DocViewSVGManager
         // If dimension line is very small we place text away from it
         if (this._svgDimLineIsSmall(dimLineNode))
         {
+            console.log('==== DRAM DIM LINE TEXT: SMALL ====');
+            
+
             const offsetAmount = convertValueFromToUnit(this.DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE * this.DIMLINE_TEXT_SIZE_MM, 'mm', 'pnt');
-            const offsetVec = this._svgDimLineOffsetVec(dimLineNode, offsetAmount)
+            const offsetVec = this._svgDimLineOffsetVec(dimLineNode, offsetAmount);
+
+            console.log('==== OFFSETVEC ====');
+            console.log(offsetVec)
 
             if(!offsetVec)
             { 
