@@ -47,7 +47,7 @@ export class ParamManagerOperator
     targetParam:Param
     value:any // reference to targetParam.value
     manager: ParamManager
-    operation:ParamOperation // new, update, delete
+    operation:ParamOperation // undefined (none), new, update, delete
 
     constructor(manager:ParamManager, p?:Param)
     {
@@ -169,6 +169,12 @@ export class ParamManagerOperator
     }
 
     //// COMPARE WITH ORIGINAL PARAM ////
+
+    /** Had this operator any operations */
+    paramOperated():boolean
+    {
+        return this.operation !== undefined;
+    }
     
     /** Compare target Param with original one */
     paramChanged():boolean

@@ -135,7 +135,7 @@ export class GLTFBuilder
                             '3dprint' : { 'glb : { ... }, 'stl' : { ...} }
                         }
                     */
-                    managedParams: ay?.paramManager?.getChangedParamsByOperation(),
+                    managedParams: ay?.paramManager?.getOperatedParamsByOperation(),
                 } as ArchiyouData
                 
                 let buffer = io.writeBinary(this.doc); 
