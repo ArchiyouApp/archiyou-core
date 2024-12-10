@@ -399,16 +399,9 @@ export class DocViewSVGManager
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
-
         if(!dimLineCoords) return null;
 
         const vec = [dimLineCoords[2]-dimLineCoords[0], dimLineCoords[3]-dimLineCoords[1]] as [number,number];
-
-        console.log('==== SVG DIM LINE OFFSET VEC - dim line vec ===')
-        console.log(dimLineNode);
-        console.log(dimLineCoords)
-        console.log(vec);
-        console.log(this._rotateVec(vec, 90, length));
         
         return this._rotateVec(vec, 90, length)
     }
@@ -497,14 +490,8 @@ export class DocViewSVGManager
         // If dimension line is very small we place text away from it
         if (this._svgDimLineIsSmall(dimLineNode))
         {
-            console.log('==== DRAM DIM LINE TEXT: SMALL ====');
-            
-
             const offsetAmount = convertValueFromToUnit(this.DIMLINE_TEXT_SMALL_OFFSET_TIMES_TEXT_SIZE * this.DIMLINE_TEXT_SIZE_MM, 'mm', 'pnt');
             const offsetVec = this._svgDimLineOffsetVec(dimLineNode, offsetAmount);
-
-            console.log('==== OFFSETVEC ====');
-            console.log(offsetVec)
 
             if(!offsetVec)
             { 

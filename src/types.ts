@@ -540,7 +540,7 @@ export interface DimensionOptions
 
 export interface DimensionLevel
 {
-    axis:MainAxis
+    axis:MainAxis // axis of dimension cut line
     at: number // coordinate on given axis, relative or absolute
     coordType?: 'relative' | 'absolute' // auto determine
     align?: 'min'|'auto'|'max' // align dimension lines to Shape/Collection

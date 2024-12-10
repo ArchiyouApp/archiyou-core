@@ -2628,9 +2628,6 @@
                return agg  
          },[]);
 
-         console.log('==== GET ANNOTATIONS ====');
-         console.log(shapeAnnotations);
-
          return [...this.annotations, ...shapeAnnotations];
       }
 
