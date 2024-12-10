@@ -52,6 +52,51 @@ export class ParamManager
         return this
     }
 
+    //// CLASS METHOD ////
+
+    /** Compare managedParams with original ones of ParamManager and update params array in place
+     *  If needed forcing reactivity by creating copies
+     *  returns new or changed params 
+     */
+    static updateParamsWithManaged(currentParams:Array<Param|PublishParam>, managedParams:Record<ParamOperation, Array<PublishParam>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<Param>
+    {
+        const allManagedParams = [...managedParams.new, ...managedParams.updated];
+        const paramsToChange:Array<Param> = []
+
+        allManagedParams.forEach( managedParam => 
+        {
+            const presentParam = currentParams.find( p => p.name === managedParam.name);
+            if(!presentParam)
+            {
+                // new param
+                paramsToChange.push(publishParamToParam(managedParam));
+            }
+            else {
+                // existing param: check if changed
+                if(!deepEqual(paramToPublishParam(ParamManager.validateParam(presentParam)), managedParam))
+                { 
+                    paramsToChange.push(publishParamToParam(managedParam))
+                }
+            }
+        })
+        // Now update the original currentParams
+        paramsToChange.forEach((pc) => {
+            const i = currentParams.findIndex((p) => p.name === pc.name)
+            if(i >= 0)
+            {
+                // update existing in place
+                currentParams[i] = pc;
+            }
+            else {
+                // new
+                currentParams.push(pc);
+            }
+        })
+
+        if(forceReactivity) currentParams = [...currentParams];
+        return paramsToChange
+    }
+
     //// MANAGING PARAMS ////
 
     /** Add or update Param and return what was done (update, new, null)  */
@@ -169,11 +214,11 @@ export class ParamManager
      *  We try to make anything work here, except if nothing is given
      *  See also checkParam in ParamEntryController
      */
-    _validateParam(p:Param):Param
+    static validateParam(p:Param):Param
     {
         if(!p)
         {
-            console.error(`ParamManager::_validateParam(p:Param): Please supply valid Param object! Got null/undefined!`);
+            console.error(`ParamManager::validateParam(p:Param): Please supply valid Param object! Got null/undefined!`);
             return null;
         }
 
@@ -219,7 +264,7 @@ export class ParamManager
                 checkedParam = {
                     ...p,
                     type: paramType,
-                    listElem: this._validateParam(p.listElem) ?? this._validateParam({ type: 'number' } as Param), // a Number is the default for a List
+                    listElem: ParamManager.validateParam(p.listElem) ?? ParamManager.validateParam({ type: 'number' } as Param), // a Number is the default for a List
                 } as Param;
                 break;
             case 'object':
@@ -229,7 +274,7 @@ export class ParamManager
                 
                 for (const [name, param] of Object.entries(s))
                 {
-                    schema[name.toUpperCase()] = this._validateParam(param); // param names are always uppercase!
+                    schema[name.toUpperCase()] = ParamManager.validateParam(param); // param names are always uppercase!
                 }
 
                 checkedParam = {
@@ -248,12 +293,18 @@ export class ParamManager
         return checkedParam;
     }
 
-    //// EVALUATE CHANGES ////
+    _validateParam(p:Param):Param
+    {
+        return ParamManager.validateParam(p);
+    }
 
-    getChangedParamsByOperation():Record<ParamOperation, Array<PublishParam>>
+    //// EVALUATE ////
+
+    /** Return Params that we operated upon */
+    getOperatedParamsByOperation():Record<ParamOperation, Array<PublishParam>>
     {
         const changedParamsByOperation = this.paramOperators
-                                    .filter((po) => po.paramChanged())
+                                    .filter((po) => po.paramOperated())
                                     .reduce(
                                         (acc,po) => {
                                             acc[po.operation as ParamOperation].push(po.toData())
@@ -261,12 +312,11 @@ export class ParamManager
                                         }, 
                                         { new: [] as Array<PublishParam>, updated: [] as Array<PublishParam>, deleted: [] as Array<PublishParam> })
 
-        console.info('**** ParamManager::getChangedParamsByOperation ****')
+        console.info('**** ParamManager::getOperatedParamsByOperation ****')
         console.info(changedParamsByOperation);
         
         return changedParamsByOperation
     }
-
  
     //// UTILS ////
 
