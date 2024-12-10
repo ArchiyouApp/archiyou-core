@@ -335,10 +335,6 @@ export class Annotator
             // NOTE: if coordType not given, We take it that if the level is given in 0 < coord > 1.0 it is absolute
             const levelCoordType = !lvl?.coordType && ((levelCoord < 0 || levelCoord > 1 ) ? 'absolute' : 'relative');
 
-            console.log('==== LEVEL ====');
-            console.log(levelCoordType);
-            console.log(levelAxis); 
-            
             if(levelCoordType === 'relative')
             {
                 levelCoord = (levelCoord > 1.0) ? 1.0 : levelCoord; 
@@ -347,8 +343,6 @@ export class Annotator
             
             const bboxSize = collectionBbox.sizeAlongAxis(levelAxis);
             const rangeAxis = (['x','y','z'] as Array<MainAxis>).find((a) => a !== levelAxis && collectionBbox.axisMissingIn2D() !== a); // dimension section line along this axis
-
-            console.log(rangeAxis);
 
             const sectionLineDepthAxis = (['x','y','z'] as Array<MainAxis>).find(a => a !== levelAxis && a !== rangeAxis); // this axis is not really in play
             const sectionLineRangeStart = collectionBbox.min()[rangeAxis] - BBOX_MARGIN;
@@ -359,16 +353,8 @@ export class Annotator
                                                 ? collectionBbox.minAtAxis(levelAxis) + levelCoord*bboxSize 
                                                 : levelCoord;
 
-            console.log('LEVEL COORD')
-            console.log(levelCoord);
-            console.log(collectionBbox.minAtAxis(levelAxis))
-            console.log(levelCoord*bboxSize)
-            console.log(sectionLineLevelCoord);
-
             const sectionLine = new Edge().makeLine(sectionLineStart,sectionLineEnd) // set basic section line 
                                             ['move'+levelAxis.toUpperCase()](sectionLineLevelCoord); // move line to level coord
-
-            sectionLine.addToScene().color('red')
 
             if(lvl?.showLine){ sectionLine.color('red').addToScene() };
             // to deal with accurary issues we use a section plane
