@@ -1111,7 +1111,7 @@ export class Shape
     }
 
     /** Try to align Shape with x (horizontal) or y axis (vertical) as much as possible */
-    @checkInput([['OrientationXY', 'vertical']], ['auto'])
+    @checkInput([['OrientationXY', 'vertical']], ['auto', 'auto'])
     rotateToOrthoXY(o?:OrientationXY)
     {
         /* We determine the primary axis of a Shape by different methods:
@@ -1248,7 +1248,7 @@ export class Shape
      *  If given an axis we only select Faces that face that axis
      *  Otherwise we consider the Shapes as extrusions and use extrudedFace 
     */
-    @checkInput('MainAxis', 'auto')
+    @checkInput(['MainAxis'], ['auto'])
     _flattened(axis?:MainAxis):AnyShape
     {
         const FACE_NORMAL_AXIS_ANGLE_MAX = 1;
@@ -2138,7 +2138,7 @@ export class Shape
 
     /** Directly make a line from this Shape to the closest other */
     @addResultShapesToScene
-    lineTo(other:PointLikeOrAnyShapeOrCollection):Edge|null
+    lineTo(other:PointLikeOrAnyShapeOrCollection):Shape|null // NOTE: Can't use Edge yet in TS?
     {
         const closestLink = this.distanceLink(other);
         
@@ -3872,7 +3872,7 @@ export class Shape
     }
 
     /** Select SubShapes by index or indices */
-    _selectorIndex(shapes:AnyShapeCollection, index: SelectorIndex):AnyShapeCollection
+    _selectorIndex(shapes:AnyShapeCollection,index: SelectorIndex):AnyShapeCollection
     {
         let selectedShapes = new ShapeCollection();
         shapes.forEach( (shape, i) => {
