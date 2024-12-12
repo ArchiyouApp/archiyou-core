@@ -11,11 +11,12 @@
 
  import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
          ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
-         Pivot,AnyShapeSequence, Alignment, Bbox, Side} from './internal' // see types
+         Pivot,AnyShapeSequence, Alignment, Bbox, Side,
+         isMainAxis} from './internal' // see types
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, MainAxis, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
  import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, AnnotationAutoDimStrategy } from './internal'
 
@@ -78,6 +79,7 @@
          
          this._addEntities(entities); // pack all together
          this._setFakeArrayKeys();
+         this._setFakeNameKeys();
 
          return this;
       }
@@ -273,7 +275,7 @@
       }
 
 
-      /* EXPERIMENTAL: try to be compatible with Arrays by setting index keys on this instance */
+      /** EXPERIMENTAL: try to be compatible with Arrays by setting index keys on this instance */
       _setFakeArrayKeys()
       {
          // remove previous if any
@@ -291,7 +293,17 @@
          }
          // add fake keys
          this.shapes.forEach( (shape,index) => this[index] = shape);
-         
+      }
+
+      /** EXPERIMENTAL: Set references to Shapes by name directly on instance */
+      _setFakeNameKeys()
+      {
+         this.shapes.forEach(s => {
+            if(s.name())
+            {
+               this[s.name() as string] = s;
+            }
+         })
       }
 
       /** EXPERIMENTAL: directly access groups by adding property to instance */
@@ -396,6 +408,14 @@
          this._addEntities([shapes, ...args])
          this._setFakeArrayKeys();
 
+         return this;
+      }
+
+      /**  Array API - Add Shape to ShapeCollection*/
+      @checkInput('AnyShape', 'auto')
+      push(shape:AnyShape):ShapeCollection
+      {
+         this.add(shape);
          return this;
       }
 
@@ -1250,13 +1270,6 @@
          return selectedShapes.distinct();
       }
 
-      /**  Array API - Add Shape to ShapeCollection*/
-      @checkInput('AnyShape', 'auto')
-      push(shape:AnyShape):ShapeCollection
-      {
-         this.shapes.push(shape);
-         return this;
-      }
 
       /**  Array API - Pop last Shape from ShapeCollection*/
       pop():ShapeCollection
@@ -2222,18 +2235,47 @@
 
       //// LAYOUTING ALGORITHMS ////
 
-      /** Flatten all Shapes into new Shapes, align to fixed depth and return new ShapeCollection */
-      flattened():AnyShapeCollection
+      /** Flatten all Shapes into new Shapes, align to one plane and return new ShapeCollection 
+       *   If an axis is given all Shapes are flattened along that axis and placed at 0 at that axis
+       *   Otherwise we consider shapes as extrusions and we flatten according to _extrudedFace()
+      */
+      @addResultShapesToScene
+      @checkInput(['MainAxis', ['Boolean', true]], ['auto','auto'])
+      flattened(axis?:MainAxis, filterDuplicates?:boolean):AnyShapeCollection
       {
-         const flattened = this.map( s => s.flattened());       
-         if(flattened.is2D())
+         let flattened = this.map( s => s._flattened(axis)
+                                          .setName(s.getName())); // NOTE: we take over the name for easy access
+         
+         // move to zero
+         if (isMainAxis(axis))
          {
-            // make sure all 2D faces are on the same depth plane
-            const depthAxis2D = flattened.first().bbox().axisMissingIn2D();
-            console.log(depthAxis2D);
-            if(depthAxis2D)
+            flattened.forEach(s => s.moveToAxisCoord(axis, 0));
+            
+            // filter out duplicate based on bbox
+            if(filterDuplicates)
             {
-               flattened.forEach( s => s[`moveTo${depthAxis2D.toUpperCase()}`](0)); // just move to 0 for robustness
+                  flattened = new ShapeCollection(
+                     Object.values(
+                        flattened.toArray().reduce(
+                           (agg,s) => {
+                              agg[s.bbox().hash()] = s;
+                              return agg;
+                           }, 
+                        {})
+                     )
+                  )   
+            }
+         }
+         else {
+            if(flattened.is2D())
+            {
+               // make sure all 2D faces are on the same depth plane
+               const depthAxis2D = flattened.first().bbox().axisMissingIn2D();
+               
+               if(depthAxis2D)
+               {
+                  flattened.forEach( s => s[`moveTo${depthAxis2D.toUpperCase()}`](0)); // just move to 0 for robustness
+               }
             }
          }
 

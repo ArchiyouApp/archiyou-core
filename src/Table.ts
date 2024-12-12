@@ -1,6 +1,10 @@
-/** a AY table: basically a wrapper over a Danfo dataframe  */
+/**
+ *  Table.ts
+ *     A table object holds data and enables easy adding, modifiying of data
+ *     !!!! WIP !!!! We need to refactor the dependancy of Danfo, which is a bit too heavy for this context
+ * 
+*/
 
-// Danfo docs: https://danfo.jsdata.org/api-re
 import { Db, DataRowsColumnValue, DataRowColumnValue, DataRows } from './internal';
 import { isDataRowsValues, isDataRowsColumnValue } from './internal';
 import { DbCompareStatement } from './internal'; // types.ts
@@ -17,7 +21,7 @@ export class Table
     _name:string;
     _danfo:any; // Danfo module
     _db:Db; // reference to database parent
-    _dataframe:DataFrame;
+    _dataframe:DataFrame; // TODO: Remove Danfo stuff
     _dataRows: DataRowsColumnValue; // raw data fallback: [{ col1: v1, col2: v2}, { col1: v3, col2: v4 }]}
 
     /** Make Table from either rows with Objects or Danfo Dataframe */
@@ -95,15 +99,15 @@ export class Table
 
     firstRow():DataRowColumnValue
     {
-        return this?._dataframe?.iloc(0) || this._dataRows[0] || {}
+        return this._dataRows[0] || {}
     }
 
     /** Get size of table in rows and columns */
     shape():Array<number> // [rows,columns]
     {
-        return this?._dataframe?.shape || [this._dataRows.length, Object.keys(this._dataRows[0])?.length];
+        return [this._dataRows.length, Object.keys(this._dataRows[0])?.length];
     }
-
+    
     size():Array<number>
     {
         return this.shape();
@@ -119,6 +123,7 @@ export class Table
         return this.shape()[1];
     }
 
+    /** Set name of columns */
     setColumns(names:Array<string>):Table
     {
         if(!Array.isArray(names))
@@ -141,24 +146,51 @@ export class Table
         return this;
     }
 
-    /** Return column labels */
     columns():Array<string>
     {
-        return this?._dataframe?.columns || Object.keys(this.firstRow());
+        return this._dataRows.reduce( (agg, row) => 
+        {
+            Object.keys(row).forEach( (col) => 
+            {
+                if(!agg.includes(col))
+                {
+                    agg.push(col);
+                }
+            });
+            return agg
+        },
+            []
+        ) as Array<string>
     }
 
-    copy():Table 
-    {
-        return new Table(this?._dataframe?.copy() || [...this._dataRows])
-    }
 
     /** Return index labels. By default serial integers */
     index():Array<string|number>
     {
-        return this?._dataframe?.index || Array.from(Array(this._dataRows.length).keys());
+        return Array.from(Array(this._dataRows.length).keys());
     }
 
-    // ==== slicing and dicing methods ====
+    //// SIMPLE OPS ////
+
+    /** Add a simple row consisting of valyues */
+    addRow(row:Array<string|number|Record<string,  string|number>>):this
+    {
+        if(Array.isArray(row))
+        {
+            this._dataRows.push(this._zip(this.columns(), row))
+        }
+        else if(typeof row === 'object'){
+            const fullRow = { ...this._zip(this.columns(), []), ...(row as Object) };
+            this._dataRows.push(fullRow); // can directly push the key:value pair
+        }
+
+        console.log(this._dataRows);
+
+        return this;
+    }
+
+    //// SLICING AND DICING ////
+    // TODO: Remove Danfo stuff
 
     head(amount:number):Table
     {
@@ -294,39 +326,7 @@ export class Table
         return new Table( new this._danfo.DataFrame(rowObjs) );
     }
 
-    /** Add Column with certain value to Dataframe and return the new Table
-     *  @value 
-     *      - Can be a static value number, 'test' etc. !!!! IMPORTANT: Value cannot be null or undefined due to Danfo using NaN !!!!
-     *      - Can be a function to operate on the row (row,index,all?) -- needs to return a value for the new column
-     */
-    addColumn(name:string, value:any|Array<any>|((row:Object,index?:number, all?:Array<Object>) => any)=NaN):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
 
-        // an normal static value
-        if( !(typeof value == 'function'))
-        {
-            // IMPORTANT: Danfo expects a Array of values - and these values cannot be null or undefined in this context ==> use Nan
-            if (!(value instanceof Array))
-            {
-                value = new Array(this.numRows()).fill(this._protectNullUndefined(value));
-            }
-            let newDf = this._dataframe.copy();
-            newDf.addColumn(name, value); 
-
-            return new Table(newDf);
-        }
-        else {
-            // a dynamic value calculated on a row basis
-            let tmpTable = this.addColumn(name, NaN );
-            let wrapColFunc = (row:Object,index:number,all:Array<Object>) =>
-            {
-                row[name] = (value as Function)(row,index,all);
-            };
-            
-            return tmpTable.apply(wrapColFunc);            
-        }
-    }
 
     /** GroupBy: Grouping rows by column values and run aggregate functions */
     groupBy(columns:string|Array<string>, aggFuncs:string|Array<string>, aggColumns:string|Array<string>):Table
@@ -422,46 +422,19 @@ export class Table
     /** Output to Row objects */
     toDataRows():DataRowsColumnValue // TODO: TS typing
     {
-        if (!this._danfo) return this._dataRows;
-
-        let rawRows = this._dataframe.values; // returns [ [row1],[row2],[row3] ]
-        let columnNames = this.columns();
-
-        let rows = [];
-        rawRows.forEach( rowValues => {
-            rows.push( this._zip(columnNames, rowValues));
-        })
-        
-        return rows;
+        return this._dataRows;
     }
 
     /** Output to raw Array of values of this column */
     toDataColumn(columnName:string):Array<number|string>
     {
-        if (!this._danfo)
-        { 
-            return this._dataRows.map(row => row[columnName]); 
-        }
-
-        let colIndex = this.columns().indexOf(columnName);
-        if(colIndex !== -1)
-        {
-            let colValues = [];
-            this._dataframe.values.forEach( rowValues => 
-            {
-                colValues.push(rowValues[colIndex])
-            });
-
-            return colValues;
-        }
-
-        return [];
+        return this._dataRows.map(row => row[columnName]); 
     }
 
     /** Output raw data in rows */
     toData():DataRows
     {
-        return this?._danfo?.toJSON(this._dataframe) || this._dataRows;
+        return this._dataRows;
     }
 
     // ==== utils ====
@@ -484,7 +457,7 @@ export class Table
         
         keys.forEach( (key, index) =>
         {
-            obj[key] = values[index]
+            obj[key] = values[index] ?? null
         });
 
         return obj;

@@ -9,7 +9,7 @@
  * 
 */
 
-import { Point, Vector, Shape, Edge, AnyShape, ShapeCollection, AnyShapeOrCollection, isAnyShapeOrCollection } from './internal'
+import { Point, Vector, Shape, Edge, AnyShape, ShapeCollection, AnyShapeOrCollection, isAnyShapeOrCollection, isPointLike } from './internal'
 import {  Coord, MainAxis, PointLike, ModelUnits, DimensionLineData, DimensionOptions, AnnotationType} from './internal' // types
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
@@ -101,7 +101,13 @@ export class DimensionLine extends BaseAnnotation
     {
         this.linkedTo = (Shape.isShape(to)) 
                             ? this._getParentShape(to as Shape)
-                            : to as ShapeCollection; // Make sure we always got the top Shape
+                            : (ShapeCollection.isShapeCollection(to)) ? to as ShapeCollection : null; // Make sure we always got the top Shape
+
+        if(!this.linkedTo)
+        {
+            console.warn(`AnnotatorDimensionLine::link(): No valid Shape or ShapeCollection to link to. Skipped!`)
+            return this;
+        }
 
         this.linkedTo.addAnnotations(this);
 
@@ -317,7 +323,8 @@ export class DimensionLine extends BaseAnnotation
     {
         this.ortho = o?.ortho ?? false;
         this.offsetLength = o?.offset || this.offsetLength || this._calculateAutoOffsetLength();
-        this.offsetVec = o?.offsetVec || this.offsetVec || this._calculateOffsetVec();
+        const optionsOffsetVec = (isPointLike(o?.offsetVec)) ? new Vector(o.offsetVec) : null; // Transform any PointLikes of user into a Vector
+        this.offsetVec = optionsOffsetVec || this.offsetVec || this._calculateOffsetVec();
         this.units = o?.units || this.units;
         this.roundDecimals = o?.roundDecimals || this.roundDecimals;
         // TODO: more: color, linethickness etc.

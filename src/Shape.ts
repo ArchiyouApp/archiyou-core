@@ -935,6 +935,13 @@ export class Shape
         return this;
     }
 
+    /** Alias for moveToX/Y/Z() */
+    @checkInput(['MainAxis', Number], ['auto','auto'])
+    moveToAxisCoord(axis:MainAxis, coord:number)
+    {
+        return this[`moveTo${axis.toUpperCase()}`](coord);
+    }
+
     /** Move copy of the Shape to a Point in space */
     @checkInput('PointLike','Vector')
     movedTo(to:PointLike, ...args):this
@@ -1173,12 +1180,12 @@ export class Shape
     }
 
     /** Check if a Solid Shape can be seen as a simple extrusion and return the base Face */
-    _extrudedFace(side:SideZ='bottom'):this
+    _extrudedFace(side:SideZ='bottom'):Face|null
     {
         if(!this.is3D())
         { 
             console.warn(`Shape::_extrudedFace(): Shape is not 3D. Returned original`);
-            return this;
+            return null;
         }
 
         // An extrusion can be detected by 2 Faces with same normal and size (use area for now, not width and height)
@@ -1234,26 +1241,46 @@ export class Shape
         side = (['top','bottom'].includes(side)) ? side : 'bottom'
         const selectedExtrudedFace = (faceGroups[0] as any).faces.sort( (f1,f2) => f1.center().z - f2.center().z)[(side === 'top') ? 1 : 0];
 
-        return selectedExtrudedFace._copy()
+        return selectedExtrudedFace._copy() as Face;
     }
 
-    /** Flatten a Shape into a copy of a Face without altering the position */
-    _flattened():AnyShape
+    /** Flatten a Shape into a copy of a Face without altering the position 
+     *  If given an axis we only select Faces that face that axis
+     *  Otherwise we consider the Shapes as extrusions and use extrudedFace 
+    */
+    @checkInput('MainAxis', 'auto')
+    _flattened(axis?:MainAxis):AnyShape
     {
-        const extrudeFace = this._extrudedFace();
-        if (extrudeFace){ 
-            return extrudeFace
+        const FACE_NORMAL_AXIS_ANGLE_MAX = 1;
+
+        let flatFace:Face = null;
+        if(isMainAxis(axis))
+        {
+            const axisVec = this._axisAndPlanesToVector(axis);
+            flatFace = this.faces().find((f) => 
+            {
+                const a1 = Math.abs(f.normal().angle(axisVec));
+                const a2 = Math.abs(f.normal().angle(axisVec.reversed()));
+                return ( a1 <= FACE_NORMAL_AXIS_ANGLE_MAX || a2 <= FACE_NORMAL_AXIS_ANGLE_MAX)
+            })
+            flatFace = flatFace.copy(); // Make copy
         }
         else {
-            console.warn(`Shape::flattened(): Not an extruded Shape. We simply return the bottom Face.`)
-            return new ShapeCollection(this.select('F||bottom'))?.first();
+            flatFace = this._extrudedFace();
         }
+
+        if (!flatFace) 
+        {
+            console.warn(`Shape::flattened(): We cannot find a Face to flatten to. Returned null.`)
+        }
+        return flatFace;
     }
 
     @addResultShapesToScene
-    flattened():AnyShape
+    @checkInput('MainAxis', 'auto')
+    flattened(axis?:MainAxis):AnyShape
     {
-        return this._flattened();
+        return this._flattened(axis);
     }
 
     /** 
@@ -2107,6 +2134,17 @@ export class Shape
         }
         let links = this._closestLinks(other as PointLikeOrAnyShapeOrCollection);
         return  (links.length > 0) ? links[0] : null; 
+    }
+
+    /** Directly make a line from this Shape to the closest other */
+    @addResultShapesToScene
+    lineTo(other:PointLikeOrAnyShapeOrCollection):Edge|null
+    {
+        const closestLink = this.distanceLink(other);
+        
+        return (closestLink) 
+                ? new Edge().makeLine(closestLink.from, closestLink.to)
+                : null;
     }
 
     /** Returns the Vector of closest path from current Shape to the other */
@@ -3506,7 +3544,7 @@ export class Shape
     select(selectString:string=null):AnyShape|AnyShapeCollection // NOTE: always return ShapeCollection for clarity
     {
         let selectedShapes:AnyShapeCollection = new Selector(this).select(selectString);
-        selectedShapes.forEach( shape => shape._parent = this ); // keep reference to parent Shape
+        selectedShapes.forEach((ss) => ss._parent = this); // keep reference to parent Shape: TODO: Shall we recurve to find top parent (if any) ?
 
         return selectedShapes.checkSingle(); // return either ShapeCollection or single Shape
     }
@@ -3514,12 +3552,12 @@ export class Shape
     _axisAndPlanesToVector(axis:string):Vector
     {
         const AXIS_TO_VEC = {
-            'xy' : [0,0,1],
-            'yz' : [1,0,0],
-            'xz' : [0,1,0],
             'x' : [1,0,0],
             'y' : [0,1,0],
             'z' : [0,0,1],
+            'xy' : [0,0,1],
+            'yz' : [1,0,0],
+            'xz' : [0,1,0],
         }
 
         if ( (typeof axis) != 'string')
@@ -3767,6 +3805,7 @@ export class Shape
 
     /** Selects Shapes that intersect with the sides of the Bbox
      *  example: "V||fronttop"
+     *  TODO: Really make this more robust
      */
     @checkInput(['ShapeCollection', String], ['auto', 'auto'])
     _selectorSide(shapes:AnyShapeCollection, sidesString:string):AnyShapeCollection

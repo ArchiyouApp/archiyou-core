@@ -76,9 +76,9 @@ export class ParamManager
             }
             else {
                 // existing param: check if changed
-                if(!deepEqual(paramToPublishParam(ParamManager.validateParam(presentParam)), managedParam))
+                if(!deepEqual(paramToPublishParam(ParamManager.validateParam(presentParam)), ParamManager.validateParam(managedParam)))
                 { 
-                    paramsToChange.push(publishParamToParam(managedParam))
+                    paramsToChange.push(publishParamToParam(ParamManager.validateParam(managedParam)))
                 }
             }
         })
@@ -213,11 +213,11 @@ export class ParamManager
         return this;
     }
 
-    /** Check Param input and fill in defaults
+    /** Check Param or PublishParam input and fill in defaults
      *  We try to make anything work here, except if nothing is given
      *  See also checkParam in ParamEntryController
      */
-    static validateParam(p:Param):Param
+    static validateParam<TParam extends Param|PublishParam>(p:TParam):TParam
     {
         if(!p)
         {
@@ -227,7 +227,7 @@ export class ParamManager
 
         const paramType = p?.type || 'number'; // Default Param type is number
 
-        let checkedParam;
+        let checkedParam:TParam;
 
         switch(paramType)
         {
@@ -238,7 +238,7 @@ export class ParamManager
                     start: p?.start ?? 0,
                     end: p?.end ?? 100,
                     step: p?.step ?? 1,
-                } as Param;
+                } as TParam;
                 // if default not given choose start
                 checkedParam['default'] = p?.default ?? p.start;
                 break;
@@ -246,21 +246,21 @@ export class ParamManager
                 checkedParam = {
                     ...p, // copy all for convenience 
                     type: paramType,
-                } as Param;
+                } as TParam;
                 break;
             case 'text':
                 checkedParam = {
                     ...p,
                     type: paramType,
                     length: p.length ?? 100,
-                } as Param;
+                } as TParam;
                 break;
             case 'options':
                 checkedParam = {
                     ...p,
                     type: paramType,
                     options: p.options ?? [],
-                } as Param;
+                } as TParam;
                 break;
             case 'list': 
                 // NOTE: listElem is also a Param, which we need to check!
@@ -268,7 +268,7 @@ export class ParamManager
                     ...p,
                     type: paramType,
                     listElem: ParamManager.validateParam(p.listElem) ?? ParamManager.validateParam({ type: 'number' } as Param), // a Number is the default for a List
-                } as Param;
+                } as TParam;
                 break;
             case 'object':
                 // Object schema is also a set of Params
@@ -284,7 +284,7 @@ export class ParamManager
                     ...p,
                     type: paramType,
                     schema: schema,
-                } as Param;
+                } as TParam;
                 break;
         }
 

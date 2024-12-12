@@ -292,7 +292,7 @@ export interface Param
     id?: string
     type: ParamType
     listElem?: Param, // definition of list content (also a Param)
-    name?: string
+    name: string // always a name!
     enabled?:boolean // enabled or not
     visible?:boolean // Param is visible or not
     label: string // publically visible name
@@ -1049,4 +1049,4 @@ export type ParamOperation = 'new'|'updated'|'deleted'
 
 //// PUBLISH TYPES ////
 
-export type PublishLicense = 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'
+export type PublishLicense = 'unknown' | 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'

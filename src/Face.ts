@@ -231,10 +231,10 @@ export class Face extends Shape
             'yz' : { normal: [1,0,0], switch: true }
         }
 
-        let fromVec = from as Vector;
-        let toVec = to as Vector;
+        const fromVec = from as Vector;
+        const toVec = to as Vector;
 
-        let sharedPlane = fromVec.sharedPlane(toVec); // xy, yz, xz
+        const sharedPlane = fromVec.sharedPlane(toVec); // xy, yz, xz
 
         if (!sharedPlane)
         {

@@ -1198,6 +1198,7 @@ export class Edge extends Shape
         options.units = options?.units || this._geom.units(); // make sure we have units
 
         const dimLine = this._geom._annotator.dimensionLine().fromEdge(this, options);
+        dimLine.link(this._parent); // set parent
 
         return dimLine
     }

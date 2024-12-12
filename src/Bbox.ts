@@ -105,8 +105,8 @@ export class Bbox
     {
         // WORKAROUND FOR BUG in OPENCASCADE.JS: this._ocBbox.Get(xmin, ymin, zmin, xmax, ymax, zmax); // this gives an Error: RuntimeError: function signature mismatch11
 
-        let min = new Vector()._fromOcPoint(this._ocBbox.CornerMin()).round(); // Correct bbox calculation very small numbers (e1-7)
-        let max = new Vector()._fromOcPoint(this._ocBbox.CornerMax()).round();
+        const min = new Vector()._fromOcPoint(this._ocBbox.CornerMin()).round(); // Correct bbox calculation very small numbers (e1-7)
+        const max = new Vector()._fromOcPoint(this._ocBbox.CornerMax()).round();
         
         /* IMPORTANT: Sometimes we get inaccurate results. 
             For example X=[-1,1] for Shapes that are on XY plane
@@ -116,6 +116,12 @@ export class Bbox
         this.bounds = [min.x,max.x,min.y,max.y,min.z,max.z];
         
         return this.bounds;
+    }
+
+    /** Make string hash based on values to be able to identify quickly */
+    hash(round:boolean=true):string
+    {
+        return `bbox<${(round) ? this.bounds.map(b => Math.round(b)) : this.bounds}>`;
     }
 
     /** Copy this Bounding Box */
@@ -524,7 +530,6 @@ export class Bbox
                 console.warn(`Bbox::rect: Bbox is not 2D, so can't turn into a rectangle Face!`);
                 return null; 
         }
-
         return new Face().makePlaneBetween(this.min(), this.max()); // Just a simple 2D Plane on XY plane ( normal parallel in Z)
     }
 

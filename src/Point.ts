@@ -512,21 +512,23 @@ export class Point
     @checkInput('PointLike', 'Point')
     sharedPlane(other:PointLike):Plane
     {
-        let otherPoint = other as Point;
+        const TOLERANCE = this._oc.SHAPE_TOLERANCE;
+        const otherPoint = other as Point;
+
         if(this.equals(otherPoint))
         {
             console.warn(`Point:sharedPlane: Points are equal!`)
             return null;
         }
-        else if(this.z == otherPoint.z)
+        else if(Math.abs(this.z - otherPoint.z) <= TOLERANCE)
         {
             return 'xy';
         }
-        else if(this.x == otherPoint.x)
+        else if(Math.abs(this.x - otherPoint.x) <= TOLERANCE)
         {
             return 'yz'
         }
-        else if(this.y == otherPoint.y)
+        else if(Math.abs(this.y - otherPoint.y) <= TOLERANCE)
         {
             return 'xz'
         }

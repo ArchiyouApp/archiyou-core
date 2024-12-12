@@ -812,11 +812,13 @@ export class Vector extends Point
     @checkInput('PointLike', 'Vector') // convert input to Vector
     sharedPlanes(other:PointLike, ...args):Array<string>
     {
+        const TOLERANCE = this._oc.SHAPE_TOLERANCE;
         const otherVec = other as Vector; // auto converted by @checkInput
+
         const planes = [];
-        if ( this._x == otherVec.x ) planes.push('x');
-        if ( this._y == otherVec.y ) planes.push('y');
-        if ( this._z == otherVec.z ) planes.push('z');
+        if ( Math.abs(this._x - otherVec.x) <= TOLERANCE) planes.push('x');
+        if ( Math.abs(this._y - otherVec.y) <= TOLERANCE) planes.push('y');
+        if ( Math.abs(this._z - otherVec.z) <= TOLERANCE) planes.push('z');
 
         return planes;
     }
