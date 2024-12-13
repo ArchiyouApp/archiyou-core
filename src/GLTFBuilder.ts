@@ -137,11 +137,8 @@ export class GLTFBuilder
                     */
                     managedParams: ay?.paramManager?.getOperatedParamsByOperation(),
                 } as ArchiyouData
-
-                console.log('==== EXPORT GLTF AY =====');
-                console.log(JSON.stringify(ay?.paramManager?.getOperatedParamsByOperation()));
                 
-                let buffer = io.writeBinary(this.doc); 
+                const buffer = io.writeBinary(this.doc); 
                 return buffer; 
             }   
             catch(e)
