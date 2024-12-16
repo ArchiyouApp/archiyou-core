@@ -192,6 +192,7 @@ export class Annotator
         const OFFSET_PER_LEVEL = 15;
         const DIMENSION_MIN_DISTANCE = 1;
         const LEVEL_COORD_ROUND_DECIMALS = 0; // round to full units
+        const LEVEL_CHECK_VERTICES_TOLERANCE = 3; // when check
         const SIDE_VERTICES_UNIQUE_TOLERANCE = 1;
 
         // Take some settings from optional settings
@@ -205,8 +206,8 @@ export class Annotator
         if(!part.is2D()){ throw new Error('Annotator.autoDimPart(): Please make sure you have a 2D part on the XY plane!');}
 
         // Level 1: stock size (bbox)
-        newAnnotations.push(part.bbox(false).back().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
-        newAnnotations.push(part.bbox(false).left().dimension({ offset: dimLevelOffset * 2, units: dimUnits }) as DimensionLine);
+        newAnnotations.push(part.bbox(false).back().dimension({ offset: dimLevelOffset * 3, units: dimUnits }) as DimensionLine);
+        newAnnotations.push(part.bbox(false).left().dimension({ offset: dimLevelOffset * 3, units: dimUnits }) as DimensionLine);
 
         
         // Level 2: edges on and parallel to sides of bbox
@@ -230,28 +231,38 @@ export class Annotator
                                 return !(e as Edge).direction().normalize().abs().round().equals(sideDir90) // no perpendicular
                                     && (!e.direction().isOrtho() || (e.direction().isOrtho() && roundTo(e.center()[levelCoordAxis], LEVEL_COORD_ROUND_DECIMALS) === levelCoordValue)) // ortho edges need to be on side, other we allow
                             });
+
             // We keep track of those, so we don't use them twice
             sideEdgesUsed.addUnique(sideEdges);
 
             const sideDimOffsetVec = sideEdge.center().toVector().subtracted(part.bbox().center()).normalize();
+            /*
+            // Not really needed
+            if (part.bbox().center().distance(sideEdge.center().moved(sideDimOffsetVec)) 
+                    < part.bbox().center().distance(sideEdge.center().moved(sideDimOffsetVec.reversed())))
+            {
+                sideDimOffsetVec.reverse();
+            }
+            */
             
             // Generate dimension lines along sides
             const dimLevelVertices = sideEdges
                     .vertices()
                     .add(sideEdge.start(), sideEdge.end())
                     .unique(SIDE_VERTICES_UNIQUE_TOLERANCE) // again: tolerance to be more robust!
-                     // make sure we don't include points that are not on level
-                    .filter(v => roundTo(v[levelCoordAxis],LEVEL_COORD_ROUND_DECIMALS) === levelCoordValue)
+                     // make sure we don't include points that are not on level, with tolerance
+                    .filter((v) => Math.abs(roundTo(v[levelCoordAxis],LEVEL_COORD_ROUND_DECIMALS) - levelCoordValue) < LEVEL_CHECK_VERTICES_TOLERANCE )
                     .sort((v1,v2) => {
                         // sort x,y ascending. 
-                        // IMPORTANT: deal with inaccuracies here too!
-                        if(roundTo(v1.x,LEVEL_COORD_ROUND_DECIMALS) !== roundTo(v2.x,LEVEL_COORD_ROUND_DECIMALS))
-                        { 
-                            return v1.x - v2.x 
+                        if(sideAlongAxis === 'x')
+                        {
+                            // sort on x-axis
+                            return v1.x - v2.x;
                         }
-                        else { 
-                            return roundTo(v1.y, LEVEL_COORD_ROUND_DECIMALS) - roundTo(v2.y, LEVEL_COORD_ROUND_DECIMALS) 
-                        };
+                        else {
+                            // sort on y-axis
+                            return v1.y - v2.y;
+                        }
                     })
                     .toArray();
 

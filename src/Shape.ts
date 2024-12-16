@@ -1111,7 +1111,7 @@ export class Shape
     }
 
     /** Try to align Shape with x (horizontal) or y axis (vertical) as much as possible */
-    @checkInput([['OrientationXY', 'vertical']], ['auto', 'auto'])
+    @checkInput([['OrientationXY', 'vertical']], ['auto'])
     rotateToOrthoXY(o?:OrientationXY)
     {
         /* We determine the primary axis of a Shape by different methods:
@@ -1248,7 +1248,7 @@ export class Shape
      *  If given an axis we only select Faces that face that axis
      *  Otherwise we consider the Shapes as extrusions and use extrudedFace 
     */
-    @checkInput(['MainAxis'], ['auto'])
+    @checkInput([['MainAxis',null]], ['auto'])
     _flattened(axis?:MainAxis):AnyShape
     {
         const FACE_NORMAL_AXIS_ANGLE_MAX = 1;
@@ -1263,7 +1263,7 @@ export class Shape
                 const a2 = Math.abs(f.normal().angle(axisVec.reversed()));
                 return ( a1 <= FACE_NORMAL_AXIS_ANGLE_MAX || a2 <= FACE_NORMAL_AXIS_ANGLE_MAX)
             })
-            flatFace = flatFace.copy(); // Make copy
+            flatFace = flatFace._copy(); // Make copy
         }
         else {
             flatFace = this._extrudedFace();
@@ -1277,7 +1277,7 @@ export class Shape
     }
 
     @addResultShapesToScene
-    @checkInput('MainAxis', 'auto')
+    @checkInput([['MainAxis',null]], ['auto'])
     flattened(axis?:MainAxis):AnyShape
     {
         return this._flattened(axis);
@@ -4250,7 +4250,10 @@ export class Shape
     /** Get name of container Obj */
     setName(newName?:string):this
     {   
-        if (!newName || (typeof newName !== 'string')){ throw new Error('Please supply a string for the name!') };
+        if (!newName || (typeof newName !== 'string'))
+        { 
+            console.warn(`Shape::setName(): Please supply a name. Ignored empty name.`)
+        }
         this.checkObj().name(newName);  
         return this;
     }

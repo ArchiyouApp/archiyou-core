@@ -109,9 +109,9 @@
          {
             let addedShapes = []; // keep track of added Shapes for grouping
 
-            if (es === null)
+            if (es === null || es === undefined) // null of undefined
             {
-               console.warn('ShapeCollection::_addEntities: Skipped null!')
+               console.warn('ShapeCollection::_addEntities: Skipped nullish entity!')
             }
             else if(isPointLike(es))
             {
@@ -2224,13 +2224,20 @@
       }
 
       /** Shape API - hide all Shapes in Collection */
-      hide():ShapeCollection
+      hide():this
       {
          this.forEach( shape => shape.hide());
 
          return this;
       }
 
+      /** Shape API - show all Shapes in Collection */
+      show():this
+      {
+         this.forEach( shape => shape.show());
+         return this;
+      }
+      
       // TODO: .color, .
 
       //// LAYOUTING ALGORITHMS ////
