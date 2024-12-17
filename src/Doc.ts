@@ -638,10 +638,16 @@ export class Doc
         const PARAM_SEPERATOR_CHAR = ' '
 
         console.log('==== TEST PARAM SUMMARY ====');
+        console.log(this?._ay);
+        console.log(this?._ay?.worker);
         console.log(this?._ay?.worker?.lastExecutionRequest);
-        console.log(this?._ay?.worker?.lastExecutionRequest?.script?.params);
+        console.log(JSON.stringify(this?._ay?.worker?.lastExecutionRequest?.params));
 
-        const params = this?._ay?.worker?.lastExecutionRequest?.script?.params; // TODO: publishScript too?
+        let params = this?._ay?.worker?.lastExecutionRequest?.script?.params // in editor
+                            || this?._ay?.worker?.lastExecutionRequest?.params // in node worker
+
+        if (typeof params === 'object' ){ params = Object.values(params);}
+        
         if (!params)
         {
             return 'no parameters'
@@ -722,7 +728,7 @@ export class Doc
     _getVersion():string
     {
         const version = this?._ay?.worker?.lastExecutionRequest?.script?.published_as?.version // editor app
-            || this?._ay?.worker?.lastExecutionRequest?.script?.version // compute worker context
+            || this?._ay?.worker?.lastExecutionRequest?.version // compute worker context:  OcciCadScriptRequest
             || '0'
 
         return `v${version}`
