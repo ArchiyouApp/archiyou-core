@@ -38,7 +38,7 @@ import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUni
     ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer,
         isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
                 DocGraphicInputLine, DocGraphicInputOrthoLine, isContainerPositionCoordRel,
-                ContainerBlock, TitleBlockInput, LabelBlockOptions
+                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param
             } from './internal'
 
 import { convertValueFromToUnit, isNumeric } from './internal' // utils
@@ -643,12 +643,24 @@ export class Doc
         console.log(this?._ay?.worker?.lastExecutionRequest);
         console.log(JSON.stringify(this?._ay?.worker?.lastExecutionRequest?.params));
 
-        let params = this?._ay?.worker?.lastExecutionRequest?.script?.params // in editor
-                            || this?._ay?.worker?.lastExecutionRequest?.params // in node worker
+        let params = [] as Array<Param>;
+        if(this?._ay?.worker?.lastExecutionRequest?.script?.params)
+        {
+            // In worker editor
+            params = this?._ay?.worker?.lastExecutionRequest?.script?.params;
+        }
+        else 
+        {
+            // In node worker - combine params with request.params for values
+            const paramValues = this?._ay?.worker?.lastExecutionRequest?.request?.params;
+            params = this?._ay?.worker?.lastExecutionRequest?.params?.map(p => {
+                return { ...p, value: paramValues[p.name] }
+            })
+        }
 
-        if (typeof params === 'object' ){ params = Object.values(params);}
+        console.log(JSON.stringify(params));
         
-        if (!params)
+        if (!params && params.length === 0)
         {
             return 'no parameters'
         }
@@ -665,8 +677,6 @@ export class Doc
                 const paramNameParts = this._splitStringRecurse([p.name], PARAM_SPLIT_CHARS);
                 paramSummaryName = paramNameParts.slice(0,PARAM_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
             }
-            
-            
             return `${paramSummaryName}${PARAM_IS_VALUE_CHAR}${this._formatMetricParamValue(p.value)}`;
         }).join(PARAM_SEPERATOR_CHAR)
            
