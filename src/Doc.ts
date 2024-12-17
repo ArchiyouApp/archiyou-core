@@ -637,6 +637,10 @@ export class Doc
         const PARAM_IS_VALUE_CHAR = ':'
         const PARAM_SEPERATOR_CHAR = ' '
 
+        console.log('==== TEST PARAM SUMMARY ====');
+        console.log(this?._ay?.worker?.lastExecutionRequest);
+        console.log(this?._ay?.worker?.lastExecutionRequest?.script?.params);
+
         const params = this?._ay?.worker?.lastExecutionRequest?.script?.params; // TODO: publishScript too?
         if (!params)
         {
