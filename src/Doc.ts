@@ -363,7 +363,7 @@ export class Doc
     text(text:string|number, options?:TextOptions):Doc
     {
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
-        text = (typeof text !== 'string') ? text.toString() : text;
+        text = (typeof text !== 'string') ? (text?.toString() || '') : text;
 
         const newTextContainer = new Text(text, options).on(this._activePage);
         this._activeContainer = newTextContainer;
@@ -374,7 +374,7 @@ export class Doc
     textarea(text:string|number, options?:TextOptions):Doc
     {
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
-        text = (typeof text !== 'string') ? text.toString() : text;    
+        text = (typeof text !== 'string') ? (text?.toString() || '') : text;    
 
         const newTextAreaContainer = new TextArea(text, options).on(this._activePage);
         this._activeContainer = newTextAreaContainer;
@@ -703,7 +703,7 @@ export class Doc
             mm : '', // remove mm
         }
 
-        let s = (typeof v !== 'string') ? v.toString() : v;
+        let s = (typeof v !== 'string') ? (v?.toString() || 'none') : v;
         Object.keys(TRANSFORM_REPLACE_VALUES)
             .forEach((r,i) => {
                 if(s.includes(r))
