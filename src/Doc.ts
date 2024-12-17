@@ -747,7 +747,7 @@ export class Doc
     /** Get version string like 'v1.0 at 10-20-2025 */
     _getVersionSummary():string
     {
-        return `${this._getVersion()} at ${this?._ay?.worker?.lastExecutionRequest?.createdAtString || '' }`;
+        return `${this._getVersion()} at ${this?._ay?.worker?.lastExecutionRequest?.createdAtString || new Date().toLocaleString('nl-NL') }`;
     }
 
     _splitStringRecurse(strings:Array<string>, splitChars:Array<string>):Array<string>
