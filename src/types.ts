@@ -542,12 +542,12 @@ export interface DimensionOptions
 
 export interface DimensionLevel
 {
-    axis:MainAxis // axis of dimension cut line
+    axis:MainAxis // axis of dimension cut line. Horizontal cut is axis y, vertical is x
     at: number // coordinate on given axis, relative or absolute
     coordType?: 'relative' | 'absolute' // auto determine
-    align?: 'min'|'auto'|'max' // align dimension lines to Shape/Collection
+    align?: 'min'|'auto'|'max'|false|true // align dimension lines to Shape/Collection. Use false to disable.
     minDistance?: number // skip when distance is less then minDistance
-    offset?:number // offset from outside of bbox of Shape/Collection
+    offset?:number
     showLine?:boolean // show DEBUG line
 }
 

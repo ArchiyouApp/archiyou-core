@@ -644,10 +644,20 @@ export class Doc
         }
         
         return params.map(p => {
-            // Shorten name of param like BEAM_WIDTH = BW, SEAT-HEIGHT => SH
-            const paramNameParts = this._splitStringRecurse([p.name], PARAM_SPLIT_CHARS);
-            const paramSummaryName = paramNameParts.slice(0,PARAM_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
-            return `${paramSummaryName}${PARAM_IS_VALUE_CHAR}${p.value}`;
+            const paramName = p.label || p.name;
+            let paramSummaryName;
+            if(paramName.length <= PARAM_NAME_MAXCHAR)
+            {
+                paramSummaryName = paramName;
+            }
+            // Shorten long name of param like BEAM_WIDTH = BW, SEAT-HEIGHT => SH
+            else {
+                const paramNameParts = this._splitStringRecurse([p.name], PARAM_SPLIT_CHARS);
+                paramSummaryName = paramNameParts.slice(0,PARAM_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
+            }
+            
+            
+            return `${paramSummaryName}${PARAM_IS_VALUE_CHAR}${this._formatMetricParamValue(p.value)}`;
         }).join(PARAM_SEPERATOR_CHAR)
            
     }
@@ -666,10 +676,39 @@ export class Doc
         }
         
         return metrics.map(m => {
-            const metricNameParts = this._splitStringRecurse([m.label||m.name], METRIC_SPLIT_CHARS);
-            const metricSummaryName = metricNameParts.slice(0,METRIC_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
-            return `${metricSummaryName}${METRIC_IS_VALUE_CHAR}${m.data} ${m?.options?.unit ?? ''}`;
+            const metricName = m.label || m.name;
+            let metricSummaryName;
+            if(metricName.length <= METRIC_NAME_MAXCHAR)
+            {
+                metricSummaryName = metricName;
+            }
+            else {
+                const metricNameParts = this._splitStringRecurse([m.label||m.name], METRIC_SPLIT_CHARS);
+                metricSummaryName = metricNameParts.slice(0,METRIC_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
+            }
+            return `${metricSummaryName}${METRIC_IS_VALUE_CHAR}${this._formatMetricParamValue(m.data as any)} ${m?.options?.unit ?? ''}`;
         }).join(METRIC_SEPERATOR_CHAR)
+    }
+
+    _formatMetricParamValue(v:string|number):string
+    {
+        const MAX_LENGTH = 5;
+        const TRANSFORM_REPLACE_VALUES = {
+            true : 'yes',
+            false : 'no',
+            mm : '', // remove mm
+        }
+
+        let s = (typeof v !== 'string') ? v.toString() : v;
+        Object.keys(TRANSFORM_REPLACE_VALUES)
+            .forEach((r,i) => {
+                if(s.includes(r))
+                {
+                    s = s.replace(r, TRANSFORM_REPLACE_VALUES[r]);
+                }
+            })
+        
+        return s.slice(0, MAX_LENGTH)
     }
 
     /** Get version in different contexts

@@ -1253,6 +1253,12 @@ export class Shape
     {
         const FACE_NORMAL_AXIS_ANGLE_MAX = 1;
 
+        if(this.type() !== 'Solid')
+        {
+            console.warn(`Shape::_flattened(): Can only flatten Solid. This Shape is a ${this.type}. Returned copy of original`);
+            return this._copy();
+        }
+
         let flatFace:Face = null;
         if(isMainAxis(axis))
         {

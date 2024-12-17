@@ -396,7 +396,6 @@ export class Make
         const openingDiagrams = new ShapeCollection();
         const openingFlags = []; // flags per opening - register a snap of opening to wall frame (leaving out the window frame)
 
-        
         // Openings: basic input checks
         // NOTE: We only support one opening now
         openings.forEach( (o,i) => 
@@ -463,9 +462,10 @@ export class Make
                     }
 
                     // Now make diagram Shape for opening
-                    openingDiagrams.add( new Face().makePlaneBetween(
-                        [o.left, 0, o.sill],
-                        [o.left+o.width, 0, o.sill+o.height]))
+                    openingDiagrams.add( 
+                        new Face().makePlaneBetween(
+                            [o.left, 0, o.sill],
+                            [o.left+o.width, 0, o.sill+o.height]))
                     
                 }
                 else {
@@ -639,12 +639,12 @@ export class Make
                             {
                                 const dx = Math.abs((closeGridLine.center().x + studThickness * 0.5) - checkedOpening.max().x);
                                 checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().move(dx))
-                                this._ay.console.user(`Enlarged opening #${i} by ${dx} units Now last cripple aligns with grid`);
+                                this._ay.console.user(`Enlarged opening #${i} by ${dx} units. Now last cripple aligns with grid`);
                             }
                         }
                     }
                 }
-    
+                
                 checkedOpenings.add(checkedOpening); // keep track of final openings
 
                 // make opening surrounding frame
@@ -686,8 +686,8 @@ export class Make
                                 studThickness,
                                 'horizontal'
                             )
-                            .moveTo(openingTestBuffer.center())
-
+                            .moveTo(openingTestBuffer.center());
+                
                 // Don't add frame left, top and bottom or right if opening was snapped
                 const includeFrameParts = [];
                 for (const [flag,val] of Object.entries(curOpeningFlags))
@@ -699,7 +699,7 @@ export class Make
                     }
                 }
 
-                openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name)));
+                openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name())));
                 
                 openingFramesHorizontals.add(openingFrame.filter(s => s.name() === 'frameTop' || s.name() === 'frameBottom'))
                 openingFramesVerticals.add(openingFrame.filter(s => s.name() === 'frameLeft' || s.name() === 'frameRight'))

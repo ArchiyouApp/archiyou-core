@@ -396,16 +396,22 @@ export class Annotator
             });
             intersectionPointsAlongRangeAxis.sort((a,b) => a - b ); // min first
             
-            // Now make the dimension lines at a given coord (parallel to section line) based on align ('min','max,'auto') and offset
+            // Now make the dimension lines at a given coord (parallel to section line) 
+            // based on align ('min','max,'auto') and offset
             let dimLinesLevelCoord = sectionLineLevelCoord;
-            if ((lvl?.align ?? true) || lvl?.align === 'auto')
+
+            if(lvl?.align === false)
+            {
+                // user diabled align by setting it to false. Default is auto align (see below)
+            }
+            else if ((lvl?.align ?? true) || (lvl?.align === true) || lvl?.align === 'auto')
             {
                 // section line on side of bbox at levelAxis that is closest to given sectionLineLevelCoord
                 const minSide = collectionBbox['min'+levelAxis.toUpperCase()]();
                 const maxSide = collectionBbox['max'+levelAxis.toUpperCase()]();
                 dimLinesLevelCoord = Math.abs(sectionLineLevelCoord - minSide) <  Math.abs(sectionLineLevelCoord - maxSide) ? minSide : maxSide;
             }
-            else if(['min','max'].includes(lvl?.align))
+            else if(['min','max'].includes(lvl?.align as string))
             {
                 dimLinesLevelCoord = collectionBbox[lvl.align+levelAxis.toUpperCase()]() 
             }
@@ -440,7 +446,7 @@ export class Annotator
                                             dimLineStartPoint,
                                             dimLineEndPoint,
                                             {  
-                                                offset: lvl?.offset || DIMENSION_LINE_OFFSET_FROM_BBOX, 
+                                                offset: (lvl?.offset ?? DIMENSION_LINE_OFFSET_FROM_BBOX), 
                                                 offsetVec: offsetVec,
                                                 roundDecimals: 0,
                                             }

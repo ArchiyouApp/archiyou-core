@@ -2367,7 +2367,14 @@
          {
             let s = (copy) ? shape._copy() : shape;
             if(autoRotate) s.rotateToLayFlat(); 
-            if(flatten) s = s._flattened(); 
+            if(flatten)
+            {
+               const f = s._flattened(); 
+               if(!f)
+               { 
+                  console.error(`ShapeCollection::pack(): Can not flatten Shape at index ${i} of type ${s.type()}`)
+               }
+            } 
             return this._makeBinPackBox(s, boxMargin, i)
          });
 

@@ -261,8 +261,8 @@ export class DimensionLine extends BaseAnnotation
     {
         // Now it is static. TODO: something dynamic based on model units?
         const l = this.DIMENSION_OFFSET_DEFAULT;
-        if(!this.offsetLength){ this.offsetLength = l; } // don't override
-        return l;
+        if(this.offsetLength === undefined || this.offsetLength === null){ this.offsetLength = l; } // don't override any values (also 0)
+        return this.offsetLength;
     }
 
     /** The start and end point of DimensionLine in original coordinate system  
@@ -322,9 +322,11 @@ export class DimensionLine extends BaseAnnotation
     setOptions(o:DimensionOptions):this
     {
         this.ortho = o?.ortho ?? false;
-        this.offsetLength = o?.offset || this.offsetLength || this._calculateAutoOffsetLength();
         const optionsOffsetVec = (isPointLike(o?.offsetVec)) ? new Vector(o.offsetVec) : null; // Transform any PointLikes of user into a Vector
         this.offsetVec = optionsOffsetVec || this.offsetVec || this._calculateOffsetVec();
+        this.offsetLength = o?.offset // Can also be 0, only if undefined/null we do something
+        this.offsetLength = (this.offsetLength === undefined || o?.offset === null) ? this._calculateAutoOffsetLength() : this.offsetLength;
+
         this.units = o?.units || this.units;
         this.roundDecimals = o?.roundDecimals || this.roundDecimals;
         // TODO: more: color, linethickness etc.
