@@ -653,9 +653,11 @@ export class Doc
         {
             // In node worker - combine params with request.params for values
             const paramValues = this?._ay?.worker?.lastExecutionRequest?.request?.params;
-            params = this?._ay?.worker?.lastExecutionRequest?.params?.map(p => {
+            params = (Object.values(this?._ay?.worker?.lastExecutionRequest?.params) as Array<Param>).map(p => 
+                {
                 return { ...p, value: paramValues[p.name] }
-            })
+                }
+            )
         }
 
         console.log(JSON.stringify(params));
