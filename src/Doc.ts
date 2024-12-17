@@ -709,7 +709,7 @@ export class Doc
             mm : '', // remove mm
         }
 
-        let s = (typeof v !== 'string') ? v.toString() : v;
+        let s = (typeof v !== 'string') ? (v?.toString() || 'none') : v;
         Object.keys(TRANSFORM_REPLACE_VALUES)
             .forEach((r,i) => {
                 if(s.includes(r))
