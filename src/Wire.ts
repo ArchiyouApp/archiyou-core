@@ -1283,9 +1283,9 @@ export class Wire extends Shape
         }
 
 
-        // do the sweep with pre-aligned  offsetEdge and no autorotate
+        // do the sweep with pre-aligned offsetEdge and no autorotate
         // NOTE: We need to check for Shape types with only one subtype ( like Shell only one Face => downgrade then)
-        let newFace = offsetEdge.sweeped(this, false, false, null).checkDowngrade() as Face; // !!!! autoRotate needs to be off for 2D shapes! !!!!
+        let newFace = offsetEdge._sweeped(this, false, false, null).checkDowngrade() as Face; // !!!! autoRotate needs to be off for 2D shapes! !!!!
 
         newFace._unifyDomain(); // remove subdivision on same plane
 

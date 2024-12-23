@@ -13,7 +13,7 @@ import { checkInput } from './decorators' // NOTE: needs to be direct
 import { Annotation, AnnotationData, DimensionLine, DimensionLevelSettings, AnnotationAutoDimStrategy, 
             MainAxis, DimensionLevel } from './internal'
 
-import { roundTo } from './internal' // utils
+import { roundTo, roundToTolerance } from './internal' // utils
 
 
 export class Annotator
@@ -416,7 +416,7 @@ export class Annotator
                 dimLinesLevelCoord = collectionBbox[lvl.align+levelAxis.toUpperCase()]() 
             }
 
-            const minDistance = lvl?.minDistance || DEFAULT_MIN_DISTANCE;
+            const minDistance = lvl?.minDistance ?? DEFAULT_MIN_DISTANCE;
             // Determine offset Vector based on line and collection: Should always point outwards of collection
             const offsetVec = sectionLine.normal()
             if( collection.center().distance(sectionLine.center().moved(offsetVec)) 
@@ -432,7 +432,7 @@ export class Annotator
                     const lineStartCoord = v;
                     const lineEndCoord = arr[i+1];
                     const distance = lineEndCoord - lineStartCoord;
-                    if(distance > minDistance)
+                    if(roundToTolerance(distance) > minDistance) // TODO: Use the dimension value rounding settings to avoid zero values in dim lines
                     {
                         const dimLineStartPoint = new Point(0,0,0)
                                                     ['set'+rangeAxis.toUpperCase()](lineStartCoord)

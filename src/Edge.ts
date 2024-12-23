@@ -591,7 +591,7 @@ export class Edge extends Shape
     _thickened(amount?:number, direction?:ThickenDirection,  onPlaneNormal?:PointLike):IFace
     {
         // the same for Edges and Wire: forward to the Wire one
-        return this._toWire().thickened(amount, direction, onPlaneNormal);
+        return this._toWire()._thickened(amount, direction, onPlaneNormal);
     }
 
     /** Thicken Edge to create a Face */
@@ -831,7 +831,9 @@ export class Edge extends Shape
         this._oc.BRepLib.BuildCurves3d_1(this._ocShape, this._oc.SHAPE_TOLERANCE, this._oc.GeomAbs_Shape.GeomAbs_C1, 14, 0);
     }
 
-    /** Extend Edge into a given direction (start or end) */
+    /** Extend Edge into a given direction (start or end) 
+     *  NOTE: Check quality of Edge - there are signs of resulting Edges not being consistent  
+    */
     @checkInput([ [Number, EDGE_DEFAULT_EXTEND_AMOUNT], ['LinearShapeTail', EDGE_DEFAULT_EXTEND_DIRECTION]], [Number,'auto'])
     extend(amount?:number, direction?:LinearShapeTail):Edge
     {

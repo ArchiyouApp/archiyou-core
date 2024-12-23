@@ -836,7 +836,7 @@ export class Make
             throw new Error(`Make::partList: Please supply valid ShapeCollection of beam-like shapes to generate a partlist!`)
         }
 
-        const partRowsAll = [];
+        let partRowsAll = [];
 
         console.info(`Make::partList(shapes, name): Got ${shapes.length} to make a part list with. If you name and group shapes the results will be better.`);
 
@@ -849,11 +849,12 @@ export class Make
                     // part (0), subpart (1), section (2), length (3), quantity (4)
                     const beamDims = shape.beamDims();
                     // NOTE: round to integer for now
-                    partRowsAll.push([groupName, shape.getName(), `${Math.round(beamDims.small)}x${Math.round(beamDims.mid)}`, Math.round(beamDims.length), 1])   
+                    partRowsAll.push(
+                        [groupName, shape.getName(), `${Math.round(beamDims.small)}x${Math.round(beamDims.mid)}`, Math.round(beamDims.length), 1]
+                    )   
                 }
             })
         });
-
         const groupedPartRows = {};
         const genId = (row) => `${row[0]}-x${row[2]}-${row[3]}`; // group by main part, section dims and length
         
@@ -872,10 +873,26 @@ export class Make
             }
         })
 
-        // make Calc table
+        // After grouping flatten again into Array
+        let groupedRows = Object.values(groupedPartRows);
+
+        // Now also count the totals per section
+        const uniqueSections = Array.from(new Set(partRowsAll.map((row) => row[COLUMNS.indexOf('section') as any])));
+        const totalRows = uniqueSections.map((section) => 
+        {
+            const totalSectionLength = partRowsAll.reduce((sum,row) => sum + ((row[COLUMNS.indexOf('length')] ?? 0) * (row[COLUMNS.indexOf('quantity')] ?? 1)), 0)
+            return ['TOTAL', '', section, totalSectionLength, '']    
+        })
+        
+        groupedRows = groupedRows.concat([
+                            ['','','---- +', '---- +', ''], 
+                            ...totalRows
+                        ]);
+
+        // Make Calc table
         return this._ay.calc.table(
             name || shapes.getName() as string || 'parts',
-            Object.values(groupedPartRows),
+            groupedRows,
             COLUMNS
         ) as Table
         
