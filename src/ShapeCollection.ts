@@ -2247,7 +2247,7 @@
        *   Otherwise we consider shapes as extrusions and we flatten according to _extrudedFace()
       */
       @addResultShapesToScene
-      @checkInput(['MainAxis', ['Boolean', true]], ['auto','auto'])
+      @checkInput([['MainAxis',null], ['Boolean', true]], ['auto','auto'])
       flattened(axis?:MainAxis, filterDuplicates?:boolean):AnyShapeCollection
       {
          let flattened = this.map( s => s._flattened(axis)
