@@ -96,6 +96,7 @@ export class DocPDFExporter
     {
         this.inDocs = {};
         this.docs = {};
+        this.blobs = {};
         this.activeDoc = undefined;
         this.activePage = undefined;
         this.activePDFDoc = undefined;
