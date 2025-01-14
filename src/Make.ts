@@ -881,11 +881,11 @@ export class Make
         const totalRows = uniqueSections.map((section) => 
         {
             const totalSectionLength = partRowsAll.reduce((sum,row) => sum + ((row[COLUMNS.indexOf('length')] ?? 0) * (row[COLUMNS.indexOf('quantity')] ?? 1)), 0)
-            return ['TOTAL', '', section, totalSectionLength, '']    
+            return ['TOTAL', '', section, '', totalSectionLength]  // align to right
         })
         
         groupedRows = groupedRows.concat([
-                            ['','','---- +', '---- +', ''], 
+                            ['','','---- +', 'L x Q', '---- +'], 
                             ...totalRows
                         ]);
 

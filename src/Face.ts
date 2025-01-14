@@ -356,6 +356,7 @@ export class Face extends Shape
         return s;
     }
 
+    /** Create Wire of Face without adding to scene */
     _toWire():Wire
     {
         return this.wires()[0];

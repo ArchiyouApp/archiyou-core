@@ -122,7 +122,7 @@
             // single ShapeCollection
             else if(isAnyShapeCollection(es))
             {
-               // auto grouping
+               // auto grouping - keeps track of the previous collection
                if(!group) // if not already user defined group
                { 
                   const collName = (es as ShapeCollection).getName() as string;
@@ -130,13 +130,14 @@
                }
 
                // flatten an given ShapeCollection into this one
-               let shapes = (es as ShapeCollection).shapes;
+               const shapes = (es as ShapeCollection).shapes;
                this.shapes = this.shapes.concat(shapes);
+               this.annotations = this.annotations.concat((es as ShapeCollection).annotations); // Merge annotations of incoming ShapeCollection too
                addedShapes = addedShapes.concat(shapes);
             }
             else if(isPointLikeSequence(es)) // NOTE: this needs to be later than single ShapeCollection
             {
-               let points = new ShapeCollection(es); // bring all point sequences in collection
+               const points = new ShapeCollection(es); // bring all point sequences in collection
                points.forEach( e => 
                {
                   if(isPointLike(e))
@@ -299,18 +300,20 @@
       _setFakeNameKeys()
       {
          this.shapes.forEach(s => {
-            if(s.name())
+            if(s.name() && s[s.name() as string] === undefined) // don't overwrite existing properties
             {
                this[s.name() as string] = s;
             }
          })
       }
 
-      /** EXPERIMENTAL: directly access groups by adding property to instance */
+      /** EXPERIMENTAL: directly access groups by adding property to instance 
+       *   TODO: Check for overwriting properties!
+      */
       _setFakeGroupKeys()
       {
          Object.entries(this._groups).forEach(([k,v]) => { 
-            if (k !== 'shapes')  // don't set shapes because this will break access to real data
+            if (this[k] === undefined)  // don't set existing props (like shapes) because this will break access to real data
             { 
                this[k] = new ShapeCollection(v) 
             }
@@ -374,6 +377,7 @@
       {
          other = other as ShapeCollection;
          this.shapes = this.shapes.concat(other.shapes);
+         this.annotations = this.annotations.concat(other.annotations); // Merge annotations of incoming ShapeCollection too
          this._setFakeArrayKeys();
          return this;
       }
@@ -2145,10 +2149,11 @@
       /**  Shape API - Add all shapes in the collection to the Scene */
       addToScene():ShapeCollection
       {
-         // Keep Shapes in Collection together within layer
-         this._geom.layer( this._geom.getNextLayerName(this.getName()));
+         // For now, flatten collection into existing layer
+         // TODO: We could start a new layer to keep collection together
+         // this._geom.layer( this._geom.getNextLayerName(this.getName()));
          this.all().forEach(shape => shape.addToScene());
-         this._geom.resetLayers(); // return active layer to scene
+         //this._geom.resetLayers(); // return active layer to scene
          return this;
       }
 

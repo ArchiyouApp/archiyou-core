@@ -30,11 +30,13 @@ export class Container
     _borderStyle:DocPathStyle;
     _frame:Frame;
     _index:number; // ordering z-index
-    _caption:string;
     _contentAlign:ContainerAlignment;
     _content:any; // TODO: raw content (like Svg for View, source for Image etc)
     _zoomLevel:ScaleInput;
     _zoomRelativeTo:ZoomRelativeTo;
+
+    _title:string; // title of container placed above container (for example: "Front elevation") 
+    _caption:string; // caption of container placed below container (for example: "View from the front")
 
     constructor() 
     {
@@ -179,6 +181,22 @@ export class Container
         this._borderStyle = (typeof style === 'object') ? style : (typeof style === 'string') ? { strokeColor: style } as DocPathStyle : null; 
     }
 
+    //// ADDED CONTEXTUAL CONTENT ////
+    
+    caption(s:string):this
+    {
+        if(!s || typeof s !== 'string'){ throw new Error(`DocPageContainer::caption(): Please supply a caption string!`)}
+        this._caption = s;
+        return this
+    }
+
+    title(s:string):this
+    {
+        if(!s || typeof s !== 'string'){ throw new Error(`DocPageContainer::title(): Please supply a title string!`)}
+        this._title = s;
+        return this
+    }
+
     //// OUTPUT ////
 
     /** Transform from relative width (to page or page-content-area) to absolute (in DocUnits) */
@@ -239,13 +257,14 @@ export class Container
             borderStyle: this._borderStyle,
             frame: this._frame,
             index: this._index,
-            caption: this._caption,
             contentAlign: this._contentAlign || this.CONTENT_ALIGN_DEFAULT,
             content: null,
             zoomLevel: this._zoomLevel || 1,
             zoomRelativeTo: this._zoomRelativeTo || 'container',
             docUnits: this._page._units, // needed to scale the content
             modelUnits: this._page?._doc?._geom?._units, // needed to scale the content
+            caption: this._caption,
+            title: this._title,
         }
 
         return c;

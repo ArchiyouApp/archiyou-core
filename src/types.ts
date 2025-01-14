@@ -618,7 +618,7 @@ export type ContainerPositionLike = ContainerPositionRel|ContainerAlignment|Cont
 export type ContainerData = { // Combine all Container types for convenience
     _entity:string
     name:string
-    parent:string
+    parent?:string // Name of parent
     type:ContainerType
     width:number // relative to (see: widthRelativeTo)
     widthRelativeTo:ContainerSizeRelativeTo
@@ -632,13 +632,17 @@ export type ContainerData = { // Combine all Container types for convenience
     borderStyle?:DocPathStyle // style to draw border
     frame?:any // advanced shapes as border
     index?:number
-    caption?:string
+
     contentAlign:ContainerAlignment // alignment of content inside container
     content:any; // TODO: raw content
-    zoomLevel:ScaleInput, // number or 'auto' [default]
-    zoomRelativeTo:ZoomRelativeTo,
+    zoomLevel?:ScaleInput, // number or 'auto' [default]
+    zoomRelativeTo?:ZoomRelativeTo,
     docUnits:DocUnits, 
     modelUnits:ModelUnits,
+    
+    caption?:string
+    title?:string
+
     _domElem?:HTMLDivElement, // added on placement
 }
 

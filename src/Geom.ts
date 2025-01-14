@@ -47,8 +47,7 @@ export class Geom
   layerStack:Array<Obj> = [];
   activeSketch:Sketch; // if we are in Sketch mode
   _captureShapesStart:ShapeCollection = null;
-  _activeLayerGroup:Obj = null;
-  _activeLayerGroupInObj:Obj = null;
+  _activeLayerGroup:Obj = null; // active group of layers - used to combine layer into one
   _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
   // NOTE: meshingQuality is either in Main or Webworker scope
   _Arr2D:any; // holds class Reference to Arrangements2D module
@@ -587,11 +586,17 @@ export class Geom
   {
     return new ShapeCollection(shapes, ...args);
   }
+
+  /** Get active layer of group of layers */
+  getActiveLayer():Obj
+  {
+    return this._activeLayerGroup || this.activeLayer
+  }
   
   addToActiveLayer(obj:Obj):Geom
   {
     // NOTE: activeLayer is scene when no other layer Obj is set
-    let activeLayer = this._activeLayerGroup || this.activeLayer;
+    const activeLayer = this.getActiveLayer();
 
     if(activeLayer && !activeLayer.has(obj))
     {

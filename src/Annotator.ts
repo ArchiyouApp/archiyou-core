@@ -329,6 +329,7 @@ export class Annotator
         const SECTION_PLANE_DEPTH = 2;
         const DIMENSION_LINE_OFFSET_FROM_BBOX = 30;
         const DEFAULT_MIN_DISTANCE = 0;
+        const ADD_BBOX_OUTLINE_TO_LEVEL_SECTION = true;
 
         if(!settings || !Array.isArray(settings?.levels)){ throw new Error('Annotator.autoDimLevels(options): No autoDim settings given. Please supply levels ({ axis:x|y|z, at:number }]). Level options are minDistance, coordType, and offset')}
 
@@ -368,6 +369,8 @@ export class Annotator
                                             ['move'+levelAxis.toUpperCase()](sectionLineLevelCoord); // move line to level coord
 
             if(lvl?.showLine){ sectionLine.color('red').addToScene() };
+
+
             // to deal with accurary issues we use a section plane
             const sectionPlaneNormal = new Vector(0,0,0)['set'+sectionLineDepthAxis.toUpperCase()](1);
             const sectionPlane = sectionLine._extruded(SECTION_PLANE_DEPTH, sectionPlaneNormal)
@@ -375,7 +378,21 @@ export class Annotator
 
             // now get unique intersection points of all shapes
             const intersectionPointsAlongRangeAxis = []
+
+            // If we want dimensions from bbox too, add it to shallow copy of collection
+            if(ADD_BBOX_OUTLINE_TO_LEVEL_SECTION)
+            {
+                const bboxOutline = collectionBbox.rect()._toWire();
+                collection.add(bboxOutline);
+            }
+
             const intersections = collection._intersections(sectionPlane);
+
+            // Remove last added bbox outline
+            if(ADD_BBOX_OUTLINE_TO_LEVEL_SECTION)
+            {
+                collection.pop();
+            }
 
             if(intersections.length === 0)
             {

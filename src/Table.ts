@@ -72,12 +72,15 @@ export class Table
     }
 
     /** Get/set name */
-    name(newName?:string)
+    name(newName?:string):string|Table
     {
-        if(!newName){ return this._name;}
+        if(!newName)
+        { 
+            return this._name;
+        }
         
-        this._name = newName;
-        return this._name;
+        this._db.renameTable(this, newName);
+        return this;
     }
 
     /** Save this Table in the database*/

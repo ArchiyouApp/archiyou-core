@@ -1002,6 +1002,21 @@ export class Doc
         return this;
     }
 
+    /** Set caption on active container */
+    caption(s?:string):this
+    {
+        if(!this._activeContainer){ throw new Error(`Doc::caption(): Cannot set caption. No active container. Please make one first!`)};
+        this._activeContainer.caption(s);
+        return this;
+    }
+
+    title(s?:string):this
+    {
+        if(!this._activeContainer){ throw new Error(`Doc::title(): Cannot set title. No active container. Please make one first!`)};
+        this._activeContainer.title(s);
+        return this;
+    }
+
     //// FORWARD TO SPECIFIC CONTAINER TYPES ////
 
     /** Bind ShapeCollection to View: either a real reference or the name of a ShapeCollection after running the doc pipeline */

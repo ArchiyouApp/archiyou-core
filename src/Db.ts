@@ -72,8 +72,17 @@ export class Db
 
     saveTable(table:Table, name?:string)
     {
-        name = name || table.name() || (this.UNNAMED_TABLE + '_' + Object.keys(this._tables).length);
+        name = name || (table.name() as string) || (this.UNNAMED_TABLE + '_' + Object.keys(this._tables).length);
         this._tables[name] = table;
+    }
+
+    /** Rename table and update its references in Db */
+    renameTable(table:Table, newName:string)
+    {
+        const oldName = table.name() as string;
+        table._name = newName;
+        this._tables[newName] = table;
+        delete this._tables[oldName];
     }
 
     tables():Array<string>
