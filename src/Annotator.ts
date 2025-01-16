@@ -421,7 +421,7 @@ export class Annotator
             {
                 // user diabled align by setting it to false. Default is auto align (see below)
             }
-            else if ((lvl?.align ?? true) || (lvl?.align === true) || lvl?.align === 'auto')
+            else if ( lvl?.align === true || lvl?.align === 'auto' || (lvl?.align ?? true) === true ) // last term checks nullish
             {
                 // section line on side of bbox at levelAxis that is closest to given sectionLineLevelCoord
                 const minSide = collectionBbox['min'+levelAxis.toUpperCase()]();

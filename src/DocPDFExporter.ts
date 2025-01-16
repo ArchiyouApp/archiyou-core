@@ -383,9 +383,9 @@ export class DocPDFExporter
             this.activePDFDoc.text( 
                     c.caption, 
                     x + w/2, // center of container
-                    y + h, // No padding here
+                    y + h + mmToPoints(DOC_CONTAINER_CAPTION_TEXT_HEIGHT*DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR), // No padding here
                     { 
-                        baseline: 'top', 
+                        baseline: 'bottom',  // align to bottom
                         lineHeightFactor : 1.0, 
                         align: 'center', 
                     } // Keep the same as HTML rendering - center text
