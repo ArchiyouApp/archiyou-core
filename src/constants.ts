@@ -116,6 +116,9 @@ export const FACE_CHAMFER_DISTANCE = 10;
 export const FACE_CHAMFER_ANGLE = 45;
 
 export const DOC_DIMENSION_LINES_TEXT_HEIGHT = 2.5; // in mm
+export const DOC_CONTAINER_TITLE_TEXT_HEIGHT = 6; // in mm
+export const DOC_CONTAINER_CAPTION_TEXT_HEIGHT = 3; // in mm
+export const DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR = 2; // applied to text height
 
 //// MESH QUALITY OUTPUT SETTINGS ////
 

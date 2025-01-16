@@ -81,6 +81,8 @@ export class TextArea extends Container
     {
         return {
             ...this._toContainerData(),
+            caption: null, // caption does not make sense for text area
+            title: null,
             content: { 
                 data: this._text, 
                 settings: this._options 

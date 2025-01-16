@@ -63,6 +63,7 @@ export class Doc
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
     CONTENT_ALIGN_DEFAULT:ContainerAlignment = ['left', 'top'];
     TEXT_SIZE_DEFAULT = '10mm';
+    TYPES_WITHOUT_CAPTION = ['text', 'textarea'];
 
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
@@ -1005,7 +1006,10 @@ export class Doc
     /** Set caption on active container */
     caption(s?:string):this
     {
+        
+
         if(!this._activeContainer){ throw new Error(`Doc::caption(): Cannot set caption. No active container. Please make one first!`)};
+        if(this.TYPES_WITHOUT_CAPTION.includes(this._activeContainer._type)){ console.warn(`Doc::caption(): Container type ${this._activeContainer._type} does not support caption!`); return this; }
         this._activeContainer.caption(s);
         return this;
     }
@@ -1013,6 +1017,7 @@ export class Doc
     title(s?:string):this
     {
         if(!this._activeContainer){ throw new Error(`Doc::title(): Cannot set title. No active container. Please make one first!`)};
+        if(this.TYPES_WITHOUT_CAPTION.includes(this._activeContainer._type)){ console.warn(`Doc::title(): Container type ${this._activeContainer._type} does not support title!`); return this; }
         this._activeContainer.title(s);
         return this;
     }

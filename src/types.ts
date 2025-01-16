@@ -618,7 +618,7 @@ export type ContainerPositionLike = ContainerPositionRel|ContainerAlignment|Cont
 export type ContainerData = { // Combine all Container types for convenience
     _entity:string
     name:string
-    parent?:string // Name of parent
+    parent?:string // Name of parent - NOT USED YET
     type:ContainerType
     width:number // relative to (see: widthRelativeTo)
     widthRelativeTo:ContainerSizeRelativeTo
@@ -708,7 +708,7 @@ export interface TextOptions
     underline?:boolean // TODO implement in renderer
     strike?:boolean // TODO implement in renderer   
     oblique?:boolean // TODO implement in renderer
-    align?:TextAreaAlign
+    align?:TextAreaAlign // Not used. Use: Cotnainer.contentAlign
     baseline?:TextBaseline
     angle?:number // in degrees
     // NOTE: some of these parameters are plugged directly into jsPDF.text()

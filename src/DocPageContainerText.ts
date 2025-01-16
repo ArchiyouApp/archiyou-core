@@ -24,6 +24,7 @@ export class Text extends Container
 
         this._setDefaults();
         this._origOptions = options;
+
     }
 
     /** with Text Container width/height is less important than position and size - reflect this in setting to null by default */
@@ -80,6 +81,8 @@ export class Text extends Container
     {
         return {
             ...this._toContainerData(),
+            caption: null, // caption does not make sense for text
+            title: null,
             content: { 
                 data: this._text, 
                 settings: this._options as TextOptions // size, color

@@ -20,6 +20,9 @@
 
 import { PageSize } from './internal'
 import { PageData, ContainerData, Page } from './internal'
+import { DOC_CONTAINER_CAPTION_TEXT_HEIGHT, DOC_CONTAINER_TITLE_TEXT_HEIGHT, 
+    DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR } from './internal' // constants
+
 import { DocViewSVGManager } from './DocViewSVGManager'
 
 import { arrayBufferToBase64, convertValueFromToUnit, mmToPoints, pointsToMm } from './utils'
@@ -348,19 +351,47 @@ export class DocPDFExporter
                 - TODO: container width/height based on content
 
         */
-
         const DEFAULT_BORDER_STYLE = {  strokeColor: '#999999', lineWidth: 0.5 } as DocPathStyle
+
+        const { x, y } = this.containerToPDFPositionInPnts(c, p); // PDF position in pnts, with regard for pivot (also y axis switch)
+        const w = this.relWidthToPoints(c.width, p);
+        const h = this.relHeightToPoints(c.height, p);
 
         // Border rectangle border (mostly for debug for now)
         if(c.border)
         {
             this._setPathStyle({ ...DEFAULT_BORDER_STYLE, ...(c.borderStyle || {}) });
-            const x = this.coordRelWidthToPoints(c.position[0] - ((c?.width) ? c.width*c.pivot[0] : 0), p);
-            const y = this.coordRelHeightToPoints(c.position[1] + ((c?.height) ? c.height*c.pivot[1] : 0), p);
-            const w = this.relWidthToPoints(c.width, p);
-            const h = this.relHeightToPoints(c.height, p);
             this.activePDFDoc.rect(x,y,w,h, 'S');
         }
+        // Title - use native PDF functions (not _placeText) for now, because it's more direct and does not involve creating container data
+        // NOTE: Title is added to the top of the container, keeping the original position
+        if(c?.title)
+        {
+            this.activePDFDoc.setFontSize(mmToPoints(DOC_CONTAINER_TITLE_TEXT_HEIGHT));
+            this.activePDFDoc.text( // pivot of text is top,left when baseline is top
+                    c.title, 
+                    x, 
+                    y - mmToPoints(DOC_CONTAINER_TITLE_TEXT_HEIGHT*DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR), // move up the page, above container start
+                    { 
+                        baseline: 'top', lineHeightFactor : 1.0 } // Keep the same as HTML rendering
+            );   
+        }
+        // Caption is added below the container
+        if(c?.caption)
+        {
+            this.activePDFDoc.setFontSize(mmToPoints(DOC_CONTAINER_CAPTION_TEXT_HEIGHT));
+            this.activePDFDoc.text( 
+                    c.caption, 
+                    x + w/2, // center of container
+                    y + h, // No padding here
+                    { 
+                        baseline: 'top', 
+                        lineHeightFactor : 1.0, 
+                        align: 'center', 
+                    } // Keep the same as HTML rendering - center text
+            );   
+        }
+
     }
 
     //// TEXT ////
@@ -770,7 +801,7 @@ export class DocPDFExporter
         return mmToPoints(convertValueFromToUnit(this.activePage.height, this.activePage.docUnits, 'mm'));
     }
 
-    /** Convert Container position data to x,y in PDF points, including taking take of pivot position and Page.padding. In jspdf coord system
+    /** Convert Container position data to top left postion [x,y] in PDF points, including taking take of pivot position and Page.padding. In jspdf coord system
      *      NOTES: 
      *          - All incoming ContainerData data (position, width, height) is relative to page size
     */

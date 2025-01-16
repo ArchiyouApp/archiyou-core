@@ -1,4 +1,4 @@
-import { Doc, PageSide, Container, View, WidthHeightInput, ContainerData, 
+import { Doc, PageSide, Container, View, WidthHeightInput, ContainerData, PageData,
     DocUnits, PageSize, PageOrientation, AnyPageContainer, isPageSize,
     isPageOrientation,  isAnyPageContainer, ValueWithUnitsString} from './internal'
 import { convertValueFromToUnit } from './internal' // utils
@@ -148,7 +148,7 @@ export class Page
 
     //// OUTPUTS ////
 
-    async toData(cache?:Record<string,any>)
+    async toData(cache?:Record<string,any>):Promise<PageData>
     {
         // async load (some) containers
         const containersData = [];
@@ -167,7 +167,7 @@ export class Page
             padding: this._padding,
             containers: containersData,
             docUnits: this._units // taken from doc, used in rendering
-        }
+        } as PageData;
     }
 
     //// UTILS
