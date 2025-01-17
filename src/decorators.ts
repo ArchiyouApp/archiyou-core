@@ -582,7 +582,8 @@ function _getArgNames(func:any):Array<string>
 
 /** 
 *   Decorator for caching the results of operations and getting them when needed
-*   !!!! This function does not work !!!! TODO: Check TS version and see why this is not working
+*   !!!! This function does not work anymore !!!! 
+*   TODO: Check TS version and see why this is not working: https://www.typescriptlang.org/docs/handbook/decorators.html
 */
 export function cacheOperation(targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor
 {
@@ -597,7 +598,6 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         {
             return wrappedMethod.apply(this, args); // this is the direct output 
         }
-
         const cache = this._geom._cache;
         const hash = _hashOp(wrappedMethodName, args)
         const cacheResult = _checkCache(cache, hash);

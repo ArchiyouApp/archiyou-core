@@ -182,7 +182,8 @@ export class Exporter
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
 
         const ocShapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get(); // autonaming is on by default
-        
+        let ocIncMesh;
+
         /* For now we export all visible shapes in a flattened scene (without nested scenegraph) 
             and export as much properties (id, color) as possible 
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
@@ -217,7 +218,7 @@ export class Exporter
                 }
                 
                 // triangulate BREP to mesh
-                new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
+                ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
             }
         })
 
@@ -237,6 +238,7 @@ export class Exporter
 
         // clean up OC classes
         ocShapeTool.delete();
+        ocIncMesh.delete();
         ocGLFTWriter.delete();
         ocCoordSystemConverter.delete();
 

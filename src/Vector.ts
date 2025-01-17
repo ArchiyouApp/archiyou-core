@@ -10,6 +10,7 @@ import { Vertex } from './internal'
 import { PointLike, isPointLike } from './internal' // see: types.ts
 import { addResultShapesToScene, checkInput } from './decorators' // decorators
 import { toDeg, toRad, roundToTolerance } from './internal' // utils
+import { targetOcForGarbageCollection } from './internal'
 
 
 export class Vector extends Point
@@ -28,7 +29,7 @@ export class Vector extends Point
     */
     
     _oc:any; // this is set on the prototype by the main entrypoint of the library
-    _ocVector: any; // OC gp_Vec https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___vec.html
+    _ocVector:any; // OC gp_Vec https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___vec.html
 
     //// CREATION METHODS ////
     constructor (p?:PointLike, ...args)
@@ -36,6 +37,14 @@ export class Vector extends Point
         super(p, ...args);
 
         this._updateOcVector();
+        targetOcForGarbageCollection(this, this._ocVector);
+    }
+
+    _clearOcVector()
+    {
+        this?._ocVector?.delete();
+        this._ocVector = undefined;
+        // TODO: untarget gc
     }
 
     /* Test if a given object is a Vector */

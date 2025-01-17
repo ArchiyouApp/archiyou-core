@@ -14,10 +14,12 @@ import chroma from 'chroma-js' // direct import like in documentation does not w
 
 import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_DEFAULT_OFFSET, EDGE_DEFAULT_THICKEN,
     EDGE_DEFAULT_POPULATE_NUM, EDGE_DEFAULT_EXTEND_AMOUNT, EDGE_DEFAULT_EXTEND_DIRECTION, EDGE_DEFAULT_ALIGNTO_FROM,
-    EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_ANGLE_SVG, EDGE_DEFAULT_SEGMENTS_SIZE
+    EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_ANGLE_SVG, EDGE_DEFAULT_SEGMENTS_SIZE,
 } from './internal'
 
 import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
+import { targetOcForGarbageCollection } from './internal'
+
 import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, AnyShapeOrCollection,
         LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
 import { roundToTolerance } from './internal'
@@ -78,6 +80,9 @@ export class Edge extends Shape
             this._ocShape = ocEdge;
             this._ocId = this._hashcode();
             this.round(); // round to tolerance - !!!! look like not really working
+
+            targetOcForGarbageCollection(this, this._ocShape)
+
             return this;
         }
         else {

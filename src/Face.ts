@@ -12,6 +12,7 @@ import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPoin
         PointLikeOrAnyShape, isPointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection, AnyShapeOrSequence, isAnyShapeOrSequence,
         isAnyShapeCollection, AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, SelectionString, isSelectionString} from './internal'; // types
 import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+import { targetOcForGarbageCollection } from './internal'
 
 import { flattenEntities, toRad, roundToTolerance } from './internal' // utils
 
@@ -178,6 +179,8 @@ export class Face extends Shape
             this._ocShape = ocFace;
             this._ocId = this._hashcode();
             this.round(); // round to tolerance
+
+            targetOcForGarbageCollection(this, this._ocShape);
 
             return this;
         }

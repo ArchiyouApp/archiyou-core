@@ -1,11 +1,11 @@
-/* 
+/*
     Garbage Collection
     Mainly used for cleaning up OpenCascade WASM references
- *  Somewhat inspired on: https://github.com/sgenoud/replicad/blob/2780baf3479210f08137dcbf177d15e3c8a2401e/packages/replicad/src/register.ts#L61
- */
+ 
+*/
 
 if (!(globalThis as any)?.FinalizationRegistry)
-{   
+{
     console.error('!!!! **** GARBAGE COLLECTION NOT INITED: FinalizationRegistry is not present **** !!!!');
     // Some mockup to not break garbage collection methods
     (globalThis as any).FinalizationRegistry = (() => ({
@@ -16,33 +16,26 @@ if (!(globalThis as any)?.FinalizationRegistry)
 
 /** Called when a reference is cleaned up by browser
  *  When this happens depends on the browser, and is certainly not every second
- *  In dev tools you can trigger it. For example in Chrome -> More Tools -> Development Tools -> Memory > Collect Garbage 
+ *  In dev tools you can trigger it. For example in Chrome -> More Tools -> Development Tools -> Memory > Collect Garbage
  */
-const onGarbageCleanup = function(onDeleted:() => any)
-{   
+const onGarbageCollect = function(ocObjs:Array<any>)
+{
     try {
-        onDeleted()
+        ocObjs.forEach(ocObj => (ocObj as any)?.delete());
     }
     catch(e)
     {
-        console.error('GarbageCollection::onGarbageCleanup(): Incoming held value is not a function!')
+        console.error(`GarbageCollection::onGarbageCleanup(): Error: ${e}!`)
     }
 };
-    
-const garbageCollectionRegistry = new (globalThis as any).FinalizationRegistry(onGarbageCleanup);
 
+const garbageCollectionRegistry = new (globalThis as any).FinalizationRegistry(onGarbageCollect);
 
-export function useGarbageCollection(obj:any)
+/** This is the main method to target one or more OC objects for deletion after main class is garbage collected */
+export function targetOcForGarbageCollection(obj:any, ocObjs:any|Array<any>)
 {
-    const callback = () => {
-        if(obj?.onDeleted)
-        {
-            obj.onDeleted();
-        }
-        else {
-            console.warn(`GarbageCollection: Obj of type ${typeof obj} has no onDeleted method. Check if nothing needs cleaning!`)
-        }
-    }
-
-    garbageCollectionRegistry.register(obj, callback)
+    const ocObjsArr = !Array.isArray(ocObjs) ? [ocObjs] : ocObjs;
+    garbageCollectionRegistry.register(obj, ocObjsArr)
 }
+
+/** TODO: unregister things */

@@ -32,7 +32,6 @@ import { Alignment, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString,
 import { BaseAnnotation, Annotation, DimensionOptions, DimensionLine } from './internal'
 import { OBbox, BeamLikeDims } from './internal'
 
-import { useGarbageCollection } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
 type IVertex = Vertex
@@ -76,7 +75,6 @@ export class Shape
     constructor()
     {
         this._setShapeEnumToClassName(); // Some groundwork
-        useGarbageCollection(this);
     }
 
     /** Callback for garbage collection */
@@ -140,6 +138,63 @@ export class Shape
     static fromAll(value:any):AnyShape
     {
         return new Shape().fromAll(value);
+    }
+
+    
+    /** Make Shape from OC Shape if given, otherwise update properties based on current _ocShape */
+    /* !!!! Important: This method is not consistent with _fromOcWire, _fromOcSolid etc because it does not affect original 
+        So: this does NOT update current Shape with an Oc Shape. For now we do that manually in every operator
+    */
+
+    _fromOcShape(ocShape:any):AnyShapeOrCollection
+    {
+        ocShape = ocShape || this._ocShape;
+
+        if (ocShape === null || ocShape?.IsNull())
+        {
+            console.error('Shape::_fromOcShape: No valid OC Shape given!')
+            return null;
+        }
+
+        let shapeType = this._getShapeTypeFromOcShape(ocShape);
+        
+        let newShape:any;
+
+        switch(shapeType)
+        {
+            // NOTE: We round every new Shape to the global tolerance - that's done in _fromOC<<TYPE>> methods
+            case 'Vertex':
+                newShape = new Vertex()._fromOcVertex(this._makeSpecificOcShape(ocShape, shapeType));
+                break;
+            case 'Edge':
+                newShape = new Edge()._fromOcEdge(this._makeSpecificOcShape(ocShape, shapeType));
+                break;
+            case 'Wire':
+                newShape = new Wire()._fromOcWire(this._makeSpecificOcShape(ocShape, shapeType));
+                break;
+            case 'Face':
+                newShape = new Face()._fromOcFace(this._makeSpecificOcShape(ocShape, shapeType));
+                break;
+            case 'Shell':
+                newShape = new Shell()._fromOcShell(this._makeSpecificOcShape(ocShape, shapeType));
+                break;
+            case 'Solid':
+                newShape = new Solid()._fromOcSolid(this._makeSpecificOcShape(ocShape, shapeType));
+                break;
+            case 'Compound':
+            case 'CompSolid':
+                let shapeOrCollection = this._extractShapesFromOcCompound(ocShape);
+                newShape = (ShapeCollection.isShapeCollection(shapeOrCollection)) ? (shapeOrCollection as ShapeCollection).collapse() : shapeOrCollection;
+                break;
+            default:
+                console.warn(`Shape::_fromOcShape: Unknown OC Shape. Found type "${shapeType}"`);
+                newShape = null;
+        }
+
+        // Removed: Check downgrade to avoid Shells with only one Face, or Wires with only one Edge
+        // Too slow: apply checkDowngrade() after operations where it these kind of Shapes can be created
+    
+        return newShape;
     }
 
     //// MANAGING ATTRIBUTES ////
@@ -235,61 +290,6 @@ export class Shape
     }
 
 
-    /** Make Shape from OC Shape if given, otherwise update properties based on current _ocShape */
-    /* !!!! Important: This method is not consistent with _fromOcWire, _fromOcSolid etc because it does not affect original 
-        So: this does NOT update current Shape with an Oc Shape. For now we do that manually in every operator
-    */
-
-    _fromOcShape(ocShape:any):AnyShapeOrCollection
-    {
-        ocShape = ocShape || this._ocShape;
-
-        if (ocShape === null || ocShape?.IsNull())
-        {
-            console.error('Shape::_fromOcShape: No valid OC Shape given!')
-            return null;
-        }
-
-        let shapeType = this._getShapeTypeFromOcShape(ocShape);
-        
-        let newShape:any;
-
-        switch(shapeType)
-        {
-            // NOTE: We round every new Shape to the global tolerance - that's done in _fromOC<<TYPE>> methods
-            case 'Vertex':
-                newShape = new Vertex()._fromOcVertex(this._makeSpecificOcShape(ocShape, shapeType));
-                break;
-            case 'Edge':
-                newShape = new Edge()._fromOcEdge(this._makeSpecificOcShape(ocShape, shapeType));
-                break;
-            case 'Wire':
-                newShape = new Wire()._fromOcWire(this._makeSpecificOcShape(ocShape, shapeType));
-                break;
-            case 'Face':
-                newShape = new Face()._fromOcFace(this._makeSpecificOcShape(ocShape, shapeType));
-                break;
-            case 'Shell':
-                newShape = new Shell()._fromOcShell(this._makeSpecificOcShape(ocShape, shapeType));
-                break;
-            case 'Solid':
-                newShape = new Solid()._fromOcSolid(this._makeSpecificOcShape(ocShape, shapeType));
-                break;
-            case 'Compound':
-            case 'CompSolid':
-                let shapeOrCollection = this._extractShapesFromOcCompound(ocShape);
-                newShape = (ShapeCollection.isShapeCollection(shapeOrCollection)) ? (shapeOrCollection as ShapeCollection).collapse() : shapeOrCollection;
-                break;
-            default:
-                console.warn(`Shape::_fromOcShape: Unknown OC Shape. Found type "${shapeType}"`);
-                newShape = null;
-        }
-
-        // Removed: Check downgrade to avoid Shells with only one Face, or Wires with only one Edge
-        // Too slow: apply checkDowngrade() after operations where it these kind of Shapes can be created
-    
-        return newShape;
-    }
 
     //// OPERATIONS ON SHAPE AND RELATED OBJECT  ////
 

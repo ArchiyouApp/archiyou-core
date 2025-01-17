@@ -5,6 +5,7 @@
  * */
 
 import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection, AnyShapeOrCollection } from './internal'
+import { targetOcForGarbageCollection } from './internal' 
 import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
@@ -38,6 +39,14 @@ export class Bbox
         {
             this.create(min,max);
         }
+
+        targetOcForGarbageCollection(this, this._ocBbox)
+    }
+ 
+    _clearOcBbox()
+    {
+        this?._ocBbox?.delete();
+        this._ocBbox = undefined;
     }
 
     /** Link to Shape or ShapeCollection
