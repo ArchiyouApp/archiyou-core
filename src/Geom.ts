@@ -322,7 +322,7 @@ export class Geom
   Solid(shells:MakeSolidInput, ...args):Solid
   {
     // NOTE: We don't allow creating empty Solid in Geom. Use new Solid() instead
-    let solid = new Solid(shells as ShapeCollection); // auto converted and combined into 
+    const solid = new Solid(shells as ShapeCollection); // auto converted and combined into 
     solid.addToScene();
     console.geom(`Geom::Shell: Created a Solid with ${solid.shells().length} Shells and ${solid.faces().length} Faces`);
     return solid;
@@ -332,7 +332,7 @@ export class Geom
   @checkInput([ [Number,SOLID_MAKEBOX_SIZE],[Number,null], [Number, null],['PointLike',[0,0,0]] ], ['auto', 'auto','auto', 'Point']) // this automatically transforms Types
   Box(width?:number, depth?:number, height?:number, position?:PointLike):Solid
   {
-    let box = new Solid().makeBox(width, depth, height, position as Point);
+    const box = new Solid().makeBox(width, depth, height, position as Point);
     box.addToScene();
     box.name(this.getNextObjName('Box')); // auto name
     console.geom(`Geom::Box: Created a Box Solid with size [${width}, ${depth||width}, ${height||width}] at [${box.center().x},${box.center().y},${box.center().z}]`);

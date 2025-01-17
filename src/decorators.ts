@@ -15,6 +15,8 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
             isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions, isDimensionLevelSettings, isOrientationXY, isAnnotationAutoDimStrategy,
             isBeam, isBeamBaseLineAlignment } from './internal'
+
+import { SHAPE_CACHE_ENABLED } from './internal' // constants
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
 
@@ -580,6 +582,7 @@ function _getArgNames(func:any):Array<string>
 
 /** 
 *   Decorator for caching the results of operations and getting them when needed
+*   !!!! This function does not work !!!! TODO: Check TS version and see why this is not working
 */
 export function cacheOperation(targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor
 {
@@ -589,11 +592,15 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
 
     descriptor.value = function(...args )
     {  
+        // A flag can disable the cache
+        if(!SHAPE_CACHE_ENABLED)
+        {
+            return wrappedMethod.apply(this, args); // this is the direct output 
+        }
 
-        let cache = this._geom._cache;
-        let hash = _hashOp(wrappedMethodName, args)
-
-        let cacheResult = _checkCache(cache, hash);
+        const cache = this._geom._cache;
+        const hash = _hashOp(wrappedMethodName, args)
+        const cacheResult = _checkCache(cache, hash);
 
         if (cacheResult)
         {
@@ -602,13 +609,12 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
             return cacheResult?._copy() || cacheResult; 
         }       
         else {
-            let calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
+            const calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
             _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
             return calculatedOutput; // return real output - no cached version!
         }
         
     }
-
     return descriptor;
 }
 
@@ -756,7 +762,6 @@ export function checkInput(inputChecks:any|Array<any>, uniformizeToTypes:any|Arr
 {
     inputChecks = !Array.isArray(inputChecks) ? [inputChecks] : inputChecks;
     uniformizeToTypes = !Array.isArray(uniformizeToTypes) ? [uniformizeToTypes] : uniformizeToTypes;
-
 
     return function (targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor
     {

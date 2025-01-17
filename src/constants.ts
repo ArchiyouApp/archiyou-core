@@ -5,30 +5,9 @@
 
 import { DocPathStyle } from './internal'
 
-//// DRAWING STYLES
+//// IMPORTANT FLAGS ////
 
-// units are in points (corresponding to PDF units)
-export const CLASS_TO_STYLE:Record<string, DocPathStyle> = {
-    // standard line
-    line: { 
-        lineWidth: 0.425, // 0.15 mm
-        lineCap: 'butt',
-        lineJoin: 'butt',
-    },
-    dashed: {
-        lineWidth: 0.425, // 0.15 mm
-        dash: [ 11.339, 11.339] // size, space in points
-    },
-    hidden: {
-        lineWidth: 0.142, // 0.05mm
-    },
-    outline : {
-        lineWidth: 0.709, // 0.25mm
-    },
-    dimensionline : {
-        lineWidth: 0.709, // 0.1mm
-    },
-}
+export const SHAPE_CACHE_ENABLED = false;
 
 //// MISC SETTINGS
 
@@ -119,6 +98,32 @@ export const DOC_DIMENSION_LINES_TEXT_HEIGHT = 2.5; // in mm
 export const DOC_CONTAINER_TITLE_TEXT_HEIGHT = 6; // in mm
 export const DOC_CONTAINER_CAPTION_TEXT_HEIGHT = 3; // in mm
 export const DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR = 2; // applied to text height
+
+
+//// DRAWING STYLES
+
+// units are in points (corresponding to PDF units)
+export const CLASS_TO_STYLE:Record<string, DocPathStyle> = {
+    // standard line
+    line: { 
+        lineWidth: 0.425, // 0.15 mm
+        lineCap: 'butt',
+        lineJoin: 'butt',
+    },
+    dashed: {
+        lineWidth: 0.425, // 0.15 mm
+        dash: [ 11.339, 11.339] // size, space in points
+    },
+    hidden: {
+        lineWidth: 0.142, // 0.05mm
+    },
+    outline : {
+        lineWidth: 0.709, // 0.25mm
+    },
+    dimensionline : {
+        lineWidth: 0.709, // 0.1mm
+    },
+}
 
 //// MESH QUALITY OUTPUT SETTINGS ////
 

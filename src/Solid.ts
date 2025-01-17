@@ -151,7 +151,6 @@ export class Solid extends Shape
 
     /** Creates a box of size given by width, depth and height and position */
     @cacheOperation
-    @checkInput([ [Number,SOLID_MAKEBOX_SIZE],[Number,null], [Number, null],['PointLike',[0,0,0]] ], ['auto', 'auto','auto', 'Point']) // this automatically transforms Types
     makeBox(width?:number, depth?:number, height?:number, position?:PointLike):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_box.html
@@ -159,11 +158,11 @@ export class Solid extends Shape
         depth = depth || width;
         height = height || width;
 
-        let ocBox = new this._oc.BRepPrimAPI_MakeBox_2( width, depth, height).Shape();
+        const ocBox = new this._oc.BRepPrimAPI_MakeBox_2( width, depth, height).Shape();
         this._fromOcSolid(ocBox);
 
         // translate
-        let centerVec = new Vector(width/2, depth/2, height/2);
+        const centerVec = new Vector(width/2, depth/2, height/2);
         this.move( (position as Point).toVector().subtracted(centerVec));
 
         return this;
@@ -195,8 +194,8 @@ export class Solid extends Shape
     makeSphere( radius?:number, position?:PointLike, angle?:number): Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim___sphere.html
-        let angleRad = toRad(angle);
-        let ocSphere = (new this._oc.BRepPrimAPI_MakeSphere_6((position as Point)._toOcPoint(), radius, angleRad)).Shape();
+        const angleRad = toRad(angle);
+        const ocSphere = (new this._oc.BRepPrimAPI_MakeSphere_6((position as Point)._toOcPoint(), radius, angleRad)).Shape();
         this._fromOcSolid(ocSphere);
         
         return this;
@@ -209,8 +208,8 @@ export class Solid extends Shape
     makeCone( bottomRadius?:number, topRadius?:number, height?:number, position?:PointLike, angle?:number):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_cone.html#afd899db3f2bc7e2b570305678ba8b40b
-        let angleRad = toRad(angle);
-        let ocCone = (new this._oc.BRepPrimAPI_MakeCone_2( bottomRadius, topRadius, height, angleRad)).Shape();
+        const angleRad = toRad(angle);
+        const ocCone = (new this._oc.BRepPrimAPI_MakeCone_2( bottomRadius, topRadius, height, angleRad)).Shape();
         
         this._fromOcSolid(ocCone);
         this.move(position as Point); // auto converted to Point
@@ -226,8 +225,8 @@ export class Solid extends Shape
     makeCylinder(radius?:number, height?:number, position?:PointLike, angle?:number):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_cylinder.html
-        let angleRad = toRad(angle);
-        let ocCone = (new this._oc.BRepPrimAPI_MakeCylinder_2( radius, height, angleRad )).Shape();
+        const angleRad = toRad(angle);
+        const ocCone = (new this._oc.BRepPrimAPI_MakeCylinder_2( radius, height, angleRad )).Shape();
 
         this._fromOcSolid(ocCone);
         this.move(position as Point) as Solid;

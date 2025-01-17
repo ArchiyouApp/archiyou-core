@@ -396,16 +396,16 @@ export class Obj
     clearShapes():Obj
     {
         this._shapes = new ShapeCollection();
-
         return this;
     }
 
     /** Delete Shapes
      *  Mostly removing OC classes, JS objects are picked up by garbage collection
      */
-    clearOcShapes()
+    clearOcShapes():this
     {
-          this.allShapes().forEach(s => s._clearOcShape());
+        this.allShapes().forEach(s => s._clearOcShape());
+        return this;
     }
   
 
