@@ -829,7 +829,7 @@ export interface LabelBlockOptions
 
 export interface VertexMesh {
     objId : string,
-    ocId : number,
+    ocId : string,
     vertices: Array<number>, // vertices instead of vertex for consistency
     indexInShape: number
 }

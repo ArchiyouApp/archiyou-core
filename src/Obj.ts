@@ -371,9 +371,11 @@ export class Obj
         return obj;
     }
 
-    isEmpty():Obj
+    /** Empty Obj container by releasing all OC Shapes and then removing JS references */
+    empty():Obj
     {
-        this._shapes = new ShapeCollection();
+        this.clearOcShapes()
+        this.clearShapes();
         this._children = [];
 
         return this;
@@ -397,6 +399,15 @@ export class Obj
 
         return this;
     }
+
+    /** Delete Shapes
+     *  Mostly removing OC classes, JS objects are picked up by garbage collection
+     */
+    clearOcShapes()
+    {
+          this.allShapes().forEach(s => s._clearOcShape());
+    }
+  
 
     /** Get type of Shape(s) in this Object */
     shapeType():string

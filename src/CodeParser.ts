@@ -5,9 +5,13 @@
  */
 
 import { Statement } from './internal'
+import { GEOM_METHODS_INTO_GLOBAL } from './internal'
 import { Parser, Options, Node } from 'acorn'
+import findGlobals from 'acorn-globals'
 import { ScriptVersion, ImportStatement } from './models'
+
 import { IO } from './IO'
+
 
 interface PreStats
 {
@@ -109,6 +113,20 @@ export class CodeParser
         )
 
         return this.statements;
+    }
+    
+    getGlobalVars():Array<string>
+    {
+        // NOTE: the acorn-globals if a bit weird, correct some things
+        const SKIP_GLOBALS = ['Array', 'Math']
+        const ARCHIYOU_MODULES = ['doc', 'geom', 'calc', 'make', 'beams']
+
+        const globalFuncsLowerCase = GEOM_METHODS_INTO_GLOBAL.map(f => f.toLowerCase())
+
+        return findGlobals(this.code).map(r => r.name)
+                    .filter(g => !globalFuncsLowerCase.includes(g.toLowerCase()))
+                    .filter(g => g.charAt(0) !== '$') // don't do params
+                    .filter(g => !ARCHIYOU_MODULES.includes(g) && !SKIP_GLOBALS.includes(g))
     }
 
     getCodeOfNode(node:Node):string

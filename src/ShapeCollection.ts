@@ -67,6 +67,12 @@
          }
       }
 
+      /** Clear OC Shapes - used to make sure memory is released */
+      _clearOcShapes()
+      {
+         this.shapes.forEach(s => s._clearOcShape());
+      }
+
       /** Try to convert anything to a ShapeCollection */
       // We use an incremental way of iterating over collections (Arrays, ShapeCollections), testing the entities and adding them
       // IMPORTANT TODO: if new ShapeCollection from existing one - what to do with taking over attributes? 
@@ -2515,7 +2521,7 @@
          let shapeMeshes:Array<MeshShape> = [];
          this.shapes.forEach( s => 
          {
-            let meshShape = s.toMeshShape(quality);
+            const meshShape = s.toMeshShape(quality);
             if (meshShape)
             {
                shapeMeshes.push(meshShape);

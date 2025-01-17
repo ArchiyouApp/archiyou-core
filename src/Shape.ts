@@ -32,6 +32,8 @@ import { Alignment, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString,
 import { BaseAnnotation, Annotation, DimensionOptions, DimensionLine } from './internal'
 import { OBbox, BeamLikeDims } from './internal'
 
+import { useGarbageCollection } from './internal'
+
 // this can disable TS errors when subclasses are not initialized yet
 type IVertex = Vertex
 type IEdge = Edge
@@ -73,7 +75,14 @@ export class Shape
 
     constructor()
     {
-        this._setShapeEnumToClassName(); // Some groundwork        
+        this._setShapeEnumToClassName(); // Some groundwork
+        useGarbageCollection(this);
+    }
+
+    /** Callback for garbage collection */
+    onDeleted()
+    {
+        this._clearOcShape();
     }
 
     /** Update _OcShape from Shape properties */
@@ -90,6 +99,13 @@ export class Shape
         {
             this._ocShape = ocShape;
         }
+    }
+
+    /** Clear OC Shape - used to make sure memory is released */
+    _clearOcShape()
+    {
+        this?._ocShape?.delete();
+        this._ocShape = null;
     }
 
     /** Do an effort to create a Shape */
@@ -475,8 +491,7 @@ export class Shape
     /** Create hash for this Shape: can be used to check if an Shape is the same instance (NOTE: not that is has equal geometry!) */
     _hashcode():string
     {
-        let h = (this._ocShape) ? this._ocShape.HashCode(2147483647) : null;
-        return h;
+        return (this._ocShape) ? (this._ocShape.HashCode(2147483647) as number).toString() : null;
     }
 
     ocGeom():any 
@@ -4534,23 +4549,35 @@ export class Shape
 
     //// OUTPUTS ////
 
-    /** Output all Vertices of this Shape into an Array for further processing */
+    /** Output all Vertices of this Shape into an Array for further processing 
+     *  NOTE: Because of its importance and size we do some extra efforts here to make sure we clear all memory
+    */
     toMeshVertices():Array<VertexMesh>
     {
-        let meshVertices:Array<VertexMesh> = []
-        this.vertices().forEach( (curVertex, curVertexIndex) =>
-        {
-            meshVertices.push({ vertices : curVertex.toArray(), objId: this._obj.id, ocId: curVertex._hashcode(), indexInShape: curVertexIndex });
-        });
+        const vertices = this.vertices();
+        const meshVertices:Array<VertexMesh> = vertices.toArray().map(
+            (curVertex, curVertexIndex) => 
+            {
+                return { 
+                    objId: this._obj.id, 
+                    ocId: curVertex._hashcode(), 
+                    vertices : (curVertex as Vertex).toArray(), 
+                    indexInShape: curVertexIndex 
+                } as VertexMesh
+            }
+        )
+        // Clear memory of vertices
+        vertices._clearOcShapes();
 
         return meshVertices;
     }
 
     toMeshEdges(quality:MeshingQualitySettings):Array<EdgeMesh>
     {
-        let meshEdges:Array<EdgeMesh> = [];
+        const meshEdges:Array<EdgeMesh> = [];
+        const edges = this.edges();
 
-        this.edges().forEach( (curEdge, curEdgeIndex) => 
+        edges.forEach( (curEdge, curEdgeIndex) => 
         {   
             let vertexCoords = [];
             let ocLocation = new this._oc.TopLoc_Location_1(); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_top_loc___location.html
@@ -4591,6 +4618,8 @@ export class Shape
             }
         });
 
+        edges._clearOcShapes();
+
         return meshEdges;
     }
 
@@ -4612,18 +4641,20 @@ export class Shape
             - BRep_Tool: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_b_rep___tool.html
             - Poly_Connect: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_poly___connect.html
         
-            
-        /*
             Here the core of the meshing takes place - it converts the Shape into a Mesh. 
              Data is placed on the Faces of the Shape and retrieved by BRep_Tool.Triangulation(face)
             By cloning we can greatly reduce the calculations here
+
             This works by registering the cloning with Shape.clone() and then when meshing fall back to original 
                 Shape, which is probably already is meshed. We use the fact that OpenCascade already keeps 
                 topology mostly the same and just applies transformations for operations like move, rotate and mirror
-            So for a cloned object we 
+            
+            WARNING: Mirroring a cloned object does not work yet
         */
+        
         let meshedShape = this as AnyShape;
         let ocMesher = null;
+
         if(this._cloned && this._checkCloned())
         {
             meshedShape = this._cloned.from;
@@ -4637,13 +4668,14 @@ export class Shape
                 false);  // NOTE: this is needed to start triangulation
         }
 
-        let meshFaces: Array<FaceMesh> = [];
+        const meshFaces: Array<FaceMesh> = [];
+        const faces = meshedShape.faces();
 
-        meshedShape.faces().forEach( (curFace, curFaceIndex) => 
+        faces.forEach( (curFace, curFaceIndex) => 
         {
             const ocLocation = new this._oc.TopLoc_Location_1();
 
-            let ocTriangulation = new this._oc.BRep_Tool.Triangulation(curFace._ocShape, ocLocation, 0); // Poly_MeshPurpose.Poly_MeshPurpose_NONE
+            const ocTriangulation = new this._oc.BRep_Tool.Triangulation(curFace._ocShape, ocLocation, 0); // Poly_MeshPurpose.Poly_MeshPurpose_NONE
             const faceTransformation = ocLocation.Transformation();
             const clonedShapeTransformation = (this._cloned) ? this._ocShape.Location_1().Transformation() : null;
 
@@ -4653,8 +4685,6 @@ export class Shape
             }
             else 
             {
-                //ocTriangulation = ocTriangulation.get().Copy(); // copy
-
                 const faceMesh = {
                     ocId: curFace._ocId,
                     objId : this._obj.id,
@@ -4671,7 +4701,7 @@ export class Shape
                 faceMesh.vertices = new Array(numNodes * 3);
                 for(let i = 0; i < numNodes; i++) 
                 {
-                    let p = ocTriangulation.get().Node(i+1); // gp_Pnt
+                    const p = ocTriangulation.get().Node(i+1); // gp_Pnt
                     // NOTE: One of the transformations is enough (either just the face, or for main cloned Shape )
                     if(clonedShapeTransformation)
                     { 
@@ -4691,7 +4721,7 @@ export class Shape
                 //// UV coordinate buffer ////
 
                 // Important: Face orientation will be used in coming calculations
-                let faceOrientation = curFace._ocShape.Orientation_1().value; // 0 = forward, 1 = backward
+                const faceOrientation = curFace._ocShape.Orientation_1().value; // 0 = forward, 1 = backward
 
                 if (ocTriangulation.get().HasUVNodes()) 
                 {
@@ -4760,8 +4790,7 @@ export class Shape
                 }
             
                 // Face triangles
-
-                let triangles = ocTriangulation.get().Triangles();
+                const triangles = ocTriangulation.get().Triangles();
                 faceMesh.triangleIndices = new Array(triangles.Length() * 3);
                 let validFaceTriCount = 0;
 
@@ -4779,7 +4808,6 @@ export class Shape
                         n1 = n2;
                         n2 = tmp;
                     }
-                
                     faceMesh.triangleIndices[(validFaceTriCount * 3) + 0] = n1 - 1;
                     faceMesh.triangleIndices[(validFaceTriCount * 3) + 1] = n2 - 1;
                     faceMesh.triangleIndices[(validFaceTriCount * 3) + 2] = n3 - 1;
@@ -4793,13 +4821,13 @@ export class Shape
                 ocTriangulation.delete();
                 ocPolyConnect.delete();
 
-
             } // end not null Face
             
         }); // end faces iteration
 
         // clean up
         ocMesher?.delete()
+        faces._clearOcShapes();
 
         return meshFaces;
     }
