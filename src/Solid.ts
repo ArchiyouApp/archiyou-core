@@ -151,6 +151,7 @@ export class Solid extends Shape
 
     /** Creates a box of size given by width, depth and height and position */
     @cacheOperation
+    @checkInput([ [Number,SOLID_MAKEBOX_SIZE], [Number, null], [Number, null], ['PointLike',[0,0,0]]], ['auto','auto','auto','PointLike'])
     makeBox(width?:number, depth?:number, height?:number, position?:PointLike):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_box.html

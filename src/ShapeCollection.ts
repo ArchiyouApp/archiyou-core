@@ -2645,7 +2645,13 @@
           
             // Info per entity
             meshShapeBuffer.verticesInfo = meshShapeBuffer.verticesInfo.concat( 
-               curMeshShape.vertices.map( v => ({ objId: v.objId, shapeId: v.ocId, subShapeType: 'Vertex', indexInShape: v.indexInShape, color: chroma(curMeshShape?.style?.line?.color || '#333333').darken(0.5).num()  }) )
+                  curMeshShape.vertices.map( 
+                     (v) => ({ 
+                        objId: v.objId, 
+                        shapeId: v.ocId, 
+                        subShapeType: 'Vertex', 
+                        indexInShape: v.indexInShape, 
+                        color: chroma(curMeshShape?.style?.line?.color || '#333333').darken(0.5).num()  })) as any // Get rid of TS error. TODO: Look into it!
             );
 
          })

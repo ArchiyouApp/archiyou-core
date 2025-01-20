@@ -15,7 +15,7 @@
  *        - Vector and Vertex extend the Point class
  */
 
-import { Vector, Vertex, ShapeCollection, useGarbageCollection} from './internal'
+import { Vector, Vertex, ShapeCollection, targetOcForGarbageCollection } from './internal'
 import { AXIS_TO_VECS, MainAxis, PointLike, isPointLike, isCoord, Coord, PolarCoord, Axis, isAxis, Cursor, 
     isAnyShapeOrCollection, AnyShapeOrCollection, isCursor, Plane } from './internal' // see types.ts
 import { isRelativeCartesianCoordString, parseRelativePolarCoordString, relativeCoordToNumber, roundToTolerance} from './internal' // utils
