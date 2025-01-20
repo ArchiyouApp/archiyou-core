@@ -7,7 +7,7 @@
 import { Statement } from './internal'
 import { GEOM_METHODS_INTO_GLOBAL } from './internal'
 import { Parser, Options, Node } from 'acorn'
-// import findGlobals from 'acorn-globals'
+import findGlobals from 'acorn-globals'
 import { ScriptVersion, ImportStatement } from './models'
 
 import { IO } from './IO'
@@ -115,7 +115,7 @@ export class CodeParser
         return this.statements;
     }
     
-    /*
+    
     getGlobalVars():Array<string>
     {
         // NOTE: the acorn-globals if a bit weird, correct some things
@@ -129,7 +129,7 @@ export class CodeParser
                     .filter(g => g.charAt(0) !== '$') // don't do params
                     .filter(g => !ARCHIYOU_MODULES.includes(g) && !SKIP_GLOBALS.includes(g))
     }
-    */
+    
 
     getCodeOfNode(node:Node):string
     {
