@@ -966,7 +966,6 @@ export function addResultShapesToScene(targetPrototype: any, propertyKey: string
         }
         
     }
-
     return descriptor;
 }
 

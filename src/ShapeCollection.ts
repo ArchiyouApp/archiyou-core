@@ -5,8 +5,6 @@
  *
  *    ShapeCollection makes operating on multiple Shapes as easy as working on single Shapes (Inspired like JTS/GEOS). 
  *
- *   - TODO: Find a good strategy for this
- *   - TODO: The Scene is also a ShapeCollection => clear and advanced Object trees for navigation
  */
 
  import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
