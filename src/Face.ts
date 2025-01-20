@@ -424,7 +424,6 @@ export class Face extends Shape
     {
         const OcBRepTools = this._oc.BRepTools.prototype.constructor;
         const w = new Wire()._fromOcWire(OcBRepTools.OuterWire(this._ocShape));
-        OcBRepTools?.delete(); // clear OC instance
         return w;
     }
 
