@@ -8,6 +8,9 @@
 import { SOLID_MAKEBOX_SIZE, SOLID_MAKESPHERE_RADIUS, SOLID_MAKESPHERE_ANGLE, SOLID_MAKECONE_BOTTOM_RADIUS, SOLID_MAKECONE_TOP_RADIUS,
     SOLID_MAKECONE_HEIGHT, SOLID_CYLINDER_RADIUS, SOLID_CYLINDER_HEIGHT, SOLID_CYLINDER_ANGLE, SOLID_FILLET_RADIUS, SOLID_CHAMFER_DISTANCE,
     SOLID_THICKEN_AMOUNT, SOLID_THICKEN_DIRECTION } from './internal'
+
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Shell, ShapeCollection } from './internal'
 import { cacheOperation } from './internal'; // decorators
 import { toRad } from './internal';
@@ -39,8 +42,8 @@ export class Solid extends Shape
     @checkInput(isMakeSolidInput, ShapeCollection)
     fromAll(shells:MakeSolidInput, ...args):Solid // args are used in decorator to create ShapeCollection
     {   
-        let shapes = shells as ShapeCollection; // auto converted
-        let checkedShells = shapes.getShapesByType('Shell');
+        const shapes = shells as ShapeCollection; // auto converted
+        const checkedShells = shapes.getShapesByType('Shell');
 
         if (checkedShells.length == 0)
         {
@@ -61,8 +64,7 @@ export class Solid extends Shape
     @checkInput(Shell, 'auto')
     fromShell(shell: Shell) 
     {
-        let ocSolid = new this._oc.ShapeFix_Solid_1().SolidFromShell(shell._ocShape);
-
+        const ocSolid = new this._oc.ShapeFix_Solid_1().SolidFromShell(shell._ocShape);
         return this._fromOcShape(ocSolid) as Solid;
     }
 
@@ -127,6 +129,8 @@ export class Solid extends Shape
             {
                 this._fix();
             }
+            targetOcForGarbageCollection(this, this._ocShape);
+
             return this;
         }
         else {
@@ -280,14 +284,14 @@ export class Solid extends Shape
 
     _fix():Solid
     {
-        let ocSolid = this._makeSpecificOcShape(this._ocShape);
-        let ocShapeFix = new this._oc.ShapeFix_Solid_2(ocSolid);
+        const ocSolid = this._makeSpecificOcShape(this._ocShape);
+        const ocShapeFix = new this._oc.ShapeFix_Solid_2(ocSolid);
         ocShapeFix.SetPrecision(this._oc.SHAPE_TOLERANCE); // does not seem to work
         ocShapeFix.SetMaxTolerance(this._oc.SHAPE_TOLERANCE);
         ocShapeFix.SetMinTolerance(this._oc.SHAPE_TOLERANCE);
 
         ocShapeFix.Perform(new this._oc.Message_ProgressRange_1());
-        let fixedOcSolid = this._makeSpecificOcShape(ocShapeFix.Shape()); // make sure it is a TopoDS_Solid 
+        const fixedOcSolid = this._makeSpecificOcShape(ocShapeFix.Shape()); // make sure it is a TopoDS_Solid 
         this._fromOcSolid(fixedOcSolid, false); // avoid infinite loops by avoiding fix
         return this;
     }
@@ -419,8 +423,9 @@ export class Solid extends Shape
         ocMakeFillet.Build(new this._oc.Message_ProgressRange_1());
         if (ocMakeFillet.IsDone())
         {
-            let ocShape = ocMakeFillet.Shape();
-            let newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            const ocShape = ocMakeFillet.Shape();
+            const newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            removeOcTargetForGarbageCollection(newSolid._ocShape); // remove from garbage collection
             this._fromOcSolid(newSolid._ocShape); // replace old Solid with new one            
             
             return this;
@@ -537,7 +542,8 @@ export class Solid extends Shape
         if (ocMakeChamfer.IsDone())
         {
             let ocShape = ocMakeChamfer.Shape();
-            let newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            const newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            removeOcTargetForGarbageCollection(newSolid._ocShape); // avoid shared OC instances
             this._fromOcSolid(newSolid._ocShape); // replace old Solid with new one
             
             return this;

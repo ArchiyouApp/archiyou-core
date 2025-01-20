@@ -18,7 +18,7 @@ import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_
 } from './internal'
 
 import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
-import { targetOcForGarbageCollection } from './internal'
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal'
 
 import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, AnyShapeOrCollection,
         LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
@@ -26,7 +26,8 @@ import { roundToTolerance } from './internal'
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
 import { WIRE_LOFTED_SOLID } from './internal'
 import { toRad, convertValueFromToUnit } from './internal';
-import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+import { DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+
 
 // this can disable TS errors when subclasses are not initialized yet
 type IWire = Wire
@@ -70,7 +71,7 @@ export class Edge extends Shape
 
     //// TRANSFORMATION METHODS ////
 
-    _fromOcEdge(ocEdge:any):Edge
+    _fromOcEdge(ocEdge:any):this
     {
         if (ocEdge && (ocEdge instanceof this._oc.TopoDS_Edge || ocEdge instanceof this._oc.TopoDS_Shape) && !ocEdge.IsNull() )
         {
@@ -81,7 +82,7 @@ export class Edge extends Shape
             this._ocId = this._hashcode();
             this.round(); // round to tolerance - !!!! look like not really working
 
-            targetOcForGarbageCollection(this, this._ocShape)
+            targetOcForGarbageCollection(this, this._ocShape);
 
             return this;
         }
@@ -140,8 +141,7 @@ export class Edge extends Shape
          * Adaptor3d_Curve: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_adaptor3d___curve.html
          * */
 
-        let curve = new this._oc.BRepAdaptor_Curve_2(this._ocShape);
-        return curve;
+        return new this._oc.BRepAdaptor_Curve_2(this._ocShape);
     }
     
     _toOcCurveHandle():any
@@ -249,7 +249,9 @@ export class Edge extends Shape
         if ( new Edge(start, end).intersects(mid))
         {
             console.warn('Edge::makeArc: created a straight Edge instead!');
-            this._fromOcEdge(new Edge(start, end)._ocShape);
+            const lineEdge = new Edge(start, end);
+            removeOcTargetForGarbageCollection(lineEdge._ocShape);
+            this._fromOcEdge(lineEdge._ocShape);
         }
         else 
         { 
@@ -388,20 +390,25 @@ export class Edge extends Shape
             return null 
         };
 
-        let system = new this._oc.GProp_GProps_1();
-        this._oc.BRepGProp.LinearProperties(this._ocShape, system, false, false);
-        return roundToTolerance(system.Mass());
+        const ocProps = new this._oc.GProp_GProps_1();
+        this._oc.BRepGProp.LinearProperties(this._ocShape, ocProps, false, false);
+        const l = roundToTolerance(ocProps.Mass());
+        ocProps?.delete(); // clear OC instance
+        return l;
     }
 
     /** Calculate the center of this Edge and return a Point */
     center():Point
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_b_rep_g_prop.html
-        let ocProps = new this._oc.GProp_GProps_1();
-        let BRepGProp = this._oc.BRepGProp.prototype.constructor;
+        const ocProps = new this._oc.GProp_GProps_1();
+        const BRepGProp = this._oc.BRepGProp.prototype.constructor;
         BRepGProp.LinearProperties(this._ocShape, ocProps, false, false);
 
-        return new Point()._fromOcPoint(ocProps.CentreOfMass()).round(); // also round it to avoid very small numbers
+        const center = new Point()._fromOcPoint(ocProps.CentreOfMass()).round(); // also round it to avoid very small numbers
+        ocProps?.delete(); // clear OC instance
+
+        return center;
     }
 
     /** Return middle of Edge */
@@ -481,8 +488,7 @@ export class Edge extends Shape
             !!!! WARNING / TODO: this could lead to weird results !!!!
         */
 
-        let newOcEdge = this._reverseOcEdge(this._ocShape)
-        this._fromOcEdge(newOcEdge);
+        this._fromOcEdge(this._reverseOcEdge(this._ocShape));
 
         return this;
     }
@@ -1108,7 +1114,7 @@ export class Edge extends Shape
         }
 
         // see OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_int_tools___edge_edge.html#a60cf5b162b732d577b38c2890387a4ba
-        let ocIntTool = new this._oc.IntTools_EdgeEdge_2(this._ocShape, other._ocShape);
+        const ocIntTool = new this._oc.IntTools_EdgeEdge_2(this._ocShape, other._ocShape);
         ocIntTool.Perform();
         if(!ocIntTool.IsDone())
         {
@@ -1140,7 +1146,8 @@ export class Edge extends Shape
                 }
             }
 
-           return intersectingShapes.collapse() as any; // avoid TS errors here: collapse can return all kind of Shapes but here only Edge,Vertex or ShapeCollection
+            ocIntTool?.delete(); // clear OC instance
+            return intersectingShapes.collapse() as any; // avoid TS errors here: collapse can return all kind of Shapes but here only Edge,Vertex or ShapeCollection
         }
     }   
 

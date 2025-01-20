@@ -5,6 +5,9 @@
  */
 
 import { FACE_PLANE_WIDTH, FACE_PLANE_DEPTH, FACE_PLANE_POSITION, FACE_PLANE_NORMAL, FACE_BASEPLANE_AXIS, FACE_BASEPLANE_SIZE, FACE_CIRCLE_RADIUS, FACE_EXTRUDE_AMOUNT, FACE_OFFSET_AMOUNT, FACE_OFFSET_TYPE, FACE_THICKEN_AMOUNT, FACE_THICKEN_DIRECTION, FACE_LOFT_SOLID, FACE_NORMAL_EDGE_SIZE, FACE_FILLET_RADIUS, FACE_CHAMFER_DISTANCE, FACE_CHAMFER_ANGLE, LinearShape } from './internal'
+
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+
 import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, ShapeCollection } from './internal'
 import { addResultShapesToScene, checkInput, protectOC  } from './decorators'; // Import directly to avoid ts-node error
 import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPointLikeSequence, MakeFaceInput, 
@@ -12,7 +15,6 @@ import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPoin
         PointLikeOrAnyShape, isPointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection, AnyShapeOrSequence, isAnyShapeOrSequence,
         isAnyShapeCollection, AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, SelectionString, isSelectionString} from './internal'; // types
 import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
-import { targetOcForGarbageCollection } from './internal'
 
 import { flattenEntities, toRad, roundToTolerance } from './internal' // utils
 
@@ -125,9 +127,10 @@ export class Face extends Shape
             }
             else {
                 // use Shell.fromEdges to make non-planar Face
-                let newShape = new Shell().fromEdges(wireEdges).checkDowngrade();
-                
+                const newShape = new Shell().fromEdges(wireEdges).checkDowngrade();
+                removeOcTargetForGarbageCollection(newShape._ocShape); // Avoid any sharing of OC instances
                 this._fromOcFace(newShape._ocShape);
+                
                 
                 if(newShape.type() != 'Face')
                 {
@@ -172,6 +175,7 @@ export class Face extends Shape
         return this.fromWire(wire) as Face;
     }
 
+    /** Create a Face from a OC Face instance */
     _fromOcFace(ocFace:any):Face
     {
         if(ocFace && (ocFace instanceof this._oc.TopoDS_Face || ocFace instanceof this._oc.TopoDS_Shape) && !ocFace.IsNull())
@@ -212,8 +216,8 @@ export class Face extends Shape
         position = position as Point; // auto converted
         normal = normal as Vector; 
 
-        let ocPlane = new this._oc.gp_Pln_3(position._toOcPoint(), normal._toOcDir());
-        let ocFace = new this._oc.BRepBuilderAPI_MakeFace_9(
+        const ocPlane = new this._oc.gp_Pln_3(position._toOcPoint(), normal._toOcDir());
+        const ocFace = new this._oc.BRepBuilderAPI_MakeFace_9(
             ocPlane, -width * 0.5, width * 0.5, -depth * 0.5, depth * 0.5
         ).Face();
 
@@ -305,8 +309,8 @@ export class Face extends Shape
     @checkInput([ [Number, FACE_CIRCLE_RADIUS ],'PointLike'], ['auto', 'Point'])
     makeCircle(radius:number, center:PointLike ):Face
     {
-        let circleFace = new Face().fromWire(new Edge().makeCircle(radius, center)._toWire());
-
+        const circleFace = new Face().fromWire(new Edge().makeCircle(radius, center)._toWire());
+        removeOcTargetForGarbageCollection(circleFace._ocShape); // Avoid sharing OC instances
         this._fromOcFace(circleFace._ocShape);
 
         return this;
@@ -328,7 +332,8 @@ export class Face extends Shape
             const newShapeOrCollection = new Shape()._fromOcShape(ocMakeFilling.Shape())
             if(Shape.isShape(newShapeOrCollection) && newShapeOrCollection.type() === 'Face')
             {
-                this._fromOcFace((newShapeOrCollection as Shape)._ocShape)
+                removeOcTargetForGarbageCollection((newShapeOrCollection as Shape)._ocShape); // Avoid sharing OC instances
+                this._fromOcFace((newShapeOrCollection as Shape)._ocShape);
                 return this;
             }
             else {
@@ -417,14 +422,16 @@ export class Face extends Shape
 
     outerWire():Wire
     {
-        let BRepTools = this._oc.BRepTools.prototype.constructor;
-        return new Wire()._fromOcWire(BRepTools.OuterWire(this._ocShape));
+        const OcBRepTools = this._oc.BRepTools.prototype.constructor;
+        const w = new Wire()._fromOcWire(OcBRepTools.OuterWire(this._ocShape));
+        OcBRepTools?.delete(); // clear OC instance
+        return w;
     }
 
     innerWires():ShapeCollection
     {
-        let outerWire = this.outerWire();
-        let innerWires = new ShapeCollection(this.wires().filter(w => !w.same(outerWire))); // filter can return single Shape
+        const outerWire = this.outerWire();
+        const innerWires = new ShapeCollection(this.wires().filter(w => !w.same(outerWire))); // filter can return single Shape
         return innerWires;
     }
 
@@ -439,12 +446,12 @@ export class Face extends Shape
             See solution for references to javascript variables: https://github.com/donalffons/opencascade.js/blob/master/doc/README.md#references-to-built-in-data-types
         */
 
-        let umin= { current: 0 };
-        let umax = { current: 0 };
-        let vmin = { current: 0 };
-        let vmax = { current: 0 };
+        const umin= { current: 0 };
+        const umax = { current: 0 };
+        const vmin = { current: 0 };
+        const vmax = { current: 0 };
 
-        let ocFace = this._makeSpecificOcShape(this._ocShape, 'Face');        
+        const ocFace = this._makeSpecificOcShape(this._ocShape, 'Face');        
         this._oc.BRepTools.UVBounds_1(ocFace, umin,umax, vmin, vmax); // Although it does not crash these values still don't get updated!
 
         return [umin.current,umax.current, vmin.current, vmax.current];
@@ -553,12 +560,13 @@ export class Face extends Shape
     /** Calculate the area of this Face */
     area():number
     {
-        let ocProps = new this._oc.GProp_GProps_1();
-        let BRepGProp = this._oc.BRepGProp.prototype.constructor;
-        
-        BRepGProp.SurfaceProperties_1(this._ocShape, ocProps, false, false);
+        const ocProps = new this._oc.GProp_GProps_1();
+        const BRepGProp = this._oc.BRepGProp.prototype.constructor;
 
-        return roundToTolerance(ocProps.Mass());
+        BRepGProp.SurfaceProperties_1(this._ocShape, ocProps, false, false);
+        const area = roundToTolerance(ocProps.Mass());
+        ocProps?.delete(); // clear OC instance
+        return area;
     }
     
 
@@ -660,14 +668,14 @@ export class Face extends Shape
         }
 
         // use Wire method
-        let offsetWire = this._toWire()._offsetted(amount,type);
+        const offsetWire = this._toWire()._offsetted(amount,type);
         if(!offsetWire)
         {
             console.warn(`Face::offsetted: Failed to offset Wire. Returned copy of original`);
             return this.copy() as this; // avoid TS warning 
         }
         
-        let newFace = offsetWire._toFace()._copy() as this; // avoid TS warning 
+        const newFace = offsetWire._toFace()._copy() as this; // avoid TS warning 
 
         return newFace;        
     }
@@ -684,14 +692,17 @@ export class Face extends Shape
     @checkInput([[Number,FACE_OFFSET_AMOUNT],[String, FACE_OFFSET_TYPE],['PointLike',null]], ['auto', 'auto', 'Vector'])
     offset(amount?:number, type?:string, onPlaneNormal?:PointLike):this
     {
-       let offsetFace = this._offsetted(amount, type)
+       const offsetFace = this._offsetted(amount, type)
 
        if(!offsetFace)
        {
-            console.warn(`Face::offset: Could not offset Face. Returned origina!`);
+            console.warn(`Face::offset: Could not offset Face. Returned original!`);
        }
        else {
-           this._ocShape = offsetFace._ocShape;
+            // IMPORTANT: We can't directly set _ocShape from offsetFace because 
+            // it will create a shared instance that might be deleted when offsetFace is garbage collected
+            removeOcTargetForGarbageCollection(offsetFace._ocShape); // Avoid sharing OC instances
+            this._ocShape = offsetFace._ocShape;
        }
 
        return this;
@@ -872,9 +883,7 @@ export class Face extends Shape
         });
 
         ocMakeFillet.Build(new this._oc.Message_ProgressRange_1());
-        let newOcFace = ocMakeFillet.Shape();
-
-        this._fromOcFace(newOcFace);
+        this._fromOcFace(ocMakeFillet.Shape());
 
         return this;        
     }

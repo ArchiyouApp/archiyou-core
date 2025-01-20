@@ -65,7 +65,9 @@
          }
       }
 
-      /** Clear OC Shapes - used to make sure memory is released */
+      /** Manually clear OC Shapes instances - used to make sure memory is released 
+       *  NOTE: Please use automatic garbageCollection.targetOcForGarbageCollection() for more generic approach
+      */
       _clearOcShapes()
       {
          this.shapes.forEach(s => s._clearOcShape());

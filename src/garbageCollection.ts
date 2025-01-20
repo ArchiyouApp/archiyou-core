@@ -3,7 +3,7 @@
     Mainly used for cleaning up OpenCascade WASM references
     We use the readily availble Javascript FinalizationRegistry
     See: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry
-    Approach by: Steve Genoud in Replicad: https://github.com/sgenoud/replicad/pull/4
+    Approach inspired by Steve Genoud in Replicad: https://github.com/sgenoud/replicad/pull/4
 
     Usage:
         For every Class that wraps OpenCascade primitives use global method:
@@ -13,10 +13,14 @@
         When main class (like Shape, Edge) is garbage collected we call
         ocObj.delete() to free memory 
 
-    NOTE: 
-        - For temporary OpenCascade instances, directly delete them after use
-    
+    NOTES: 
+        - Browser/Node garbage collection is not every second. In browser you can trigger it to test if callbacks are working
+          For example in Chrome: More Tools -> Development Tools -> Memory > Collect Garbage
 
+        - For temporary OpenCascade instances, directly delete them after use
+
+        - We need to be very carefyl avoiding shared OC instances, because one Class instance might delete it before another is done using it
+    
 */
 
 if (!(globalThis as any)?.FinalizationRegistry)
@@ -47,10 +51,16 @@ const onGarbageCollect = function(ocObjs:Array<any>)
 const garbageCollectionRegistry = new (globalThis as any).FinalizationRegistry(onGarbageCollect);
 
 /** This is the main method to target one or more OC objects for deletion after main class is garbage collected */
-export function targetOcForGarbageCollection(obj:any, ocObjs:any|Array<any>)
+export function targetOcForGarbageCollection(obj:any, ocObj:any)
 {
-    const ocObjsArr = !Array.isArray(ocObjs) ? [ocObjs] : ocObjs;
-    garbageCollectionRegistry.register(obj, ocObjsArr)
+    // TODO: some error checking
+    garbageCollectionRegistry.register(obj, ocObj, ocObj); // Use object itself as unregister token
 }
 
-/** TODO: unregister things */
+/** Unregister  */
+export function removeOcTargetForGarbageCollection(ocObj:any)
+{
+    // TODO: some error checking
+    garbageCollectionRegistry.unregister(ocObj);
+    return ocObj;
+}
