@@ -77,12 +77,6 @@ export class Shape
         this._setShapeEnumToClassName(); // Some groundwork
     }
 
-    /** Callback for garbage collection */
-    onDeleted()
-    {
-        this._clearOcShape();
-    }
-
     /** Update _OcShape from Shape properties */
     _updateOcShape()
     {
@@ -99,7 +93,9 @@ export class Shape
         }
     }
 
-    /** Clear OC Shape - used to make sure memory is released */
+    /** Manually Clear OC Shape 
+     *  Please use automatic methods in carbageCollection module
+    */
     _clearOcShape()
     {
         this?._ocShape?.delete();
@@ -4566,9 +4562,6 @@ export class Shape
                 } as VertexMesh
             }
         )
-        // Clear memory of vertices
-        vertices._clearOcShapes();
-
         return meshVertices;
     }
 
@@ -4617,9 +4610,6 @@ export class Shape
                 ocTangDef.delete();
             }
         });
-
-        edges._clearOcShapes();
-
         return meshEdges;
     }
 
@@ -4827,7 +4817,6 @@ export class Shape
 
         // clean up
         ocMesher?.delete()
-        faces._clearOcShapes();
 
         return meshFaces;
     }

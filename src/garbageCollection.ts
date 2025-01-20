@@ -37,13 +37,19 @@ if (!(globalThis as any)?.FinalizationRegistry)
  *  When this happens depends on the browser, and is certainly not every second
  *  In dev tools you can trigger it. For example in Chrome -> More Tools -> Development Tools -> Memory > Collect Garbage
  */
-const onGarbageCollect = function(ocObjs:Array<any>)
+const onGarbageCollect = function(ocObj:Array<any>)
 {
     try {
-        ocObjs.forEach(ocObj => (ocObj as any)?.delete());
+        (ocObj as any)?.delete(); // Delete OC reference - NOTE: This might happen 100k+ for every scene. Don't log for speed!
     }
     catch(e)
     {
+        if(e.name === 'BindingError')
+        {
+            // Most commonly - object is already deleted
+            return;
+        }
+        
         console.error(`GarbageCollection::onGarbageCleanup(): Error: ${e}!`)
     }
 };
@@ -57,7 +63,7 @@ export function targetOcForGarbageCollection(obj:any, ocObj:any)
     garbageCollectionRegistry.register(obj, ocObj, ocObj); // Use object itself as unregister token
 }
 
-/** Unregister  */
+/** Unregister with token (the Oc instance)  */
 export function removeOcTargetForGarbageCollection(ocObj:any)
 {
     // TODO: some error checking

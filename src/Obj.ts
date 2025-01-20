@@ -374,7 +374,7 @@ export class Obj
     /** Empty Obj container by releasing all OC Shapes and then removing JS references */
     empty():Obj
     {
-        this.clearOcShapes()
+        // this.clearOcShapes(); // Since we got automatic garbage collection we don't need to manually delete OC objects
         this.clearShapes();
         this._children = [];
 
