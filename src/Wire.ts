@@ -1322,6 +1322,8 @@ export class Wire extends Shape
 
     /** Offset Wire to create a new parallel Wire at given distance (private) 
      *  IMPORTANT: minus amount means the Wire becomes smaller. We will check for that!
+     *  TODO: Offsetting a simple Wire can generate unordered Edges and problems later on. Need to introduce checks
+     *  ex: polyline([0,0,25],[50,0,50],[100,0,25]).offsetted(5)  => 2 vertices!              
     */
     @checkInput([[Number,WIRE_OFFSET_AMOUNT],[String, WIRE_OFFSET_TYPE], ['PointLike', null]], ['auto', 'auto', 'Vector'])
     _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Wire

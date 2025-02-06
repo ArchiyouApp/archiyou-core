@@ -154,7 +154,7 @@ export class Solid extends Shape
     //// MAKE SPECIFIC SOLIDS ////
 
     /** Creates a box of size given by width, depth and height and position */
-    @cacheOperation
+    //@cacheOperation
     @checkInput([ [Number,SOLID_MAKEBOX_SIZE], [Number, null], [Number, null], ['PointLike',[0,0,0]]], ['auto','auto','auto','PointLike'])
     makeBox(width?:number, depth?:number, height?:number, position?:PointLike):Solid
     {
@@ -174,7 +174,7 @@ export class Solid extends Shape
     }
 
     /** Creates a Box by giving two extreme points ( not the same, and not on the same axis ) */
-    @cacheOperation
+    //@cacheOperation
     @checkInput(['PointLike', 'PointLike'], ['Point','Point'] ) // this automatically transforms Types
     makeBoxBetween(from:PointLike, to:PointLike): Solid
     {
@@ -194,7 +194,7 @@ export class Solid extends Shape
     }  
 
     /** Creates a Sphere Solid */
-    @cacheOperation   
+    //@cacheOperation   
     @checkInput([ [Number,SOLID_MAKESPHERE_RADIUS],['PointLike',[0,0,0]],[Number,SOLID_MAKESPHERE_ANGLE]], ['auto', 'Point', 'auto']) // this automatically transforms Types
     makeSphere( radius?:number, position?:PointLike, angle?:number): Solid
     {
@@ -207,7 +207,7 @@ export class Solid extends Shape
     }
     
     /** Creates a Cone Solid */
-    @cacheOperation
+    //@cacheOperation
     @checkInput([ [Number,SOLID_MAKECONE_BOTTOM_RADIUS],[Number, SOLID_MAKECONE_TOP_RADIUS],[Number, SOLID_MAKECONE_HEIGHT],['PointLike', [0,0,0]]], 
                 ['auto','auto','auto', Point, 'auto'])
     makeCone( bottomRadius?:number, topRadius?:number, height?:number, position?:PointLike, angle?:number):Solid
@@ -223,7 +223,7 @@ export class Solid extends Shape
     }
 
     /** Creates a Cylinder with a given radius, height and position */
-    @cacheOperation
+    //@cacheOperation
     @checkInput([ [Number, SOLID_CYLINDER_RADIUS], [Number,SOLID_CYLINDER_HEIGHT], ['PointLike', [0,0,0]], [Number, SOLID_CYLINDER_ANGLE]],
             ['auto','auto','Point','auto']
         ) // TODO: these long parameter sequences are good candidates for using input models

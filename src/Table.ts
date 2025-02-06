@@ -187,8 +187,6 @@ export class Table
             this._dataRows.push(fullRow); // can directly push the key:value pair
         }
 
-        console.log(this._dataRows);
-
         return this;
     }
 

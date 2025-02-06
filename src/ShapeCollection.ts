@@ -136,7 +136,7 @@
                }
 
                // flatten an given ShapeCollection into this one
-               const shapes = (es as ShapeCollection).shapes;
+               const shapes = (es as ShapeCollection).shapes.filter(s => !s.isEmpty()); // Check for validity of Shapes
                this.shapes = this.shapes.concat(shapes);
                this.annotations = this.annotations.concat((es as ShapeCollection).annotations); // Merge annotations of incoming ShapeCollection too
                addedShapes = addedShapes.concat(shapes);

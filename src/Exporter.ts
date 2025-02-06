@@ -307,9 +307,6 @@ export class Exporter
         if(!only2D)
         {
             const visibleShapes = this._parent.geom.all().filter(s => s.visible());
-            
-            console.log(visibleShapes);
-
             return visibleShapes._isometry().toSvg();
         }
         else {

@@ -799,6 +799,7 @@ export class Geom
   {
     this._annotator.reset();
     this.scene.empty(); // remove all Shapes from scene obj
+    this.scene = new Obj().name("scene") as Obj; // create empty Obj to be sure
     this.resetLayers();
     this._pipelines = [];
   }

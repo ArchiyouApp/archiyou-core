@@ -598,12 +598,20 @@ export class Shape
         : false
     }
 
-    /** Test if a Shape is valid */
+    /** Test if a Shape is valid 
+     *  NOTE: Since we have garbage collection on the OC Shape a Shape can become invalid 
+     *  bacause for some reason the ocShape is deleted, giving a BindingError just using the Shape
+     *  So use this method when these errors pop up
+    */
     valid(ocShape?:any)
     {
         try {
             ocShape = ocShape || this._ocShape;
-            let ocChecker = new this._oc.BRepCheck_Analyzer(ocShape, true, false);
+          
+            if (!ocShape){ return false };
+            if (ocShape.IsNull()){ return false };
+
+            const ocChecker = new this._oc.BRepCheck_Analyzer(ocShape, true, false);
             const result = ocChecker.IsValid_2();
             ocChecker.delete();
             return result;
@@ -1636,7 +1644,7 @@ export class Shape
             throw new Error(`Shape::offset: Cannot offset Shape type ${this.type()}. Check if it makes sense!`);
         }
         
-        let ocMakeOffsetShape = new this._oc.BRepOffsetAPI_MakeOffsetShape();
+        const ocMakeOffsetShape = new this._oc.BRepOffsetAPI_MakeOffsetShape();
 
         let joinType;
         if (['arc','intersection'].includes(type))
@@ -1651,16 +1659,15 @@ export class Shape
 
         ocMakeOffsetShape.PerformByJoin(this._ocShape, amount, 0.001, DIRECTION_TYPES.skin, false, false, joinType, false, new this._oc.Message_ProgressRange_1()); // tolerance, construction method, intersection, self intersection, join type, remove internal edges
 
-        let ocNewShape = ocMakeOffsetShape.Shape();
+        const ocNewShape = ocMakeOffsetShape.Shape();
 
         if(ocNewShape.IsNull())
         {
             throw new Error(`${this.type()}::_offsetted: Offset Failed with empty Shape. Check Shape continuity. ${(type == 'intersection') ? 'Try again with type to "arc". Intersection is rather unstable' : ''}`);
             // NOTE: simple calculation does weird things, so avoid here
         }
-        let newShape = new Shape()._fromOcShape(ocNewShape);
+        const newShape = new Shape()._fromOcShape(ocNewShape);
         return newShape;
-        
     }
 
     /** Offset Shape to create a new version parallel to original with a given distance and by corners of given type (arc, intersection)  */
@@ -1673,7 +1680,7 @@ export class Shape
             throw new Error(`Shape::offset: Cannot offset Shape type ${this.type()}. Check if it makes sense!`);
         }
 
-        let newShape = this._offsetted(amount); 
+        const newShape = this._offsetted(amount); 
         this.replaceShape(newShape);
         return newShape;
     }
@@ -1791,7 +1798,7 @@ export class Shape
                         let newShape = new Shape()._fromOcShape(newOcShape) as Solid;
                         if (newShape.type() == 'Solid')
                         {
-                            newShape._fix(); // needed
+                            (newShape as Solid)._fix(); // needed
                             return newShape as Solid;
                         }
                     }
