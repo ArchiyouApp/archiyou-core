@@ -18,7 +18,10 @@ import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POIN
 import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
 import { PointLike,PointLikeOrAnyShape,AnyShape,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
 import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection,  } from './internal'
+
 import { ShapeClone } from './internal'
+
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal'
 
 import { Link,SelectorPointRange, SelectorAxisCoord, 
             SelectorBbox,SelectorIndex } from './internal' // InternalModels
@@ -89,7 +92,9 @@ export class Shape
         // Can be overriden by subclass
         if(ocShape && !ocShape?.IsNull())
         {
+            removeOcTargetForGarbageCollection(this._ocShape); // remove old target
             this._ocShape = ocShape;
+            targetOcForGarbageCollection(this, ocShape); // set new target
         }
     }
 
@@ -259,7 +264,9 @@ export class Shape
             if (ocShape && !ocShape.IsNull())
             {
                 // success
+                removeOcTargetForGarbageCollection(this._ocShape); // remove old target
                 this._ocShape = this._makeSpecificOcShape(ocFixer.Shape(), this.type());
+                targetOcForGarbageCollection(this, this._ocShape); // set new target
             }
         }
         catch(e)
