@@ -67,6 +67,7 @@ export function targetOcForGarbageCollection(obj:any, ocObj:any)
 export function removeOcTargetForGarbageCollection(ocObj:any)
 {
     // TODO: some error checking
+    if(!ocObj) return null;
     garbageCollectionRegistry.unregister(ocObj);
     return ocObj;
 }
