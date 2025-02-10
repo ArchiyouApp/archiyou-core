@@ -10,8 +10,8 @@
 */
 
 export * from './types'
-export * from './garbageCollection'
 export * from './constants'
+export * from './garbageCollection'
 export * from './Point'
 export * from './Vector'
 export * from './Obj'

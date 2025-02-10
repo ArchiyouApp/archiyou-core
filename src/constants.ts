@@ -6,7 +6,7 @@
 import { DocPathStyle } from './internal'
 
 //// IMPORTANT FLAGS ////
-
+export const USE_GARBAGE_COLLECTION = false; // if true, we will use garbage collection for OpenCascade objects
 export const SHAPE_CACHE_ENABLED = false;
 
 //// MISC SETTINGS

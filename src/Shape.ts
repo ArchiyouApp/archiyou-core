@@ -4678,7 +4678,6 @@ export class Shape
         faces.forEach( (curFace, curFaceIndex) => 
         {
             const ocLocation = new this._oc.TopLoc_Location_1();
-
             const ocTriangulation = new this._oc.BRep_Tool.Triangulation(curFace._ocShape, ocLocation, 0); // Poly_MeshPurpose.Poly_MeshPurpose_NONE
             const faceTransformation = ocLocation.Transformation();
             const clonedShapeTransformation = (this._cloned) ? this._ocShape.Location_1().Transformation() : null;

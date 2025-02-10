@@ -23,6 +23,8 @@
     
 */
 
+import { USE_GARBAGE_COLLECTION } from "./internal"; // constants
+
 if (!(globalThis as any)?.FinalizationRegistry)
 {
     console.error('!!!! **** GARBAGE COLLECTION FAIL: FinalizationRegistry is not present **** !!!!');
@@ -37,9 +39,10 @@ if (!(globalThis as any)?.FinalizationRegistry)
  *  When this happens depends on the browser, and is certainly not every second
  *  In dev tools you can trigger it. For example in Chrome -> More Tools -> Development Tools -> Memory > Collect Garbage
  */
-const onGarbageCollect = function(ocObj:Array<any>)
+const onGarbageCollect = function(ocObj:any)
 {
     try {
+        // SERIOUS PROBLEM: BindingError cannot pass deleted object as  pointer
         (ocObj as any)?.delete(); // Delete OC reference - NOTE: This might happen 100k+ for every scene. Don't log for speed!
     }
     catch(e)
@@ -47,6 +50,8 @@ const onGarbageCollect = function(ocObj:Array<any>)
         if(e.name === 'BindingError')
         {
             // Most commonly - object is already deleted
+            //console.log('==== GB ERROR ====')
+            //console.log(ocObj);
             return;
         }
         
@@ -59,8 +64,10 @@ const garbageCollectionRegistry = new (globalThis as any).FinalizationRegistry(o
 /** This is the main method to target one or more OC objects for deletion after main class is garbage collected */
 export function targetOcForGarbageCollection(obj:any, ocObj:any)
 {
-    // TODO: some error checking
-    garbageCollectionRegistry.register(obj, ocObj, ocObj); // Use object itself as unregister token
+    if(USE_GARBAGE_COLLECTION)
+    {
+        garbageCollectionRegistry.register(obj, ocObj, ocObj); // Use object itself as unregister token
+    }
 }
 
 /** Unregister with token (the Oc instance)  */

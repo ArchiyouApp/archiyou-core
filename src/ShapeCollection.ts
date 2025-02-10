@@ -1821,6 +1821,7 @@
          })
 
          this.shapes = Object.values(distinctShapesByHash);
+         
          this._setFakeArrayKeys();
 
          return this;
