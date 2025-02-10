@@ -10,6 +10,8 @@ import { WIRE_RECT_WIDTH, WIRE_RECT_DEPTH, WIRE_RECT_POSITION, WIRE_POPULATE_NUM
     WIRE_OFFSET_TYPE, WIRE_FILLET_RADIUS, WIRE_CHAMFER_DISTANCE, WIRE_CHAMFER_ANGLE } from './internal'
 
 import { Vector, Shape, Vertex, Point, Edge, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+
 import { isCoordArray, PointLike, isPointLike,isCoord,Coord, Cursor, AnyShape,isAnyShape,AnyShapeOrCollection,
         isAnyShapeOrCollection, Alignment, isAlignment, ColorInput, isColorInput,Pivot,isPivot, LinearShape, isLinearShape, PointLikeSequence, 
         isPointLikeSequence, PointLikeOrVertexCollection, LinearShapeTail, isLinearShapeTail, AnyShapeCollection, isAnyShapeCollection,
@@ -17,7 +19,9 @@ import { isCoordArray, PointLike, isPointLike,isCoord,Coord, Cursor, AnyShape,is
         isThickenDirection, MakeWireInput, ShapeType, isShapeType} from './internal' // see types
 import { checkInput, cacheOperation, protectOC, addResultShapesToScene } from './decorators'; // Direct import to avoid error with ts-node/jest
 import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+
 import { flattenEntitiesToArray, toRad, toDeg } from './internal' // utils
+
 
 // this can disable TS errors when subclasses are not initialized yet
 type IFace = Face
@@ -48,11 +52,15 @@ export class Wire extends Shape
         }
     }
 
-     _fromWire(w:Wire):Wire
+    /** Copy a other Wire instance 
+     *  NOTE: Is this still needed, as we have a copy method?
+    */
+    _fromWire(w:Wire):Wire
     {
-        if (w && !w.isEmpty())
+        if (w && Shape.isShape(w) && w.type() === 'Wire' && !w.isEmpty())
         {
-            this._ocShape = w._ocShape;
+            removeOcTargetForGarbageCollection(w._ocShape); // Avoid any sharing of OC instances
+            this._ocShape = w._ocShape; 
         }
         return this;
     }
@@ -71,6 +79,10 @@ export class Wire extends Shape
             {
                 this.checkAndFix();
             }
+            
+            // Target for garbage collection - TODO: make sure we don't OC reference while still being used
+            targetOcForGarbageCollection(this, this._ocShape);
+
             return this;
         }
         else {
@@ -107,10 +119,8 @@ export class Wire extends Shape
     @checkInput('MakeWireInput', 'auto')
     _addEntities(entities:MakeWireInput)
     {   
-        let entitiesArray = flattenEntitiesToArray(entities);
-
-        let collection = new ShapeCollection(entitiesArray);
-
+        const entitiesArray = flattenEntitiesToArray(entities);
+        const collection = new ShapeCollection(entitiesArray);
         this._fromShapeCollection(collection);
 
         return this;
@@ -212,7 +222,7 @@ export class Wire extends Shape
             return this.combineEdges(edges);
         }
         else {
-            let ocWire = wireBuilder.Wire();
+            const ocWire = wireBuilder.Wire();
             this._fromOcWire(ocWire, true); // NOTE: enable checking again
 
             // Close the Wire if the first and last Edges connect
@@ -895,10 +905,10 @@ export class Wire extends Shape
     reverse():Wire
     {
         // non-OC
-        let reversedEdges = [];
+        const reversedEdges = [];
         this.edges().reverse().forEach( e => reversedEdges.push( new Edge(e.end(), e.start()) ));
-        let w = new Wire().fromEdges(reversedEdges);
-        this._ocShape = w._ocShape; // copy ocShape
+        const w = new Wire().fromEdges(reversedEdges);
+        this._fromWire(w);
 
         // this._ocShape.Reverse(); // this does not work: OC probably means something different for orientation !
 
@@ -916,8 +926,7 @@ export class Wire extends Shape
     combined(other:Wire, radius?:number):Wire
     {
         // !!!! OC can be very weird with order of Edges in a Wire: use a own method
-        let allEdges:ShapeCollection = this.edges().concat(other.edges());
-
+        const allEdges:ShapeCollection = this.edges().concat(other.edges());
         return this.combineEdges(allEdges);
     }
 
@@ -1283,9 +1292,9 @@ export class Wire extends Shape
         }
 
 
-        // do the sweep with pre-aligned  offsetEdge and no autorotate
+        // do the sweep with pre-aligned offsetEdge and no autorotate
         // NOTE: We need to check for Shape types with only one subtype ( like Shell only one Face => downgrade then)
-        let newFace = offsetEdge.sweeped(this, false, false, null).checkDowngrade() as Face; // !!!! autoRotate needs to be off for 2D shapes! !!!!
+        let newFace = offsetEdge._sweeped(this, false, false, null).checkDowngrade() as Face; // !!!! autoRotate needs to be off for 2D shapes! !!!!
 
         newFace._unifyDomain(); // remove subdivision on same plane
 
@@ -1312,9 +1321,10 @@ export class Wire extends Shape
     }
 
     /** Offset Wire to create a new parallel Wire at given distance (private) 
-     *  IMPORTANT: -amount means the Wire becomes smaller. We will check for that!
+     *  IMPORTANT: minus amount means the Wire becomes smaller. We will check for that!
+     *  TODO: Offsetting a simple Wire can generate unordered Edges and problems later on. Need to introduce checks
+     *  ex: polyline([0,0,25],[50,0,50],[100,0,25]).offsetted(5)  => 2 vertices!              
     */
-    // TODO: @protectOC
     @checkInput([[Number,WIRE_OFFSET_AMOUNT],[String, WIRE_OFFSET_TYPE], ['PointLike', null]], ['auto', 'auto', 'Vector'])
     _offsetted(amount?:number, type?:string, onPlaneNormal?:PointLike):Wire
     {
@@ -1398,7 +1408,8 @@ export class Wire extends Shape
     @checkInput([[Number,WIRE_OFFSET_AMOUNT],[String, WIRE_OFFSET_TYPE], ['PointLike',null]], ['auto', 'auto', 'Vector'])
     offset(amount?:number, type?:string, onPlaneNormal?:PointLike):Wire
     {
-        let newWire = this._offsetted(amount, type, onPlaneNormal);
+        const newWire = this._offsetted(amount, type, onPlaneNormal);
+        removeOcTargetForGarbageCollection(newWire._ocShape); // avoid shared OC instances
         this._fromOcWire(newWire._ocShape); // update Wire 
         return this;
     }
@@ -1643,7 +1654,8 @@ export class Wire extends Shape
             }
         })
         
-        let newWire = new Wire().fromEdges(filletEdges);
+        const newWire = new Wire().fromEdges(filletEdges);
+        removeOcTargetForGarbageCollection(newWire._ocShape); // Avoid any sharing of OC instances
         this._fromOcWire(newWire._ocShape, false); 
 
         return this;
@@ -1740,7 +1752,8 @@ export class Wire extends Shape
             }
         })
         
-        let newWire = new Wire().fromEdges(chamferEdges);
+        const newWire = new Wire().fromEdges(chamferEdges);
+        removeOcTargetForGarbageCollection(newWire._ocShape); // Avoid any sharing of OC instances
         this._fromOcWire(newWire._ocShape, false); 
 
         return this;

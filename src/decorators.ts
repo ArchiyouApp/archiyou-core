@@ -13,8 +13,10 @@ import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCurso
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
             isSelectionString, isPointLikeOrAnyShapeOrCollectionOrSelectionString, isSelectorPointRange,
-            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions,isOrientationXY, isAnnotationAutoDimStrategy,
+            isLayoutOptions, ModelUnits, isModelUnits, isDimensionOptions, isDimensionLevelSettings, isOrientationXY, isAnnotationAutoDimStrategy,
             isBeam, isBeamBaseLineAlignment } from './internal'
+
+import { SHAPE_CACHE_ENABLED } from './internal' // constants
 import { isNumeric } from './internal'
 import { ALL_SHAPE_NAMES, SIDES, ALIGNMENTS_ADD_TO_SIDES } from './internal'
 
@@ -420,6 +422,14 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             errorMessage: { possible: ['LayoutOptions: { margin: number, flatten: boolean, stock: string, groupSame: boolean }'] }, // TODO
             transformInput: null,
         },
+        'isAnnotationAutoDimStrategy' :
+        {
+            name: 'AnnotationAutoDimStrategy',
+            obj: isAnnotationAutoDimStrategy,
+            check: isAnnotationAutoDimStrategy,
+            errorMessage: { possible: ['part', 'levels'] }, 
+            transformInput: null,
+        },
         'isDimensionOptions':
         {
             name: 'DimensionOptions',
@@ -428,12 +438,12 @@ function _getDecoratorTargetInfo(decoratorTarget:any):DecoratorCheckInfo
             errorMessage: { possible: ['DimensionOptions: { units:string, offset:number, offsetVec:Vector, ortho:boolean, roundDecimals:int }'] }, 
             transformInput: null,
         },
-        'isAnnotationAutoDimStrategy' :
+        'isDimensionLevelSettings':
         {
-            name: 'AnnotationAutoDimStrategy',
-            obj: isAnnotationAutoDimStrategy,
-            check: isAnnotationAutoDimStrategy,
-            errorMessage: { possible: ['part', 'levels'] }, 
+            name: 'DimensionLevelSettings',
+            obj: isDimensionLevelSettings,
+            check: isDimensionLevelSettings,
+            errorMessage: { possible: ['DimensionLevelSettings: [{ axis:mainAxis, at:number, coordType?:relative|absolute, align?:min|max|auto, minDistance?:number, offset?:number } ]'] }, 
             transformInput: null,
         },
         'isModelUnits':
@@ -572,6 +582,8 @@ function _getArgNames(func:any):Array<string>
 
 /** 
 *   Decorator for caching the results of operations and getting them when needed
+*   !!!! This function does not work anymore !!!! 
+*   TODO: Check TS version and see why this is not working: https://www.typescriptlang.org/docs/handbook/decorators.html
 */
 export function cacheOperation(targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor
 {
@@ -581,11 +593,14 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
 
     descriptor.value = function(...args )
     {  
-
-        let cache = this._geom._cache;
-        let hash = _hashOp(wrappedMethodName, args)
-
-        let cacheResult = _checkCache(cache, hash);
+        // A flag can disable the cache
+        if(!SHAPE_CACHE_ENABLED)
+        {
+            return wrappedMethod.apply(this, args); // this is the direct output 
+        }
+        const cache = this._geom._cache;
+        const hash = _hashOp(wrappedMethodName, args)
+        const cacheResult = _checkCache(cache, hash);
 
         if (cacheResult)
         {
@@ -594,13 +609,12 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
             return cacheResult?._copy() || cacheResult; 
         }       
         else {
-            let calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
+            const calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
             _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
             return calculatedOutput; // return real output - no cached version!
         }
         
     }
-
     return descriptor;
 }
 
@@ -746,187 +760,201 @@ function _generateCheckError(className:string, wrappedMethod:Function, wrappedMe
  */
 export function checkInput(inputChecks:any|Array<any>, uniformizeToTypes:any|Array<any>): MethodDecorator
 {
-    inputChecks = !Array.isArray(inputChecks) ? [inputChecks] : inputChecks;
-    uniformizeToTypes = !Array.isArray(uniformizeToTypes) ? [uniformizeToTypes] : uniformizeToTypes;
-
-
-    return function (targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor
+    // DEBUG: try to  fix BindingError
+    try 
     {
-        /*  target is Prototype function ( NOT instance! ): we can actually just use (this) in the descriptor function
-            propertyKey is name of the wrapped method
-            descriptor is all information of wrapped method { configurable, enumerable, value : function, writable }
-        */
-
-        const wrappedMethod = descriptor.value;
-
-        // wrap method
-        descriptor.value = function(...args)
+        inputChecks = !Array.isArray(inputChecks) ? [inputChecks] : inputChecks;
+        uniformizeToTypes = !Array.isArray(uniformizeToTypes) ? [uniformizeToTypes] : uniformizeToTypes;
+    
+        return function (targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor
         {
-            // the real inputs the wrapped method gets
-            let inputValues = args;
-
-            // test decorator configuration consistency
-            if (inputChecks.length != uniformizeToTypes.length)
-            {
-                console.warn(`${propertyKey}::@checkInput: number of inputChecks(${inputChecks.length}) is not the same as uniformizeToTypes (${uniformizeToTypes.length}): Check decorator config!`);
-            }
-            
-            /* !!!! IMPORTANT: Because we only iterate inputs, we don't check the inputs that are not coming in!
-                This might be a bit counter-intuitive 
-                TODO: Make the uniformizeToTypes leading??
+            /*  target is Prototype function ( NOT instance! ): we can actually just use (this) in the descriptor function
+                propertyKey is name of the wrapped method
+                descriptor is all information of wrapped method { configurable, enumerable, value : function, writable }
             */
-            // do the checks
-            let allCorrect = true;
-            let wrappedMethodName = propertyKey;
-            //let curClassName = this.constructor.name;
-            let checkedInputValues = inputValues; // all checked input values go here - we plug these later in the wrapped method
-
-            // if we have a method defined with only one inputCheck and receive multiple inputValues we take it that the user provided flat inputs
-            // for example shape.move(x,y,z) or new Edge().makeSpline(p1,p2,p3,p4)
-            let flatInputs = inputChecks.length == 1 && inputValues.length > 1;
-
-            // checking input types and uniformize
-            inputChecks.some( (inputCheckType, inputCheckIndex) => 
-            {   
-
-                /* inputCheckType can be:
-                    - just a Class, standard type string ('string') or type guard function
-                    - an Array of the above with default value [ Class/func, defaultValue ]
-                */
-                let curValue = inputValues[inputCheckIndex]; // if not there: undefined
-                let decoratorTargetType = inputCheckType;
-                let allowedNullValue = false;
-
-                // if default values given in format [ decoratorTargetType, defaultValue ]
-                if (Array.isArray(inputCheckType))
-                {   
-                    curValue = (curValue === null || curValue === undefined ) ? inputCheckType[1] : curValue; // if value is null/undefined use default
-                    
-                    allowedNullValue = (
-                        (curValue === null || curValue === undefined) 
-                        && (inputCheckType[1] === null || inputCheckType[1] === undefined)) ? true : false;
-                    
-                    decoratorTargetType = inputCheckType[0];
-                
-                }
-                
-                let targetTypeInfo = _getDecoratorTargetInfo(decoratorTargetType);
-
-                let check = (targetTypeInfo !== null) ? targetTypeInfo.check : null;
-
-                if (!check)
-                {
-                    console.warn(`Error @checkInput(${this}.${propertyKey}{ .. }). Could not get check function for given typeTarget: "${decoratorTargetType}": Check @checkInput(${propertyKey}) config! Total @checkInput checks: ${inputChecks}`)
-                    allCorrect = false;
-                }
-                else
-                {
-                    // start checking based on different types of checks: function, Class or string
-                    if (check === null)
-                    {
-                        console.warn("Could not validate input: Please check given check class or function in decorator config! Check also if you don't use types! PointLike => isPointLike");
-                        allCorrect = false;
-                    }
-                    else if (allowedNullValue)
-                    {
-                        // let null pass: don't check
-                    }
-                    else if (typeof check === 'function')  // a function (type check / type guard or Class )
-                    {
-                        let checkArgs = (flatInputs) ? inputValues : [curValue]; // if flat: all arguments including curValue, otherwise array so we can spread
-
-                        // It's hard to distinguish between real check functions and Classes: 
-                        // so we check first if a value is a instance
-                        let isCheckError = false;
-                        try {
-
-                            isCheckError = (!(curValue instanceof check) && check(...checkArgs) === false);
-                            if (isCheckError)
-                            {
-                                allCorrect = false;
-                            }
-                        }
-                        catch(e)
-                        {
-                            // this triggers when we try to use a Class function as real function. For example: Edge(..)
-                            allCorrect = false;
-                        }
-                        finally {
-                            // generate error message for both
-                            if (isCheckError)
-                            { 
-                                _generateCheckError(this.constructor.name, wrappedMethod, wrappedMethodName, decoratorTargetType, checkArgs, inputCheckIndex); 
-                            }
-                        }
-
-                    }
-                    else if (typeof check === 'string')
-                    {
-                        if (!(typeof curValue == check))
-                        {
-                            _generateCheckError(this.constructor.name, wrappedMethod, wrappedMethodName, decoratorTargetType, curValue, inputCheckIndex)
-                            allCorrect = false;
-                        }  
-                    }
-                    else {
-                        console.warn(`Unknown check given: ${check}. Check @checkInput decorator config!`);
-                        allCorrect = false;
-                    }
-                }
-
-                // if error set curValue to null
-                if (!allCorrect)
-                {
-                    curValue = null;   
-                }
-
-                // make sure its null and not undefined
-                curValue = (curValue === undefined) ? null : curValue;
-
-                // uniformize to given type
-                if (allowedNullValue || curValue != null) // don't use if(curValue) because first value can be 0
-                {      
-                    if (flatInputs)
-                    {
-                        /* Special case for PointLike and Sequences of all sorts: if we have only one inputCheck and multiple real inputs (inputValues)
-                            We can take it that we have a flattened point description, like move(x,y,z): 
-                            Then plug all the inputValues into the _uniformize function */
-                        curValue = inputValues; // these are all args
-                    }
-                    
-                    curValue = (allowedNullValue) ? null : _uniformize(curValue, uniformizeToTypes[inputCheckIndex], inputCheckType);
-                    
-                    // save checked values
-                    if(!flatInputs)
-                    {
-                        checkedInputValues[inputCheckIndex] = curValue;
-                    }
-                    else {
-                        // We checked all flattened inputs as one - restore their original structure - and stop loop
-                        checkedInputValues = [curValue];
-                        return true; // break some loop
-                    }
-                }
-            }) // end some loop
-
-            // if all inputs are correct we can continue with the execution
-            if (allCorrect)
+    
+            const wrappedMethod = descriptor.value;
+    
+            // wrap method
+            descriptor.value = function(...args)
             {
-                // really run wrapped method with arguments
-                let output = wrappedMethod.apply(this, checkedInputValues); // arguments needs to be an Array!
-                return output;
+                // the real inputs the wrapped method gets
+                let inputValues = args;
+    
+                // test decorator configuration consistency
+                if (inputChecks.length != uniformizeToTypes.length)
+                {
+                    console.warn(`${propertyKey}::@checkInput: number of inputChecks(${inputChecks.length}) is not the same as uniformizeToTypes (${uniformizeToTypes.length}): Check decorator config!`);
+                }
+                
+                /* !!!! IMPORTANT: Because we only iterate inputs, we don't check the inputs that are not coming in!
+                    This might be a bit counter-intuitive 
+                    TODO: Make the uniformizeToTypes leading??
+                */
+                // do the checks
+                let allCorrect = true;
+                let wrappedMethodName = propertyKey;
+                //let curClassName = this.constructor.name;
+                let checkedInputValues = inputValues; // all checked input values go here - we plug these later in the wrapped method
+    
+                // if we have a method defined with only one inputCheck and receive multiple inputValues we take it that the user provided flat inputs
+                // for example shape.move(x,y,z) or new Edge().makeSpline(p1,p2,p3,p4)
+                let flatInputs = inputChecks.length == 1 && inputValues.length > 1;
+    
+                // checking input types and uniformize
+                inputChecks.some( (inputCheckType, inputCheckIndex) => 
+                {   
+    
+                    /* inputCheckType can be:
+                        - just a Class, standard type string ('string') or type guard function
+                        - an Array of the above with default value [ Class/func, defaultValue ]
+                    */
+                    let curValue = inputValues[inputCheckIndex]; // if not there: undefined
+                    let decoratorTargetType = inputCheckType;
+                    let allowedNullValue = false;
+    
+                    // if default values given in format [ decoratorTargetType, defaultValue ]
+                    if (Array.isArray(inputCheckType))
+                    {   
+                        curValue = (curValue === null || curValue === undefined ) ? inputCheckType[1] : curValue; // if value is null/undefined use default
+                        
+                        allowedNullValue = (
+                            (curValue === null || curValue === undefined) 
+                            && (inputCheckType[1] === null || inputCheckType[1] === undefined)) ? true : false;
+                        
+                        decoratorTargetType = inputCheckType[0];
+                    
+                    }
+                    
+                    let targetTypeInfo = _getDecoratorTargetInfo(decoratorTargetType);
+    
+                    let check = (targetTypeInfo !== null) ? targetTypeInfo.check : null;
+    
+                    if (!check)
+                    {
+                        console.warn(`Error @checkInput(${this}.${propertyKey}{ .. }). Could not get check function for given typeTarget: "${decoratorTargetType}": Check @checkInput(${propertyKey}) config! Total @checkInput checks: ${inputChecks}`)
+                        allCorrect = false;
+                    }
+                    else
+                    {
+                        // start checking based on different types of checks: function, Class or string
+                        if (check === null)
+                        {
+                            console.warn("Could not validate input: Please check given check class or function in decorator config! Check also if you don't use types! PointLike => isPointLike");
+                            allCorrect = false;
+                        }
+                        else if (allowedNullValue)
+                        {
+                            // let null pass: don't check
+                        }
+                        else if (typeof check === 'function')  // a function (type check / type guard or Class )
+                        {
+                            let checkArgs = (flatInputs) ? inputValues : [curValue]; // if flat: all arguments including curValue, otherwise array so we can spread
+    
+                            // It's hard to distinguish between real check functions and Classes: 
+                            // so we check first if a value is a instance
+                            let isCheckError = false;
+                            try {
+    
+                                isCheckError = (!(curValue instanceof check) && check(...checkArgs) === false);
+                                if (isCheckError)
+                                {
+                                    console.error(`@checkinput at "${this.constructor.name}.${wrappedMethodName}()" failed. Wrong values "${checkArgs.join(',')}"`);
+                                    allCorrect = false;
+                                }
+                            }
+                            catch(e)
+                            {
+                                // this triggers when we try to use a Class function as real function. For example: Edge(..)
+                                // HACK: ignore binding errors 
+                                if(e.name !== 'BindingError')
+                                {
+                                    console.error(`@checkinput at ${this.constructor.name}.${wrappedMethodName}() failed. With inputs: ${inputValues} this error: ${e}`);
+                                    allCorrect = false;
+                                }
+                                else {
+                                    console.error(`@checkinput at ${this.constructor.name}.${wrappedMethodName}(): BindingError. Ignored. Error: ${e}. Input: ${inputValues}`);
+                                }
+                            }
+                            finally {
+                                // generate error message for both
+                                if (isCheckError)
+                                { 
+                                    _generateCheckError(this.constructor.name, wrappedMethod, wrappedMethodName, decoratorTargetType, checkArgs, inputCheckIndex); 
+                                }
+                            }
+    
+                        }
+                        else if (typeof check === 'string')
+                        {
+                            if (!(typeof curValue == check))
+                            {
+                                _generateCheckError(this.constructor.name, wrappedMethod, wrappedMethodName, decoratorTargetType, curValue, inputCheckIndex)
+                                allCorrect = false;
+                            }  
+                        }
+                        else {
+                            console.warn(`Unknown check given: ${check}. Check @checkInput decorator config!`);
+                            allCorrect = false;
+                        }
+                    }
+    
+                    // if error set curValue to null
+                    if (!allCorrect)
+                    {
+                        curValue = null;   
+                    }
+    
+                    // make sure its null and not undefined
+                    curValue = (curValue === undefined) ? null : curValue;
+    
+                    // uniformize to given type
+                    if (allowedNullValue || curValue != null) // don't use if(curValue) because first value can be 0
+                    {      
+                        if (flatInputs)
+                        {
+                            /* Special case for PointLike and Sequences of all sorts: if we have only one inputCheck and multiple real inputs (inputValues)
+                                We can take it that we have a flattened point description, like move(x,y,z): 
+                                Then plug all the inputValues into the _uniformize function */
+                            curValue = inputValues; // these are all args
+                        }
+                        
+                        curValue = (allowedNullValue) ? null : _uniformize(curValue, uniformizeToTypes[inputCheckIndex], inputCheckType);
+                        
+                        // save checked values
+                        if(!flatInputs)
+                        {
+                            checkedInputValues[inputCheckIndex] = curValue;
+                        }
+                        else {
+                            // We checked all flattened inputs as one - restore their original structure - and stop loop
+                            checkedInputValues = [curValue];
+                            return true; // break some loop
+                        }
+                    }
+                }) // end some loop
+    
+                // if all inputs are correct we can continue with the execution
+                if (allCorrect)
+                {
+                    // really run wrapped method with arguments
+                    return wrappedMethod.apply(this, checkedInputValues); // arguments needs to be an Array!
+                }
+                else {
+                    console.error(`Failed to execute decorated method: "${this.constructor?.name}.${wrappedMethodName}". This is probably due to a decorator config error! Check if all conversions went well.`)
+                    return null;
+                }
+                
             }
-            else {
-                console.error('Failed to execute decorated method: This is probably due to a decorator config error! Check if all conversions went well.')
-                return null;
-            }
-            
-        }
-
-        return descriptor;
-
-        
-    };
+    
+            return descriptor;
+        };
+    }
+    catch(e)
+    {
+        console.error(`checkInput: Error: ${e}`);
+    }
+   
 }
 
 //// SCENE MANAGEMENT ////
@@ -953,7 +981,6 @@ export function addResultShapesToScene(targetPrototype: any, propertyKey: string
         }
         
     }
-
     return descriptor;
 }
 

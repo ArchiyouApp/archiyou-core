@@ -11,6 +11,7 @@
 
 export * from './types'
 export * from './constants'
+export * from './garbageCollection'
 export * from './Point'
 export * from './Vector'
 export * from './Obj'
@@ -67,6 +68,7 @@ export * from './Db'
 export * from './Calc'
 
 export * from './ParamManager'
+export * from './ParamManagerOperator'
 
 
 export * from './Make'

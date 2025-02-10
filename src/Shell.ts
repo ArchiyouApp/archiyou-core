@@ -6,6 +6,9 @@
  */
 
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Solid, ShapeCollection } from './internal'
+
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+
 import { PointLike, isCoordArray, isMakeShellInput, MakeShellInput, AnyShape, ThickenDirection, isThickenDirection, AnyShapeOrCollection, 
             isLinearShape, AnyShapeSequence, isAnyShapeSequence } from './internal' // types
 import { checkInput, cacheOperation, addResultShapesToScene, protectOC } from './decorators'; // Direct import to avoid error in ts-node/jest
@@ -50,8 +53,25 @@ export class Shell extends Shape
             else {
                 this.fromAll(selectedEntities);   
             }
+        }   
+    }
+
+    _fromOcShell(ocShell:any):Shell // TODO: OC typing
+    {
+        if (ocShell && (ocShell instanceof this._oc.TopoDS_Shell || ocShell instanceof this._oc.TopoDS_Shape) && !ocShell.IsNull())
+        {
+            // For easy debug, always make sure the wrapped OC Shape is TopoDS_Shell
+            ocShell = this._makeSpecificOcShape(ocShell, 'Shell');
+            this._ocShape = ocShell;
+            this._ocId = this._hashcode();
+            this.round(); // round to tolerance
+            targetOcForGarbageCollection(this, this._ocShape);
+
+            return this;
         }
-        
+        else {
+            throw new Error(`Shell::_fromOcShell: Incoming ocShape is not a TopoDS_Shell! Check not null, OC Shape type and if empty`);
+        }
     }
 
     @checkInput('MakeShellInput', 'ShapeCollection')
@@ -76,11 +96,13 @@ export class Shell extends Shape
     fromFace(face:Face):Shell
     {
         // BRep_Builder: https://dev.opencascade.org/doc/refman/html/class_b_rep___builder.html
-        let ocBRepBuilder = new this._oc.BRep_Builder();
-        let newOcShell = new this._oc.TopoDS_Shell();
+        const ocBRepBuilder = new this._oc.BRep_Builder();
+        const newOcShell = new this._oc.TopoDS_Shell();
         ocBRepBuilder.MakeShell(newOcShell);
         ocBRepBuilder.Add(newOcShell, face._ocShape); 
-        return this._fromOcShell(newOcShell);
+        const shell = this._fromOcShell(newOcShell);
+        ocBRepBuilder?.delete();
+        return shell
     }
 
     @checkInput(['MakeShellInput',[Boolean,false]], ['ShapeCollection', 'auto'])
@@ -157,9 +179,10 @@ export class Shell extends Shape
         else if (checkedEdges.length == 2)
         {
             // a lofted Face Surface
-            let firstEdge = edges[0];
-            let otherEdge = edges[1];
-            let shellLoft = firstEdge._toWire().lofted(otherEdge, false); // Shell only ( can have only 1 Face)
+            const firstEdge = edges[0];
+            const otherEdge = edges[1];
+            const shellLoft = firstEdge._toWire().lofted(otherEdge, false); // Shell only ( can have only 1 Face)
+            removeOcTargetForGarbageCollection(shellLoft._ocShape); // Avoid shared OC references for garbage collection
             this._fromOcShell(shellLoft._ocShape);
             
             return this;
@@ -201,8 +224,8 @@ export class Shell extends Shape
                 return null;
             }
 
-            let newShell = new Shape()._fromOcShape(ocShell).specific() as Shell;
-
+            const newShell = new Shape()._fromOcShape(ocShell).specific() as Shell;
+            removeOcTargetForGarbageCollection(newShell._ocShape); // Avoid shared OC references for garbage collection
             this._fromOcShell(newShell._ocShape);
 
             return this;
@@ -262,23 +285,6 @@ export class Shell extends Shape
         return this;
     }
 
-
-    _fromOcShell(ocShell:any):Shell // TODO: OC typing
-    {
-        if (ocShell && (ocShell instanceof this._oc.TopoDS_Shell || ocShell instanceof this._oc.TopoDS_Shape) && !ocShell.IsNull())
-        {
-            // For easy debug, always make sure the wrapped OC Shape is TopoDS_Shell
-            ocShell = this._makeSpecificOcShape(ocShell, 'Shell');
-            this._ocShape = ocShell;
-            this._ocId = this._hashcode();
-            this.round(); // round to tolerance
-
-            return this;
-        }
-        else {
-            throw new Error(`Shell::_fromOcShell: Incoming ocShape is not a TopoDS_Shell! Check not null, OC Shape type and if empty`);
-        }
-    }
 
     //// TRANSFORMATIONS ////
 

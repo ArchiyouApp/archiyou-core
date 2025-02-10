@@ -24,7 +24,7 @@ export class View extends Container
             ...this._toContainerData(),
             content: { 
                 data: (ShapeCollection.isShapeCollection(this._shapes)) ? 
-                                (this._shapes as ShapeCollection)?.toSvg({ all: this._forceAll }) : 
+                                (this._shapes as ShapeCollection)?.toSvg({ all: this._forceAll, annotations: true }) : 
                                 this.resolveShapeNameToSVG(this._shapes as string), 
                 settings: {} 
             } as ContainerContent,
@@ -46,11 +46,11 @@ export class View extends Container
 
             if(!Shape.isShape(realShapes) && !ShapeCollection.isShapeCollection(realShapes))
             { 
-                throw new Error(`View::resolveShapeNameToSVG(): Given shapes "{shapes}" does not refer to a valid Shape or ShapeCollection!`) 
+                throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapes}" does not refer to a valid Shape or ShapeCollection!`) 
             } 
             
-            const s = new ShapeCollection(realShapes); // make sure we got a ShapeCollection
-            return s.toSvg({ all: this._forceAll });
+            const s = ShapeCollection.isShapeCollection(realShapes) ? realShapes : new ShapeCollection(realShapes); // make sure we got a ShapeCollection
+            return s.toSvg({ all: this._forceAll, annotations: true });
         }
         else {
             console.warn('DocPageContainerView:resolveShapenameToSVG(): Could not determine worker scope: Could not resolve shapes variable. No shapes were outputted!');

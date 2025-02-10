@@ -38,10 +38,19 @@ import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUni
     ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer,
         isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
                 DocGraphicInputLine, DocGraphicInputOrthoLine, isContainerPositionCoordRel,
-                ContainerBlock, TitleBlockInput, LabelBlockOptions
+                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param
             } from './internal'
 
 import { convertValueFromToUnit, isNumeric } from './internal' // utils
+
+//// LOCAL INTEFACES ////
+
+interface DocPipeline
+{
+    fn:() => any
+    done: boolean
+}
+
 
 //// MAIN CLASS ////
 
@@ -54,6 +63,7 @@ export class Doc
     PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape';
     CONTENT_ALIGN_DEFAULT:ContainerAlignment = ['left', 'top'];
     TEXT_SIZE_DEFAULT = '10mm';
+    TYPES_WITHOUT_CAPTION = ['text', 'textarea'];
 
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
@@ -69,7 +79,7 @@ export class Doc
     _pageOrientationByDoc:{[key:string]:PageOrientation} = {}; // default orientation
     _pagesByDoc:{[key:string]:Array<Page>} = {};
     _unitsByDoc:{[key:string]:DocUnits} = {};
-    _pipelinesByDoc:{[key:string]:() => void} = {}; 
+    _pipelinesByDoc:{[key:string]:DocPipeline} = {};  // by doc name : { fn: fn, done:bool }, see DocPipeline
 
     _activePage:Page
     _activeContainer:AnyPageContainer
@@ -122,6 +132,7 @@ export class Doc
         this._pagesByDoc = {};
         this._unitsByDoc = {};
         this._activeDoc = null;
+        this._pipelinesByDoc = {};
     }
 
     _setDefaults():Doc
@@ -138,9 +149,15 @@ export class Doc
     */
     executePipelines(include:Array<string> = [], exclude:Array<string> = [])
     {
-        for (const [docName,pipelineFn] of Object.entries(this._pipelinesByDoc))
+        for (const [docName,pipelineData] of Object.entries(this._pipelinesByDoc))
         {
+            const pipeline = pipelineData as DocPipeline
+            const pipelineFn = pipeline.fn;
+            const pipelineDone = pipeline.done;
+
             if (
+                    !pipelineDone // avoid double execution
+                    &&
                     typeof pipelineFn === 'function' && 
                     (include.length === 0 || include.includes(docName)) &&
                     (exclude.length === 0 || !exclude.includes(docName))
@@ -149,6 +166,7 @@ export class Doc
                 try {
                     console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
                     this._ay.worker.funcs.executeFunc(pipelineFn)
+                    pipeline.done = true; // set done
                 }
                 catch(e){
                     console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: Error: "${e}"`);
@@ -275,7 +293,7 @@ export class Doc
 
         if(typeof fn !== 'function'){ throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active document!`); }
 
-        this._pipelinesByDoc[this._activeDoc] = fn;
+        this._pipelinesByDoc[this._activeDoc] = { fn: fn, done: false } as DocPipeline;
 
         return this;
     }
@@ -346,7 +364,7 @@ export class Doc
     text(text:string|number, options?:TextOptions):Doc
     {
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
-        text = (typeof text !== 'string') ? text.toString() : text;
+        text = (typeof text !== 'string') ? (text?.toString() || '') : text;
 
         const newTextContainer = new Text(text, options).on(this._activePage);
         this._activeContainer = newTextContainer;
@@ -357,7 +375,7 @@ export class Doc
     textarea(text:string|number, options?:TextOptions):Doc
     {
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
-        text = (typeof text !== 'string') ? text.toString() : text;    
+        text = (typeof text !== 'string') ? (text?.toString() || '') : text;    
 
         const newTextAreaContainer = new TextArea(text, options).on(this._activePage);
         this._activeContainer = newTextAreaContainer;
@@ -550,11 +568,12 @@ export class Doc
     //// BLOCKS OF CONTAINERS ////
 
     /** Place default title block
-     *  @param
+     *  @param data:TitleBlockInput
      */
     titleblock(data?:TitleBlockInput)
     {
-        const TITLEBLOCK_WIDTH = '60mm';
+        const TITLE_BLOCK_NUM = 60;
+        const TITLEBLOCK_WIDTH = `${TITLE_BLOCK_NUM}mm`;
         const BLOCK_MARGIN = this._activePage._resolveValueWithUnitsStringToRel('1mm', 'height'); 
 
         const DEFAULT_SETTINGS = {
@@ -578,22 +597,31 @@ export class Doc
             .width('30mm')
             .height('8mm')
 
-        
-        this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        // Version info left of image
+        this.text(this._getVersionSummary(), { size: '2mm'})
+            .width(`${TITLE_BLOCK_NUM/2}mm`)
+            .height('3mm')
+            .pivot(1,0)
+            .position([`${297-30}mm`, '6mm'] as ContainerPositionAbs); // bit hacky
+
+        // Metric labelblock
+        this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH, numTextLines: 2 }); // TODO: dynamic param readout
         const metricsBlock = this.lastBlock();
-        this.labelblock('params', this._getParamSummary(), { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH }); // TODO: dynamic param readout
+        // Param labelblock
+        this.labelblock('params', this._getParamSummary(), { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH, numTextLines: 2 }); // TODO: dynamic param readout
         const paramsBlock = this.lastBlock();
+        // Info labelblock
         this.labelblock(
                         ['designer', 'design license', 'manual license'], 
                         [ settings.designer, settings.designLicense, settings.manualLicense], 
-                        { y: paramsBlock.bbox[3] + BLOCK_MARGIN, textSize : '3.5mm', width: TITLEBLOCK_WIDTH });
+                        { y: paramsBlock.bbox[3] + BLOCK_MARGIN, textSize : '3.5mm', width: TITLEBLOCK_WIDTH, numTextLines: 1 });
         const designBlock =  this.lastBlock();
         
         this.hline({ thickness: '2pnt', color: 'black', length: TITLEBLOCK_WIDTH})
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2)
             .pivot(1,0.5)
         // header
-        this.text( data.title, { size: '8mm', bold: true })
+        this.text( data?.title || DEFAULT_SETTINGS.title, { size: '8mm', bold: true })
             .pivot(1,0)
             .width(TITLEBLOCK_WIDTH)
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2);
@@ -610,17 +638,41 @@ export class Doc
         const PARAM_IS_VALUE_CHAR = ':'
         const PARAM_SEPERATOR_CHAR = ' '
 
-        const params = this?._ay?.worker?.lastExecutionRequest?.script?.params; // TODO: publishScript too?
-        if (!params)
+        let params = [] as Array<Param>;
+        if(this?._ay?.worker?.lastExecutionRequest?.script?.params)
+        {
+            // In worker editor
+            params = this?._ay?.worker?.lastExecutionRequest?.script?.params;
+        }
+        else 
+        {
+            // In node worker - combine params with request.params for values
+            const paramValues = this?._ay?.worker?.lastExecutionRequest?.request?.params;
+            params = (Object.values(this?._ay?.worker?.lastExecutionRequest?.params) as Array<Param>).map(p => 
+                {
+                return { ...p, value: paramValues[p.name] }
+                }
+            )
+        }
+        
+        if (!params && params.length === 0)
         {
             return 'no parameters'
         }
         
         return params.map(p => {
-            // Shorten name of param like BEAM_WIDTH = BW, SEAT-HEIGHT => SH
-            const paramNameParts = this._splitStringRecurse([p.name], PARAM_SPLIT_CHARS);
-            const paramSummaryName = paramNameParts.slice(0,PARAM_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
-            return `${paramSummaryName}${PARAM_IS_VALUE_CHAR}${p.value}`;
+            const paramName = p.label || p.name;
+            let paramSummaryName;
+            if(paramName.length <= PARAM_NAME_MAXCHAR)
+            {
+                paramSummaryName = paramName;
+            }
+            // Shorten long name of param like BEAM_WIDTH = BW, SEAT-HEIGHT => SH
+            else {
+                const paramNameParts = this._splitStringRecurse([p.name], PARAM_SPLIT_CHARS);
+                paramSummaryName = paramNameParts.slice(0,PARAM_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
+            }
+            return `${paramSummaryName}${PARAM_IS_VALUE_CHAR}${this._formatMetricParamValue(p.value)}`;
         }).join(PARAM_SEPERATOR_CHAR)
            
     }
@@ -639,10 +691,58 @@ export class Doc
         }
         
         return metrics.map(m => {
-            const metricNameParts = this._splitStringRecurse([m.label||m.name], METRIC_SPLIT_CHARS);
-            const metricSummaryName = metricNameParts.slice(0,METRIC_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
-            return `${metricSummaryName}${METRIC_IS_VALUE_CHAR}${m.data} ${m?.options?.unit ?? ''}`;
+            const metricName = m.label || m.name;
+            let metricSummaryName;
+            if(metricName.length <= METRIC_NAME_MAXCHAR)
+            {
+                metricSummaryName = metricName;
+            }
+            else {
+                const metricNameParts = this._splitStringRecurse([m.label||m.name], METRIC_SPLIT_CHARS);
+                metricSummaryName = metricNameParts.slice(0,METRIC_NAME_MAXCHAR).reduce((agg,cur) => agg += cur[0].toUpperCase(), '');
+            }
+            return `${metricSummaryName}${METRIC_IS_VALUE_CHAR}${this._formatMetricParamValue(m.data as any)} ${m?.options?.unit ?? ''}`;
         }).join(METRIC_SEPERATOR_CHAR)
+    }
+
+    _formatMetricParamValue(v:string|number):string
+    {
+        const MAX_LENGTH = 5;
+        const TRANSFORM_REPLACE_VALUES = {
+            true : 'yes',
+            false : 'no',
+            mm : '', // remove mm
+        }
+
+        let s = (typeof v !== 'string') ? (v?.toString() || 'none') : v;
+        Object.keys(TRANSFORM_REPLACE_VALUES)
+            .forEach((r,i) => {
+                if(s.includes(r))
+                {
+                    s = s.replace(r, TRANSFORM_REPLACE_VALUES[r]);
+                }
+            })
+        
+        return s.slice(0, MAX_LENGTH)
+    }
+
+    /** Get version in different contexts
+     *  In editor we use ScriptVersion->PublishScript instances
+     *  In compute worker PublishScript
+     */
+    _getVersion():string
+    {
+        const version = this?._ay?.worker?.lastExecutionRequest?.script?.published_as?.version // editor app
+            || this?._ay?.worker?.lastExecutionRequest?.version // compute worker context:  OcciCadScriptRequest
+            || '0'
+
+        return `v${version}`
+    }
+
+    /** Get version string like 'v1.0 at 10-20-2025 */
+    _getVersionSummary():string
+    {
+        return `${this._getVersion()} at ${this?._ay?.worker?.lastExecutionRequest?.createdAtString || new Date().toLocaleString('nl-NL') }`;
     }
 
     _splitStringRecurse(strings:Array<string>, splitChars:Array<string>):Array<string>
@@ -706,7 +806,7 @@ export class Doc
         const blockTextSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockTextSizePnt + 'pnt', 'height');
         const blockLabelSizeRel = this._activePage._resolveValueWithUnitsStringToRel(blockLabelSizePnt + 'pnt', 'height');
 
-        const blockHeightRel = blockTextSizeRel + blockLabelSizeRel + 2*blockMarginRel + blockMarginBetweenRel;
+        const blockHeightRel = blockTextSizeRel*(options?.numTextLines ?? 1) + blockLabelSizeRel + 2*blockMarginRel + blockMarginBetweenRel;
 
         const xRel =  this._activePage._resolveValueWithUnitsStringToRel(options.x, 'width');
         const yRel = this._activePage._resolveValueWithUnitsStringToRel(options.y, 'height');
@@ -721,18 +821,19 @@ export class Doc
         
         labels.forEach((label,i,arr) => 
         {
+            // label
             this.text(label, { size: blockLabelSizePnt})
             .width(blockWidthRel)
             .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
-            .position(blockXRel, blockYRel+blockMarginRel+blockTextSizeRel*1.2+blockMarginBetweenRel); // NOTE: small factor to correct for bigger height
+            .position(blockXRel, blockYRel+blockMarginRel+blockTextSizeRel*options?.numTextLines*1.1+blockMarginBetweenRel); // NOTE: small factor to correct for bigger height
 
+            // main text
             this.text(texts[i] || '', { size: (i === 0) ? blockTextSizePnt : blockSecondaryTextSizePnt }) // Secondary texts are smaller
                 .width(blockWidthRel)
                 .pivot((i==0) ? 1 : (arr.length > 1) ? 0.5*i/(arr.length-1) : 0.5,0)
-                .position(blockXRel, blockYRel+blockMarginRel)
+                .position(blockXRel, blockYRel+blockMarginRel+((options?.numTextLines-1)*blockTextSizeRel))
         })
         
-       
         this._lastBlock = {
             x: blockXRel,
             y: blockYRel,
@@ -899,6 +1000,25 @@ export class Doc
 
         this._activeContainer._contentAlign = newContentAlign;
 
+        return this;
+    }
+
+    /** Set caption on active container */
+    caption(s?:string):this
+    {
+        
+
+        if(!this._activeContainer){ throw new Error(`Doc::caption(): Cannot set caption. No active container. Please make one first!`)};
+        if(this.TYPES_WITHOUT_CAPTION.includes(this._activeContainer._type)){ console.warn(`Doc::caption(): Container type ${this._activeContainer._type} does not support caption!`); return this; }
+        this._activeContainer.caption(s);
+        return this;
+    }
+
+    title(s?:string):this
+    {
+        if(!this._activeContainer){ throw new Error(`Doc::title(): Cannot set title. No active container. Please make one first!`)};
+        if(this.TYPES_WITHOUT_CAPTION.includes(this._activeContainer._type)){ console.warn(`Doc::title(): Container type ${this._activeContainer._type} does not support title!`); return this; }
+        this._activeContainer.title(s);
         return this;
     }
 

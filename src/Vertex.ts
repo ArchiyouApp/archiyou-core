@@ -8,6 +8,7 @@ import { PointLike, isPointLike, PointLikeOrAnyShapeOrCollection } from './inter
 import { Point, Vector, Shape, Edge } from './internal'
 import { checkInput } from './decorators' // Use direct import to avoid error with ts-node/jest
 import { roundToTolerance } from './internal'
+import { targetOcForGarbageCollection } from './internal'
 
 // this can disable TS errors when subclasses are not initialized yet
 type IEdge = Edge
@@ -35,6 +36,7 @@ export class Vertex extends Shape
             fromPointLike will give an error message if the input is wrong */
         super(); // this sets up basic Shape structure, but not much else
         this.fromPointLike(p, ...args); 
+        targetOcForGarbageCollection(this, this._ocShape);
     }
 
     /** Create Vertex from PointLike input */

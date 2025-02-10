@@ -1,5 +1,5 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, 
-            VertexCollection, DimensionLineData, PipelineType, Beam,  
+            VertexCollection, DimensionLineData, DimensionLevel, DimensionLevelSettings, PipelineType, Beam,  
             DocUnitsWithPerc} from './internal'
 
 import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
@@ -317,6 +317,20 @@ export function isDimensionOptions(o:any): o is DimensionLineData
         && (o?.units && isModelUnits(o?.units))
         && (o?.offset && typeof o?.offset === 'number')
         && (o?.roundDecimals && typeof o?.roundDecimals === 'number')
+}
+
+export function isDimensionLevel(o:any): o is DimensionLevel
+{
+    return (typeof o === 'object') 
+        && isMainAxis(o?.axis)
+        && isNumeric(o?.at)
+}
+
+export function isDimensionLevelSettings(o:any): o is DimensionLevelSettings
+{
+    return (typeof o === 'object') 
+        && (Array.isArray(o?.levels))
+        && o.levels.every(l => isDimensionLevel(l))
 }
 
 export function isAnnotationAutoDimStrategy(o:any): o is AnnotationAutoDimStrategy

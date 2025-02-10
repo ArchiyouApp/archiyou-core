@@ -285,8 +285,8 @@ export function convertValueFromToUnit(v:number, from:UnitsWithPerc, to:UnitsWit
 
     if( typeof v !== 'number'){ console.warn(`utils::convertValueFromToUnit(): Please supply a number!`); return null; }
     
-    if((from === '%' || to === '%') && !relativeToNum ){ console.warn(`utils::convertValueFromToUnit(): Converting from/to % is not supported without a number to which we relate to!`); return null; } 
-    if(!isDocUnitsWithPerc(from) || !isDocUnitsWithPerc(to)){ console.warn(`utils::convertValueFromToUnit(): Please supply valid from/to units ('mm', 'cm', 'inch'). Got "${from}"=>"${to}"`); return null; } 
+    if((from === '%' || to === '%') && !relativeToNum ){ console.warn(`utils::convertValueFromToUnit(): Converting from/to % is not supported without a number to which we relate to! Returned original`); return v; } 
+    if(!isDocUnitsWithPerc(from) || !isDocUnitsWithPerc(to)){ console.warn(`utils::convertValueFromToUnit(): Please supply valid from/to units ('mm', 'cm', 'inch'). Got "${from}"=>"${to}". Returned original`); return v; } 
 
     if(from === to)
     {

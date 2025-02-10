@@ -1,3 +1,8 @@
+/**
+ *  Module for loading and parsing external data sources
+ * 
+ */
+
 import { Geom } from "./Geom";
 import { AnyShape, ShapeCollection, Sketch } from "./internal";
 
@@ -47,14 +52,13 @@ export class IO
 
     constructor(geom:Geom)
     {
-        console.log('IO::constructor');
         this._geom = geom;
         this._oc = this?._geom?._oc;
     }
 
     async load(source:string, forceFetch:boolean=false, onlyCache:boolean=false)
     {
-        console.log(`IO::load: ${source}`);
+        console.info(`IO::load: ${source}`);
 
         this.source = source;
         let cachedAsset = await this._getAssetFromCache(source);
@@ -213,7 +217,7 @@ export class IO
       
         if(!asset)
         {
-            console.log('IO::_importSVG: Skipped invalid SVG')
+            console.info('IO::_importSVG: Skipped invalid SVG')
             return null;
         }
 
@@ -225,7 +229,7 @@ export class IO
         }
         catch(e)
         {
-            console.log(`IO::_importSVG: parse error. Check if valid SVG!`);
+            console.error(`IO::_importSVG: parse error. Check if valid SVG!`);
             return null;
         }
 

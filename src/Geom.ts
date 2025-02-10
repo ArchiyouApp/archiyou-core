@@ -47,8 +47,7 @@ export class Geom
   layerStack:Array<Obj> = [];
   activeSketch:Sketch; // if we are in Sketch mode
   _captureShapesStart:ShapeCollection = null;
-  _activeLayerGroup:Obj = null;
-  _activeLayerGroupInObj:Obj = null;
+  _activeLayerGroup:Obj = null; // active group of layers - used to combine layer into one
   _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
   // NOTE: meshingQuality is either in Main or Webworker scope
   _Arr2D:any; // holds class Reference to Arrangements2D module
@@ -323,7 +322,7 @@ export class Geom
   Solid(shells:MakeSolidInput, ...args):Solid
   {
     // NOTE: We don't allow creating empty Solid in Geom. Use new Solid() instead
-    let solid = new Solid(shells as ShapeCollection); // auto converted and combined into 
+    const solid = new Solid(shells as ShapeCollection); // auto converted and combined into 
     solid.addToScene();
     console.geom(`Geom::Shell: Created a Solid with ${solid.shells().length} Shells and ${solid.faces().length} Faces`);
     return solid;
@@ -333,7 +332,7 @@ export class Geom
   @checkInput([ [Number,SOLID_MAKEBOX_SIZE],[Number,null], [Number, null],['PointLike',[0,0,0]] ], ['auto', 'auto','auto', 'Point']) // this automatically transforms Types
   Box(width?:number, depth?:number, height?:number, position?:PointLike):Solid
   {
-    let box = new Solid().makeBox(width, depth, height, position as Point);
+    const box = new Solid().makeBox(width, depth, height, position as Point);
     box.addToScene();
     box.name(this.getNextObjName('Box')); // auto name
     console.geom(`Geom::Box: Created a Box Solid with size [${width}, ${depth||width}, ${height||width}] at [${box.center().x},${box.center().y},${box.center().z}]`);
@@ -587,11 +586,17 @@ export class Geom
   {
     return new ShapeCollection(shapes, ...args);
   }
+
+  /** Get active layer of group of layers */
+  getActiveLayer():Obj
+  {
+    return this._activeLayerGroup || this.activeLayer
+  }
   
   addToActiveLayer(obj:Obj):Geom
   {
     // NOTE: activeLayer is scene when no other layer Obj is set
-    let activeLayer = this._activeLayerGroup || this.activeLayer;
+    const activeLayer = this.getActiveLayer();
 
     if(activeLayer && !activeLayer.has(obj))
     {
@@ -792,9 +797,10 @@ export class Geom
   /** clean out the scene and reset stuff if needed */
   reset()
   {
-    this.resetLayers();
     this._annotator.reset();
-    this.scene.isEmpty();
+    this.scene.empty(); // remove all Shapes from scene obj
+    this.scene = new Obj().name("scene") as Obj; // create empty Obj to be sure
+    this.resetLayers();
     this._pipelines = [];
   }
 

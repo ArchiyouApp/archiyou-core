@@ -9,7 +9,7 @@
  * 
 */
 
-import { Point, Vector, Shape, Edge, AnyShape } from './internal'
+import { Point, Vector, Shape, Edge, AnyShape, ShapeCollection, AnyShapeOrCollection, isAnyShapeOrCollection, isPointLike } from './internal'
 import {  Coord, MainAxis, PointLike, ModelUnits, DimensionLineData, DimensionOptions, AnnotationType} from './internal' // types
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
@@ -27,7 +27,7 @@ export class DimensionLine extends BaseAnnotation
     targetStart:Point; // point on Shape
     targetEnd:Point; // point on Shape
     targetShape:AnyShape = null; // the (sub)shape (mostly an Edge) the dimension line is directly generated from
-    mainShape:AnyShape = null; // the main parent Shape this dimension belongs to
+    linkedTo:AnyShapeOrCollection = null; // the main parent Shape or ShapeCollection this dimension is linked to
     value:number; // the value of the dimension line, can be static - in BaseAnnotation
     static:boolean = false;
     units:ModelUnits = null;
@@ -90,15 +90,26 @@ export class DimensionLine extends BaseAnnotation
         if(edge.type() !== 'Edge'){ throw new Error(`DimensionLine::init(): Please supply a Edge. Other Shapes are not yet supported!`); }
         
         this.targetShape = edge;
-        this.mainShape = this._getParentShape(edge); // set main Shape
+        this.linkedTo = this._getParentShape(edge); // set main Shape
+        this.linkedTo.addAnnotations(this); // make two-sided link
         return this.init(edge.start().toPoint(), edge.end().toPoint(), options)
     }
 
-    /** Link this Annotation to given Shape 
-     *  This helps with more advanced dimensioning */
-    link(shape:AnyShape):this
+    /** Link this Annotation to given Shape or ShapeCollection 
+     *  This helps with more advanced dimensioning and retrieving Dimension when exporting Shapes */
+    link(to:AnyShapeOrCollection):this
     {
-        this.mainShape = this._getParentShape(shape); // Make sure we always got the top Shape
+        this.linkedTo = (Shape.isShape(to)) 
+                            ? this._getParentShape(to as Shape)
+                            : (ShapeCollection.isShapeCollection(to)) ? to as ShapeCollection : null; // Make sure we always got the top Shape
+
+        if(!this.linkedTo)
+        {
+            console.warn(`AnnotatorDimensionLine::link(): No valid Shape or ShapeCollection to link to. Skipped!`)
+            return this;
+        }
+
+        this.linkedTo.addAnnotations(this);
 
         // recalculate for offset based on main shape
         this._calculateAutoOffsetLength(); 
@@ -107,21 +118,14 @@ export class DimensionLine extends BaseAnnotation
     }
 
     /** Recurse parents to find main parent Shape of given shape */
-    _getParentShape(shape:AnyShape):AnyShape|null
+    _getParentShape(s:AnyShapeOrCollection):AnyShapeOrCollection|null
     {
-        if(!Shape.isShape(shape))
+        if(!isAnyShapeOrCollection(s))
         { 
             console.warn(`AnnotatorDimensionLine::_getParentShape(): Could not find a parent Shape. Did you supply a Shape to start recursion?`);
             return null;
         }
-
-        if(shape._parent)
-        {
-            return this._getParentShape(shape._parent)
-        }
-        else {
-            return shape;
-        }
+        return (s._parent) ? this._getParentShape(s._parent) : s; 
     }
 
 
@@ -207,7 +211,7 @@ export class DimensionLine extends BaseAnnotation
         else 
         {
             // Determine offset from a 2D/3D Shape: So the Shape can have an outside
-            const insidePoint = (this.mainShape?.is2D() || this.mainShape?.is3D()) ? this.mainShape?.center() : new Point(0,0,0);
+            const insidePoint = (this.linkedTo?.is2D() || this.linkedTo?.is3D()) ? this.linkedTo?.center() : new Point(0,0,0);
 
             let newOffsetVec = this.targetDir().crossed([0,0,1]);
             
@@ -257,8 +261,8 @@ export class DimensionLine extends BaseAnnotation
     {
         // Now it is static. TODO: something dynamic based on model units?
         const l = this.DIMENSION_OFFSET_DEFAULT;
-        if(!this.offsetLength){ this.offsetLength = l; } // don't override
-        return l;
+        if(this.offsetLength === undefined || this.offsetLength === null){ this.offsetLength = l; } // don't override any values (also 0)
+        return this.offsetLength;
     }
 
     /** The start and end point of DimensionLine in original coordinate system  
@@ -318,8 +322,11 @@ export class DimensionLine extends BaseAnnotation
     setOptions(o:DimensionOptions):this
     {
         this.ortho = o?.ortho ?? false;
-        this.offsetLength = o?.offset || this.offsetLength || this._calculateAutoOffsetLength();
-        this.offsetVec = o?.offsetVec || this.offsetVec || this._calculateOffsetVec();
+        const optionsOffsetVec = (isPointLike(o?.offsetVec)) ? new Vector(o.offsetVec) : null; // Transform any PointLikes of user into a Vector
+        this.offsetVec = optionsOffsetVec || this.offsetVec || this._calculateOffsetVec();
+        this.offsetLength = o?.offset // Can also be 0, only if undefined/null we do something
+        this.offsetLength = (this.offsetLength === undefined || o?.offset === null) ? this._calculateAutoOffsetLength() : this.offsetLength;
+
         this.units = o?.units || this.units;
         this.roundDecimals = o?.roundDecimals || this.roundDecimals;
         // TODO: more: color, linethickness etc.
@@ -384,7 +391,7 @@ export class DimensionLine extends BaseAnnotation
         
         const l = (flags.compareOffsetLength) ? this.offsetLength : 1;
         const v = (flags.compareValue) ? Math.round(this.value) : ''; // round to full units by default
-        const sId = (flags.compareWithShape) ? (this.mainShape?._hashcode() || this.uuid) : '';
+        const sId = (flags.compareWithShape) ? (this.linkedTo?._hashcode() || this.uuid) : '';
         const y = (flags.compareProjYAxis) ? Math.round(this._projYAxis()) : ''
 
         return `${ov}-${l}-${v}-${sId}-${y}`;

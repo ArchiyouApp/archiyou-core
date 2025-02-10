@@ -129,7 +129,7 @@ export class Console
         }
         catch(e)
         {
-            console.log(`Console.stringifyMessage: Could not simply stringify`)
+            console.warn(`Console.stringifyMessage: Could not simply stringify`)
         }
         
         if (!serializatedObj)

@@ -8,6 +8,9 @@
 import { SOLID_MAKEBOX_SIZE, SOLID_MAKESPHERE_RADIUS, SOLID_MAKESPHERE_ANGLE, SOLID_MAKECONE_BOTTOM_RADIUS, SOLID_MAKECONE_TOP_RADIUS,
     SOLID_MAKECONE_HEIGHT, SOLID_CYLINDER_RADIUS, SOLID_CYLINDER_HEIGHT, SOLID_CYLINDER_ANGLE, SOLID_FILLET_RADIUS, SOLID_CHAMFER_DISTANCE,
     SOLID_THICKEN_AMOUNT, SOLID_THICKEN_DIRECTION } from './internal'
+
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Shell, ShapeCollection } from './internal'
 import { cacheOperation } from './internal'; // decorators
 import { toRad } from './internal';
@@ -39,8 +42,8 @@ export class Solid extends Shape
     @checkInput(isMakeSolidInput, ShapeCollection)
     fromAll(shells:MakeSolidInput, ...args):Solid // args are used in decorator to create ShapeCollection
     {   
-        let shapes = shells as ShapeCollection; // auto converted
-        let checkedShells = shapes.getShapesByType('Shell');
+        const shapes = shells as ShapeCollection; // auto converted
+        const checkedShells = shapes.getShapesByType('Shell');
 
         if (checkedShells.length == 0)
         {
@@ -61,8 +64,7 @@ export class Solid extends Shape
     @checkInput(Shell, 'auto')
     fromShell(shell: Shell) 
     {
-        let ocSolid = new this._oc.ShapeFix_Solid_1().SolidFromShell(shell._ocShape);
-
+        const ocSolid = new this._oc.ShapeFix_Solid_1().SolidFromShell(shell._ocShape);
         return this._fromOcShape(ocSolid) as Solid;
     }
 
@@ -127,6 +129,8 @@ export class Solid extends Shape
             {
                 this._fix();
             }
+            targetOcForGarbageCollection(this, this._ocShape);
+
             return this;
         }
         else {
@@ -150,8 +154,8 @@ export class Solid extends Shape
     //// MAKE SPECIFIC SOLIDS ////
 
     /** Creates a box of size given by width, depth and height and position */
-    @cacheOperation
-    @checkInput([ [Number,SOLID_MAKEBOX_SIZE],[Number,null], [Number, null],['PointLike',[0,0,0]] ], ['auto', 'auto','auto', 'Point']) // this automatically transforms Types
+    //@cacheOperation
+    @checkInput([ [Number,SOLID_MAKEBOX_SIZE], [Number, null], [Number, null], ['PointLike',[0,0,0]]], ['auto','auto','auto','PointLike'])
     makeBox(width?:number, depth?:number, height?:number, position?:PointLike):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_box.html
@@ -159,18 +163,18 @@ export class Solid extends Shape
         depth = depth || width;
         height = height || width;
 
-        let ocBox = new this._oc.BRepPrimAPI_MakeBox_2( width, depth, height).Shape();
+        const ocBox = new this._oc.BRepPrimAPI_MakeBox_2( width, depth, height).Shape();
         this._fromOcSolid(ocBox);
 
         // translate
-        let centerVec = new Vector(width/2, depth/2, height/2);
+        const centerVec = new Vector(width/2, depth/2, height/2);
         this.move( (position as Point).toVector().subtracted(centerVec));
 
         return this;
     }
 
     /** Creates a Box by giving two extreme points ( not the same, and not on the same axis ) */
-    @cacheOperation
+    //@cacheOperation
     @checkInput(['PointLike', 'PointLike'], ['Point','Point'] ) // this automatically transforms Types
     makeBoxBetween(from:PointLike, to:PointLike): Solid
     {
@@ -190,27 +194,27 @@ export class Solid extends Shape
     }  
 
     /** Creates a Sphere Solid */
-    @cacheOperation   
+    //@cacheOperation   
     @checkInput([ [Number,SOLID_MAKESPHERE_RADIUS],['PointLike',[0,0,0]],[Number,SOLID_MAKESPHERE_ANGLE]], ['auto', 'Point', 'auto']) // this automatically transforms Types
     makeSphere( radius?:number, position?:PointLike, angle?:number): Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim___sphere.html
-        let angleRad = toRad(angle);
-        let ocSphere = (new this._oc.BRepPrimAPI_MakeSphere_6((position as Point)._toOcPoint(), radius, angleRad)).Shape();
+        const angleRad = toRad(angle);
+        const ocSphere = (new this._oc.BRepPrimAPI_MakeSphere_6((position as Point)._toOcPoint(), radius, angleRad)).Shape();
         this._fromOcSolid(ocSphere);
         
         return this;
     }
     
     /** Creates a Cone Solid */
-    @cacheOperation
+    //@cacheOperation
     @checkInput([ [Number,SOLID_MAKECONE_BOTTOM_RADIUS],[Number, SOLID_MAKECONE_TOP_RADIUS],[Number, SOLID_MAKECONE_HEIGHT],['PointLike', [0,0,0]]], 
                 ['auto','auto','auto', Point, 'auto'])
     makeCone( bottomRadius?:number, topRadius?:number, height?:number, position?:PointLike, angle?:number):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_cone.html#afd899db3f2bc7e2b570305678ba8b40b
-        let angleRad = toRad(angle);
-        let ocCone = (new this._oc.BRepPrimAPI_MakeCone_2( bottomRadius, topRadius, height, angleRad)).Shape();
+        const angleRad = toRad(angle);
+        const ocCone = (new this._oc.BRepPrimAPI_MakeCone_2( bottomRadius, topRadius, height, angleRad)).Shape();
         
         this._fromOcSolid(ocCone);
         this.move(position as Point); // auto converted to Point
@@ -219,15 +223,15 @@ export class Solid extends Shape
     }
 
     /** Creates a Cylinder with a given radius, height and position */
-    @cacheOperation
+    //@cacheOperation
     @checkInput([ [Number, SOLID_CYLINDER_RADIUS], [Number,SOLID_CYLINDER_HEIGHT], ['PointLike', [0,0,0]], [Number, SOLID_CYLINDER_ANGLE]],
             ['auto','auto','Point','auto']
         ) // TODO: these long parameter sequences are good candidates for using input models
     makeCylinder(radius?:number, height?:number, position?:PointLike, angle?:number):Solid
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_cylinder.html
-        let angleRad = toRad(angle);
-        let ocCone = (new this._oc.BRepPrimAPI_MakeCylinder_2( radius, height, angleRad )).Shape();
+        const angleRad = toRad(angle);
+        const ocCone = (new this._oc.BRepPrimAPI_MakeCylinder_2( radius, height, angleRad )).Shape();
 
         this._fromOcSolid(ocCone);
         this.move(position as Point) as Solid;
@@ -280,14 +284,14 @@ export class Solid extends Shape
 
     _fix():Solid
     {
-        let ocSolid = this._makeSpecificOcShape(this._ocShape);
-        let ocShapeFix = new this._oc.ShapeFix_Solid_2(ocSolid);
+        const ocSolid = this._makeSpecificOcShape(this._ocShape);
+        const ocShapeFix = new this._oc.ShapeFix_Solid_2(ocSolid);
         ocShapeFix.SetPrecision(this._oc.SHAPE_TOLERANCE); // does not seem to work
         ocShapeFix.SetMaxTolerance(this._oc.SHAPE_TOLERANCE);
         ocShapeFix.SetMinTolerance(this._oc.SHAPE_TOLERANCE);
 
         ocShapeFix.Perform(new this._oc.Message_ProgressRange_1());
-        let fixedOcSolid = this._makeSpecificOcShape(ocShapeFix.Shape()); // make sure it is a TopoDS_Solid 
+        const fixedOcSolid = this._makeSpecificOcShape(ocShapeFix.Shape()); // make sure it is a TopoDS_Solid 
         this._fromOcSolid(fixedOcSolid, false); // avoid infinite loops by avoiding fix
         return this;
     }
@@ -419,8 +423,9 @@ export class Solid extends Shape
         ocMakeFillet.Build(new this._oc.Message_ProgressRange_1());
         if (ocMakeFillet.IsDone())
         {
-            let ocShape = ocMakeFillet.Shape();
-            let newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            const ocShape = ocMakeFillet.Shape();
+            const newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            removeOcTargetForGarbageCollection(newSolid._ocShape); // remove from garbage collection
             this._fromOcSolid(newSolid._ocShape); // replace old Solid with new one            
             
             return this;
@@ -537,7 +542,8 @@ export class Solid extends Shape
         if (ocMakeChamfer.IsDone())
         {
             let ocShape = ocMakeChamfer.Shape();
-            let newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            const newSolid = this._fromOcShape(ocShape) as Solid; // automatically converts the returned Compound with only one Solid Shape to that Solid
+            removeOcTargetForGarbageCollection(newSolid._ocShape); // avoid shared OC instances
             this._fromOcSolid(newSolid._ocShape); // replace old Solid with new one
             
             return this;

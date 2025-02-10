@@ -396,7 +396,6 @@ export class Make
         const openingDiagrams = new ShapeCollection();
         const openingFlags = []; // flags per opening - register a snap of opening to wall frame (leaving out the window frame)
 
-        
         // Openings: basic input checks
         // NOTE: We only support one opening now
         openings.forEach( (o,i) => 
@@ -463,9 +462,10 @@ export class Make
                     }
 
                     // Now make diagram Shape for opening
-                    openingDiagrams.add( new Face().makePlaneBetween(
-                        [o.left, 0, o.sill],
-                        [o.left+o.width, 0, o.sill+o.height]))
+                    openingDiagrams.add( 
+                        new Face().makePlaneBetween(
+                            [o.left, 0, o.sill],
+                            [o.left+o.width, 0, o.sill+o.height]))
                     
                 }
                 else {
@@ -639,12 +639,12 @@ export class Make
                             {
                                 const dx = Math.abs((closeGridLine.center().x + studThickness * 0.5) - checkedOpening.max().x);
                                 checkedOpening = new Face().makePlaneBetween(checkedOpening.min(), checkedOpening.max().move(dx))
-                                this._ay.console.user(`Enlarged opening #${i} by ${dx} units Now last cripple aligns with grid`);
+                                this._ay.console.user(`Enlarged opening #${i} by ${dx} units. Now last cripple aligns with grid`);
                             }
                         }
                     }
                 }
-    
+                
                 checkedOpenings.add(checkedOpening); // keep track of final openings
 
                 // make opening surrounding frame
@@ -686,8 +686,8 @@ export class Make
                                 studThickness,
                                 'horizontal'
                             )
-                            .moveTo(openingTestBuffer.center())
-
+                            .moveTo(openingTestBuffer.center());
+                
                 // Don't add frame left, top and bottom or right if opening was snapped
                 const includeFrameParts = [];
                 for (const [flag,val] of Object.entries(curOpeningFlags))
@@ -699,7 +699,7 @@ export class Make
                     }
                 }
 
-                openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name)));
+                openingFrame = new ShapeCollection(openingFrame.filter(s => includeFrameParts.includes(s.name())));
                 
                 openingFramesHorizontals.add(openingFrame.filter(s => s.name() === 'frameTop' || s.name() === 'frameBottom'))
                 openingFramesVerticals.add(openingFrame.filter(s => s.name() === 'frameLeft' || s.name() === 'frameRight'))
@@ -836,7 +836,7 @@ export class Make
             throw new Error(`Make::partList: Please supply valid ShapeCollection of beam-like shapes to generate a partlist!`)
         }
 
-        const partRowsAll = [];
+        let partRowsAll = [];
 
         console.info(`Make::partList(shapes, name): Got ${shapes.length} to make a part list with. If you name and group shapes the results will be better.`);
 
@@ -849,11 +849,12 @@ export class Make
                     // part (0), subpart (1), section (2), length (3), quantity (4)
                     const beamDims = shape.beamDims();
                     // NOTE: round to integer for now
-                    partRowsAll.push([groupName, shape.getName(), `${Math.round(beamDims.small)}x${Math.round(beamDims.mid)}`, Math.round(beamDims.length), 1])   
+                    partRowsAll.push(
+                        [groupName, shape.getName(), `${Math.round(beamDims.small)}x${Math.round(beamDims.mid)}`, Math.round(beamDims.length), 1]
+                    )   
                 }
             })
         });
-
         const groupedPartRows = {};
         const genId = (row) => `${row[0]}-x${row[2]}-${row[3]}`; // group by main part, section dims and length
         
@@ -872,10 +873,26 @@ export class Make
             }
         })
 
-        // make Calc table
+        // After grouping flatten again into Array
+        let groupedRows = Object.values(groupedPartRows);
+
+        // Now also count the totals per section
+        const uniqueSections = Array.from(new Set(partRowsAll.map((row) => row[COLUMNS.indexOf('section') as any])));
+        const totalRows = uniqueSections.map((section) => 
+        {
+            const totalSectionLength = partRowsAll.reduce((sum,row) => sum + ((row[COLUMNS.indexOf('length')] ?? 0) * (row[COLUMNS.indexOf('quantity')] ?? 1)), 0)
+            return ['TOTAL', '', section, '', totalSectionLength]  // align to right
+        })
+        
+        groupedRows = groupedRows.concat([
+                            ['','','---- +', 'L x Q', '---- +'], 
+                            ...totalRows
+                        ]);
+
+        // Make Calc table
         return this._ay.calc.table(
             name || shapes.getName() as string || 'parts',
-            Object.values(groupedPartRows),
+            groupedRows,
             COLUMNS
         ) as Table
         

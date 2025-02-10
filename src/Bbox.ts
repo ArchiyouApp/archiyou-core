@@ -4,7 +4,8 @@
  *          Is used also for selecting and aligning 
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection } from './internal'
+import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection, AnyShapeOrCollection } from './internal'
+import { targetOcForGarbageCollection } from './internal' 
 import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
@@ -20,6 +21,7 @@ export class Bbox
     _oc:any;
     _geom:any;
     _ocBbox:any = null;
+    _parent:AnyShapeOrCollection;
 
     position:Point;
     bounds:Array<number> = null; // [xmin,xmax, ymin,ymax, zmin, zmax]
@@ -38,6 +40,21 @@ export class Bbox
             this.create(min,max);
         }
 
+        targetOcForGarbageCollection(this, this._ocBbox)
+    }
+ 
+    _clearOcBbox()
+    {
+        this?._ocBbox?.delete();
+        this._ocBbox = undefined;
+    }
+
+    /** Link to Shape or ShapeCollection
+     *  Used to keep track of _parent chain for Bbox subshapes
+     */
+    setParent(p:AnyShapeOrCollection)
+    {
+        this._parent = p
     }
 
     @checkInput(['PointLike', 'PointLike'], ['Vector', 'Vector'])
@@ -97,8 +114,8 @@ export class Bbox
     {
         // WORKAROUND FOR BUG in OPENCASCADE.JS: this._ocBbox.Get(xmin, ymin, zmin, xmax, ymax, zmax); // this gives an Error: RuntimeError: function signature mismatch11
 
-        let min = new Vector()._fromOcPoint(this._ocBbox.CornerMin()).round(); // Correct bbox calculation very small numbers (e1-7)
-        let max = new Vector()._fromOcPoint(this._ocBbox.CornerMax()).round();
+        const min = new Vector()._fromOcPoint(this._ocBbox.CornerMin()).round(); // Correct bbox calculation very small numbers (e1-7)
+        const max = new Vector()._fromOcPoint(this._ocBbox.CornerMax()).round();
         
         /* IMPORTANT: Sometimes we get inaccurate results. 
             For example X=[-1,1] for Shapes that are on XY plane
@@ -108,6 +125,12 @@ export class Bbox
         this.bounds = [min.x,max.x,min.y,max.y,min.z,max.z];
         
         return this.bounds;
+    }
+
+    /** Make string hash based on values to be able to identify quickly */
+    hash(round:boolean=true):string
+    {
+        return `bbox<${(round) ? this.bounds.map(b => Math.round(b)) : this.bounds}>`;
     }
 
     /** Copy this Bounding Box */
@@ -488,7 +511,7 @@ export class Bbox
         return this[AXIS_TO_SIDE[axis]]();
     }   
 
-    /** Get Shape from this Orientated Bounding Box */
+    /** Get Shape from this Bounding Box */
     shape():Edge|Face|Solid|null
     {
         // TODO: point or line?
@@ -516,7 +539,6 @@ export class Bbox
                 console.warn(`Bbox::rect: Bbox is not 2D, so can't turn into a rectangle Face!`);
                 return null; 
         }
-
         return new Face().makePlaneBetween(this.min(), this.max()); // Just a simple 2D Plane on XY plane ( normal parallel in Z)
     }
 
@@ -729,7 +751,7 @@ export class Bbox
             sideShape = bboxSolid.directionMinMaxSelector(bboxSolid.faces(), axisWithDir).specific() as Vertex|Edge|Face;
         }   
 
-        sideShape._parent = this.shape(); // set parent shape so for example knows what the main bbox shape is
+        sideShape._parent = this._parent ?? this.shape(); // set parent shape so for example knows what the main bbox shape is
         return sideShape;
     }
 

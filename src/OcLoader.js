@@ -18,7 +18,7 @@ import { Geom } from './Geom'
 export default class OcLoader
 {
   //// SETTINGS ////
-  USE_FAST = true;
+  USE_FAST = false; // Fast is not really a big difference!
   SHAPE_TOLERANCE = 0.001;
   RUN_TEST = false;
 

@@ -10,6 +10,7 @@ import { Vertex } from './internal'
 import { PointLike, isPointLike } from './internal' // see: types.ts
 import { addResultShapesToScene, checkInput } from './decorators' // decorators
 import { toDeg, toRad, roundToTolerance } from './internal' // utils
+import { targetOcForGarbageCollection } from './internal'
 
 
 export class Vector extends Point
@@ -28,7 +29,7 @@ export class Vector extends Point
     */
     
     _oc:any; // this is set on the prototype by the main entrypoint of the library
-    _ocVector: any; // OC gp_Vec https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___vec.html
+    _ocVector:any; // OC gp_Vec https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___vec.html
 
     //// CREATION METHODS ////
     constructor (p?:PointLike, ...args)
@@ -36,6 +37,14 @@ export class Vector extends Point
         super(p, ...args);
 
         this._updateOcVector();
+        targetOcForGarbageCollection(this, this._ocVector);
+    }
+
+    _clearOcVector()
+    {
+        this?._ocVector?.delete();
+        this._ocVector = undefined;
+        // TODO: untarget gc
     }
 
     /* Test if a given object is a Vector */
@@ -78,6 +87,8 @@ export class Vector extends Point
                 this._z || 0
                 ) : null; // Allow null as _ocVector if OC is not loaded
 
+        targetOcForGarbageCollection(this, this._ocVector); // New instance, register too
+
         return this;
     }
 
@@ -89,11 +100,12 @@ export class Vector extends Point
 
     _toOcLocation():any // TODO OC type
     {
-        let ocTransform = new this._oc.gp_Trsf_1();
+        const ocTransform = new this._oc.gp_Trsf_1();
         ocTransform.SetTranslationPart(this._ocVector);
-        let ocLocation = new this._oc.TopLoc_Location_2(ocTransform);
+        const ocLocation = new this._oc.TopLoc_Location_2(ocTransform);
 
         return ocLocation;
+        // TODO: target for garbage collection
     }
 
     //// CREATION METHODS ////
@@ -121,18 +133,27 @@ export class Vector extends Point
         
     }
 
-    /** Set properties x,y,z from given or already wrapped OC gp_Vec instance */
+    /** Set internal properties x,y,z from a given or already wrapped OC gp_Vec instance */
     _fromOcVec(ocVec:any=null):Vector
     {
+        // If any existing gp_Vec giving, first set that
         if (ocVec != null)
         {
-            this._ocVector = ocVec;
+            this._ocVector = ocVec; // TODO: research if a reference to OC instance can be problematic when carbage collecting
+            targetOcForGarbageCollection(this, this._ocVector);
         }
-        this._x = this._ocVector.X();
-        this._y = this._ocVector.Y();
-        this._z = this._ocVector.Z();
-        
-        // NOTE: Don't round automatically because Vectors need more accuracy than Shapes
+
+        if(this._ocVector)
+        {
+            // Update internal coords
+            // NOTE: Don't round automatically because Vectors need more accuracy than Shapes
+            this._x = this._ocVector.X();
+            this._y = this._ocVector.Y();
+            this._z = this._ocVector.Z();
+        }
+        else {
+            console.warn(`Vector::_fromOcVec(): Can not set internals from empty _ocVector. You got a undefined Vector instance!`);
+        }
 
         return this;
     }
@@ -156,8 +177,7 @@ export class Vector extends Point
     /** Create Vector from OC Direction instance */
     _fromOcDir(ocDir:any):Vector 
     {
-        let newVec = new Vector(ocDir.X(),ocDir.Y(), ocDir.Z());
-        return newVec;
+        return new Vector(ocDir.X(),ocDir.Y(), ocDir.Z());
     }
 
     /** Random Vector in a circle of given radius */
@@ -392,16 +412,14 @@ export class Vector extends Point
     /** Copy Vector and return a new one */
     copy():Vector
     {
-        let v = new Vector(this._x, this._y, this._z);
-
-        return v;
+        return new Vector(this._x, this._y, this._z);
     }
 
     /** Add a PointLike to this Vector */
     @checkInput('PointLike', 'Vector')
     add(vector:PointLike, ...args):Vector // NOTE: args to signify that checkInput will gather them and avoid TS warnings
     {
-        let v = vector as Vector; // autoconverted
+        const v = vector as Vector; // autoconverted
         this._ocVector.Add(v._ocVector)
         this._fromOcVec(); // update properties [x,y,z]
 
@@ -537,27 +555,25 @@ export class Vector extends Point
     {
         if(this.equals([0,0,0]))
         {
-            console.warn(`Vector::normalize(): Normalized [0,0,0]!`)
-            this._ocVector = new Vector(0,0,0)._ocVector;
+            console.warn(`Vector::normalize(): Can't normalize a zero length Vector!`)
         }
         else 
         {
             this._ocVector.Normalize();
+            this._fromOcVec(); // update internals from ocVector
         }
-        this._fromOcVec();
+        
         return this;
     }
 
     /** Normalize current Vector and return a copy */
     normalized():Vector 
     {
-        let v = this.copy();
-        v.normalize()
-        return v;
+        return this.copy().normalize();
     }
 
     /** Reverse current Vector and return current Vector */
-    reverse():Vector 
+    reverse():this 
     {
         this._ocVector.Reverse();
         this._fromOcVec();
@@ -567,9 +583,7 @@ export class Vector extends Point
     /** Reverse current Vector and return a copy */
     reversed():Vector 
     {
-        let v = this.copy();
-        v.reverse()
-        return v;
+        return this.copy().reverse();
     }
 
     /** Mirror current Vector 
@@ -579,21 +593,20 @@ export class Vector extends Point
     @checkInput( [ ['PointLike',[0,0,0]] , ['PointLike',[0,1,0]] ], [Vector, Vector]) // default values in checkInput
     mirror(position?:PointLike, direction?:PointLike):Vector
     {
-        let positionPoint = (position as Vector).toPoint(); // auto converted to Vector
-        let directionVec = direction as Vector
+        const positionPoint = (position as Vector).toPoint(); // auto converted to Vector
+        const directionVec = direction as Vector
 
-        let ocAxis = new this._oc.gp_Ax1_2( positionPoint._toOcPoint(), directionVec._toOcDir() );
+        const ocAxis = new this._oc.gp_Ax1_2( positionPoint._toOcPoint(), directionVec._toOcDir() );
         this._ocVector.Mirror_2(ocAxis);
-        this._fromOcVec();
+        this._fromOcVec(); // sync internals with Oc instance
+        ocAxis?.delete(); // clear ocAxis
         return this;
     }
 
     /** Mirror current Vector and return a copy */
     mirrored(position?:PointLike, direction?:PointLike):Vector
     {
-        const v = this.copy();
-        v.mirror(position, direction);
-        return v;
+        return this.copy().mirror(position, direction);
     }
 
     /** 
@@ -601,14 +614,15 @@ export class Vector extends Point
      *   @param angle in degrees
      */   
     @checkInput( [Number, ['PointLike',[0,0,0]] , ['PointLike',[0,0,1]] ], [Number, 'Point', 'Vector'])
-    rotate(angle:number, position?:PointLike, direction?:PointLike):Vector
+    rotate(angle:number, position?:PointLike, direction?:PointLike):this
     {
         // IMPORTANT: probably right-hand rotation - for Y - axis this could cause problems 
 
         /** See OC gp_Pnt: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___pnt.html */
         const ocAxis = new this._oc.gp_Ax1_2( (position as Point)._toOcPoint(), (direction as Vector)._toOcDir() ); // auto converted
         this._ocVector.Rotate(ocAxis,toRad(angle));
-        this._fromOcVec();
+        this._fromOcVec(); // sync internals from oc instance
+        ocAxis?.delete(); // clean
         return this;
     }
 
@@ -619,25 +633,23 @@ export class Vector extends Point
     @checkInput( [Number, ['PointLike',[0,0,0]] , ['PointLike',[0,0,1]] ], [Number, 'Point', 'Vector'])    
     rotated(angle:number, position?:PointLike, direction?:PointLike):Vector
     {
-        const v = this.copy();
-        v.rotate(angle, position, direction);
-        return v;
+        return this.copy().rotate(angle, position, direction);
     }
 
     @checkInput(Number,'auto')
-    rotateX(angle:number):Vector
+    rotateX(angle:number):this
     {
         return this.rotate(angle, [0,0,0], [1,0,0])
     }
 
     @checkInput(Number,'auto')
-    rotateY(angle:number):Vector
+    rotateY(angle:number):this
     {
         return this.rotate(angle, [0,0,0], [0,1,0])
     }
 
     @checkInput(Number,'auto')
-    rotateZ(angle:number):Vector
+    rotateZ(angle:number):this
     {
         return this.rotate(angle, [0,0,0], [0,0,1])
     }
@@ -678,7 +690,7 @@ export class Vector extends Point
     @checkInput('PointLike', 'Vector')
     isParallel(other:PointLike, ...args):boolean
     {
-        let otherVec = other as Vector; // auto converted in checkInput
+        const otherVec = other as Vector; // auto converted in checkInput
         if(this.length() == 0 || otherVec.length() == 0)
         {
             console.warn(`Vector::isParallel: Cannot check parallelism with zero length Vector`)
@@ -707,14 +719,13 @@ export class Vector extends Point
     @checkInput('PointLike', 'Vector')
     angle(other:PointLike, ...args):number
     {
-        let otherVec = other as Vector; // auto converted in checkInput
+        const otherVec = other as Vector; // auto converted in checkInput
         // protect against zero size Vector
         if(this.length() == 0 || otherVec.length() == 0)
         {
             console.warn(`Vector::angle: Cannot calculate angle with a zero length Vector. Returned null`)
             return null;
         }
-
         return roundToTolerance(toDeg(this._ocVector.Angle(otherVec._ocVector)));
     }
 
@@ -762,8 +773,8 @@ export class Vector extends Point
     @checkInput(['PointLike','PointLike'], ['Vector','Vector'])
     angleRef(other:PointLike, ref:PointLike):number
     {
-        let otherVec = other as Vector; // auto converted
-        let refVec = ref as Vector;
+        const otherVec = other as Vector; // auto converted
+        const refVec = ref as Vector;
 
         if( this.normalized().equals(otherVec.normalized())){  return 0 } // avoid error in OC
 
@@ -812,11 +823,13 @@ export class Vector extends Point
     @checkInput('PointLike', 'Vector') // convert input to Vector
     sharedPlanes(other:PointLike, ...args):Array<string>
     {
+        const TOLERANCE = this._oc.SHAPE_TOLERANCE;
         const otherVec = other as Vector; // auto converted by @checkInput
+
         const planes = [];
-        if ( this._x == otherVec.x ) planes.push('x');
-        if ( this._y == otherVec.y ) planes.push('y');
-        if ( this._z == otherVec.z ) planes.push('z');
+        if ( Math.abs(this._x - otherVec.x) <= TOLERANCE) planes.push('x');
+        if ( Math.abs(this._y - otherVec.y) <= TOLERANCE) planes.push('y');
+        if ( Math.abs(this._z - otherVec.z) <= TOLERANCE) planes.push('z');
 
         return planes;
     }

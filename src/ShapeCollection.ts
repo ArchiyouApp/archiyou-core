@@ -5,19 +5,18 @@
  *
  *    ShapeCollection makes operating on multiple Shapes as easy as working on single Shapes (Inspired like JTS/GEOS). 
  *
- *   - TODO: Find a good strategy for this
- *   - TODO: The Scene is also a ShapeCollection => clear and advanced Object trees for navigation
  */
 
  import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
          ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
-         Pivot,AnyShapeSequence, Alignment, Bbox, Side} from './internal' // see types
+         Pivot,AnyShapeSequence, Alignment, Bbox, Side,
+         isMainAxis} from './internal' // see types
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, MainAxis, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
- import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, MainAxis } from './internal'
+ import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, AnnotationAutoDimStrategy } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
@@ -48,6 +47,7 @@
       _oc:any; // Don't set to null!
       _geom:any; // Set on init of Geom
       _obj:Obj = null; // Obj container
+      _parent:AnyShapeOrCollection;
       shapes:Array<AnyShape> = []; // No ShapeCollection here
       _groups:{[key:string]:Array<AnyShape>} = {}; // mechanism to define groups within ShapeCollection (experimental)
 
@@ -65,8 +65,17 @@
          }
       }
 
+      /** Manually clear OC Shapes instances - used to make sure memory is released 
+       *  NOTE: Please use automatic garbageCollection.targetOcForGarbageCollection() for more generic approach
+      */
+      _clearOcShapes()
+      {
+         this.shapes.forEach(s => s._clearOcShape());
+      }
+
       /** Try to convert anything to a ShapeCollection */
       // We use an incremental way of iterating over collections (Arrays, ShapeCollections), testing the entities and adding them
+      // IMPORTANT TODO: if new ShapeCollection from existing one - what to do with taking over attributes? 
       @checkInput('MakeShapeCollectionInput', 'auto') // no conversion of types
       fromAll(entities?:MakeShapeCollectionInput):AnyShapeCollection
       {
@@ -76,6 +85,7 @@
          
          this._addEntities(entities); // pack all together
          this._setFakeArrayKeys();
+         this._setFakeNameKeys();
 
          return this;
       }
@@ -105,9 +115,9 @@
          {
             let addedShapes = []; // keep track of added Shapes for grouping
 
-            if (es === null)
+            if (es === null || es === undefined) // null of undefined
             {
-               console.warn('ShapeCollection::_addEntities: Skipped null!')
+               console.warn('ShapeCollection::_addEntities: Skipped nullish entity!')
             }
             else if(isPointLike(es))
             {
@@ -118,7 +128,7 @@
             // single ShapeCollection
             else if(isAnyShapeCollection(es))
             {
-               // auto grouping
+               // auto grouping - keeps track of the previous collection
                if(!group) // if not already user defined group
                { 
                   const collName = (es as ShapeCollection).getName() as string;
@@ -126,13 +136,14 @@
                }
 
                // flatten an given ShapeCollection into this one
-               let shapes = (es as ShapeCollection).shapes;
+               const shapes = (es as ShapeCollection).shapes.filter(s => !s.isEmpty()); // Check for validity of Shapes
                this.shapes = this.shapes.concat(shapes);
+               this.annotations = this.annotations.concat((es as ShapeCollection).annotations); // Merge annotations of incoming ShapeCollection too
                addedShapes = addedShapes.concat(shapes);
             }
             else if(isPointLikeSequence(es)) // NOTE: this needs to be later than single ShapeCollection
             {
-               let points = new ShapeCollection(es); // bring all point sequences in collection
+               const points = new ShapeCollection(es); // bring all point sequences in collection
                points.forEach( e => 
                {
                   if(isPointLike(e))
@@ -271,7 +282,7 @@
       }
 
 
-      /* EXPERIMENTAL: try to be compatible with Arrays by setting index keys on this instance */
+      /** EXPERIMENTAL: try to be compatible with Arrays by setting index keys on this instance */
       _setFakeArrayKeys()
       {
          // remove previous if any
@@ -289,14 +300,26 @@
          }
          // add fake keys
          this.shapes.forEach( (shape,index) => this[index] = shape);
-         
       }
 
-      /** EXPERIMENTAL: directly access groups by adding property to instance */
+      /** EXPERIMENTAL: Set references to Shapes by name directly on instance */
+      _setFakeNameKeys()
+      {
+         this.shapes.forEach(s => {
+            if(s.name() && s[s.name() as string] === undefined) // don't overwrite existing properties
+            {
+               this[s.name() as string] = s;
+            }
+         })
+      }
+
+      /** EXPERIMENTAL: directly access groups by adding property to instance 
+       *   TODO: Check for overwriting properties!
+      */
       _setFakeGroupKeys()
       {
          Object.entries(this._groups).forEach(([k,v]) => { 
-            if (k !== 'shapes')  // don't set shapes because this will break access to real data
+            if (this[k] === undefined)  // don't set existing props (like shapes) because this will break access to real data
             { 
                this[k] = new ShapeCollection(v) 
             }
@@ -360,6 +383,7 @@
       {
          other = other as ShapeCollection;
          this.shapes = this.shapes.concat(other.shapes);
+         this.annotations = this.annotations.concat(other.annotations); // Merge annotations of incoming ShapeCollection too
          this._setFakeArrayKeys();
          return this;
       }
@@ -394,6 +418,14 @@
          this._addEntities([shapes, ...args])
          this._setFakeArrayKeys();
 
+         return this;
+      }
+
+      /**  Array API - Add Shape to ShapeCollection*/
+      @checkInput('AnyShape', 'auto')
+      push(shape:AnyShape):ShapeCollection
+      {
+         this.add(shape);
          return this;
       }
 
@@ -1008,6 +1040,12 @@
          }
       }
 
+      /* If this ShapeCollection is 3D */
+      is3D():boolean
+      {
+         return this.bbox().is3D()
+      }
+
       /** Shape API - get combined bbox of all Shapes in Collection */
       bbox(withAnnotations:boolean=false):Bbox|null
       {
@@ -1025,9 +1063,21 @@
                }
             }
          })
-         // Extra: enlarge bbox with possible Annotations within or nearby
-         this._geom._annotator.getAnnotationsInBbox(combinedBbox).forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+         
+         if(withAnnotations)
+         {
+            // Add Annotations linked to Collection
+            this.getAnnotations().forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+            
+            // Extra: enlarge bbox with possible Annotations within or nearby
+            /*
+            this._geom._annotator.getAnnotationsInBbox(combinedBbox)
+                  .forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
+            */
+         }
 
+         // link this collection to Bbox so it can link annotations
+         combinedBbox.setParent(this);
 
          return combinedBbox;
       }
@@ -1230,13 +1280,6 @@
          return selectedShapes.distinct();
       }
 
-      /**  Array API - Add Shape to ShapeCollection*/
-      @checkInput('AnyShape', 'auto')
-      push(shape:AnyShape):ShapeCollection
-      {
-         this.shapes.push(shape);
-         return this;
-      }
 
       /**  Array API - Pop last Shape from ShapeCollection*/
       pop():ShapeCollection
@@ -1778,6 +1821,7 @@
          })
 
          this.shapes = Object.values(distinctShapesByHash);
+         
          this._setFakeArrayKeys();
 
          return this;
@@ -2092,7 +2136,9 @@
          return this._unioned(other);
       }
 
-      /** Shape API - Try to union all shapes in Collection */
+      /** Shape API - Try to union all shapes in Collection 
+       *   TODO: test and make more robust for a variety of Shapes in a Collection
+      */
       @addResultShapesToScene
       union():this
       {
@@ -2110,10 +2156,11 @@
       /**  Shape API - Add all shapes in the collection to the Scene */
       addToScene():ShapeCollection
       {
-         // Keep Shapes in Collection together within layer
-         this._geom.layer( this._geom.getNextLayerName(this.getName()));
+         // For now, flatten collection into existing layer
+         // TODO: We could start a new layer to keep collection together
+         // this._geom.layer( this._geom.getNextLayerName(this.getName()));
          this.all().forEach(shape => shape.addToScene());
-         this._geom.resetLayers(); // return active layer to scene
+         //this._geom.resetLayers(); // return active layer to scene
          return this;
       }
 
@@ -2189,29 +2236,65 @@
       }
 
       /** Shape API - hide all Shapes in Collection */
-      hide():ShapeCollection
+      hide():this
       {
          this.forEach( shape => shape.hide());
 
          return this;
       }
 
+      /** Shape API - show all Shapes in Collection */
+      show():this
+      {
+         this.forEach( shape => shape.show());
+         return this;
+      }
+      
       // TODO: .color, .
 
       //// LAYOUTING ALGORITHMS ////
 
-      /** Flatten all Shapes into new Shapes, align to fixed depth and return new ShapeCollection */
-      flattened():AnyShapeCollection
+      /** Flatten all Shapes into new Shapes, align to one plane and return new ShapeCollection 
+       *   If an axis is given all Shapes are flattened along that axis and placed at 0 at that axis
+       *   Otherwise we consider shapes as extrusions and we flatten according to _extrudedFace()
+      */
+      @addResultShapesToScene
+      @checkInput([['MainAxis',null], ['Boolean', true]], ['auto','auto'])
+      flattened(axis?:MainAxis, filterDuplicates?:boolean):AnyShapeCollection
       {
-         const flattened = this.map( s => s.flattened());       
-         if(flattened.is2D())
+         let flattened = this.map( s => s._flattened(axis)
+                                          .setName(s.getName())); // NOTE: we take over the name for easy access
+         
+         // move to zero
+         if (isMainAxis(axis))
          {
-            // make sure all 2D faces are on the same depth plane
-            const depthAxis2D = flattened.first().bbox().axisMissingIn2D();
-            console.log(depthAxis2D);
-            if(depthAxis2D)
+            flattened.forEach(s => s.moveToAxisCoord(axis, 0));
+            
+            // filter out duplicate based on bbox
+            if(filterDuplicates)
             {
-               flattened.forEach( s => s[`moveTo${depthAxis2D.toUpperCase()}`](0)); // just move to 0 for robustness
+                  flattened = new ShapeCollection(
+                     Object.values(
+                        flattened.toArray().reduce(
+                           (agg,s) => {
+                              agg[s.bbox().hash()] = s;
+                              return agg;
+                           }, 
+                        {})
+                     )
+                  )   
+            }
+         }
+         else {
+            if(flattened.is2D())
+            {
+               // make sure all 2D faces are on the same depth plane
+               const depthAxis2D = flattened.first().bbox().axisMissingIn2D();
+               
+               if(depthAxis2D)
+               {
+                  flattened.forEach( s => s[`moveTo${depthAxis2D.toUpperCase()}`](0)); // just move to 0 for robustness
+               }
             }
          }
 
@@ -2296,7 +2379,14 @@
          {
             let s = (copy) ? shape._copy() : shape;
             if(autoRotate) s.rotateToLayFlat(); 
-            if(flatten) s = s._flattened(); 
+            if(flatten)
+            {
+               const f = s._flattened(); 
+               if(!f)
+               { 
+                  console.error(`ShapeCollection::pack(): Can not flatten Shape at index ${i} of type ${s.type()}`)
+               }
+            } 
             return this._makeBinPackBox(s, boxMargin, i)
          });
 
@@ -2400,7 +2490,8 @@
       addAnnotations(a:Annotation|Array<Annotation>):this
       {
         // TODO: check for doubles etc
-        const annotations = (Array.isArray(a) ? a : [a]).filter(ann => BaseAnnotation.isAnnotation(ann) )
+        const annotations = (Array.isArray(a) ? a : [a])
+                              .filter(ann => BaseAnnotation.isAnnotation(ann) )
         this.annotations = this.annotations.concat(annotations)
         return this;
       }
@@ -2413,10 +2504,10 @@
        *    }
        * 
       */
-      autoDim(settings?:DimensionLevelSettings):ShapeCollection
+      autoDim(settings?:DimensionLevelSettings, strategy?:AnnotationAutoDimStrategy):ShapeCollection
       {
          // TODO: How to tie annotations to ShapeCollection?
-         this._geom._annotator.autoDim(this);
+         this._geom._annotator.autoDim(this, settings, strategy);
 
          return this;
       }
@@ -2431,7 +2522,7 @@
          let shapeMeshes:Array<MeshShape> = [];
          this.shapes.forEach( s => 
          {
-            let meshShape = s.toMeshShape(quality);
+            const meshShape = s.toMeshShape(quality);
             if (meshShape)
             {
                shapeMeshes.push(meshShape);
@@ -2557,7 +2648,13 @@
           
             // Info per entity
             meshShapeBuffer.verticesInfo = meshShapeBuffer.verticesInfo.concat( 
-               curMeshShape.vertices.map( v => ({ objId: v.objId, shapeId: v.ocId, subShapeType: 'Vertex', indexInShape: v.indexInShape, color: chroma(curMeshShape?.style?.line?.color || '#333333').darken(0.5).num()  }) )
+                  curMeshShape.vertices.map( 
+                     (v) => ({ 
+                        objId: v.objId, 
+                        shapeId: v.ocId, 
+                        subShapeType: 'Vertex', 
+                        indexInShape: v.indexInShape, 
+                        color: chroma(curMeshShape?.style?.line?.color || '#333333').darken(0.5).num()  })) as any // Get rid of TS error. TODO: Look into it!
             );
 
          })
@@ -2596,21 +2693,16 @@
          return shapeEdges;
       }
 
-      /** Get Annotations tied to the shapes in this collection
-       *    IMPORTANT: For robustness we use all annotations that are in the bounding box of this ShapeCollection
-       *          not just the annotations that are directly tied to the Shapes within
-       *          This because annotations might be added using methods like bbox() 
-       */
+      /** Get Annotations tied to the collection or sub Shapes  */
       getAnnotations(onlyVisibleShapes:boolean=false):Array<Annotation>
       {
-         const BBOX_MARGIN = 100; 
+         const shapeAnnotations = this.shapes.reduce((agg,s) => 
+         {
+               agg = (onlyVisibleShapes && s.visible()) ? agg.concat(s.annotations) : agg.concat(s.annotations)
+               return agg  
+         },[]);
 
-         const allAnnotations = this._geom._annotator.getAnnotations();
-         let collectionBbox = this.bbox(true); // withAnnotations - but does not take into account annotations not tied to shapes!
-         collectionBbox = collectionBbox.enlarged(BBOX_MARGIN); // TMP FIX: make bbox larges to catch dimensions not tied to shapes
-
-         const annotationsInBbox = allAnnotations.filter(a => a.inBbox(collectionBbox) && ((onlyVisibleShapes) ? a?.shape?.visible : true) )  
-         return annotationsInBbox;
+         return [...this.annotations, ...shapeAnnotations];
       }
 
       /** Export Shapes that are 2D and on XY plane to SVG 
@@ -2620,8 +2712,12 @@
        *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
        *    TODO: run these algorithms apart from OC
       */
-      toSvg(options:toSVGOptions = { all: false, annotations: true}):string
+      toSvg(options?:toSVGOptions):string
       {
+         const DEFAULT_OPTIONS = { all: false, annotations: true };
+
+         options = { ...DEFAULT_OPTIONS, ...(options ?? {}) };
+
          const BBOX_ANNOTATION_MARGIN = 10; // Add small margin on all sides to exported bboxes (SVG and world) - mostly for texts on dimension lines
 
          let shapeEdges = this._get2DXYShapeEdges(options?.all);
@@ -2651,7 +2747,7 @@
                         _bbox="${svgWorldBbox}" 
                         _worldUnits="${this._geom._units}" stroke="black">
                         ${svgPaths.join('\n\t')}
-                        ${(withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
+                        ${ (withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
 

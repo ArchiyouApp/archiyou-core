@@ -4,6 +4,10 @@
  *  and builds the whole Scenegraph. Scene is also just a Obj
  *  All coordinates of underlying shapes are in world coordinates (not local Object coordinates); 
  *  We only use position and rotation (and its transformations: move and rotate ) to transform them
+ *  
+ *  NOTES:
+ *      - Problems with BindingErrors: As containers Obj's are sensitive to OC Shapes that for some reason are garbage collected
+ *          The strong function Shape.valid() check if pointers are valid. Use that above Shape.isEmpty() because it not really works in this case
  *
  */
 
@@ -316,7 +320,14 @@ export class Obj
         for(let c = 0; c < children.length; c++)
         {
             let childChildren = children[c].descendants();
-            children = children.concat(childChildren);
+            // Some sanity tests here by id
+            childChildren.forEach( cc => 
+            {
+                if(!children.find( c => c.id === cc.id))
+                {
+                    children.push(cc)
+                }
+            });
         }
 
         return children;
@@ -333,31 +344,52 @@ export class Obj
     /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection */
     allShapesCollection():ShapeCollection
     {
-        let collection = this._shapes.shallowCopy(); // IMPORTANT: don't change reference this._shapes
+        // IMPORTANT: don't change reference this._shapes
+        const collection = this._shapes.shallowCopy().filter(s => s.valid());  // Protect against invalid Shapes too!
 
         this.children().forEach((child,i) => 
         {
             // add as layers
             if(child.isLayer())
             {
-                const groupShapes = child.allShapes();
+                const groupShapes = child.allShapes().filter(s => s.valid());
                 collection.addGroup( child?.name() as string || `obj${i}`, groupShapes);
             }
             else {
-                collection.add(child._shapes)
+                collection.add(child._shapes.filter(s => s.valid()));
             }
         });
  
         return collection;
     }
 
+    /** DEBUG:  Sometimes weird Objs are created */
+    isCircular():boolean
+    {
+        try {
+            JSON.stringify(this._shapes)
+            return false;
+        }   
+        catch(e)
+        {
+            return true;
+        }
+    }
+
     /** Get all Shapes within this Obj and its children Objs */
     allShapes():ShapeCollection
-    {
+    {   
         const shapes = new ShapeCollection();
+    
         this.descendants().forEach(obj => 
         {
-            shapes.add(obj._shapes) 
+            obj._shapes.forEach((s) => 
+            {
+                if(s.valid()) // Protect against empty shapes for example
+                {
+                    shapes.add(s);
+                }
+            })
         });
 
         return shapes;
@@ -371,10 +403,13 @@ export class Obj
         return obj;
     }
 
-    isEmpty():Obj
+    /** Empty Obj container by releasing all OC Shapes and then removing JS references */
+    empty():Obj
     {
-        this._shapes = new ShapeCollection();
+        // this.clearOcShapes(); // Since we got automatic garbage collection we don't need to manually delete OC objects
+        this.clearShapes();
         this._children = [];
+        this._parent = null;
 
         return this;
     }
@@ -384,7 +419,7 @@ export class Obj
     @checkInput('AnyShape', 'auto')
     addShape(shape:AnyShape):Obj
     {
-        this._shapes.push(shape);
+        this._shapes.add(shape);
         this._setProps();
         
         return this;
@@ -394,14 +429,23 @@ export class Obj
     clearShapes():Obj
     {
         this._shapes = new ShapeCollection();
-
         return this;
     }
+
+    /** Delete Shapes
+     *  Mostly removing OC classes, JS objects are picked up by garbage collection
+     */
+    clearOcShapes():this
+    {
+        this.allShapes().forEach(s => s._clearOcShape());
+        return this;
+    }
+  
 
     /** Get type of Shape(s) in this Object */
     shapeType():string
     {
-        let shapeCollapsed = this._shapes.collapse(); // will be null if empty ShapeCollection, single Shape if only one or ShapeCollection
+        let shapeCollapsed = this._shapes.filter(s => s.valid()).collapse(); // will be null if empty ShapeCollection, single Shape if only one or ShapeCollection
         this._shapeType = (shapeCollapsed == null) ? 'container' : shapeCollapsed.type(); 
         
         return this._shapeType;
@@ -466,11 +510,11 @@ export class Obj
         {
             curNode.name = this._name || `Unnamed Layer`;
             curNode.type = 'layer'
-            curNode.nodes = this.children().map(child => child.toGraph() );
+            curNode.nodes = this.children().map(child => child.toGraph() ); // Recurse into children
         }
         else 
         {
-            // is an Obj
+            // is an Obj wrapping a Shape
             curNode.name = this._name || `Unnamed Obj`;
             curNode.type = 'object';
 
@@ -481,17 +525,19 @@ export class Obj
             // big overview (but heavy to calculate)
             if (OUTPUT_SHAPE_STATS)
             {
-                // If this Object has only one Shape in its ShapeCollection ._shapes then output more details of it!
-                if(this._shapes.length == 1 && Shape.isShape(this._shapes.first()))
+                // If this Obj has only one Shape in its ShapeCollection ._shapes then output more details of it!
+
+                if(this._shapes.length == 1 && this._shapes.first()?.valid())
                 {
                     let singleShape = this._shapes.first() as Shape;
-                    shapeDetails = { ...shapeDetails, 
+                    shapeDetails = { 
+                                    ...shapeDetails, 
                                     ...{  
-                                    subType : singleShape.subType(), 
-                                    numVertices : singleShape.vertices().length, 
-                                    numEdges : singleShape.edges().length,
-                                    numWires : singleShape.wires().length,
-                                    numFaces : singleShape.faces().length,
+                                        subType : singleShape.subType(), 
+                                        numVertices : singleShape.vertices().length, 
+                                        numEdges : singleShape.edges().length,
+                                        numWires : singleShape.wires().length,
+                                        numFaces : singleShape.faces().length,
                                 }}
                 }
             }

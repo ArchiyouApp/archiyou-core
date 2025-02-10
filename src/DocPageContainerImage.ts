@@ -83,7 +83,7 @@ export class Image extends Container
             data = cache[this._url];
         }
         else {
-            // async load the image
+            // async load the image through a proxy (to avoid CORS issues in browser)
             const proxyUrl = this._page._doc?._settings?.proxy;
 
             if(!proxyUrl)
@@ -113,7 +113,7 @@ export class Image extends Container
                 }
                 catch(e)
                 {
-                    console.warn(`DocPageContainerImage::loadImageData(): Could not load image. "${e}`)
+                    console.warn(`DocPageContainerImage::loadImageData(): Could not load image at "${this._url}" fetching through proxy: "${proxyUrl}":  ERROR: "${e}".`);
                 }
             }
 

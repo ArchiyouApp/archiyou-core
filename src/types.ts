@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, BaseAnnotation  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, BaseAnnotation, ParamManager  } from './internal'
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
 import { Console } from './Console'
 
@@ -92,7 +92,8 @@ export interface ArchiyouApp
     make?: Make,
     // TODO: importer?
     gizmos?: Array<Gizmo>, // TODO: move this to Geom?
-    beams?: Beams
+    beams?: Beams,
+    paramManager?:ParamManager
 }
 
 export interface ArchiyouAppInfoBbox
@@ -141,6 +142,7 @@ export interface ArchiyouData
     messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
     metrics?: Record<string, Metric>,  
     tables?:{[key:string]:any}, // raw data tables
+    managedParams?:Record<ParamOperation, Array<PublishParam>>
 }
 
 /** Data structure on the current state of the Archiyou App (mostly inside a worker) */
@@ -163,6 +165,7 @@ export interface ExportGLTFOptions
     binary?: boolean
     quality?: MeshingQualitySettings
     archiyouFormat?: boolean // use Archiyou format
+    archiyouOutput?:ArchiyouOutputSettings
     includePointsAndLines?: boolean // export loose points and edges 
     extraShapesAsPointLines?: boolean // for visualization purposes seperate points and lines
 }   
@@ -224,13 +227,14 @@ export interface ExecutionRequestCompute
 
 export interface ExecutionRequest
 {
-    script: ScriptVersion,
-    mode: 'main'|'local', // executing in main or in some component (for example keep meshes local or not)
+    script: ScriptVersion
+    createdAtString:string
+    mode: 'main'|'local' // executing in main or in some component (for example keep meshes local or not)
     compute: ExecutionRequestCompute
     meshingQuality: MeshingQualitySettings,
-    outputFormat?: 'buffer'|'glb'|'svg', // null = default
+    outputFormat?: 'buffer'|'glb'|'svg' // null = default
     outputOptions?: ExportGLTFOptions|ExportSVGOptions // TODO: more options per output
-    onDone?: ((result:ComputeResult) => any),
+    onDone?: ((result:ComputeResult) => any)
 }
 
 
@@ -269,6 +273,7 @@ export interface ComputeResult
     tables?: Record<string, any>, // TS type TODO
     metrics?: Record<string, any>, // TS type TODO
     info?:ArchiyouAppInfo, // general metadata 
+    managedParams?:Record<ParamOperation, Array<PublishParam>>
 }
 
 
@@ -287,7 +292,7 @@ export interface Param
     id?: string
     type: ParamType
     listElem?: Param, // definition of list content (also a Param)
-    name?: string
+    name: string // always a name!
     enabled?:boolean // enabled or not
     visible?:boolean // Param is visible or not
     label: string // publically visible name
@@ -302,7 +307,7 @@ export interface Param
     length?: number // for ParamInputText, ParamInputList    
     units?:ModelUnits
     // internal data for ParamManager
-    _manageOperation?: ParamOperation
+    // _manageOperation?: ParamOperation // Not used
     _definedProgrammatically?: boolean // this Param is defined programmatically in script
     // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
     _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
@@ -537,12 +542,12 @@ export interface DimensionOptions
 
 export interface DimensionLevel
 {
-    axis:MainAxis
+    axis:MainAxis // axis of dimension cut line. Horizontal cut is axis y, vertical is x
     at: number // coordinate on given axis, relative or absolute
     coordType?: 'relative' | 'absolute' // auto determine
-    align?: 'min'|'auto'|'max' // align dimension lines to Shape/Collection
+    align?: 'min'|'auto'|'max'|false|true // align dimension lines to Shape/Collection. Use false to disable.
     minDistance?: number // skip when distance is less then minDistance
-    offset?:number // offset from outside of bbox of Shape/Collection
+    offset?:number
     showLine?:boolean // show DEBUG line
 }
 
@@ -613,7 +618,7 @@ export type ContainerPositionLike = ContainerPositionRel|ContainerAlignment|Cont
 export type ContainerData = { // Combine all Container types for convenience
     _entity:string
     name:string
-    parent:string
+    parent?:string // Name of parent - NOT USED YET
     type:ContainerType
     width:number // relative to (see: widthRelativeTo)
     widthRelativeTo:ContainerSizeRelativeTo
@@ -627,13 +632,17 @@ export type ContainerData = { // Combine all Container types for convenience
     borderStyle?:DocPathStyle // style to draw border
     frame?:any // advanced shapes as border
     index?:number
-    caption?:string
+
     contentAlign:ContainerAlignment // alignment of content inside container
     content:any; // TODO: raw content
-    zoomLevel:ScaleInput, // number or 'auto' [default]
-    zoomRelativeTo:ZoomRelativeTo,
+    zoomLevel?:ScaleInput, // number or 'auto' [default]
+    zoomRelativeTo?:ZoomRelativeTo,
     docUnits:DocUnits, 
     modelUnits:ModelUnits,
+    
+    caption?:string
+    title?:string
+
     _domElem?:HTMLDivElement, // added on placement
 }
 
@@ -699,7 +708,7 @@ export interface TextOptions
     underline?:boolean // TODO implement in renderer
     strike?:boolean // TODO implement in renderer   
     oblique?:boolean // TODO implement in renderer
-    align?:TextAreaAlign
+    align?:TextAreaAlign // Not used. Use: Cotnainer.contentAlign
     baseline?:TextBaseline
     angle?:number // in degrees
     // NOTE: some of these parameters are plugged directly into jsPDF.text()
@@ -820,7 +829,7 @@ export interface LabelBlockOptions
 
 export interface VertexMesh {
     objId : string,
-    ocId : number,
+    ocId : string,
     vertices: Array<number>, // vertices instead of vertex for consistency
     indexInShape: number
 }
@@ -1040,8 +1049,8 @@ export interface CalcData
 //// PARAM MANAGER ////
 // NOTE: See above for general types around Params
 
-export type ParamOperation = 'new'|'updated'|'same'|'deleted'
+export type ParamOperation = 'new'|'updated'|'deleted'
 
 //// PUBLISH TYPES ////
 
-export type PublishLicense = 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'
+export type PublishLicense = 'unknown' | 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'

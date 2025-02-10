@@ -43,7 +43,7 @@ import { GEOM_METHODS_INTO_GLOBAL } from './internal' // constants.ts
      })
  }
 
-export function setParamVariables(scope:any, params:{[key:string]:any}) // param { value : val }
+export function setParamVariables(scope:any, params:{[key:string]:any}) // { param1 : val, ... }
 {
     const PARAM_SIGNIFIER = '$';
     
