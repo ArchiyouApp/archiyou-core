@@ -60,6 +60,9 @@ export class Shell extends Shape
     {
         if (ocShell && (ocShell instanceof this._oc.TopoDS_Shell || ocShell instanceof this._oc.TopoDS_Shape) && !ocShell.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Shell
             ocShell = this._makeSpecificOcShape(ocShell, 'Shell');
             this._ocShape = ocShell;
@@ -502,10 +505,10 @@ export class Shell extends Shape
     @checkInput(Shell, 'auto')
     _bridge(other:Shell):ISolid
     {
-        let offsetShellWire = (other as Shell).outerWire();
-        let originaShellWire = this.outerWire();
-        let sideShell = originaShellWire._lofted(offsetShellWire, false) as Shell;
-        let newSolid = new Solid().fromShells(new ShapeCollection(this, other as Shell,sideShell));
+        const offsetShellWire = (other as Shell).outerWire();
+        const originaShellWire = this.outerWire();
+        const sideShell = originaShellWire._lofted(offsetShellWire, false) as Shell;
+        const newSolid = new Solid().fromShells(new ShapeCollection(this, other as Shell,sideShell));
         return newSolid;
     }
 

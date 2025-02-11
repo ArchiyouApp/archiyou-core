@@ -345,18 +345,19 @@ export class Obj
     allShapesCollection():ShapeCollection
     {
         // IMPORTANT: don't change reference this._shapes
-        const collection = this._shapes.shallowCopy().filter(s => s.valid());  // Protect against invalid Shapes too!
+        //const collection = this._shapes.shallowCopy().filter(s => s.valid()); // GC: valid() only needed with GC - but slows down a lot!
+        const collection = this._shapes.shallowCopy();
 
         this.children().forEach((child,i) => 
         {
             // add as layers
             if(child.isLayer())
             {
-                const groupShapes = child.allShapes().filter(s => s.valid());
+                const groupShapes = child.allShapes(); // .filter(s => s.valid()); // GC 
                 collection.addGroup( child?.name() as string || `obj${i}`, groupShapes);
             }
             else {
-                collection.add(child._shapes.filter(s => s.valid()));
+                collection.add(child._shapes); // .filter(s => s.valid()));
             }
         });
  
@@ -385,10 +386,11 @@ export class Obj
         {
             obj._shapes.forEach((s) => 
             {
-                if(s.valid()) // Protect against empty shapes for example
-                {
+                // TMP DISABLED - SLOW!
+                //if(s.valid()) // Protect against empty shapes for example
+                //{
                     shapes.add(s);
-                }
+                //}
             })
         });
 
@@ -445,7 +447,8 @@ export class Obj
     /** Get type of Shape(s) in this Object */
     shapeType():string
     {
-        let shapeCollapsed = this._shapes.filter(s => s.valid()).collapse(); // will be null if empty ShapeCollection, single Shape if only one or ShapeCollection
+        //.filter(s => s.valid()) 
+        let shapeCollapsed = this._shapes.collapse(); // will be null if empty ShapeCollection, single Shape if only one or ShapeCollection
         this._shapeType = (shapeCollapsed == null) ? 'container' : shapeCollapsed.type(); 
         
         return this._shapeType;
@@ -527,7 +530,7 @@ export class Obj
             {
                 // If this Obj has only one Shape in its ShapeCollection ._shapes then output more details of it!
 
-                if(this._shapes.length == 1 && this._shapes.first()?.valid())
+                if(this._shapes.length == 1) // this._shapes.first()?.valid()
                 {
                     let singleShape = this._shapes.first() as Shape;
                     shapeDetails = { 

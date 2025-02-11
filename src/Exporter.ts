@@ -174,6 +174,8 @@ export class Exporter
     */
     async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array|string>
     {
+        const startGLTFExport = performance.now();
+
         const oc = this._parent.geom._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
         
@@ -242,9 +244,13 @@ export class Exporter
         ocGLFTWriter.delete();
         ocCoordSystemConverter.delete();
 
+        console.info(`Exporter::exportToGLTF: Exported OC data in ${Math.round(performance.now() - startGLTFExport)}ms`);
+        const startGLTFExtra = performance.now();
+
         // Force inclusion of points and lines to export
         if (options.includePointsAndLines)
         {
+            const startGLTFPointsAndLines = performance.now();
             const pointAndLineShapes:ShapeCollection = new ShapeCollection(
                         this._parent.geom.all()
                         .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type()))));
@@ -252,21 +258,28 @@ export class Exporter
             {
                 gltfContent = await new GLTFBuilder().addPointsAndLines(gltfContent, pointAndLineShapes, meshingQuality); 
             }
+            console.info(`Exporter::exportToGLTF: Exported ${pointAndLineShapes.length} Points and Lines in ${Math.round(performance.now() - startGLTFPointsAndLines)}ms`);
         }
 
         // extra vertices and lines for specific visualization styles
         if (options?.extraShapesAsPointLines)
-            {
-                const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
-                gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
-            }
+        {
+            const startGLTFExtraShapes = performance.now();
+            const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
+            gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
+            console.info(`Exporter::exportToGLTF: Exported extra ${extraOutputShapes.length} Shapes in ${Math.round(performance.now() - startGLTFExtraShapes)}ms`);
+        }
 
         // Add special archiyou data in GLTF asset.extras section
         if(options?.archiyouFormat)
         {
             // add special Archiyou data to GLTF
+            const startGLTFArchiyouData = performance.now();
             gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, options?.archiyouOutput || {}); 
+            console.info(`Exporter::exportToGLTF: Exported archiyou data in ${Math.round(performance.now() - startGLTFArchiyouData)}ms`);	
         }
+
+        console.info(`Exporter::exportToGLTF: Exported extra data in ${Math.round(performance.now() - startGLTFExtra)}ms`);	
 
         return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
     }

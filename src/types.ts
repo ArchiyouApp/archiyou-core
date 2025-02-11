@@ -852,6 +852,12 @@ export interface FaceMesh {
     indexInShape: number,
 }
 
+export interface MeshCache {
+    vertices:Array<VertexMesh>|null,
+    edges:Array<EdgeMesh>|null,
+    faces:Array<FaceMesh>|null,
+}
+
 /** MeshShape is a very verbose format in which to save Shape Mesh data
  *  Inclusing for every Vertex, Edge and Face:
  *      - objId

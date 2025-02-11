@@ -27,7 +27,7 @@ import { Link,SelectorPointRange, SelectorAxisCoord,
             SelectorBbox,SelectorIndex } from './internal' // InternalModels
 import { ShapeAttributes, isShapeAttributes } from './internal' // attributes
 import { ObjStyle } from './internal'
-import { MeshShape, FaceMesh, EdgeMesh, VertexMesh } from './internal' // see: ExportModels
+import { MeshShape, FaceMesh, EdgeMesh, VertexMesh, MeshCache } from './internal' // see: ExportModels
 import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
@@ -42,6 +42,7 @@ type IEdge = Edge
 type ISolid = Solid
 type IWire = Wire
 type IDimensionLine = DimensionLine
+
  
 export class Shape
 {
@@ -53,6 +54,9 @@ export class Shape
     _ocId:string = null;
     _isTmp:boolean = false; // Flag to signify if a Shape is temporary (for example for construction)
     _cloned:ShapeClone|null = null;
+
+    // cache for mesh results
+    _meshCache:MeshCache = { vertices: null, edges: null, faces: null }
     
     attributes:ShapeAttributes = {}; // data attributes that can be added to Shapes (NOT STYLING)
     annotations:Array<Annotation> = []; // array of annotations associated with this Shape
@@ -80,76 +84,13 @@ export class Shape
         this._setShapeEnumToClassName(); // Some groundwork
     }
 
-    /** Update _OcShape from Shape properties */
-    _updateOcShape()
-    {
-        // override by different classes where needed, for example in Vertex
-    }
-
-    /** Update properties from current OC Shape */
-    _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
-    {
-        // Can be overriden by subclass
-        if(ocShape && !ocShape?.IsNull())
-        {
-            removeOcTargetForGarbageCollection(this._ocShape); // remove old target
-            this._ocShape = ocShape;
-            targetOcForGarbageCollection(this, ocShape); // set new target
-        }
-    }
-
-    /** Manually Clear OC Shape 
-     *  Please use automatic methods in carbageCollection module
-    */
-    _clearOcShape()
-    {
-        this?._ocShape?.delete();
-        this._ocShape = null;
-    }
-
-    /** Do an effort to create a Shape */
-    fromAll(value:any):AnyShape
-    {
-        // Overrides by subclasses
-        
-        if (value === null || value === undefined)
-        {
-            return null;
-        }
-        // already a Shape
-        if (Shape.isShape(value))
-        {
-            return value; // original Shape
-        }
-        else if (isPointLike(value))
-        {
-            return new Point(value as PointLike)._toVertex(); // Vertex
-        }
-        else if (value instanceof Bbox)
-        {
-            return (value as Bbox).box(); // Solid
-        }
-        else {
-            console.warn(`_convertToShape: Could not convert "${value}" to a Shape! Returned null`);
-        }
-        
-    }
-
-    /** Class method for ease of use */
-    static fromAll(value:any):AnyShape
-    {
-        return new Shape().fromAll(value);
-    }
-
-    
-    /** Make Shape from OC Shape if given, otherwise update properties based on current _ocShape */
-    /* !!!! Important: This method is not consistent with _fromOcWire, _fromOcSolid etc because it does not affect original 
+     /** Make Shape from OC Shape */
+    /* !!!! IMPORTANT: This method is not consistent with _fromOcWire, _fromOcSolid etc because it does not affect original 
         So: this does NOT update current Shape with an Oc Shape. For now we do that manually in every operator
     */
-
-    _fromOcShape(ocShape:any):AnyShapeOrCollection
+    _fromOcShape(ocShape?:any):AnyShapeOrCollection
     {
-        ocShape = ocShape || this._ocShape;
+        ocShape = ocShape
 
         if (ocShape === null || ocShape?.IsNull())
         {
@@ -197,6 +138,74 @@ export class Shape
     
         return newShape;
     }
+
+    /** Update _OcShape from Shape properties */
+    _updateOcShape()
+    {
+        // override by different classes where needed, for example in Vertex
+    }
+
+    /** Update properties from current OC Shape */
+    _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
+    {
+        // Can be overriden by subclass
+        if(ocShape && !ocShape?.IsNull())
+        {
+            this._clearOcShape(); // clear previous
+            this._ocShape = ocShape;
+            targetOcForGarbageCollection(this, ocShape); // set new target
+            this.clearMeshCache();
+        }
+    }
+
+    /** Manually clear existing OC Shape */
+    _clearOcShape()
+    {
+        if(this._ocShape)
+        {
+            removeOcTargetForGarbageCollection(this._ocShape);
+            this?._ocShape?.delete();
+            this._ocShape = null;
+            this.clearMeshCache();
+        }
+    }
+
+    /** Do an effort to create a Shape */
+    fromAll(value:any):AnyShape
+    {
+        // Overrides by subclasses
+        
+        if (value === null || value === undefined)
+        {
+            return null;
+        }
+        // already a Shape
+        if (Shape.isShape(value))
+        {
+            return value; // original Shape
+        }
+        else if (isPointLike(value))
+        {
+            return new Point(value as PointLike)._toVertex(); // Vertex
+        }
+        else if (value instanceof Bbox)
+        {
+            return (value as Bbox).box(); // Solid
+        }
+        else {
+            console.warn(`_convertToShape: Could not convert "${value}" to a Shape! Returned null`);
+        }
+        
+    }
+
+    /** Class method for ease of use */
+    static fromAll(value:any):AnyShape
+    {
+        return new Shape().fromAll(value);
+    }
+
+    
+   
 
     //// MANAGING ATTRIBUTES ////
 
@@ -264,7 +273,6 @@ export class Shape
             if (ocShape && !ocShape.IsNull())
             {
                 // success
-                removeOcTargetForGarbageCollection(this._ocShape); // remove old target
                 this._ocShape = this._makeSpecificOcShape(ocFixer.Shape(), this.type());
                 targetOcForGarbageCollection(this, this._ocShape); // set new target
             }
@@ -585,7 +593,7 @@ export class Shape
     /** is this Shape 2D */
     is2D():boolean
     {
-        return (!this.isEmpty() && this.valid())
+        return (!this.isEmpty()) // && this.valid() // GC
                 ? this.bbox().is2D()
                 : false
     }
@@ -600,7 +608,7 @@ export class Shape
 
     is3D():boolean
     {
-        return (!this.isEmpty() && this.valid())
+        return (!this.isEmpty()) // && this.valid() // GC
         ? this.bbox().is3D()
         : false
     }
@@ -4559,11 +4567,22 @@ export class Shape
 
     //// OUTPUTS ////
 
+    clearMeshCache()
+    {
+        this._meshCache = { vertices: null, edges: null, faces: null };
+    }
+
     /** Output all Vertices of this Shape into an Array for further processing 
      *  NOTE: Because of its importance and size we do some extra efforts here to make sure we clear all memory
     */
     toMeshVertices():Array<VertexMesh>
     {
+        // Check cache first
+        if(this._meshCache.vertices)
+        {
+            return this._meshCache.vertices;
+        }
+
         const vertices = this.vertices();
         const meshVertices:Array<VertexMesh> = vertices.toArray().map(
             (curVertex, curVertexIndex) => 
@@ -4576,14 +4595,23 @@ export class Shape
                 } as VertexMesh
             }
         )
+        this._meshCache.vertices = meshVertices;
         return meshVertices;
     }
 
     toMeshEdges(quality:MeshingQualitySettings):Array<EdgeMesh>
     {
+        const startMeshEdges = performance.now();
         const meshEdges:Array<EdgeMesh> = [];
         const edges = this.edges();
 
+        // Check cache first to avoid double calculations
+        if(this._meshCache.edges)
+        {
+            return this._meshCache.edges;
+        }
+
+        // TODO: introduce caching of results for speedup
         edges.forEach( (curEdge, curEdgeIndex) => 
         {   
             let vertexCoords = [];
@@ -4591,12 +4619,15 @@ export class Shape
 
             if(curEdge._ocShape == null)
             {
-                console.warn(`Shape::toMeshShape: null Edge detected!`);
+                console.warn(`Shape::toMeshEdges: null Edge detected!`);
             }
+            /*
+            // DISABLED GC
             else if (!curEdge.valid())
             {
-                console.warn(`Shape::toMeshShape: Invalid Edge detected!`);
+                console.warn(`Shape::toMeshEdges: Invalid Edge detected!`);
             }
+            */
             else 
             {   
                 const ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
@@ -4624,6 +4655,11 @@ export class Shape
                 ocTangDef.delete();
             }
         });
+
+        console.info(`Shape::toMeshEdges: Meshed ${meshEdges.length} Edges for Shape ${this._hashcode()} in ${Math.round(performance.now() - startMeshEdges)}ms`);
+
+        this._meshCache.edges = meshEdges;
+
         return meshEdges;
     }
 
@@ -4656,8 +4692,15 @@ export class Shape
             WARNING: Mirroring a cloned object does not work yet
         */
         
+        const startMeshFaces = performance.now();
         let meshedShape = this as AnyShape;
         let ocMesher = null;
+
+        // Check cache first to avoid double calculations
+        if(this._meshCache.faces)
+        {
+            return this._meshCache.faces;
+        }
 
         if(this._cloned && this._checkCloned())
         {
@@ -4830,6 +4873,10 @@ export class Shape
 
         // clean up
         ocMesher?.delete()
+
+        console.info(`Shape::toMeshFaces: Meshed ${meshFaces.length} Faces in ${Math.round(performance.now() - startMeshFaces)}ms`);
+
+        this._meshCache.faces = meshFaces;
 
         return meshFaces;
     }

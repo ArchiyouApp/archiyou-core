@@ -69,6 +69,9 @@ export class Wire extends Shape
     {
         if(ocWire && (ocWire instanceof this._oc.TopoDS_Wire || ocWire instanceof this._oc.TopoDS_Shape) && !ocWire.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Wire
             ocWire = this._makeSpecificOcShape(ocWire, 'Wire');
             this._ocShape = ocWire;
