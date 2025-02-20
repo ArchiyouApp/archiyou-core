@@ -1,6 +1,8 @@
 {
+  "name": "archiyou-core",
   "type": "module",
-  "version": "0.5",
+  "version": "0.6.0",
+  "description": "Archiyou script core wrapping custom OpenCascade WASM build",
   "scripts": {
     "test-load-oc": "node --experimental-specifier-resolution=node --loader ts-node/esm  ./tests/loadOctest.ts",
     "test": "node --experimental-vm-modules --experimental-specifier-resolution=node --loader ts-node/esm  node_modules/jest/bin/jest.js --detectOpenHandles",
