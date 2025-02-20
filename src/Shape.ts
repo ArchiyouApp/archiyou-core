@@ -4659,6 +4659,7 @@ export class Shape
         let meshedShape = this as AnyShape;
         let ocMesher = null;
 
+        // Triangulate the Shape - either use data from cloned parent Shape or calculate for current Shape
         if(this._cloned && this._checkCloned())
         {
             meshedShape = this._cloned.from;
@@ -4821,7 +4822,7 @@ export class Shape
                 meshFaces.push(faceMesh);
                 
                 // clean up Face data
-                ocTriangulation.delete();
+                ocTriangulation.delete(); // NOTE: Do we need to delete this? Clone does not seem to work
                 ocPolyConnect.delete();
 
             } // end not null Face

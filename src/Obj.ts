@@ -341,7 +341,9 @@ export class Obj
         return (all) ? this.allShapes() : this._shapes; // all children of ShapeCollection _shapes
     }
 
-    /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection */
+    /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection 
+     *  TODO: Do we need Shape.valid() - It's slow!
+    */
     allShapesCollection():ShapeCollection
     {
         // IMPORTANT: don't change reference this._shapes
