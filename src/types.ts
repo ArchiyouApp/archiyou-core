@@ -94,6 +94,7 @@ export interface ArchiyouApp
     gizmos?: Array<Gizmo>, // TODO: move this to Geom?
     beams?: Beams,
     paramManager?:ParamManager
+    config?: Record<string,any> // all environment variables
 }
 
 export interface ArchiyouAppInfoBbox

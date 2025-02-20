@@ -4696,16 +4696,12 @@ export class Shape
         let meshedShape = this as AnyShape;
         let ocMesher = null;
 
-<<<<<<< HEAD
-        // Triangulate the Shape - either use data from cloned parent Shape or calculate for current Shape
-=======
         // Check cache first to avoid double calculations
         if(this._meshCache.faces)
         {
             return this._meshCache.faces;
         }
 
->>>>>>> 293f126934262c5032b264a9ea681fb39ddb55c4
         if(this._cloned && this._checkCloned())
         {
             meshedShape = this._cloned.from;
