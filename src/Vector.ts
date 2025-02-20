@@ -28,7 +28,6 @@ export class Vector extends Point
         set z()
     */
     
-    _oc:any; // this is set on the prototype by the main entrypoint of the library
     _ocVector:any; // OC gp_Vec https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___vec.html
 
     //// CREATION METHODS ////

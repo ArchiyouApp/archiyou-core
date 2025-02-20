@@ -3,9 +3,16 @@
   "type": "module",
   "version": "0.6.0",
   "description": "Archiyou script core wrapping custom OpenCascade WASM build",
+  "license": "Apache-2.0",
+  "main": "./dist/internal.js",
+  "module": "./dist/internal.mjs",
+  "types": "./dist/internal.d.ts",
+  "files": [
+      "dist"
+  ],
   "scripts": {
-    "test-load-oc": "node --experimental-specifier-resolution=node --loader ts-node/esm  ./tests/loadOctest.ts",
     "test": "node --experimental-vm-modules --experimental-specifier-resolution=node --loader ts-node/esm  node_modules/jest/bin/jest.js --detectOpenHandles",
+    "build" : "tsup",	
     "apidocs": "npx typedoc"
   },
   "dependencies": {
@@ -36,7 +43,8 @@
     "@types/jest": "^27.4.1",
     "jest": "27.5.1",
     "ts-jest": "27.1.4",
-    "ts-node": "10.9.2"
+    "ts-node": "10.9.2",
+    "tsup": "^8.3.6"
   },
   "resolutions": {}
 }

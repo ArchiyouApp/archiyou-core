@@ -28,7 +28,7 @@ export class DimensionLine extends BaseAnnotation
     targetEnd:Point; // point on Shape
     targetShape:AnyShape = null; // the (sub)shape (mostly an Edge) the dimension line is directly generated from
     linkedTo:AnyShapeOrCollection = null; // the main parent Shape or ShapeCollection this dimension is linked to
-    value:number; // the value of the dimension line, can be static - in BaseAnnotation
+    // value:number; // the value of the dimension line, from BaseAnnotation
     static:boolean = false;
     units:ModelUnits = null;
     offsetVec:Vector; // Normalized Vector offset from Shape 
@@ -390,7 +390,7 @@ export class DimensionLine extends BaseAnnotation
         if(flags.compareOffsetAbs) ov = ov.abs();
         
         const l = (flags.compareOffsetLength) ? this.offsetLength : 1;
-        const v = (flags.compareValue) ? Math.round(this.value) : ''; // round to full units by default
+        const v = (flags.compareValue) ? Math.round((typeof this.value === 'string') ? parseFloat(this.value) : this.value ) : ''; // round to full units by default
         const sId = (flags.compareWithShape) ? (this.linkedTo?._hashcode() || this.uuid) : '';
         const y = (flags.compareProjYAxis) ? Math.round(this._projYAxis()) : ''
 
@@ -468,7 +468,8 @@ export class DimensionLine extends BaseAnnotation
         lineEndArr[1] = -lineEndArr[1];
         lineMidArr[1] = -lineMidArr[1];
 
-        let dimText = ((this.round) ? roundTo(this.value, this.roundDecimals) : this.value).toString();
+        const v = (typeof this.value === 'string') ? parseFloat(this.value) : this.value;
+        let dimText = ((this.round) ? roundTo(v, this.roundDecimals) : this.value).toString();
         if (this.showUnits ) dimText += this.units;
 
         return `<g class="dimensionline">
