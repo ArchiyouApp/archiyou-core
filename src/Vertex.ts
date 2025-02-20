@@ -42,7 +42,7 @@ export class Vertex extends Shape
     /** Create Vertex from PointLike input */
     fromPointLike( p?:PointLike, ...args ):Vertex
     {
-        let point = new Point().fromPointLike(p, ...args); // we need to capture null if input is bogus
+        const point = new Point().fromPointLike(p, ...args); // we need to capture null if input is bogus
 
         if (point) // error message is already given in fromPointLike
         {
@@ -82,6 +82,9 @@ export class Vertex extends Shape
         // IMPORTANT: Rounding here is a bad idea since it makes a copy of the original OC Shape, this makes it unsuitable in selections
         if (ocVertex && (ocVertex instanceof this._oc.TopoDS_Vertex || ocVertex instanceof this._oc.TopoDS_Shape) && !ocVertex.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Vertex
             ocVertex = this._makeSpecificOcShape(ocVertex, 'Vertex');
 
@@ -93,8 +96,8 @@ export class Vertex extends Shape
             else {
                 // NOTE: we take a little bit of a strange path here - not assigning ocVertex directly and calling updating properties from here
                 // TODO: Allow to disable copying and rounding for methods like vertices() where we need to keep the original Shapes
-                let ocPoint = this._oc.BRep_Tool.Pnt(ocVertex); // converts a TopoDS_Vertex to a OC Point
-                let point = new Point()._fromOcPoint(ocPoint); // The Point is rounded here
+                const ocPoint = this._oc.BRep_Tool.Pnt(ocVertex); // converts a TopoDS_Vertex to a OC Point
+                const point = new Point()._fromOcPoint(ocPoint); // The Point is rounded here
                 [this._x, this._y, this._z] = point.toArray();
                 this._updateOcShape();
             }

@@ -118,6 +118,9 @@ export class Solid extends Shape
     {
         if (ocSolid && (ocSolid instanceof this._oc.TopoDS_Solid || ocSolid instanceof this._oc.TopoDS_Shape) && !ocSolid.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+            
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Solid
             ocSolid = this._makeSpecificOcShape(ocSolid, 'Solid');
                 

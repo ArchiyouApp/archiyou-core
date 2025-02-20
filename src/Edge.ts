@@ -69,15 +69,17 @@ export class Edge extends Shape
         // NOTE: We can always create default Edges with new Edge() and then alter them with makeCircle, makeArc etc
     }
 
-    //// TRANSFORMATION METHODS ////
+    //// CREATION METHODS ////
 
     _fromOcEdge(ocEdge:any):this
     {
         if (ocEdge && (ocEdge instanceof this._oc.TopoDS_Edge || ocEdge instanceof this._oc.TopoDS_Shape) && !ocEdge.IsNull() )
         {
+            // First clear existing if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Edge
             ocEdge = this._makeSpecificOcShape(ocEdge, 'Edge');
-
             this._ocShape = ocEdge;
             this._ocId = this._hashcode();
             this.round(); // round to tolerance - !!!! look like not really working
@@ -192,8 +194,8 @@ export class Edge extends Shape
          */
 
         center = center as Point; // auto converted
-        let ocCircle = new this._oc.gp_Circ_2(new this._oc.gp_Ax2_3(center._toOcPoint(),new this._oc.gp_Dir_4(0, 0, 1)), radius); 
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_8(ocCircle).Edge();
+        const ocCircle = new this._oc.gp_Circ_2(new this._oc.gp_Ax2_3(center._toOcPoint(),new this._oc.gp_Dir_4(0, 0, 1)), radius); 
+        const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_8(ocCircle).Edge();
         this._fromOcEdge(ocEdge);
         
         return this;
@@ -226,8 +228,8 @@ export class Edge extends Shape
         let geomSplineCurveHandle = new this._oc.GeomAPI_PointsToBSpline_2(ocPointList, 3, 8, this._oc.GeomAbs_Shape.GeomAbs_C2, 1.0e-3 ).Curve();
         /* WORKAROUND: Expected null or instance of Handle_Geom_Curve, got an instance of Handle_Geom_BSplineCurve
             We resolve the handle (basically an dynamic pointer in OCE) and make a new Curve Handle from the BezierCurve */
-        let geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomSplineCurveHandle.get());
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24( geomCurveHandle ).Edge(); 
+        const geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomSplineCurveHandle.get());
+        const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24( geomCurveHandle ).Edge(); 
 
         this._fromOcEdge(ocEdge);
 
@@ -257,12 +259,12 @@ export class Edge extends Shape
         { 
             type = (type != "threepoint" && type != "tangent" ) ? 'threepoint' : type; // check inputs
 
-            let geomTrimmedCurveHandle = (type == 'threepoint') ? 
+            const geomTrimmedCurveHandle = (type == 'threepoint') ? 
                                     new this._oc.GC_MakeArcOfCircle_4(start._toOcPoint(), mid._toOcPoint(), end._toOcPoint()).Value() : // mid point is a point
                                     new this._oc.GC_MakeArcOfCircle_5(start._toOcPoint(), mid._toOcVector(), end._toOcPoint()).Value(); // mid point is a tangent
 
-            let geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomTrimmedCurveHandle.get());
-            let newOcEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(geomCurveHandle).Edge();
+            const geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomTrimmedCurveHandle.get());
+            const newOcEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(geomCurveHandle).Edge();
             this._fromOcEdge(newOcEdge);
 
         }
@@ -278,14 +280,14 @@ export class Edge extends Shape
             - Geom_Bezier_Curve: https://dev.opencascade.org/doc/refman/html/class_geom___bezier_curve.html
         */
 
-        let bezierPoints = points as VertexCollection;
+        const bezierPoints = points as VertexCollection;
         
-        let ocPointList = new this._oc.TColgp_Array1OfPnt_2(1,bezierPoints.length);
+        const ocPointList = new this._oc.TColgp_Array1OfPnt_2(1,bezierPoints.length);
         bezierPoints.forEach( (v,i) => ocPointList.SetValue(i+1, v._toOcPoint()));
 
-        let ocCurve = new this._oc.Geom_BezierCurve_1(ocPointList);
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(new this._oc.Handle_Geom_Curve_2(ocCurve)).Edge();
-        let bezierEdge = this._fromOcEdge(ocEdge);
+        const ocCurve = new this._oc.Geom_BezierCurve_1(ocPointList);
+        const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(new this._oc.Handle_Geom_Curve_2(ocCurve)).Edge();
+        const bezierEdge = this._fromOcEdge(ocEdge);
         return bezierEdge;
     }
 
@@ -465,16 +467,16 @@ export class Edge extends Shape
     {
         // see: https://dev.opencascade.org/content/reverse-edge
 
-        let curve = new this._oc.BRepAdaptor_Curve_2(ocEdge);
-        let uMin = curve.FirstParameter();
-        let uMax = curve.LastParameter();
+        const ocCurve = new this._oc.BRepAdaptor_Curve_2(ocEdge);
+        const uMin = ocCurve.FirstParameter();
+        const uMax = ocCurve.LastParameter();
         
-        let ocGeomCurve = new this._oc.Handle_Geom_Curve_2(curve.Curve().Curve().get()).get();
+        const ocGeomCurve = new this._oc.Handle_Geom_Curve_2(ocCurve.Curve().Curve().get()).get();
         
-        let uMinRev = ocGeomCurve.ReversedParameter(uMin);
-        let uMaxRev = ocGeomCurve.ReversedParameter(uMax);
+        const uMinRev = ocGeomCurve.ReversedParameter(uMin);
+        const uMaxRev = ocGeomCurve.ReversedParameter(uMax);
 
-        let ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(ocGeomCurve.Reversed(), uMaxRev, uMinRev);
+        const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(ocGeomCurve.Reversed(), uMaxRev, uMinRev);
         return ocEdgeCreator.Edge();
     }
 

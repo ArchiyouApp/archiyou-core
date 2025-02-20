@@ -155,7 +155,7 @@ export class GLTFBuilder
     {
         const io = new WebIO({credentials: 'include'});
         this.doc = await io.readBinary(gltfContent);
-        let buffer = this.doc.getRoot().listBuffers()[0];
+        const buffer = this.doc.getRoot().listBuffers()[0];
 
         // Create a node for every loose Vertex (TODO: check performace implications?)
         shapes.getShapesByType('Vertex').forEach(v => this._addPoints(v, buffer));
