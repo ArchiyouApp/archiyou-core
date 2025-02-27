@@ -9,6 +9,7 @@
  *    NOTES: 
  *      - For some reason dynamic imports don't work well in Webpack DEV server. It looks like something to do with setting up the wasm serving (Wrong MIME type). 
  *      - Please make sure you enable modern ES versions (es2017+) to enable dynamic imports
+ *      - We have this as JS, not TS to avoid any issues with the dynamic imports
 */
 
 import { Geom } from './Geom'
@@ -16,7 +17,7 @@ import { Geom } from './Geom'
 import ocFullJS from "../wasm/archiyou-opencascade.js";
 import ocFullJSFast from "../wasm/archiyou-opencascade.js";
 
-export default class OcLoader
+export class OcLoader
 {
   //// SETTINGS ////
   USE_FAST = false; // Fast is not really a big difference!
@@ -33,6 +34,7 @@ export default class OcLoader
 
   _oc;
   loaded;
+  startLoadAt;
 
   constructor()
   {
@@ -85,24 +87,19 @@ export default class OcLoader
   /** Load OpenCascade module synchronous and run function when loading is done */
   _loadOcBrowser(onLoaded)
   {
-    this._loadOcGeneric(onLoaded)
+    this._loadOcGeneric.then((oc) => this._onOcLoaded(oc, onLoaded));     
   }
 
   /** Function from Opencascade.js */
-  _loadOcGeneric(onLoaded)
+  _loadOcGeneric()
   {
-     // taken from official OC.js approach and added dynamic wasm loading to keep Node happy
-     const initOpenCascade = ({
-      mainJS = ocFullJS,
-      worker = undefined,
-      } = {}) => {
-      return new Promise((resolve, reject) => 
+     return new Promise((resolve, reject) => 
       {
         import(`../wasm/archiyou-opencascade.wasm`)
         .then( async wasmModule => 
         {
-          let mainWasm = wasmModule.default;
-          new mainJS({
+          const mainWasm = wasmModule.default;
+          new ocFullJS({
             locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
               if (path.endsWith('.wasm')) {
                 return mainWasm;
@@ -114,13 +111,9 @@ export default class OcLoader
             },
           }).then(async oc => { resolve(oc); });
         })
-      });
-    };
-
-    this.startLoadAt = performance.now();
-    
-    initOpenCascade({}).then(oc => this._onOcLoaded(oc, onLoaded));  
+    });
   }
+
 
   /** Load OpenCascade module async */
   async _loadOcBrowserAsync()
