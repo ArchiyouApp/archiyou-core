@@ -10,6 +10,8 @@
 
 import { Geom } from './Geom'
 
+import ocFullJS from "../libs/archiyou-opencascade/archiyou-opencascade.js";
+
 export default class OcLoader
 {
   //// SETTINGS ////
@@ -74,11 +76,46 @@ export default class OcLoader
   {
     return (typeof process !== 'undefined' && process.release?.name === 'node') ? 'node' : 'browser';
   }
+  
 
   /** Load OpenCascade module synchronous and run function when loading is done */
   _loadOcBrowser(onLoaded)
   {
-    this._loadOcBrowserAsync().then(oc => onLoaded(oc));
+    this._loadOcGeneric(onLoaded)
+  }
+
+  /** Function from Opencascade.js */
+  _loadOcGeneric(onLoaded)
+  {
+     // taken from official OC.js approach and added dynamic wasm loading to keep Node happy
+     const initOpenCascade = ({
+      mainJS = ocFullJS,
+      worker = undefined,
+      } = {}) => {
+      return new Promise((resolve, reject) => 
+      {
+        import(`../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`)
+        .then( async wasmModule => 
+        {
+          let mainWasm = wasmModule.default;
+          new mainJS({
+            locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
+              if (path.endsWith('.wasm')) {
+                return mainWasm;
+              }
+              if (path.endsWith('.worker.js') && !!worker) {
+                return worker;
+              }
+              return path;
+            },
+          }).then(async oc => { resolve(oc); });
+        })
+      });
+    };
+
+    this.startLoadAt = performance.now();
+    
+    initOpenCascade({}).then(oc => this._onOcLoaded(oc, onLoaded));  
   }
 
   /** Load OpenCascade module async */
@@ -131,9 +168,6 @@ export default class OcLoader
     return this._oc;
   }
 
-  
-
-  
 
   //// UTILS 
 
