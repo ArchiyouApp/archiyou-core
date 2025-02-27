@@ -13,7 +13,7 @@ import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, 
 import { Cursor, AnyShape, isAnyShape, SketchPlaneName, PointLikeSequence, 
     isPointLikeSequence, AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, AnyShapeOrCollection, SelectionString,
     isSelectionString, AnyShapeOrCollectionOrSelectionString } from './internal'
-import { gp_Ax3, gp_Trsf } from '../libs/archiyou-opencascade/archiyou-opencascade'
+
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
 import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal' // Face

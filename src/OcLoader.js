@@ -5,12 +5,16 @@
  *    - Synchronous (with callback) or as async function: load(), loadAsync()
  *    - In a browser or node (that includes jest testing) - The context is detected automatically
  *
- *  Please make sure you enable modern ES versions (es2017+) to enable dynamic imports
+ *  
+ *    NOTES: 
+ *      - For some reason dynamic imports don't work well in Webpack DEV server. It looks like something to do with setting up the wasm serving (Wrong MIME type). 
+ *      - Please make sure you enable modern ES versions (es2017+) to enable dynamic imports
 */
 
 import { Geom } from './Geom'
 
-import ocFullJS from "../libs/archiyou-opencascade/archiyou-opencascade.js";
+import ocFullJS from "../wasm/archiyou-opencascade.js";
+import ocFullJSFast from "../wasm/archiyou-opencascade.js";
 
 export default class OcLoader
 {
@@ -21,9 +25,9 @@ export default class OcLoader
 
   //// CALCULATED
 
-  ocJsModulePath = `../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
-  ocJsNodeModulePath = `../libs/archiyou-opencascade/node.js`;
-  ocWasmModulePath = `../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`
+  ocJsModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
+  ocJsNodeModulePath = `../wasm/node.js`;
+  ocWasmModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`
 
   //// PROPERTIES ////
 
@@ -94,7 +98,7 @@ export default class OcLoader
       } = {}) => {
       return new Promise((resolve, reject) => 
       {
-        import(`../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`)
+        import(`../wasm/archiyou-opencascade.wasm`)
         .then( async wasmModule => 
         {
           let mainWasm = wasmModule.default;

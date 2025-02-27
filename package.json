@@ -8,7 +8,8 @@
   "module": "./dist/internal.mjs",
   "types": "./dist/internal.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "wasm/*"
   ],
   "scripts": {
     "test": "node --experimental-vm-modules --experimental-specifier-resolution=node --loader ts-node/esm  node_modules/jest/bin/jest.js --detectOpenHandles",
