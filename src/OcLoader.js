@@ -5,7 +5,6 @@
  *    - Synchronous (with callback) or as async function: load(), loadAsync()
  *    - In a browser or node (that includes jest testing) - The context is detected automatically
  *
- * 
  *  Please make sure you enable modern ES versions (es2017+) to enable dynamic imports
 */
 
@@ -41,6 +40,8 @@ export default class OcLoader
   /** Load synchronous */
   load(onLoaded)
   {
+    console.log(`OcLoader::load()[context: ${this._getContext()}]: Loading Opencascade WASM module`);
+      
     this.startLoadAt = performance.now();
     
     if(this._getContext() === 'browser')
@@ -55,6 +56,9 @@ export default class OcLoader
   /** Load async */
   async loadAsync()
   {
+    console.log(`OcLoader::loadAsync()[context: ${this._getContext()}]: Loading Opencascade WASM module`);
+    this.startLoadAt = performance.now();
+
     if(this._getContext() === 'browser')
     {
       return await this._loadOcBrowserAsync();
@@ -99,8 +103,6 @@ export default class OcLoader
    */
   async _loadOcNodeAsync()
   {
-      console.log(`OcLoader::_loadOcAsync()[context: ${this._getContext()}]: Loading opencascade at "${this.ocJsNodeModulePath}"`);
-      
       const ocInit = (await import(this.ocJsNodeModulePath)).default;
       const oc = await ocInit();
       this._onOcLoaded(oc);
