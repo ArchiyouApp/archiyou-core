@@ -1,17 +1,13 @@
 /** OcLoader.js
  * 
- *  This helper class contains some black magic to have a custom build from OC.js working accross platforms:
+ *  This helper class contains some black magic to have a custom build from OC.js working accross environments and modes:
  * 
- *   - In the browser (see OcLoader.load())
- *   - In a Node Jest enviroment (see OcLoader.loadAsync()) 
- *   - in a Node executor enviroment ( see OcLoader.loadOcNode())
+ *    - Synchronous (with callback) or as async function: load(), loadAsync()
+ *    - In a browser or node (that includes jest testing) - The context is detected automatically
+ *
  * 
- *  Please make sure you enable modern ES versions (es2017+)  to enable dynamic imports
- *  TODO: Looking into these methods a bit better might yield way better solutions!
+ *  Please make sure you enable modern ES versions (es2017+) to enable dynamic imports
 */
-
-import ocFullJS from "../libs/archiyou-opencascade/archiyou-opencascade.js";
-import ocFullJSFast from "../libs/archiyou-opencascade/archiyou-opencascade-fast.js";
 
 import { Geom } from './Geom'
 
@@ -22,89 +18,101 @@ export default class OcLoader
   SHAPE_TOLERANCE = 0.001;
   RUN_TEST = false;
 
+  //// CALCULATED
+
+  ocJsModulePath = `../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
+  ocJsNodeModulePath = `../libs/archiyou-opencascade/node.js`;
+  ocWasmModulePath = `../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`
+
   //// PROPERTIES ////
 
   _oc;
   loaded;
 
-  constructor(onLoaded)
+  constructor()
   {
     this.loaded = false;
-    this._oc = null;
-
-    // Tricks to dynamically load the OC Node init method in Node enviroment - NOTE: Make sure the RUNTIME_ENVIRONMENT env is set to 'node'
-    if (typeof process !== 'undefined' && process.release?.name === 'node')
-    {
-      this.initOcNode = this.loadOcNode();
-    }
-    // do a little warning if not .env
-    else if(!process.env.RUNTIME_ENVIRONMENT)
-    {
-      console.error(`No RUNTIME_ENVIRONMENT set. If you are testing you need a .env! Please make one and set RUNTIME_ENVIRONMENT to node!`)
-    }
+    this._oc = null; // will be set by _onOcInit
+    // use load or loadSync to start loading Opencascade
   }
 
-  /** Load async in node environment */
-  async loadOcNode()
-  {
-    const lib = '../libs/archiyou-opencascade/node.js'
-    const { default: libFunc } = await import(lib);
-    return libFunc;
-  }
+  //// PUBLIC METHODS ////
 
-  /** Load sync in browser using the standard OC.js method **/
+  /** Load synchronous */
   load(onLoaded)
-  {  
-    // taken from official OC.js approach and added dynamic wasm loading to keep Node happy
-    const initOpenCascade = ({
-      mainJS = (this.USE_FAST) ? ocFullJSFast : ocFullJS,
-      worker = undefined,
-      } = {}) => {
-      return new Promise((resolve, reject) => 
-      {
-        import(`../libs/archiyou-opencascade/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`)
-        .then( async wasmModule => 
-        {
-          let mainWasm = wasmModule.default;
-          new mainJS({
-            locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
-              if (path.endsWith('.wasm')) {
-                return mainWasm;
-              }
-              if (path.endsWith('.worker.js') && !!worker) {
-                return worker;
-              }
-              return path;
-            },
-          }).then(async oc => { resolve(oc); });
-        })
-      });
-    };
-
-    this.startLoadAt = performance.now();
-    
-    initOpenCascade({}).then(oc => this.onReady(oc, onLoaded));     
-  }
-
-  /* Used in Jest enviroment */
-  loadAsync()
   {
-    // for timing
     this.startLoadAt = performance.now();
-
-    let curScope = this;
-
-    return new Promise(function(onLoaded,rejected)
-    {   
-        curScope.initOcNode.then((initOcFunc) =>
-          {
-            initOcFunc({ }).then(oc => curScope.onReady(oc, onLoaded));
-          })
-    })
     
+    if(this._getContext() === 'browser')
+    {
+      this._loadOcBrowser(onLoaded);
+    }
+    else {
+      this._loadOcNode(onLoaded);
+    }
   }
 
-  onReady(oc, onLoaded)
+  /** Load async */
+  async loadAsync()
+  {
+    if(this._getContext() === 'browser')
+    {
+      return this._loadOcBrowserAsync();
+    }
+    else {
+      return await this._loadOcNodeAsync();
+    }
+  }
+
+  //// PRIVATE
+
+  _getContext()
+  {
+    return (typeof process !== 'undefined' && process.release?.name === 'node') ? 'node' : 'browser';
+  }
+
+  /** Load OpenCascade module synchronous and run function when loading is done */
+  _loadOcBrowser(onLoaded)
+  {
+    this._loadOcBrowserAsync().then(oc => onLoaded(oc));
+  }
+
+  /** Load OpenCascade module async */
+  async _loadOcBrowserAsync()
+  {
+    const ocJs = (await import(this.ocJsModulePath)).default;
+    const ocWasm = (await import(this.ocWasmModulePath)).default;
+    const oc = await new ocJs({
+      locatePath(path) // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
+      { 
+        if (path.endsWith('.wasm')) { return ocWasm; }
+        if (path.endsWith('.worker.js') && !!worker) { return worker; }
+        return path;
+      }
+    });
+    return this._onOcLoaded(oc);
+  }
+
+
+  /** Load OpenCascade in Node context
+   *  We use the examples from the Opencascade.js 
+   */
+  async _loadOcNodeAsync()
+  {
+      console.log(`OcLoader::_loadOcAsync()[context: ${this._getContext()}]: Loading opencascade at "${this.ocJsNodeModulePath}"`);
+      
+      const ocInit = (await import(this.ocJsNodeModulePath)).default;
+      const oc = await ocInit();
+      this._onOcLoaded(oc);
+  }
+
+  _loadOcNode(onLoaded)
+  {
+    this._loadOcNodeAsync().then(oc => onLoaded(oc));
+  }
+  
+  /** When OC is loaded, we set a couple of things */
+  _onOcLoaded(oc, onLoaded)
   {
     console.log(`**** OC: CAD library loaded with ${Object.keys(oc).length} functions! Took: ${ Math.round((performance.now() - this.startLoadAt) )} ms`);
 
@@ -112,19 +120,20 @@ export default class OcLoader
     this._oc.SHAPE_TOLERANCE = this.SHAPE_TOLERANCE; // set tolerance
     Geom.prototype._oc = this._oc; // Geom sets it for all other OC based Classes!
 
-    if (this.RUN_TEST)
-    {
-      this.runTest();
-    }
+    if (this.RUN_TEST){ this.runTest();}
 
-    // run on loaded function
     if (onLoaded)
     {
       onLoaded(oc);
     }
-
     return this._oc;
   }
+
+  
+
+  
+
+  //// UTILS 
 
   runTest()
   {
