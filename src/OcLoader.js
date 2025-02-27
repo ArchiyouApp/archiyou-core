@@ -57,7 +57,7 @@ export default class OcLoader
   {
     if(this._getContext() === 'browser')
     {
-      return this._loadOcBrowserAsync();
+      return await this._loadOcBrowserAsync();
     }
     else {
       return await this._loadOcNodeAsync();
