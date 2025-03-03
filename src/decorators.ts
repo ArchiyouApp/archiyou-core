@@ -6,7 +6,8 @@
  * 
  * */
 
-import SparkMD5 from 'spark-md5' // this is used instead of hash-wasm because spark is not async. See: https://www.npmjs.com/package/spark-md5
+// Only needed for caching geometry which we disabled
+// import SparkMD5 from 'spark-md5' // this is used instead of hash-wasm because spark is not async. See: https://www.npmjs.com/package/spark-md5
 
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Sketch, Geom } from './internal'
 import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCursor, isObjStyle, isLinearShape, isLinearShapeTail, isShapeType, isShapeTypes,
@@ -619,6 +620,7 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
 }
 
 /** Hash arguments (parameters and values with function name) */
+/* TMP DISABLED
 function _hashOp(methodName:string, args):string
 {
     // Taken from CascadeStudio: https://github.com/zalo/CascadeStudio/blob/e75aaf857d2e8e900e674175bd521c6dbf84d2ab/js/CADWorker/CascadeStudioStandardUtils.js#L43
@@ -634,6 +636,7 @@ function _getHash(str:string):string
     return hash;
 }
 
+
 function _checkCache(cache:{(key:string):any} = null, hash:string):any
 {
     if (!cache)
@@ -648,7 +651,7 @@ function _setCache(cache:{(key:string):any}, hash:string, result:any)
 {
     cache[hash] = result;
 }
-
+*/
 
 /** TODO */
 export function ocCheck(target:Object, method:string,  descriptor: PropertyDescriptor)
