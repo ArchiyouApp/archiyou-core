@@ -118,3 +118,12 @@ npm link
 # that at app that uses module
 npm link archiyou-core
 ```
+
+Building as module with TSUP
+
+We need to bundle all dependencies. But TSUP does not do this automatically: 
+There are workarounds, but subdependencies still don't work. Add these libraries do dev dependencies:
+- guillotine-packer.es5.js
+- jspdf
+- uuid
+- spark-md5
