@@ -599,20 +599,26 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         {
             return wrappedMethod.apply(this, args); // this is the direct output 
         }
-        const cache = this._geom._cache;
-        const hash = _hashOp(wrappedMethodName, args)
-        const cacheResult = _checkCache(cache, hash);
+        else 
+        {  
+            // Cache disabled
+            /*
+            const cache = this._geom._cache;
+            const hash = _hashOp(wrappedMethodName, args)
+            const cacheResult = _checkCache(cache, hash);
 
-        if (cacheResult)
-        {
-            // IMPORTANT: There could be a situation where a function can return null|undefined
-            // return the nullish version if so
-            return cacheResult?._copy() || cacheResult; 
-        }       
-        else {
-            const calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
-            _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
-            return calculatedOutput; // return real output - no cached version!
+            if (cacheResult)
+            {
+                // IMPORTANT: There could be a situation where a function can return null|undefined
+                // return the nullish version if so
+                return cacheResult?._copy() || cacheResult; 
+            }       
+            else {
+                const calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
+                _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
+                return calculatedOutput; // return real output - no cached version!
+            }
+            */
         }
         
     }

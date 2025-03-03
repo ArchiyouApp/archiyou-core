@@ -107,3 +107,14 @@ yarn test --silent
         dpdm internal.ts`
      * with madge:
         `npx madge --circular --extensions ts internal.ts`
+
+#### Building as module and publishing locally
+
+Untill we publish on NPM.
+
+```bash
+yarn build
+npm link
+# that at app that uses module
+npm link archiyou-core
+```
