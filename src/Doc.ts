@@ -98,7 +98,7 @@ export class Doc
         this._settings = settings; 
         if(!settings)
         {
-            throw new Error(`Doc::Please supply settings with proxy URL as first parameter!`)
+            console.warn(`Doc::constructor(settings,ay): No settings ({ proxy: string }) given. Not all functionality enabled!`);
         }
         else {
             console.info(`Doc::constructor(settings, ay): Init Doc module with settings: "${JSON.stringify(settings)};`)
@@ -113,7 +113,7 @@ export class Doc
 
     //// MAIN FUNCTIONS ////
 
-    setArchiyou(ay:ArchiyouApp)
+    setArchiyou(ay?:ArchiyouApp)
     {
         if(ay)
         {
