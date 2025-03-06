@@ -6,8 +6,7 @@
  * 
  * */
 
-// Only needed for caching geometry which we disabled
-// import SparkMD5 from 'spark-md5' // this is used instead of hash-wasm because spark is not async. See: https://www.npmjs.com/package/spark-md5
+import SparkMD5 from 'spark-md5' // this is used instead of hash-wasm because spark is not async. See: https://www.npmjs.com/package/spark-md5
 
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Sketch, Geom } from './internal'
 import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCursor, isObjStyle, isLinearShape, isLinearShapeTail, isShapeType, isShapeTypes,
@@ -599,26 +598,20 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         {
             return wrappedMethod.apply(this, args); // this is the direct output 
         }
-        else 
-        {  
-            // Cache disabled
-            /*
-            const cache = this._geom._cache;
-            const hash = _hashOp(wrappedMethodName, args)
-            const cacheResult = _checkCache(cache, hash);
+        const cache = this._geom._cache;
+        const hash = _hashOp(wrappedMethodName, args)
+        const cacheResult = _checkCache(cache, hash);
 
-            if (cacheResult)
-            {
-                // IMPORTANT: There could be a situation where a function can return null|undefined
-                // return the nullish version if so
-                return cacheResult?._copy() || cacheResult; 
-            }       
-            else {
-                const calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
-                _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
-                return calculatedOutput; // return real output - no cached version!
-            }
-            */
+        if (cacheResult)
+        {
+            // IMPORTANT: There could be a situation where a function can return null|undefined
+            // return the nullish version if so
+            return cacheResult?._copy() || cacheResult; 
+        }       
+        else {
+            const calculatedOutput = wrappedMethod.apply(this, args); // this is the direct output 
+            _setCache(cache,hash,calculatedOutput?._copy()); // place a copy of the output in the cache - also nullish
+            return calculatedOutput; // return real output - no cached version!
         }
         
     }
@@ -626,7 +619,6 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
 }
 
 /** Hash arguments (parameters and values with function name) */
-/* TMP DISABLED
 function _hashOp(methodName:string, args):string
 {
     // Taken from CascadeStudio: https://github.com/zalo/CascadeStudio/blob/e75aaf857d2e8e900e674175bd521c6dbf84d2ab/js/CADWorker/CascadeStudioStandardUtils.js#L43
@@ -657,7 +649,6 @@ function _setCache(cache:{(key:string):any}, hash:string, result:any)
 {
     cache[hash] = result;
 }
-*/
 
 /** TODO */
 export function ocCheck(target:Object, method:string,  descriptor: PropertyDescriptor)

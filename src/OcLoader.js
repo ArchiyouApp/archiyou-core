@@ -80,7 +80,9 @@ export class OcLoader
 
   _getContext()
   {
-    return (typeof process !== 'undefined' && process.release?.name === 'node') ? 'node' : 'browser';
+    // NOTE: some problems with process in Jest
+    const isBrowser = (typeof globalThis.window !== "undefined")
+    return isBrowser ? 'browser' : 'node'
   }
   
 
@@ -95,7 +97,7 @@ export class OcLoader
   {
      return new Promise((resolve, reject) => 
       {
-        import(`../wasm/archiyou-opencascade.wasm`)
+        import(`../wasm/archiyou-opencascade.wasm?url`)
         .then( async wasmModule => 
         {
           const mainWasm = wasmModule.default;
@@ -139,7 +141,7 @@ export class OcLoader
   {
       const ocInit = (await import(this.ocJsNodeModulePath)).default;
       const oc = await ocInit();
-      this._onOcLoaded(oc);
+      return this._onOcLoaded(oc);
   }
 
   _loadOcNode(onLoaded)

@@ -108,9 +108,17 @@ yarn test --silent
      * with madge:
         `npx madge --circular --extensions ts internal.ts`
 
-#### Building as module and publishing locally
+#### Building as module
 
-Untill we publish on NPM.
+We use Vite to compile and bundle the library as a ES module. See vite.config.ts.
+
+```bash
+# run module build
+yarn build
+```
+
+
+Linking locally
 
 ```bash
 yarn build
@@ -118,12 +126,3 @@ npm link
 # that at app that uses module
 npm link archiyou-core
 ```
-
-Building as module with TSUP
-
-We need to bundle all dependencies. But TSUP does not do this automatically: 
-There are workarounds, but subdependencies still don't work. Add these libraries do dev dependencies:
-- guillotine-packer.es5.js
-- jspdf
-- uuid
-- spark-md5
