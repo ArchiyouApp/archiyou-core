@@ -178,7 +178,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array|string>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array|string|null>
     {
         const startGLTFExport = performance.now();
 
@@ -196,38 +196,46 @@ export class Exporter
             and export as much properties (id, color) as possible 
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
-        
-        new ShapeCollection(this._ay.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())))
-        .forEach(entity => {
-            if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
-            {
-                const shape = entity as AnyShape;
-                const ocShape = shape._ocShape;
-                const ocShapeLabel = ocShapeTool.AddShape(ocShape,false,false); // Shape, makeAssembly, makePrepare
 
-                const shapeName = `${shape.getId()}__${shape.getName()}`; // save obj_id and name into GLTF node
-                
-                oc.TDataStd_Name.Set_2(ocShapeLabel, 
-                                oc.TDataStd_Name.GetID(), 
-                                new oc.TCollection_ExtendedString_2(shapeName, false)); // Set_2 not according to docs (no Set_3)
+        const exportShapes = this._ay.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type()));
 
-                // Export basic material to GLTF
-                if (shape._getColorRGBA() !== null)
+        if(exportShapes.length === 0)
+        {
+            console.error(`Exporter::exportToGLTF: No visible shapes to export`);
+            return null;
+        }
+
+        new ShapeCollection(exportShapes)
+            .forEach(entity => {
+                if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
                 {
-                    const ocMaterialTool = oc.XCAFDoc_DocumentTool.prototype.constructor.VisMaterialTool(ocShapeLabel).get(); // returns Handle< XCAFDoc_VisMaterialTool >
-                    const ocMaterial = new oc.XCAFDoc_VisMaterial();
-                    const ocPBRMaterial = new oc.XCAFDoc_VisMaterialPBR(); // this is a struct
-                    ocPBRMaterial.BaseColor = new oc.Quantity_ColorRGBA_5(...shape._getColorRGBA()); // [ r,g,b,a]
-                    ocMaterial.SetPbrMaterial(ocPBRMaterial);
-                    const ocMaterialLabel = ocMaterialTool.AddMaterial_1( new oc.Handle_XCAFDoc_VisMaterial_2(ocMaterial), new oc.TCollection_AsciiString_2(shapeName)); // returns TDF_Label
-                    ocMaterialTool.SetShapeMaterial_1(ocShapeLabel, ocMaterialLabel);
+                    const shape = entity as AnyShape;
+                    const ocShape = shape._ocShape;
+                    const ocShapeLabel = ocShapeTool.AddShape(ocShape,false,false); // Shape, makeAssembly, makePrepare
 
-                    // NOTE: do we need to delete these OC classes (not here because we need them still). Save the references?
+                    const shapeName = `${shape.getId()}__${shape.getName()}`; // save obj_id and name into GLTF node
+                    
+                    oc.TDataStd_Name.Set_2(ocShapeLabel, 
+                                    oc.TDataStd_Name.GetID(), 
+                                    new oc.TCollection_ExtendedString_2(shapeName, false)); // Set_2 not according to docs (no Set_3)
+
+                    // Export basic material to GLTF
+                    if (shape._getColorRGBA() !== null)
+                    {
+                        const ocMaterialTool = oc.XCAFDoc_DocumentTool.prototype.constructor.VisMaterialTool(ocShapeLabel).get(); // returns Handle< XCAFDoc_VisMaterialTool >
+                        const ocMaterial = new oc.XCAFDoc_VisMaterial();
+                        const ocPBRMaterial = new oc.XCAFDoc_VisMaterialPBR(); // this is a struct
+                        ocPBRMaterial.BaseColor = new oc.Quantity_ColorRGBA_5(...shape._getColorRGBA()); // [ r,g,b,a]
+                        ocMaterial.SetPbrMaterial(ocPBRMaterial);
+                        const ocMaterialLabel = ocMaterialTool.AddMaterial_1( new oc.Handle_XCAFDoc_VisMaterial_2(ocMaterial), new oc.TCollection_AsciiString_2(shapeName)); // returns TDF_Label
+                        ocMaterialTool.SetShapeMaterial_1(ocShapeLabel, ocMaterialLabel);
+
+                        // NOTE: do we need to delete these OC classes (not here because we need them still). Save the references?
+                    }
+                    
+                    // triangulate BREP to mesh
+                    ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
                 }
-                
-                // triangulate BREP to mesh
-                ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
-            }
         })
 
         const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), meshingQuality);
@@ -244,11 +252,11 @@ export class Exporter
         
         let gltfContent =  (options.binary) ? new Uint8Array(gltfFile.buffer) : gltfFile;
 
-        // clean up OC classes
-        ocShapeTool.delete();
-        ocIncMesh.delete();
-        ocGLFTWriter.delete();
-        ocCoordSystemConverter.delete();
+        // clean up OC classes (if any shapes)
+        ocShapeTool?.delete();
+        ocIncMesh?.delete();
+        ocGLFTWriter?.delete();
+        ocCoordSystemConverter?.delete();
 
         console.info(`Exporter::exportToGLTF: Exported OC data in ${Math.round(performance.now() - startGLTFExport)}ms`);
         const startGLTFExtra = performance.now();
