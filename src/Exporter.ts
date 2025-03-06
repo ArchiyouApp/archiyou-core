@@ -1,4 +1,4 @@
-import { Shape, AnyShape, ShapeCollection} from './internal'
+import { Shape, AnyShape, ShapeCollection, ArchiyouApp} from './internal'
 
 import { ExportGLTFOptions, MeshingQualitySettings} from './internal'
 
@@ -54,11 +54,17 @@ export class Exporter
 
     //// END SETTINGS ////
 
-    _parent = null; 
+    _ay:ArchiyouApp; // New method, see set Archiyou
 
-    constructor(parent:any) 
+    constructor(ay:ArchiyouApp) 
     {
-        this._parent = parent; // Either reference to WebWorker or Main.vue
+        this._ay = ay;
+    }
+
+    setArchiyou(ay:ArchiyouApp):this
+    {
+        this._ay = ay;
+        return this;
     }
 
     exportToStep():string
@@ -71,12 +77,12 @@ export class Exporter
         */
 
         const filename = this._getFileName() + '.step';
-        let sceneCompoundShape = new ShapeCollection(this._parent.geom.all()
+        let sceneCompoundShape = new ShapeCollection(this._ay.geom.all()
                                     .filter(s => s.visible())).toOcCompound(); // filter might return only one Shape
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
 
-        const oc = this._parent.geom._oc;
+        const oc = this._ay.geom._oc;
         
         let ocWriter = new oc.STEPControl_Writer_1();
         let ocTransferResult = ocWriter.Transfer(sceneCompoundShape, 0, true, new oc.Message_ProgressRange_1()); 
@@ -123,11 +129,11 @@ export class Exporter
             - https://dev.opencascade.org/doc/refman/html/class_stl_a_p_i.html
         */
 
-        const oc = this._parent.geom._oc;
+        const oc = this._ay.geom._oc;
         const filename = this._getFileName() + '.stl';
         
         let sceneCompoundShape = new ShapeCollection(
-                                        this._parent.geom.all().filter(s => s.visible())).toOcCompound();
+                                        this._ay.geom.all().filter(s => s.visible())).toOcCompound();
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
         const ocStlWriter = new oc.StlAPI_Writer();
@@ -176,10 +182,10 @@ export class Exporter
     {
         const startGLTFExport = performance.now();
 
-        const oc = this._parent.geom._oc;
+        const oc = this._ay.geom._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
         
-        const meshingQuality = options.quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
+        const meshingQuality = options.quality || this.DEFAULT_MESH_QUALITY;
         const filename = `file.${(options.binary) ? 'glb' : 'gltf'}`
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
 
@@ -191,7 +197,7 @@ export class Exporter
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
         
-        new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())))
+        new ShapeCollection(this._ay.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())))
         .forEach(entity => {
             if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
             {
@@ -252,7 +258,7 @@ export class Exporter
         {
             const startGLTFPointsAndLines = performance.now();
             const pointAndLineShapes:ShapeCollection = new ShapeCollection(
-                        this._parent.geom.all()
+                        this._ay.geom.all()
                         .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type()))));
             if (pointAndLineShapes.length > 0)
             {
@@ -265,7 +271,7 @@ export class Exporter
         if (options?.extraShapesAsPointLines)
         {
             const startGLTFExtraShapes = performance.now();
-            const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
+            const extraOutputShapes = new ShapeCollection(this._ay.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
             gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
             console.info(`Exporter::exportToGLTF: Exported extra ${extraOutputShapes.length} Shapes in ${Math.round(performance.now() - startGLTFExtraShapes)}ms`);
         }
@@ -275,7 +281,7 @@ export class Exporter
         {
             // add special Archiyou data to GLTF
             const startGLTFArchiyouData = performance.now();
-            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, options?.archiyouOutput || {}); 
+            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._ay, options?.archiyouOutput || {}); 
             console.info(`Exporter::exportToGLTF: Exported archiyou data in ${Math.round(performance.now() - startGLTFArchiyouData)}ms`);	
         }
 
@@ -319,12 +325,12 @@ export class Exporter
     {
         if(!only2D)
         {
-            const visibleShapes = this._parent.geom.all().filter(s => s.visible());
+            const visibleShapes = this._ay.geom.all().filter(s => s.visible());
             return visibleShapes._isometry().toSvg();
         }
         else {
             // Only export 2D edges on XY plane
-            const edges2DCollection = new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && s.is2DXY()));
+            const edges2DCollection = new ShapeCollection(this._ay.geom.all().filter(s => s.visible() && s.is2DXY()));
             return edges2DCollection.toSvg();
         }
     }
