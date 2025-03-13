@@ -8,8 +8,7 @@
   "module": "./dist/archiyou-core.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "wasm"
+    "dist"
   ],
   "exports:": {
     ".": {

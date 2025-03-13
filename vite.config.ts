@@ -19,7 +19,7 @@ export default defineConfig({
     rollupOptions: 
     {
       external: [
-        'archiyou-opencascade.wasm',
+        //'archiyou-opencascade.wasm',
       ], // Add dependencies here if needed
       output: 
       {

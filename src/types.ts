@@ -258,6 +258,7 @@ export interface ComputeResult
     broker_id : string,
     task: ComputeTask,
     created_at: Date,
+    status:'success'|'error',
     meshes?: Array<MeshShape>, // individual ShapeMeshes: TO BE FASED OUT!
     meshBuffer?: MeshShapeBuffer,
     meshGLB?:ArrayBuffer, // raw GLB file in buffer
