@@ -70,7 +70,7 @@ Other great projects that might suit your needs:
 
 Archiyou-core is licensed under the terms of the Apache Public License, version 2.0.
 
-### Developer Notes
+# Developer Notes
 
 More developer guides are coming!
 
@@ -110,13 +110,12 @@ yarn test --silent
 
 #### Building as module
 
-We use Vite to compile and bundle the library as a ES module. See vite.config.ts.
+[WIP] We use Vite to compile and bundle the library as a ES module. See vite.config.ts.
 
 ```bash
 # run module build
 yarn build
 ```
-
 
 Linking locally
 
@@ -126,3 +125,6 @@ npm link
 # that at app that uses module
 npm link archiyou-core
 ```
+
+NOTES: Currently we still use the emscripting glue JS (both for browser and Node) - Thats why we have added ./wasm directory to package.json > files
+TODO: Modern use of only .wasm file?
