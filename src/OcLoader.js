@@ -4,19 +4,15 @@
  * 
  *    - Synchronous (with callback) or as async function: load(), loadAsync()
  *    - In a browser or node (that includes jest testing) - The context is detected automatically
- *
  *  
  *    NOTES: 
  *      - For some reason dynamic imports don't work well in Webpack DEV server. It looks like something to do with setting up the wasm serving (Wrong MIME type). 
  *      - Please make sure you enable modern ES versions (es2017+) to enable dynamic imports
  *      - We have this as JS, not TS to avoid any issues with the dynamic imports
+ *      - If using relative path in dynamic imports we need to make resolve them to absolute paths (otherwise they are resolved relative to the file that imports this module)
 */
 
 import { Geom } from './Geom'
-
-// Find the right paths for dynamic imports
-import { fileURLToPath } from 'url';
-import path from 'path';
 
 import ocFullJS from "../wasm/archiyou-opencascade.js";
 import ocFullJSFast from "../wasm/archiyou-opencascade.js";
@@ -29,11 +25,9 @@ export class OcLoader
   RUN_TEST = false;
 
   //// CALCULATED
-  __filename = fileURLToPath(import.meta.url);
-  __dirname = path.dirname(__filename);
-  ocJsModulePath = path.join(__dirname, `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`);
-  ocJsNodeModulePath = path.join(__dirname,`./wasm/node.js`);
-  ocWasmModulePath = `~/wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`
+  ocJsModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
+  ocJsNodeModulePath = `../wasm/node.js`;
+  ocWasmModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`;
 
   //// PROPERTIES ////
 
@@ -49,6 +43,7 @@ export class OcLoader
   }
 
   //// PUBLIC METHODS ////
+
 
   /** Load synchronous */
   load(onLoaded)
@@ -125,8 +120,8 @@ export class OcLoader
   /** Load OpenCascade module async */
   async _loadOcBrowserAsync()
   {
-    const ocJs = (await import(this.ocJsModulePath)).default;
-    const ocWasm = (await import(this.ocWasmModulePath)).default;
+    const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default;
+    const ocWasm = (await import(await this._getAbsPath(this.ocWasmModulePath))).default;
     const oc = await new ocJs({
       locatePath(path) // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
       { 
@@ -144,7 +139,7 @@ export class OcLoader
    */
   async _loadOcNodeAsync()
   {
-      const ocInit = (await import(this.ocJsNodeModulePath)).default;
+      const ocInit = (await import(await this._getAbsPath(this.ocJsNodeModulePath))).default;
       const oc = await ocInit();
       return this._onOcLoaded(oc);
   }
@@ -174,6 +169,27 @@ export class OcLoader
 
 
   //// UTILS 
+
+  async _getAbsPath(file)
+  {
+    if (typeof window !== 'undefined')
+    {
+      // Browser environment
+      return new URL('.', file).pathname;
+    } 
+    else 
+    {
+      // Node.js environment
+      const { fileURLToPath } = await import('url');
+      const path = await import('path');
+      console.log('==== GET DIR NAME ====')
+      console.log(file);
+      const curDir = path.dirname(fileURLToPath(import.meta.url));
+      const absPath = path.resolve(curDir, file);
+      console.log(absPath)
+      return absPath;
+    }
+  }
 
   runTest()
   {

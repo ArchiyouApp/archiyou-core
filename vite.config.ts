@@ -32,7 +32,7 @@ export default defineConfig({
             insertTypesEntry: true, // Ensures "types" entry in package.json
             outDir: "dist",      // Outputs .d.ts files to dist/
         }),
-        nodePolyfills({ include: ['tty', 'os' ] }),  // Add node library polyfills to keep guillotine packer module happy
+        nodePolyfills({ include: ['url','path','tty', 'os'] }),  // Add node library polyfills to keep guillotine packer module happy
         nodeResolve({ exportConditions: ['node'] })
     ]
 });
