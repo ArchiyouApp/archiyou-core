@@ -14,7 +14,7 @@ import { Cursor, AnyShape, isAnyShape, SketchPlaneName, PointLikeSequence,
     isPointLikeSequence, AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, AnyShapeOrCollection, SelectionString,
     isSelectionString, AnyShapeOrCollectionOrSelectionString } from './internal'
 
-import { gp_Ax3, gp_Trsf } from '../wasm/archiyou-opencascade' // OC
+import { gp_Ax3, gp_Trsf } from './wasm/archiyou-opencascade' // OC
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
 

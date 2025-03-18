@@ -7,3 +7,4 @@ docs/
 apidocs/
 *.ts
 src/
+wasm/

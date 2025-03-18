@@ -28,7 +28,7 @@
       },
       "skipLibCheck": true
     },
-    "include" : ["src", "wasm"], 
+    "include" : ["src", "src/wasm", "src/wasm"], 
     "exclude": [
       "node_modules",
       "**/archiyou-opencascade/*.ts", // not working when imported

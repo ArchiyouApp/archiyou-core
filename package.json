@@ -1,20 +1,18 @@
 {
   "name": "archiyou-core",
   "type": "module",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Archiyou script core wrapping custom OpenCascade WASM build",
   "license": "Apache-2.0",
   "main": "./dist/archiyou-core.js",
   "module": "./dist/archiyou-core.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "wasm"
+    "dist"
   ],
   "exports:": {
     ".": {
-      "import": "./dist/archiyou-core.js",
-      "require": "./dist/archiyou-core.umd.cjs"
+      "import": "./dist/archiyou-core.js"
     }
   },
   "scripts": {
@@ -55,6 +53,7 @@
     "vite": "^6.2.0",
     "vite-plugin-dts": "^4.5.3",
     "vite-plugin-node-polyfills": "^0.23.0",
+    "vite-plugin-static-copy": "^2.3.0",
     "vite-plugin-top-level-await": "^1.5.0",
     "vite-plugin-wasm": "^3.4.1"
   },
