@@ -14,8 +14,10 @@
 
 import { Geom } from './Geom'
 
-// NOTE: We don't currently bundle wasm files - we just add /src/wasm folder
-//import ocFullJS from "../wasm/archiyou-opencascade.js";
+// For browser we refer to the module 
+// For node we just add /src/wasm folder
+import ocFullJS from "./wasm/archiyou-opencascade.js";
+import ocFullWasm from "./wasm/archiyou-opencascade.wasm?url";
 //import ocFullJSFast from "../wasm/archiyou-opencascade.js";
 
 export class OcLoader
@@ -32,7 +34,7 @@ export class OcLoader
 
   ocJsModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
   ocJsNodeModulePath = `./wasm/node.js`;
-  ocWasmModulePath = `./wasm/archiyou-opencascade-standalone${(this.USE_FAST) ? '-fast' : ''}.wasm`;
+  ocWasmModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm?url`; // ?url let vite load a wasm without affecting other contexts (TODO TEST!)
 
   //// PROPERTIES ////
 
@@ -85,6 +87,7 @@ export class OcLoader
 
   // Test function for loading wasm directly
   // Does not really work due to WASI problems - OCjs uses this
+  /*
   async _loadWasm(urlOrPath)
   {
     const imports = {
@@ -112,6 +115,7 @@ export class OcLoader
   
     return wasmModule.instance.exports;
   }
+  */
 
   _getContext()
   {
@@ -121,46 +125,71 @@ export class OcLoader
   }
   
 
-  /** Load OpenCascade module synchronous and run function when loading is done */
+  /** Load OpenCascade module synchronous and run function when loading is done 
+   *  This still uses the standard OC.js method, because alternatives with dynamic imports are not working well in browser
+  */
   _loadOcBrowser(onLoaded)
   {
-    this._loadOcBrowserAsync().then((oc) => onLoaded(oc));     
-  }
+    /*
+    this._loadOcBrowserAsync()
+      .then(oc => {
+        if(typeof onLoaded === 'function'){ onLoaded(oc) }
+        else { console.warn('**** OcLoader.load() - No onLoaded function provided! Beware that load takes a while, so you have to wait for it!') };
+    });
+    */
 
-  /** Function from Opencascade.js */
-  /*
-  async _loadOcGenericAsync()
-  {
-     const wasmModule = await import(await this._getAbsPath(`../wasm/archiyou-opencascade.wasm?url`));
-     const ocJsModule = await new ocFullJS(
-        {
-          locateFile(path){ // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
-              if (path.endsWith('.wasm')) {
-                return wasmModule;
-              }
-              if (path.endsWith('.worker.js') && !!worker) {
-                return worker;
-              }
+   
+    // taken from official OC.js approach and added dynamic wasm loading to keep Node happy
+    const initOpenCascade = () => 
+    {
+      return new Promise((resolve, reject) => 
+      {
+        const mainWasm = ocFullWasm; // static import
+        const mainOcJS = ocFullJS; // static import
+
+        new mainOcJS({
+          locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
+            
+            console.log(`**** .wasm locate path ${path} ****` );
+
+            if (path.endsWith('.wasm')) {
+              return mainWasm;
+            }
+            if (path.endsWith('.worker.js') && !!worker) {
+              return worker;
+            }
             return path;
-          }
-        })
+          },
+        }).then(async oc => { resolve(oc); });
+      });
+    }
 
-    return ocJsModule;
+    this.startLoadAt = performance.now();
+    
+    initOpenCascade({}).then(oc => this._onOcLoaded(oc, onLoaded));     
+    
+  
   }
-  */
+
 
   /** Load OpenCascade module async */
   async _loadOcBrowserAsync()
   {
-    const ocJs = (await import(this._getAbsPath(this.ocJsModulePath))).default;
-    const ocWasm = (await import(this._getAbsPath(this.ocWasmModulePath))).default;
-    const oc = await new ocJs({
-      locatePath(path) // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
-      { 
-        if (path.endsWith('.wasm')) { return ocWasm; }
-        if (path.endsWith('.worker.js') && !!worker) { return worker; }
-        return path;
-      }
+    // This is a version of synced version but really async
+    // We first try with only wasm as dynamic 
+    
+    const ocWasm = (await import(await this._getAbsPath(this.ocWasmModulePath))).default;
+    //const ocJs = ocFullJS; // static import - This works!
+    const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default; // And does this work?
+
+    // https://emscripten.org/docs/api_reference/module.html#Module.locateFile
+    const oc = await ocJs({ 
+        locateFile(path)
+        {
+          if (path.endsWith('.wasm')) { return ocWasm; }
+          if (path.endsWith('.worker.js') && !!worker) { return worker; }
+          return path;
+        }
     });
     return this._onOcLoaded(oc);
   }
@@ -211,16 +240,19 @@ export class OcLoader
 
   //// UTILS 
 
-  async _getAbsPath(file)
+  async _getAbsPath(filepath)
   {
     if (typeof window !== 'undefined')
     {
       // Browser environment
-      return new URL(file, window.location.origin).pathname;
+      const absPath = new URL(filepath, import.meta.url).href;
+      console.log(`==== ABS PATH: ${absPath}`);
+
+      return absPath;
     } 
     else 
     {
-      // Node.js environmentnpm 
+      // Node.js environment
       const { fileURLToPath } = await import('url');
       const path = await import('path');
       let curDir = path.dirname(fileURLToPath(import.meta.url)); // directory of this file
@@ -231,8 +263,7 @@ export class OcLoader
       { 
         curDir = curDir.slice(1); 
       } 
-      
-      const absPath = path.join(curDir, file);
+      const absPath = path.join(curDir, filepath);
       console.log(`==== ABS PATH: ${absPath}`);
 
       return absPath;
