@@ -14,7 +14,7 @@ export default defineConfig({
       name: "archiyou-core",
       // fileName: (format) => `archiyou-core.${format}.js`,
       fileName: 'archiyou-core',
-      formats: ["es", "umd"],
+      formats: ["es"],
     },
     rollupOptions: 
     {
@@ -32,7 +32,7 @@ export default defineConfig({
             insertTypesEntry: true, // Ensures "types" entry in package.json
             outDir: "dist",      // Outputs .d.ts files to dist/
         }),
-        nodePolyfills({ include: ['url','path','tty', 'os'] }),  // Add node library polyfills to keep guillotine packer module happy
+        nodePolyfills({ include: ['url','fs', 'path','tty', 'os'] }),  // Add node library polyfills to keep guillotine packer module happy
         nodeResolve({ exportConditions: ['node'] })
     ]
 });

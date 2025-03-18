@@ -14,8 +14,8 @@
 
 import { Geom } from './Geom'
 
-import ocFullJS from "../wasm/archiyou-opencascade.js";
-import ocFullJSFast from "../wasm/archiyou-opencascade.js";
+//import ocFullJS from "../wasm/archiyou-opencascade.js";
+//import ocFullJSFast from "../wasm/archiyou-opencascade.js";
 
 export class OcLoader
 {
@@ -25,8 +25,8 @@ export class OcLoader
   RUN_TEST = false;
 
   //// CALCULATED
-  ocJsModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
-  ocJsNodeModulePath = `../wasm/node.js`;
+  //ocJsModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
+  //ocJsNodeModulePath = `../wasm/node.js`;
   ocWasmModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`;
 
   //// PROPERTIES ////
@@ -78,6 +78,40 @@ export class OcLoader
 
   //// PRIVATE
 
+  async _loadWasm(urlOrPath)
+  {
+    const imports = {
+      env: {
+        memory: new WebAssembly.Memory({ initial: 256, maximum: 512 }),
+        abort: () => console.error("WASM aborted!"),
+      },
+    };
+  
+    let wasmModule;
+    
+    if (typeof window !== "undefined") 
+    {
+      // Browser: Use fetch + instantiateStreaming (faster)
+      wasmModule = await WebAssembly.instantiateStreaming(fetch(urlOrPath), imports);
+    } 
+    else 
+    {
+      // Node.js: Use fs + instantiate (no fetch)
+      const fs = await import("fs");
+      const path = await import("path");
+      const wasmPath = path.resolve(urlOrPath);
+      console.log(wasmPath);
+      console.log(fs.default);
+      console.log(Object.keys(fs));
+      console.log(Object.keys(fs.default));
+      
+      const wasmBuffer = await (fs.promises || fs).readFile(wasmPath); // Compatibility in cjs
+      wasmModule = await WebAssembly.instantiate(wasmBuffer, imports);
+    }
+  
+    return wasmModule.instance.exports;
+  }
+
   _getContext()
   {
     // NOTE: some problems with process in Jest
@@ -116,7 +150,6 @@ export class OcLoader
     });
   }
 
-
   /** Load OpenCascade module async */
   async _loadOcBrowserAsync()
   {
@@ -140,8 +173,13 @@ export class OcLoader
   async _loadOcNodeAsync()
   {
       // TODO: Add fast mode to node loading process
+      /*
       const ocInit = (await import(await this._getAbsPath(this.ocJsNodeModulePath))).default;
       const oc = await ocInit();
+      */
+      console.log('==== NEW NODE LOADING WASM ====');
+      const oc = await this._loadWasm(await this._getAbsPath(this.ocWasmModulePath));
+      console.log(oc);
       return this._onOcLoaded(oc);
   }
 
