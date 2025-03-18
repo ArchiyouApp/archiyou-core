@@ -120,8 +120,8 @@ export class OcLoader
   /** Load OpenCascade module async */
   async _loadOcBrowserAsync()
   {
-    const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default;
-    const ocWasm = (await import(await this._getAbsPath(this.ocWasmModulePath))).default;
+    const ocJs = (await import(this.ocJsModulePath)).default;
+    const ocWasm = (await import(this.ocWasmModulePath)).default;
     const oc = await new ocJs({
       locatePath(path) // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
       { 
@@ -139,6 +139,7 @@ export class OcLoader
    */
   async _loadOcNodeAsync()
   {
+      // TODO: Add fast mode to node loading process
       const ocInit = (await import(await this._getAbsPath(this.ocJsNodeModulePath))).default;
       const oc = await ocInit();
       return this._onOcLoaded(oc);
@@ -175,18 +176,16 @@ export class OcLoader
     if (typeof window !== 'undefined')
     {
       // Browser environment
-      return new URL('.', file).pathname;
+      // Not used in browser
+      return file;
     } 
     else 
     {
-      // Node.js environment
+      // Node.js environmentnpm 
       const { fileURLToPath } = await import('url');
       const path = await import('path');
-      console.log('==== GET DIR NAME ====')
-      console.log(file);
       const curDir = path.dirname(fileURLToPath(import.meta.url));
       const absPath = path.resolve(curDir, file);
-      console.log(absPath)
       return absPath;
     }
   }
