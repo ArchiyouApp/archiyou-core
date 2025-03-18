@@ -14,6 +14,10 @@
 
 import { Geom } from './Geom'
 
+// Find the right paths for dynamic imports
+import { fileURLToPath } from 'url';
+import path from 'path';
+
 import ocFullJS from "../wasm/archiyou-opencascade.js";
 import ocFullJSFast from "../wasm/archiyou-opencascade.js";
 
@@ -25,10 +29,11 @@ export class OcLoader
   RUN_TEST = false;
 
   //// CALCULATED
-
-  ocJsModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
-  ocJsNodeModulePath = `../wasm/node.js`;
-  ocWasmModulePath = `../wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`
+  __filename = fileURLToPath(import.meta.url);
+  __dirname = path.dirname(__filename);
+  ocJsModulePath = path.join(__dirname, `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`);
+  ocJsNodeModulePath = path.join(__dirname,`./wasm/node.js`);
+  ocWasmModulePath = `~/wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`
 
   //// PROPERTIES ////
 

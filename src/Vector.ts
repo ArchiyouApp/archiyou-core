@@ -635,6 +635,7 @@ export class Vector extends Point
         return this.copy().rotate(angle, position, direction);
     }
 
+    // TODO: add rotation pivot
     @checkInput(Number,'auto')
     rotateX(angle:number):this
     {
