@@ -17,8 +17,9 @@ import { Geom } from './Geom'
 // For browser we refer to the module 
 // For node we just add /src/wasm folder
 import ocFullJS from "./wasm/archiyou-opencascade.js";
-import ocFullWasm from "./wasm/archiyou-opencascade.wasm?url";
-//import ocFullJSFast from "../wasm/archiyou-opencascade.js";
+//import ocFullJSFast from "../wasm/archiyou-opencascade.js"; 
+//import ocFullWasm from "./wasm/archiyou-opencascade.wasm?url"; // DEBUG
+
 
 export class OcLoader
 {
@@ -34,7 +35,7 @@ export class OcLoader
 
   ocJsModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
   ocJsNodeModulePath = `./wasm/node.js`;
-  ocWasmModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm?url`; // ?url let vite load a wasm without affecting other contexts (TODO TEST!)
+  ocWasmModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`; // ?url let vite load a wasm without affecting other contexts (TODO TEST!)
 
   //// PROPERTIES ////
 
@@ -144,25 +145,31 @@ export class OcLoader
     {
       return new Promise((resolve, reject) => 
       {
-        const mainWasm = ocFullWasm; // static import
-        const mainOcJS = ocFullJS; // static import
+        this._getAbsPath(this.ocWasmModulePath)
+        .then(async (wasmPath) =>
+        {
+            import(wasmPath) // TODO: Can the right path be resolved here?
+            .then( async wasmModule => 
+            {
+              const mainWasm = wasmModule.default;
+              new ocFullJS({
+                locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
 
-        new mainOcJS({
-          locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
-            
-            console.log(`**** .wasm locate path ${path} ****` );
+                  console.log(`**** Emscripten module.locateFile: ${path}`);
 
-            if (path.endsWith('.wasm')) {
-              return mainWasm;
-            }
-            if (path.endsWith('.worker.js') && !!worker) {
-              return worker;
-            }
-            return path;
-          },
-        }).then(async oc => { resolve(oc); });
-      });
-    }
+                  if (path.endsWith('.wasm')) {
+                    return mainWasm;
+                  }
+                  if (path.endsWith('.worker.js') && !!worker) {
+                    return worker;
+                  }
+                  return path;
+                },
+              }).then(async oc => { resolve(oc); });
+            })
+          });
+        });
+    };
 
     this.startLoadAt = performance.now();
     
@@ -246,7 +253,7 @@ export class OcLoader
     {
       // Browser environment
       const absPath = new URL(filepath, import.meta.url).href;
-      console.log(`==== ABS PATH: ${absPath}`);
+      console.log(`==== ABS PATH BROWSER: ${absPath}`);
 
       return absPath;
     } 
@@ -264,7 +271,7 @@ export class OcLoader
         curDir = curDir.slice(1); 
       } 
       const absPath = path.join(curDir, filepath);
-      console.log(`==== ABS PATH: ${absPath}`);
+      console.log(`==== ABS PATH NODE: ${absPath}`);
 
       return absPath;
     }

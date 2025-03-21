@@ -1,7 +1,7 @@
 {
   "name": "archiyou-core",
   "type": "module",
-  "version": "0.6.71",
+  "version": "0.6.73",
   "description": "Archiyou script core wrapping custom OpenCascade WASM build",
   "license": "Apache-2.0",
   "main": "./dist/archiyou-core.js",
