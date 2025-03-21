@@ -388,11 +388,17 @@ export class OBbox
         return new Face().fromVertices(this.corners().slice(0,4));
     }
 
-    /** returns a Box Shape for this Bbox if not 2D, otherwise null */
+    /** returns a Box Shape for this Bbox if not 2D, otherwise null 
+     *  NOTE: Don't automatically add to scene
+    */
     box():Solid|null
     {
-        // NOTE: not always robust!
-        return new Face().fromVertices(this.corners().slice(0,4)).extrude(this.height())
+        if(!this.is3D())
+        { 
+            console.warn(`Bbox::box: Bbox is not 3D, so can't turn into a Box!`);
+            return null;
+        }
+        return new Face().fromVertices(this.corners().slice(0,4))._extruded(this.height())
     }   
 
     /** Return flipped Bbox that is mirrored in x-axis. For certain 2D ops */

@@ -105,7 +105,6 @@ export class Console
     newMessage(type:ConsoleMessageType, message:any)
     {
         // NOTE: we allow in console mode to output non-strings - for example Objects
-        
         //this._originalConsole.log(type, message, this._getOutputType()) // example of debug output
 
         let msgStr = (typeof message === 'string' || this._getOutputType() == 'console') ? message as any :  this.stringifyMessage(message);

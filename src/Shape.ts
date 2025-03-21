@@ -565,13 +565,26 @@ export class Shape
     beamLike():boolean
     {
         const BEAM_VOLUME_PERC = 0.7;
+        const BEAM_SECTION_AREA_MAX = 300*200; // in mm
 
         if (this.type() !== 'Solid')
             return false;
 
-        const obboxDims = this.obbox() as OBbox;
-        const obbox = new Solid().makeBox(obboxDims.width(), obboxDims.depth(), obboxDims.height());
-        return (this.volume() / obbox.volume() >= BEAM_VOLUME_PERC) 
+        const obbox = this.obbox() as OBbox;
+        const box = obbox.box();
+        if(!box) return false;
+        const boxLikeCheck = (this.volume() / box.volume() >= BEAM_VOLUME_PERC); 
+        if(!boxLikeCheck) return false;
+        console.log([obbox.width(), obbox.height(), obbox.depth()]
+        .sort((a,b) => a - b)
+        .slice(0,2));
+
+        // Check reasonable section area
+        return [obbox.width(), obbox.height(), obbox.depth()]
+            .sort((a,b) => a - b)
+            .slice(0,2)
+            .reduce((agg, val) => agg * val, 1) < BEAM_SECTION_AREA_MAX;
+
     }
 
     beamDims():BeamLikeDims

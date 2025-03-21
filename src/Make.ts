@@ -874,18 +874,26 @@ export class Make
         })
 
         // After grouping flatten again into Array
-        let groupedRows = Object.values(groupedPartRows);
+        let groupedRows = Object.values(groupedPartRows) as Array<Array<any>>; // [ [row1], [row2], ...]
 
         // Now also count the totals per section
         const uniqueSections = Array.from(new Set(partRowsAll.map((row) => row[COLUMNS.indexOf('section') as any])));
+        
         const totalRows = uniqueSections.map((section) => 
         {
-            const totalSectionLength = partRowsAll.reduce((sum,row) => sum + ((row[COLUMNS.indexOf('length')] ?? 0) * (row[COLUMNS.indexOf('quantity')] ?? 1)), 0)
-            return ['TOTAL', '', section, '', totalSectionLength]  // align to right
+            const totalSectionLength = groupedRows.reduce(
+                (sum,row) => 
+                sum + (
+                        (row[COLUMNS.indexOf('length')] ?? 0) 
+                        * (row[COLUMNS.indexOf('quantity')] ?? 0)
+                        * (row[COLUMNS.indexOf('section')] === section ? 1 : 0)
+                )
+             , 0)
+            return ['', 'total per section', section, totalSectionLength, '']  // align to right
         })
         
         groupedRows = groupedRows.concat([
-                            ['','','---- +', 'L x Q', '---- +'], 
+                            ['','','---- +', 'L x Q', ''], 
                             ...totalRows
                         ]);
 

@@ -387,9 +387,10 @@ export class Exporter
         });
     }
 
-    _getFileName()
+    _getFileName():string
     {
-        return 'exportmodel'
+        // Try to get script name from parent (Webworker (likely!), or Main))
+        return this._parent?.lastExecutionRequest?.script?.file_name || this?._parent?.script?.file_name || 'exportmodel';
     }
 
     // Taken from Cascade Studio
@@ -406,12 +407,50 @@ export class Exporter
           ],
         };
 
+        // open
         if (open) 
         {
-            return await window.showOpenFilePicker(options);
+            if (window.showOpenFilePicker) 
+            {
+                return await window.showOpenFilePicker(options);
+            } 
+            else {
+                throw new Error("File Open Picker is not supported in this browser.");
+            }
         } 
+        // save
         else {
-            return await window.showSaveFilePicker(options);
+            // Chrome supports the file system API
+            if (window.showSaveFilePicker)
+            {
+                return await window.showSaveFilePicker(options);
+            } 
+            else {
+                // Fallback for unsupported browsers
+                const exportFileName =  `${this._getFileName()}.${ext}`;
+                return {
+                    name:exportFileName,
+                    async createWritable() 
+                    {
+                        const blobParts: Blob[] = [];
+                        return {
+                            async write(contents: Blob) 
+                            {
+                                blobParts.push(contents);
+                            },
+                            async close() {
+                                const blob = new Blob(blobParts, { type: mime });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = exportFileName;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            },
+                        };
+                    },
+                };
+            }
         }
     }
 
