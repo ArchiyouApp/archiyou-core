@@ -1,5 +1,4 @@
-import { Point, Shape, Solid, Geom, roundToTolerance } from '../../src/internal' // import only from internal, otherwise we get circular import problems
-import { OcLoader } from '../../src/OcLoader'
+import { Point, Shape, Solid, Geom, roundToTolerance, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 

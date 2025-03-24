@@ -1,5 +1,4 @@
-import { Geom, Wire,Solid } from '../../src/internal' // import only from internal, otherwise we get circular import problems
-import { OcLoader } from '../../src/OcLoader'
+import { Geom, Wire,Solid, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 

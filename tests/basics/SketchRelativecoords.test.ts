@@ -1,5 +1,4 @@
-import { Vector, Geom } from '../../src/internal' // import only from internal, otherwise we get circular import problems
-import { OcLoader } from '../../src/OcLoader'
+import { Vector, Geom, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 let geom;
