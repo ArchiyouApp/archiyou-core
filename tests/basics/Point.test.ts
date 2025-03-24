@@ -1,5 +1,7 @@
 import { Point } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
+import { test, expect } from 'vitest'
+
 test("Point test", () => 
 {
     console.log('test')

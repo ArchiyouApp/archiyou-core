@@ -46,7 +46,7 @@ export default defineConfig({
             insertTypesEntry: true, // Ensures "types" entry in package.json
             outDir: "dist",      // Outputs .d.ts files to dist/
         }),
-        nodePolyfills({ include: ['url','path','tty','os'] }),  // Add node library polyfills to keep guillotine packer module happy
+        nodePolyfills({ include: ['url','path','tty','os'] }),  // For node -> browser compatibility
         nodeResolve({ exportConditions: ['node'], preferBuiltins: true })
     ]
 });
