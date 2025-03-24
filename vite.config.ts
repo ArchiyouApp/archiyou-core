@@ -2,7 +2,7 @@ import { resolve } from 'path';
 import { defineConfig } from "vite";
 
 import dts from "vite-plugin-dts";
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import { nodePolyfills } from 'vite-plugin-node-polyfills' // For node -> browser compatibility
 import { nodeResolve } from '@rollup/plugin-node-resolve' // to fix problems with crypto.getRandomValues() in chroma
 
 import { viteStaticCopy } from 'vite-plugin-static-copy'; // see: https://www.npmjs.com/package/vite-plugin-static-copy
@@ -24,11 +24,13 @@ export default defineConfig({
     rollupOptions: 
     {
       external: [
-          'fs' // IMPORTANT: exclude fs from bundle, so it we can actually use it in node
+          'fs', // IMPORTANT: exclude fs from bundle, so it we can actually use it in node
       ], 
       output: 
       {
-        globals: {} // Define global variables for external dependencies
+        globals: {
+          // Define global variables for external dependencies
+        } 
       },
     }
   },
@@ -44,7 +46,7 @@ export default defineConfig({
             insertTypesEntry: true, // Ensures "types" entry in package.json
             outDir: "dist",      // Outputs .d.ts files to dist/
         }),
-        nodePolyfills({ include: ['url','path','tty', 'os'] }),  // Add node library polyfills to keep guillotine packer module happy
-        nodeResolve({ exportConditions: ['node'] })
+        nodePolyfills({ include: ['url','path','tty','os'] }),  // Add node library polyfills to keep guillotine packer module happy
+        nodeResolve({ exportConditions: ['node'], preferBuiltins: true })
     ]
 });

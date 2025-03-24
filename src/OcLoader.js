@@ -174,8 +174,6 @@ export class OcLoader
     this.startLoadAt = performance.now();
     
     initOpenCascade({}).then(oc => this._onOcLoaded(oc, onLoaded));     
-    
-  
   }
 
 
@@ -245,6 +243,7 @@ export class OcLoader
   }
 
 
+
   //// UTILS 
 
   async _getAbsPath(filepath)
@@ -266,7 +265,7 @@ export class OcLoader
       
       // The '/' is actually needed in windows for normal ES imports 
       // But does not work work wasm files
-      if(file.includes('.wasm') && curDir[0] === '/')
+      if(filepath.includes('.wasm') && curDir[0] === '/')
       { 
         curDir = curDir.slice(1); 
       } 
