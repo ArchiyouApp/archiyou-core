@@ -30,7 +30,9 @@ export class Runner
     _localScopes: Record<string, any> = {}; // TODO: more specific typing for Proxy
     _activeScope: RunnerActiveScope;
     _activeExecRequest: RunnerScriptExecutionRequest;
+    
     _manageWorker:Worker|null; // the worker that this runner manages (if role is manager)
+    _onWorkerMessageFunc:(m:RunnerWorkerMessage) => any; // function to call when we get a message from the Worker
 
     //// SETTINGS ////
 
@@ -80,12 +82,14 @@ export class Runner
             return this;
         }
         console.info(`Runner: Loading Archiyou library with WASM module`)
-        this._oc = await new OcLoader().loadAsync();
-        console.info(`Runner: Done loading. Setup default execution scope in role "${this.role}"`)
-
-        // Create a execution scope and give it a initial state with Archiyou modules 
-        this.createScope('default'); // NOTE: Errors give a big readout around OC WASM. But is not related to it!
-
+        //this._oc = await new OcLoader().loadAsync();
+        // Try this one for webpack
+        this._oc = new OcLoader().load(() => {
+            console.info(`Runner: Done loading. Setup default execution scope in role "${this.role}"`)    
+            // Create a execution scope and give it a initial state with Archiyou modules 
+            this.createScope('default'); // NOTE: Errors give a big readout around OC WASM. But is not related to it!
+        });
+        
         return this;
     }
 
@@ -105,6 +109,14 @@ export class Runner
         this.role = 'manager';
         this._connectToWorker(settings); // TODO: settings
         
+        return this;
+    }
+
+    /** Supply a function to call when we get a message from the Worker */
+    onWorkerMessage(func:(message:RunnerWorkerMessage) => any):this
+    {
+        if(!this._manageWorker){ throw new Error(`Runner::onMessage(): Worker not found`);}
+        this._onWorkerMessageFunc = func;
         return this;
     }
 
@@ -191,6 +203,9 @@ export class Runner
                 // TODO
                 console.error(`Runner:_handleMessageFromWorker: Unknown message: "${message.type}"`)
         }
+
+        // Forward to user-supplied handle function
+        this?._onWorkerMessageFunc(message);
     }
 
     //// RUNNER AS WORKER IN A SEPERATE THREAD: WEBWORKER OR WORKERTHREAD (WIP) ////

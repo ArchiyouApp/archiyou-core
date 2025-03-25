@@ -1114,7 +1114,7 @@ export interface RunnerScriptExecutionRequest
 export interface RunnerWorkerMessage
 {
     type: 'init'|'loaded'|'executing'|'stopped'|'executed'|'console'|'save-step'|'save-stl'|'save-gltf'|'save-svg'|'save-svg-2d'
-    payload?: Record<string, any>
+    payload: Record<string, any>
 }
 
 /** Message from Manager to Worker */

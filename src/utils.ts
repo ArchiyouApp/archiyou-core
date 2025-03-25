@@ -381,3 +381,13 @@ export function isWorker():boolean
 {
     return (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
 } 
+
+/** A simple uuid4 method */
+export function uuidv4(): string 
+{
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const random = Math.random() * 16 | 0; // Generate a random number between 0 and 15
+        const value = char === 'x' ? random : (random & 0x3 | 0x8); // Use 4 for the version and 8-11 for the variant
+        return value.toString(16); // Convert to hexadecimal
+    });
+}

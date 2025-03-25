@@ -9,7 +9,8 @@ onMounted(() =>
 {
     console.log('==== Mounted: Archiyou app with webworker ====');
     const worker = new Worker();
-    const manager = new Runner('manager').startAsManager(worker);
+    const manager = new Runner('manager')
+                      .startAsManager(worker);
     manager.execute('b = box(10,20,30);')
         .then((r) => console.log(r.meshGLB))
     

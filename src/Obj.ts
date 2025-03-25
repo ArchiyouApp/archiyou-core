@@ -16,7 +16,7 @@ import chroma from 'chroma-js' // direct import like in documentation does not w
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Geom, isObjStyle, isBaseStyle} from './internal'
 import { AnyShape, isAnyShape } from './internal' // types
 import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
-import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
+import { uuidv4 } from './internal' // utils
 import { MeshShape, MeshShapeBuffer } from './internal' // ExportModels.MeshShape
 import { SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle } from './internal' // InternalModels
 import { isNumeric, colorHexToInt } from './internal'

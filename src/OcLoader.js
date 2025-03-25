@@ -145,10 +145,13 @@ export class OcLoader
     {
       return new Promise((resolve, reject) => 
       {
-        this._getAbsPath(this.ocWasmModulePath)
-        .then(async (wasmPath) =>
-        {
-            import(wasmPath) // TODO: Can the right path be resolved here?
+        //this._getAbsPath(this.ocWasmModulePath)
+        //this._getAbsPath('./wasm/archiyou-opencascade.wasm')
+        //.then(async (wasmPath) =>
+        //{
+            console.log(wasmPath);
+            //import(/* webpackIgnore: true */wasmPath) // TODO: Can the right path be resolved here? - 
+            import('./wasm/archiyou-opencascade.wasm')
             .then( async wasmModule => 
             {
               const mainWasm = wasmModule.default;
@@ -168,7 +171,7 @@ export class OcLoader
               }).then(async oc => { resolve(oc); });
             })
           });
-        });
+        //});
     };
 
     this.startLoadAt = performance.now();
@@ -178,13 +181,18 @@ export class OcLoader
 
 
   /** Load OpenCascade module async */
+  /*
   async _loadOcBrowserAsync()
   {
+    console.log(`OcLoader::_loadOcBrowserAsync(): Loading OpenCascade WASM module`);
     // This is a version of synced version but really async
     // We first try with only wasm as dynamic 
-    const ocWasm = (await import(await this._getAbsPath(this.ocWasmModulePath))).default;
+    //const wasmPath = await this._getAbsPath(this.ocWasmModulePath);
+    const wasmPath = await this._getAbsPath('./wasm/archiyou-opencascade.wasm'); 
+    const ocWasm = (await import(wasmPath)).default;
     //const ocJs = ocFullJS; // static import - This works!
-    const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default; // And does this work?
+    //const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default; // And does this work?
+    const ocJs = (await import(await this._getAbsPath('./wasm/archiyou-opencascade.js'))).default; // And does this work?
 
     // https://emscripten.org/docs/api_reference/module.html#Module.locateFile
     const oc = await ocJs({ 
@@ -197,11 +205,14 @@ export class OcLoader
     });
     return this._onOcLoaded(oc);
   }
+  */
 
 
   /** Load OpenCascade in Node context
    *  We use the examples from the Opencascade.js 
    */
+  /*
+  // TMP DISABLED FOR DEBUG IN WEBPACK4
   async _loadOcNodeAsync()
   {
       // TODO: Add fast mode to node loading process
@@ -210,13 +221,14 @@ export class OcLoader
       
       // Test loading wasm directly
       // Not yet working due to WASI problems
-      /*
-      const oc = await this._loadWasm(await this._getAbsPath(this.ocWasmModulePath));
-      console.log(oc);
-      */
+      //const oc = await this._loadWasm(await this._getAbsPath(this.ocWasmModulePath));
+      //console.log(oc);
+      
       
       return this._onOcLoaded(oc);
   }
+  */
+  
 
   _loadOcNode(onLoaded)
   {
@@ -250,7 +262,8 @@ export class OcLoader
     // Browser environment or Webworker
     if (this._getContext() === 'browser' || this._getContext() === 'webworker') 
     {
-      const absPath = new URL(filepath, import.meta.url).href;
+      const fileURL = typeof document !== 'undefined' ? document.currentScript.src : ''; // import.meta.url does not work in webpack < 5
+      const absPath = new URL(filepath, fileURL).href;
       console.log(`==== ABS PATH BROWSER/WEBWORKER: ${absPath}`);
 
       return absPath;
@@ -260,7 +273,8 @@ export class OcLoader
       // Node.js environment
       const { fileURLToPath } = await import('url');
       const path = await import('path');
-      let curDir = path.dirname(fileURLToPath(import.meta.url)); // directory of this file
+      const fileURL = typeof document !== 'undefined' ? document.currentScript.src : ''; // import.meta.url does not work in webpack < 5
+      let curDir = path.dirname(fileURLToPath(fileURL)); // directory of this file
       
       // The '/' is actually needed in windows for normal ES imports 
       // But does not work work wasm files
