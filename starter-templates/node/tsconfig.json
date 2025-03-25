@@ -1,0 +1,35 @@
+// tsconfig.json
+// See reference: https://www.typescriptlang.org/tsconfig
+{
+  "compilerOptions": 
+  {
+    "target": "es2017", 
+    "module": "esnext",
+    "moduleResolution": "node", // Needed to import libs                   
+    "lib": ["es6","dom", "webworker"],        
+    "declaration" : true,
+    "allowJs": true,
+    "outDir": "dist",
+    "strict": false,
+    "noImplicitAny": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators" : true,
+    "allowSyntheticDefaultImports" : true, // fix: This module is declared with using 'export =', and can only be used with a default import when using the 'esModuleInterop' flag.
+    "sourceMap": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./*"],
+      "@/*": ["./*"]
+    },
+    "skipLibCheck": false
+  },
+  "exclude": [
+    "tests"
+  ],
+  "ts-node": {
+    "moduleTypes": {
+      "jest.config.ts": "cjs"
+    }
+  },
+}

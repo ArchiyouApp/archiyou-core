@@ -14,7 +14,8 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           ShapeAttributes, 
           DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput,
           BeamBaseLineAlignment, 
-          AnnotationAutoDimStrategy
+          AnnotationAutoDimStrategy,
+          ComputeResult
         } from './internal' // types
 
 import { ParamType, Param, PublishParam } from './internal'
@@ -546,4 +547,11 @@ export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
     return (typeof o === 'string') ? 
         ['start','end','center','middle'].includes(o)
         : isNumeric(o)
+}
+
+//// EXECUTION ////
+
+export function isComputeResult(r:any): r is ComputeResult
+{
+    return r && typeof r === 'object' && r.meshGLB
 }

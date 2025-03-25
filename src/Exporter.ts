@@ -56,7 +56,7 @@ export class Exporter
 
     _ay:ArchiyouApp; // New method, see set Archiyou
 
-    constructor(ay:ArchiyouApp) 
+    constructor(ay?:ArchiyouApp) 
     {
         this._ay = ay;
     }

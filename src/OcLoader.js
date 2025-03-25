@@ -60,7 +60,7 @@ export class OcLoader
       
     this.startLoadAt = performance.now();
     
-    if(this._getContext() === 'browser')
+    if(this._getContext() === 'browser' || this._getContext() === 'webworker')
     {
       this._loadOcBrowser(onLoaded);
     }
@@ -75,7 +75,7 @@ export class OcLoader
     console.log(`OcLoader::loadAsync()[context: ${this._getContext()}]: Loading Opencascade WASM module`);
     this.startLoadAt = performance.now();
 
-    if(this._getContext() === 'browser')
+    if(this._getContext() === 'browser' || this._getContext() === 'webworker')
     {
       return await this._loadOcBrowserAsync();
     }
@@ -120,9 +120,9 @@ export class OcLoader
 
   _getContext()
   {
-    // NOTE: some problems with process in Jest
-    const isBrowser = (typeof globalThis.window !== "undefined")
-    return isBrowser ? 'browser' : 'node'
+    const isBrowser = (typeof globalThis.window !== "undefined");
+    const isWebWorker = (typeof self !== 'undefined' && typeof window === 'undefined');
+    return isBrowser ? 'browser' : isWebWorker ? 'webworker' : 'node';
   }
   
 
@@ -182,7 +182,6 @@ export class OcLoader
   {
     // This is a version of synced version but really async
     // We first try with only wasm as dynamic 
-    
     const ocWasm = (await import(await this._getAbsPath(this.ocWasmModulePath))).default;
     //const ocJs = ocFullJS; // static import - This works!
     const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default; // And does this work?
@@ -248,11 +247,11 @@ export class OcLoader
 
   async _getAbsPath(filepath)
   {
-    if (typeof window !== 'undefined')
+    // Browser environment or Webworker
+    if (this._getContext() === 'browser' || this._getContext() === 'webworker') 
     {
-      // Browser environment
       const absPath = new URL(filepath, import.meta.url).href;
-      console.log(`==== ABS PATH BROWSER: ${absPath}`);
+      console.log(`==== ABS PATH BROWSER/WEBWORKER: ${absPath}`);
 
       return absPath;
     } 

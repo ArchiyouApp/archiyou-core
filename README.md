@@ -4,7 +4,34 @@
 
 ## 🌐 What is Archiyou?
 
-Archiyou is an online platform to codify design and making know-how. It is currently in alpha phase and freely available to try. See [Archiyou.com](https://archiyou.com).
+Archiyou is an online platform to codify design and making know-how. It is freely available to try. See [Archiyou.com](https://archiyou.com).
+
+## Quickstart: Run you own scripts standalone [WIP]
+
+To use Archiyou as a module to generate designs and documentation independently from our platform it's available as module on npm. 
+
+```ts 
+    import { Runner } from 'archiyou'
+    // A runner executes Archiyou scripts
+    const runner = new Runner()
+
+    // First a Runner needs to load (because it uses WASM)
+    runner.load().then(async (runner) => 
+    {
+         // Then you execute a script in the default scope
+         const r = await runner.execute({ 
+                     code: `b = new Box($SIZE)`, 
+                     params: { SIZE: 100 } }, 
+                     { formats: ['glb'] }
+                  ); 
+         const glb = r?.meshGLB; // The 3D model mesh in GLB format (default)
+         console.log(`Generating a GLB box took: ${r.duration} ms`);
+    });
+
+```
+
+Check out the starter-templates directory examples how to use Archiyou in the context of popular JS/TS frameworks like Nuxt, Next and React.
+
 
 ## 🚩 What is Archiyou-core?
 
@@ -33,19 +60,17 @@ That's why we want to keep the core of Archiyou open. This has some advantages:
 
 Currently the source code of the platform itself (the frontend app and server infrastructure) remains closed but parts of it become open source in collaborations like [OCCI](https://github.com/occi-cad).
 
+
 ## 🏗 What is the state of Archiyou-core?
 
-We are building the Archiyou platform, its content and the core at the same time. Currently Archiyou-core is deployed in our alpha platform; running both in the browser as a server side Node environment. Please keep in mind that it is still _alpha_ phase code quality.
+We are building the Archiyou platform, its content and the core at the same time. This means some parts are pretty robust while others might be experimental still.
 
 ## 🚀 Getting started
 
-* Try it out at [Archiyou.com](https://archiyou.com)
-We are working on starter templates for developers:
-- [ ] Basic: run your Archiyou script without Archiyou
-- [ ] Use Archiyou-core in a modern app
-- [ ] Use Archiyou-core in a server Node environment
+* To see how Archiyou works: [Archiyou.com](https://archiyou.com)
+* To start making some models yourself: [editor.archiyou.com](https://editor.archiyou.com)
+* To use the archiyou-core for your own apps: Check out npm module and starter-templates
 
-Let us know if you like more usage scenarios!
 
 ## 🙋 Contributions
 
@@ -99,14 +124,6 @@ yarn test
 yarn test --silent
 ```
 
-#### Debug
-
-* Circular dependences:
-     * with dpdm:
-        `npm i -g dpdm
-        dpdm internal.ts`
-     * with madge:
-        `npx madge --circular --extensions ts internal.ts`
 
 #### Building as module
 
@@ -127,4 +144,3 @@ npm link archiyou-core
 ```
 
 NOTES: Currently we still use the emscripting glue JS (both for browser and Node) - Thats why we have added ./wasm directory to package.json > files
-TODO: Modern use of only .wasm file?

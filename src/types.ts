@@ -1062,3 +1062,64 @@ export type ParamOperation = 'new'|'updated'|'deleted'
 //// PUBLISH TYPES ////
 
 export type PublishLicense = 'unknown' | 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'
+
+
+//// RUNNER ////
+
+
+//// TYPES
+export type RunnerExecutionContext = 'local' | 'worker'
+export type RunnerRole = 'manager' | 'worker' | 'single'
+
+export type ModelFormat = 'buffer'|'glb'|'svg'
+
+//// INTERFACES
+
+export interface RunnerOptions 
+{
+    context?: RunnerExecutionContext
+}
+
+export interface RunnerActiveScope 
+{
+    context: RunnerExecutionContext
+    name: string
+}
+
+/** Simplified version of Script(Version) */
+export interface RunnerScript
+{
+    code:string // code to execute
+    params?:Record<string,PublishParam> // param settings
+    // variants
+}
+
+/** Request results from executing a script */
+export interface RunnerScriptExecutionRequest
+{
+    script:RunnerScript
+    params?:Record<string,any> // param values
+    // What to calculate
+    docs?:Array<any>|boolean // documents to process
+    pipelines?:Array<any> // pipelines to process
+    tables?:Array<any> // tables to process
+    // model generation and export settings
+    modelFormat?:ModelFormat // TODO: typing
+    modelFormatOptions?:ExportGLTFOptions|ExportSVGOptions
+    modelSettings?:MeshingQualitySettings
+    onDone?: ((result:ComputeResult) => any) // callback
+}   
+
+/** Message from Worker to Manager */
+export interface RunnerWorkerMessage
+{
+    type: 'init'|'loaded'|'executing'|'stopped'|'executed'|'console'|'save-step'|'save-stl'|'save-gltf'|'save-svg'|'save-svg-2d'
+    payload?: Record<string, any>
+}
+
+/** Message from Manager to Worker */
+export interface RunnerManagerMessage 
+{
+    type: 'init'|'load'|'execute'|'stop'|'export-to-step'|'export-to-stl'|'export-to-gltf'|'export-to-svg'|'export-to-svg-2d'  
+    payload?: Record<string, any>
+}
