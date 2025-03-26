@@ -145,10 +145,10 @@ export class OcLoader
     {
       return new Promise((resolve, reject) => 
       {
-        //this._getAbsPath(this.ocWasmModulePath)
+        this._getAbsPath(this.ocWasmModulePath)
         //this._getAbsPath('./wasm/archiyou-opencascade.wasm')
-        //.then(async (wasmPath) =>
-        //{
+        .then(async (wasmPath) =>
+        {
             console.log(wasmPath);
             //import(/* webpackIgnore: true */wasmPath) // TODO: Can the right path be resolved here? - 
             import('./wasm/archiyou-opencascade.wasm')
@@ -171,7 +171,7 @@ export class OcLoader
               }).then(async oc => { resolve(oc); });
             })
           });
-        //});
+        });
     };
 
     this.startLoadAt = performance.now();
@@ -208,31 +208,24 @@ export class OcLoader
   */
 
 
-  /** Load OpenCascade in Node context
-   *  We use the examples from the Opencascade.js 
-   */
-  /*
+  /** Load OpenCascade in Node context */
   // TMP DISABLED FOR DEBUG IN WEBPACK4
+  ///*
   async _loadOcNodeAsync()
   {
       // TODO: Add fast mode to node loading process
-      const ocInit = (await import(await this._getAbsPath(this.ocJsNodeModulePath))).default;
+      const modulePath = await this._getAbsPath(this.ocJsNodeModulePath);
+      const ocInit = (await import(/* webpackIgnore: true */ modulePath)).default;
       const oc = await ocInit();
-      
-      // Test loading wasm directly
-      // Not yet working due to WASI problems
-      //const oc = await this._loadWasm(await this._getAbsPath(this.ocWasmModulePath));
-      //console.log(oc);
-      
-      
+
       return this._onOcLoaded(oc);
+      
   }
-  */
-  
+  //*/
 
   _loadOcNode(onLoaded)
   {
-    this._loadOcNodeAsync().then(oc => onLoaded(oc));
+      this._loadOcNodeAsync().then(oc => onLoaded(oc));
   }
   
   /** When OC is loaded, we set a couple of things */
@@ -260,28 +253,44 @@ export class OcLoader
   async _getAbsPath(filepath)
   {
     // Browser environment or Webworker
-    if (this._getContext() === 'browser' || this._getContext() === 'webworker') 
+    if (this._getContext() === 'browser') 
     {
-      const fileURL = typeof document !== 'undefined' ? document.currentScript.src : ''; // import.meta.url does not work in webpack < 5
+      // import.meta.url does not work in webpack < 5
+      // also anything with import triggers errors in webpack 4 on build time: so we can't even reference import.meta.url!
+      const fileURL = document.currentScript.src; 
       const absPath = new URL(filepath, fileURL).href;
-      console.log(`==== ABS PATH BROWSER/WEBWORKER: ${absPath}`);
+      console.log(`==== ABS PATH BROWSER: ${absPath}`);
 
       return absPath;
     } 
+    else if(this._getContext() === 'webworker')
+    {
+        // Since in webpack 4 we can't use import.meta.url
+        // And document.currentScript.src does not work in webworker
+        // We just pass the filepath - which seems to work in webworkers
+        // TODO: test in multiple enviroments
+        console.warn(`==== ABS PATH WEBWORKER: Can't make absolute path, but that might be fine too in webworkers. Returned original path: "${filepath}"`);
+        return filepath;
+    }
     else 
     {
       // Node.js environment
-      const { fileURLToPath } = await import('url');
+      const pathMode = 'url';
+      // NOTE: webpackIgnore only works in Webpack 5
+      const { fileURLToPath } = await import(/* webpackIgnore: true */ pathMode);
       const path = await import('path');
       const fileURL = typeof document !== 'undefined' ? document.currentScript.src : ''; // import.meta.url does not work in webpack < 5
-      let curDir = path.dirname(fileURLToPath(fileURL)); // directory of this file
+      //const fileURL = import.meta.url; // Use import.meta.url in Webpack 5
+      const curDir = path.dirname(fileURLToPath(fileURL)); // directory of this file
       
       // The '/' is actually needed in windows for normal ES imports 
       // But does not work work wasm files
+      /*
       if(filepath.includes('.wasm') && curDir[0] === '/')
       { 
         curDir = curDir.slice(1); 
       } 
+      */
       const absPath = path.join(curDir, filepath);
       console.log(`==== ABS PATH NODE: ${absPath}`);
 
