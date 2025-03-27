@@ -1101,8 +1101,8 @@ export interface RunnerScriptExecutionRequest
     params?:Record<string,any> // param values
     // What to calculate
     docs?:Array<any>|boolean // documents to process
-    pipelines?:Array<any> // pipelines to process
-    tables?:Array<any> // tables to process
+    pipelines?:Array<any>|boolean // pipelines to process
+    tables?:Array<any>|boolean // tables to process
     // model generation and export settings
     modelFormat?:ModelFormat // TODO: typing
     modelFormatOptions?:ExportGLTFOptions|ExportSVGOptions

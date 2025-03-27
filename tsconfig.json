@@ -6,7 +6,7 @@
       "target": "es2017", 
       "module": "esnext",
       "moduleResolution": "node", // Needed to import libs                   
-      "lib": ["es6","dom", "webworker"],        
+      "lib": ["esnext","dom", "webworker"],        
       "declaration" : true,
       "allowJs": true,
       "outDir": "dist",

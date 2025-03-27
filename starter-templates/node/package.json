@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "nodemon --trace-warnings ./src/index.ts"
   },
-  "dependencies": {
-    "archiyou-core": "^0.6.78"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/jest": "^27.4.1",
     "jest": "27.5.1",

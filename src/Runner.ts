@@ -83,8 +83,9 @@ export class Runner
         }
         console.info(`Runner: Loading Archiyou library with WASM module`)
         //this._oc = await new OcLoader().loadAsync();
-        // Try this one for webpack
-        this._oc = new OcLoader().load(() => {
+        // TODO: set when to use modern loadAsync() or non-dynamic version for compatibility
+        new OcLoader().load((oc) => {
+            this._oc = oc;
             console.info(`Runner: Done loading. Setup default execution scope in role "${this.role}"`)    
             // Create a execution scope and give it a initial state with Archiyou modules 
             this.createScope('default'); // NOTE: Errors give a big readout around OC WASM. But is not related to it!
@@ -144,7 +145,7 @@ export class Runner
     {
         const message = m.data as RunnerWorkerMessage;
 
-        console.debug(`Runner::handleMessageFromWorker(): Received message from worker: ${message}`);
+        console.info(`Runner::handleMessageFromWorker(): Received message from worker: ${message}`);
 
         switch(message.type)
         {
@@ -205,7 +206,13 @@ export class Runner
         }
 
         // Forward to user-supplied handle function
-        this?._onWorkerMessageFunc(message);
+        if(typeof this._onWorkerMessageFunc === 'function')
+        {
+            this?._onWorkerMessageFunc(message);
+        }
+        else {
+            console.warn(`Runner::_handleMessageFromWorker(): No onMessage function provided: If you want to handle messages from the worker locally, use .onWorkerMessage(func)`);
+        }
     }
 
     //// RUNNER AS WORKER IN A SEPERATE THREAD: WEBWORKER OR WORKERTHREAD (WIP) ////
@@ -234,7 +241,7 @@ export class Runner
 
         if(this._getWorkerContextName() === 'webworker')
         {
-            (ctx as globalThis).onmessage = (ev) => this._handleMessageFromManager(ev);
+            (ctx as globalThis).onmessage = async (ev) => await this._handleMessageFromManager(ev);
         }
         else
         {
@@ -253,7 +260,7 @@ export class Runner
         ctx?.postMessage(message); // Node:Workerthreads dont work yet!
     }
 
-    _handleMessageFromManager(e:MessageEvent)
+    async _handleMessageFromManager(e:MessageEvent):Promise<void>
     {
         const m = e.data as RunnerManagerMessage;
         switch(m.type)
@@ -265,7 +272,7 @@ export class Runner
             case 'execute':
                 // First callback that we are executing
                 this._postMessageToManager({ type: 'executing', payload: { msg: `Executing script`}});
-                this.execute(e.data.payload as RunnerScriptExecutionRequest); // Async function, once it is done we do callback to manager
+                await this.execute(e.data.payload as RunnerScriptExecutionRequest); // Async function, once it is done we do callback to manager
                 break;
 
             case 'stop':
@@ -526,7 +533,8 @@ export class Runner
 
         if(this.role === 'worker' || this.role === 'single') // Do the work here
         {
-            return await this._executeLocal(this._activeExecRequest, startRun, result);
+            //return await this._executeLocal(this._activeExecRequest, startRun, result);
+            return this._executeLocal(this._activeExecRequest, startRun, result);
         }
         else if(this.role === 'manager')
         {
@@ -617,31 +625,35 @@ export class Runner
         this._activeExecRequest = request;
         const executeStartTime = performance.now()
 
+        // In older apps AyncFunction is not available because await/async are replaced on buildtime
+        // This is pretty OK, instead that in the dynamic function underneath the awaits are not replaced
+        // Resulting in error: "await is only valid in async function"
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
         const scope = this._localScopes[this._activeScope.name];
         const code = request.script.code;
 
         const startRunFunc = (startRun) ? this._executeStartRun : () => {};
-        const outputFunc = (output) ? this.getLocalScopeResults : () => null; // output or return null
+        const outputFunc = (output) ? this.getLocalScopeResults : async () => null; // output or return null
+     
 
         const exec = async () =>
         {
-            return await (new AsyncFunction(
+            return await (new AsyncFunction(  
                     'request',
-                    'scope', // args
+                    'scope', 
                     'startRunFunc',
                     'outputFunc',
                         // function body
                         `
                         startRunFunc.call(scope, scope, request); // first is this, the rest args
-                        exportFn = async () => outputFunc.call(scope, scope, request); // export function in context of scope, with scope and request as args
+                        // To deal with replaced async functions in old JS enviroments
+
                         // run code in scope
                         with (scope)
                         {
-                            await (
-                                async function()
-                                { 
+                            execute = () =>
+                            { 
                                     "use strict"; 
                                     try {
                                         ${code};
@@ -651,11 +663,18 @@ export class Runner
                                         console.exec('Runner::executeLocal(): Error code script execution:' + e);
                                         return e.toString();
                                     }
-                                }
-                            ).bind(scope)();	
+                            };
+                            execute.bind(scope);
+                            execute();
                         }
                         // export results
-                        return await exportFn();    
+                        
+                        // detect if everything is OK and this is indeed a AsyncFunction - otherwise it is Function
+                        asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
+                        return (asyncOutput) 
+                                       ? Promise.resolve(outputFunc.call(scope, scope, request)) // avoid await keyword - again for Webpack 4
+                                       : outputFunc.call(scope, scope, request);
+        
                         `
                 ))(this._activeExecRequest, scope, startRunFunc, outputFunc);    
         }
@@ -676,6 +695,7 @@ export class Runner
 
         return result;
     }
+
 
     /** Run a execution request (with script, params etc) in individual statements 
      *  This is used for debugging and testing in browser

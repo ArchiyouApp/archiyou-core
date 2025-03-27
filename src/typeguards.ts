@@ -553,5 +553,5 @@ export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
 
 export function isComputeResult(r:any): r is ComputeResult
 {
-    return r && typeof r === 'object' && r.meshGLB
+    return r && typeof r === 'object' && (r.meshGLB || r.meshBuffer)
 }
