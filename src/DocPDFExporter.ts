@@ -654,7 +654,8 @@ export class DocPDFExporter
                     this.activePDFDoc[setFnName](val); // execute style function
                 }
                 else {
-                    console.warn(`DocPDFExporter::_setPathStyle(): Trying to set style property "${styleProp}" with unknown jsPDF function: jsPDF.${setFnName}(). Check config!`)
+                    // console.warn(`DocPDFExporter::_setPathStyle(): Trying to set style property "${styleProp}" with unknown jsPDF function: jsPDF.${setFnName}(). Check config!`)
+                    // TODO:  Trying to set style property "lineOpacity" with unknown jsPDF function: jsPDF.setLineOpacity(). Check config!
                 }
             }
         }

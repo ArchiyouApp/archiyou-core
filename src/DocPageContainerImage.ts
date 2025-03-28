@@ -94,11 +94,15 @@ export class Image extends Container
             {
                 try 
                 {
+                    // FIX BUG IN NODE: TypeError: Failed to fetch - Most probably a DNS problem in Docker
+                    // Maybe try setting in Node: https://nodejs.org/docs/latest-v18.x/api/net.html#socketconnectoptions-connectlistener
+                    // TODO: Have some standards images - like the footer - locally for speed
                     let r = await fetch(proxyUrl, 
                         {
                             method: 'POST',
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url : this._url })       
+                            body: JSON.stringify({ url : this._url }),
+                            // NOTE: responseType is not needed anymore
                         }
                     );
                     if(r.status !== 200) 
