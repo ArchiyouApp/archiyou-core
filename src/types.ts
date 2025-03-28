@@ -1099,6 +1099,7 @@ export interface RunnerScriptExecutionRequest
 {
     script:RunnerScript
     params?:Record<string,any> // param values
+    mode?: 'main'|'component' 
     // What to calculate
     docs?:Array<any>|boolean // documents to process
     pipelines?:Array<any>|boolean // pipelines to process
