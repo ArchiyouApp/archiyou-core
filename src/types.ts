@@ -276,6 +276,8 @@ export interface ComputeResult
     metrics?: Record<string, any>, // TS type TODO
     info?:ArchiyouAppInfo, // general metadata 
     managedParams?:Record<ParamOperation, Array<PublishParam>>
+    // outputs (NEW)
+    outputs?: ExecutionResult
 }
 
 
@@ -1099,8 +1101,10 @@ export interface RunnerScriptExecutionRequest
 {
     script:RunnerScript
     params?:Record<string,any> // param values
-    mode?: 'main'|'component' 
-    // What to calculate
+    mode?: 'main'|'component'
+    // What to calculate and output
+    outputs?: Array<ExecutionRequestOutputPath>
+    // Old ==> To be phased out
     docs?:Array<any>|boolean // documents to process
     pipelines?:Array<any>|boolean // pipelines to process
     tables?:Array<any>|boolean // tables to process
@@ -1110,6 +1114,64 @@ export interface RunnerScriptExecutionRequest
     modelSettings?:MeshingQualitySettings
     onDone?: ((result:ComputeResult) => any) // callback
 }   
+
+// path-like structure defining what and how to calculate and output
+//  basic structure: {pipeline|default}/{entity}/{entity name or all=*}/{output format}?{options}
+//  examples: 
+//      - default/model/glb (or model/glb)
+//      - default/tables/*/xls 
+//      - cnc/model/dxf?2d 
+//      - default/docs/spec/pdf
+//
+export type ExecutionRequestOutputPath = string;
+export type ExecutionRequestOutputEntityGroup = 'models'|'tables'|'docs';
+export type ExecutionRequestOutputFormat = 'raw'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
+
+export interface ExecutionRequestOutput 
+{
+    path:string // original path
+    pipeline?:string // pipeline name (default)
+    entityGroup?:ExecutionRequestOutputEntityGroup
+    entityName?:string // name or entity or * for all
+    outputFormat?:ExecutionRequestOutputFormat
+    options?:Record<string,any> // options for output format (default)
+}
+
+/* Total execution result tree 
+    example: 
+    {
+        state: { ... },
+        pipelines: 
+    	{
+		    cnc: 
+            {
+                models: 
+                {
+                    dxf : 
+                    { 
+                        options: {},
+                        data: ....					
+                    }
+                }   
+            }		
+		}
+	}
+*/
+export interface ExecutionResult
+{
+    state?: any // TODO
+    pipelines?:Record<string, ExecutionResultPipeline>
+}
+
+export interface ExecutionResultOutput
+{
+    options: Record<string,any> // TODO?
+    data: string // text or binary in base64
+}
+export type ExecutionResultPipeline = Partial<Record<ExecutionRequestOutputEntityGroup, 
+                                        Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>>>>
+
+
 
 /** Message from Worker to Manager */
 export interface RunnerWorkerMessage

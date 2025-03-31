@@ -2,7 +2,15 @@
  *  Archiyou Runner.ts
  *  Easily execute Archiyou scripts in different contexts
  * 
- */
+ *  For requesting results we use output paths in RunnerExecutionRequest.outputs:
+ *  For example: 
+*/
+ //      - default/models/glb: get the default model in GLB format with default options
+ //      - default/models/dxf?2d: get the default model in DXF format with 2D options
+ //      - 'default/docs/*/pdf' // get all documents in PDF format
+ //      - [WIP] sketch/tables/*/*  // execute sketch pipeline and get all tables in all formats
+ //      - [WIP] */*/*/* // execute all pipelines, all entities and all formats (for example for cache purposes)
+ //
 
 
 import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, StatementResult } from "./internal"
@@ -11,11 +19,14 @@ import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, ComputeResult, 
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, ParamManager } from "./internal"
 
-import { GEOM_METHODS_INTO_GLOBAL } from "./internal" // from constants
+import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
+    EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL
+ } from "./internal" // from constants
 
 
 import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
-                RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage } from "./types"
+                RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage, 
+                ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResult } from "./types"
 
 import { isComputeResult } from './typeguards'
 
@@ -634,7 +645,9 @@ export class Runner
         const code = request.script.code;
 
         const startRunFunc = (startRun) ? this._executeStartRun : () => {};
-        const outputFunc = (output) ? this.getLocalScopeResults : async () => null; // output or return null
+        const outputFunc = (output) 
+                            ? this.getLocalScopeResults.bind(this) // bind to this
+                            : async () => null; // output or return null
      
 
         const exec = async () =>
@@ -671,9 +684,10 @@ export class Runner
                         
                         // detect if everything is OK and this is indeed a AsyncFunction - otherwise it is Function
                         asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
+                        // We run the output function in scope of Runner and pass the scope as argument
                         return (asyncOutput) 
-                                       ? Promise.resolve(outputFunc.call(scope, scope, request)) // avoid await keyword - again for Webpack 4
-                                       : outputFunc.call(scope, scope, request);
+                                       ? Promise.resolve(outputFunc(scope, request)) // avoid await keyword - again for Webpack 4
+                                       : outputFunc(scope, request);
         
                         `
                 ))(this._activeExecRequest, scope, startRunFunc, outputFunc);    
@@ -765,7 +779,7 @@ export class Runner
         // Models
         switch(request.modelFormat)
         {
-            case 'buffer':
+            case 'buffer': // TODO: raw
                 result.meshBuffer = scope.geom.scene.toMeshShapeBuffer(request.modelSettings);
                 break;
             case 'glb':
@@ -801,11 +815,215 @@ export class Runner
         }
         result.info = getInfo();
 
+        // New output based on paths in request.outputs
+        console.log('********* NEW OUTPUT FUNCTION ********');
+        console.log(this.constructor.name)
+        
+        if(request.outputs)
+        {
+           result.outputs = await this.getLocalScopeResultOutputs(scope, request);
+        }
+
 
         return result;
     }
 
-    
+    /** New method for running specific pipelines and gettings outputs 
+     *  Using request.outputs
+    */
+    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest):Promise<ExecutionResult>
+    {
+        const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
+        const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
+        console.info(`Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
+
+        const resultTree = { state: {}, pipelines: {}} as ExecutionResult;
+
+        for(let i = 0; i < pipelines.length; i++)
+        {
+            const pipeline = pipelines[i];
+            
+            // Default pipeline is already run, only run others
+            if(pipeline !== 'default')
+            {
+                // TODO: run specific pipeline
+                console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
+            }
+
+            // Gather results from pipeline
+            await this._exportModels(scope, request, resultTree); 
+            await this._exportDocs(scope, request, resultTree);
+            await this._exportTables(scope, request, resultTree);
+        };
+
+        return resultTree;
+    }
+
+    /** Parse output paths to create  */
+    _parseRequestOutputPaths(outputs:Array<ExecutionRequestOutputPath>):Array<ExecutionRequestOutput>
+    {
+        const requestOutputs = [] as Array<ExecutionRequestOutput>;
+        outputs.forEach((outputPath) => 
+        {   
+            const pathParts = outputPath.split('/');
+
+            const isModel = outputPath.includes('model');
+            // default pipeline form: model/glb or docs/*/pdf
+            if((isModel && pathParts.length === 2) || (!isModel && pathParts.length === 3)) 
+            {
+                pathParts.unshift('default');
+            }
+
+            if((isModel && pathParts.length !== 3) || !isModel && pathParts.length !== 4)
+            { 
+                console.error(`Runner::_parseRequestOutputPaths(): Malformed output path "${outputPath}". Format should be {pipeline}/{models}/{format} or {pipeline}/{docs|tables}/{name}/{format}`);
+                return; // abort
+            }	
+
+            const pipeline = pathParts[0];
+            const entityGroup = pathParts[1]; 
+            const entityName = (!isModel) ? pathParts[2] : null; // name of entity or * (not used for model)
+            const outputFormat = pathParts[pathParts.length - 1]; // last part is the output format
+            const optionsString = outputPath.substring(outputPath.indexOf(outputFormat))
+            const options = optionsString.split('?').reduce((agg,v) => 
+                { 
+                    agg[v.split('=')[0]] = agg[v.split('=')[1]] || true; 
+                    return agg
+                }, {})
+            
+            requestOutputs.push(
+                {
+                    path : outputPath,
+                    pipeline: pipeline,
+                    entityGroup: entityGroup,
+                    entityName: entityName,
+                    outputFormat: outputFormat,
+                    options: options    
+                } as ExecutionRequestOutput
+            );
+        });
+
+        return requestOutputs;
+    }
+
+    /** Export models from given scope using paths in request.outputs and place in ExecutionResult tree */
+    async _exportModels(scope:any, request:RunnerScriptExecutionRequest, result:ExecutionResult):Promise<ExecutionResult>
+    {
+        const outputs = this._parseRequestOutputPaths(request.outputs)
+                        .filter(o => o.entityGroup === 'models'); 
+
+        for(let i = 0; i < outputs.length; i++)
+        {
+            const output = outputs[i];
+
+            let pipelineResult = result.pipelines[output.pipeline];
+            if(pipelineResult === undefined)
+            { 
+                result.pipelines[output.pipeline] = { models : {} }; 
+                pipelineResult = result.pipelines[output.pipeline]; 
+            }
+            const pipelineResultModels = pipelineResult.models;
+            
+            const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL : [output.outputFormat];
+
+            for(let j = 0; j < outputFormats.length; j++)
+            {
+                const format = outputFormats[j];
+                console.info(`Runner::_exportModels(): Exporting "${output.path}" with export in format: "${format}"`);
+
+                switch(format)
+                {
+                    case 'raw':
+                        pipelineResultModels.raw = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer(request.modelSettings) };
+                        break;
+                    case 'glb':
+                        pipelineResultModels.glb = { options: output.options, data:  await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions) }; 
+                        break;
+                    case 'svg':
+                        pipelineResultModels.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
+                        break;
+                    default:
+                        throw new Error(`Runner::_getScopeComputeResult(): Unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
+                }
+            }
+        }
+
+        return result;
+    }
+
+    async _exportDocs(scope: any, request: RunnerScriptExecutionRequest, result: ExecutionResult): Promise<ExecutionResult> {
+        
+        const outputs = this._parseRequestOutputPaths(request.outputs).filter(o => o.entityGroup === 'docs');
+    
+        for (let i = 0; i < outputs.length; i++) {
+            const output = outputs[i];
+    
+            if (output.entityGroup === 'docs') {
+                let pipelineResult = result.pipelines[output.pipeline];
+                if (pipelineResult === undefined) {
+                    result.pipelines[output.pipeline] = { docs: {} };
+                    pipelineResult = result.pipelines[output.pipeline];
+                }
+                const pipelineResultDocs = pipelineResult.docs;
+    
+                const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL : [output.outputFormat];
+    
+                for (let j = 0; j < outputFormats.length; j++) {
+                    const format = outputFormats[j];
+                    console.info(`Runner::_exportDocs(): Exporting "${output.path}" with export in format: "${format}"`);
+    
+                    switch (format) {
+                        case 'raw':
+                            pipelineResultDocs.raw = { options: output.options, data: await scope.doc.toData() }; // TODO: use options?
+                            break;
+                        case 'pdf':
+                            console.warn(`Runner::_exportDocs(): Exporting PDF not implemented yet. Output path "${output.path}"`);
+                            // pipelineResultDocs.pdf = scope.doc.exportToPDF(request.docSettings);
+                            break;
+                        default:
+                            throw new Error(`Runner::_getScopeComputeResult(): Unknown doc format "${output.outputFormat}" in requested output "${output.path}"`);
+                    }
+                }
+            }
+        }
+    
+        return result;
+    }
+    
+    async _exportTables(scope: any, request: RunnerScriptExecutionRequest, result: ExecutionResult): Promise<ExecutionResult> {
+
+        const outputs = this._parseRequestOutputPaths(request.outputs).filter(o => o.entityGroup === 'tables'); // filter for tables    
+    
+        for (let i = 0; i < outputs.length; i++) {
+            const output = outputs[i];
+    
+            if (output.entityGroup === 'tables') {
+                let pipelineResult = result.pipelines[output.pipeline];
+                if (pipelineResult === undefined) {
+                    result.pipelines[output.pipeline] = { tables: {} };
+                    pipelineResult = result.pipelines[output.pipeline];
+                }
+                const pipelineResultTables = pipelineResult.tables;
+    
+                const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL : [output.outputFormat];
+    
+                for (let j = 0; j < outputFormats.length; j++) {
+                    const format = outputFormats[j];
+                    console.info(`Runner::_exportTables(): Exporting "${output.path}" with export in format: "${format}"`);
+    
+                    switch (format) {
+                        case 'raw':
+                            pipelineResultTables.raw = { options: output.options, data: await scope.calc.toTableData() }; // TODO: use options?
+                            break;
+                        default:
+                            throw new Error(`Runner::_getScopeComputeResult(): Unknown table format "${output.outputFormat}" in requested output "${output.path}"`);
+                    }
+                }
+            }
+        }
+    
+        return result;
+    }
 
 }
