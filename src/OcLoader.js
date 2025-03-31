@@ -264,12 +264,20 @@ export class OcLoader
       
       // The '/' is actually needed in windows for normal ES imports 
       // But does not work with wasm files
+      // NOTE: test this
       if(filepath.includes('.wasm') && curDir[0] === '/')
       { 
         curDir = curDir.slice(1); 
       } 
       
-      const absPath = path.join(curDir, filepath);
+      let absPath = path.join(curDir, filepath);
+
+      // We need to add file:// to get this working on windows
+      if(process.platform === 'win32')
+      {
+        absPath = 'file://' + absPath; // Add file:// to the path
+      }
+
       console.log(`==== ABS PATH NODE: ${absPath}`);
 
       return absPath;

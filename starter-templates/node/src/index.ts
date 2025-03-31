@@ -1,4 +1,5 @@
-import { OcLoader } from 'archiyou-core'
+import { OcLoader } from '../../../src/internal';
+//import { OcLoader } from 'archiyou-core'
 
 
 const main = () => 
