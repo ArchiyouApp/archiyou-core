@@ -13,7 +13,9 @@
  //
 
 
-import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, StatementResult } from "./internal"
+import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
+                    StatementResult, RunnerScriptScopeState
+ } from "./internal"
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, ComputeResult, CodeParser } from "./internal"
 
@@ -26,7 +28,8 @@ import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
 
 import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
                 RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage, 
-                ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResult } from "./types"
+                ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutputs,
+                ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup } from "./types"
 
 import { isComputeResult } from './typeguards'
 
@@ -371,18 +374,27 @@ export class Runner
         const BASIC_SCOPE = { console: console };
 
         const state = this.buildLocalExecScopeState();
+        state._scope = name; // set name of the scope inside scope
 
         if(this.role === 'worker' || this.role === 'single')
         {
-            this._localScopes[name] = new Proxy({ ...BASIC_SCOPE, ...state }, 
+            const scope = new Proxy({ ...BASIC_SCOPE, ...state }, 
             {
                 has: () => true, // Allows access to any variable (avoids ReferenceError)
                 get: (target, key) => target[key], // Retrieves values from scope
                 set: (target, key, value) => {
-                    target[key] = value; // Stores values inside scope
+                    if (typeof target[key] === 'object' && target[key] !== null) {
+                        // If the property is an object, update its properties
+                        Object.assign(target[key], value);
+                    } else {
+                        // Otherwise, directly set the value
+                        target[key] = value;
+                    }
                     return true;
                 }
             });
+            scope.ay.scope = scope; // Set a property directly within the Proxy
+            this._localScopes[name] = scope; 
             this._activeScope = { name: name, context: 'local' };
         }
         else 
@@ -397,19 +409,19 @@ export class Runner
     /** Build start Archiyou state for a execution scope
      *  Each scope uses its own instances of Archiyou modules 
      */
-    buildLocalExecScopeState():Record<string,any>
+    buildLocalExecScopeState():RunnerScriptScopeState
     {
-        const state = {};
+        const scopeState = { ay: null } as RunnerScriptScopeState; 
 
         // Archiyou base modules like geom, doc, calc, make etc
-        Object.assign(state, { ay: this.initLocalArchiyou()});
+        Object.assign(scopeState, { ay: this.initLocalArchiyou()});
 
         // Add Archiyou modules as globals in execution scope state object
-        this._addModulesToScopeState(state);
+        this._addModulesToScopeState(scopeState);
         // Modeling basics into state
-        this._addModelingMethodsToScopeState(state)
+        this._addModelingMethodsToScopeState(scopeState)
 
-        return state;
+        return scopeState;
     }
 
     /** Initiate all Archiyou modules and return a state object
@@ -424,7 +436,9 @@ export class Runner
             doc: new Doc(), // TODO: settings with proxy
             calc: new Calc(),
             exporter: new Exporter(),
-            make: new Make()
+            make: new Make(),
+            worker: this, // reference to worker instance
+            scope: null, // reference to the scope - is set when scope is created
         } as ArchiyouApp
 
         // TODO: Improve providing all Archiyou modules to to modules themselves
@@ -532,7 +546,7 @@ export class Runner
      *  @startRun - reset the scope before running the code
      *  @result - return the result of the execution
     */
-    async execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult|string>
+    async execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
     {
         // Convert code to request if needed
         if(typeof request === 'string')
@@ -612,7 +626,7 @@ export class Runner
      * 
      *  @returns - ComputeResult or null if no output or error string
     */
-    async _executeLocal(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):Promise<ComputeResult|null|string>
+    async _executeLocal(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):Promise<ComputeResult|null>
     {
         if(!this.loaded())
         { 
@@ -620,9 +634,12 @@ export class Runner
 
             return new Promise((resolve, reject) => {
                 const checkLoaded = () => {
-                    if (this.loaded()) {
+                    if (this.loaded())
+                    {
                         resolve(this._executeLocal(request, startRun, output)); // Resolve the promise when loaded() is true
-                    } else {
+                    } 
+                    else 
+                    {
                         setTimeout(checkLoaded, 100); // Check again after the interval
                     }
                 };
@@ -639,6 +656,7 @@ export class Runner
         // In older apps AyncFunction is not available because await/async are replaced on buildtime
         // This is pretty OK, instead that in the dynamic function underneath the awaits are not replaced
         // Resulting in error: "await is only valid in async function"
+        // We use a fix that detects type of inner execution function
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
         const scope = this._localScopes[this._activeScope.name];
@@ -652,45 +670,45 @@ export class Runner
 
         const exec = async () =>
         {
-            return await (new AsyncFunction(  
-                    'request',
-                    'scope', 
-                    'startRunFunc',
-                    'outputFunc',
-                        // function body
-                        `
-                        startRunFunc.call(scope, scope, request); // first is this, the rest args
-                        // To deal with replaced async functions in old JS enviroments
+            try 
+            {
+                return await (new AsyncFunction(  
+                        'request',
+                        'scope', 
+                        'startRunFunc',
+                        'outputFunc',
+                            // function body
+                            `
+                            startRunFunc.call(scope, scope, request); // first is this, the rest args
+                            // To deal with replaced async functions in old JS enviroments
 
-                        // run code in scope
-                        with (scope)
-                        {
-                            execute = () =>
-                            { 
-                                    "use strict"; 
-                                    try {
-                                        ${code};
-                                    }
-                                    catch(e)
-                                    {
-                                        console.exec('Runner::executeLocal(): Error code script execution:' + e);
-                                        return e.toString();
-                                    }
-                            };
-                            execute.bind(scope);
-                            execute();
-                        }
-                        // export results
-                        
-                        // detect if everything is OK and this is indeed a AsyncFunction - otherwise it is Function
-                        asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
-                        // We run the output function in scope of Runner and pass the scope as argument
-                        return (asyncOutput) 
-                                       ? Promise.resolve(outputFunc(scope, request)) // avoid await keyword - again for Webpack 4
-                                       : outputFunc(scope, request);
-        
-                        `
-                ))(this._activeExecRequest, scope, startRunFunc, outputFunc);    
+                            // run code in scope
+                            with (scope)
+                            {
+                                "use strict"; 
+                                ${code};
+                            }
+                            // export results
+                            
+                            // detect if everything is OK and this is indeed a AsyncFunction - otherwise it is Function
+                            asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
+                            // We run the output function in scope of Runner and pass the scope as argument
+                            return (asyncOutput) 
+                                        ? Promise.resolve(outputFunc(scope, request)) // avoid await keyword - again for Webpack 4
+                                        : outputFunc(scope, request);
+            
+                            `
+                    ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as Promise<ComputeResult>|ComputeResult;    
+            }
+            catch(e)
+            {
+                // Any error while executing code is caught here
+                console.error(`Runner::_executeLocal(): Error while executing code: "${e}" : ${e.stack}`);
+                return {
+                    status: 'error',
+                    errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
+                } as ComputeResult
+            }
         }
 
         const result = await exec();
@@ -730,14 +748,14 @@ export class Runner
             const output = s === statements.length -1; // only output on last statement
             const r = await this.execute(statement.code, (s === 0), output); // only start run on first and return result on last
             const statementDuration = Math.round(performance.now() - statementStartTime);
-            if(typeof r === 'string')
+            if(r.status === 'error')
             {
                 statementResults.push({ 
                     ...statement,
                     status: 'error',
-                    message: r,
+                    message: r.errors[0].message, // add error message to statement result
                     duration: statementDuration 
-                }); // Error
+                }); 
             }
             else {
                 console.info(`Runner::_executeLocalInStatements(): Statement "${statement.code.slice(0,50) }]" [index:${s+1} - ${output ? 'with' : 'without'} output] executed in ${statementDuration}ms`);
@@ -776,21 +794,32 @@ export class Runner
    
         const result = {} as ComputeResult;
 
-        // Models
-        switch(request.modelFormat)
+        // New request outputs
+        if(request.outputs)
         {
-            case 'buffer': // TODO: raw
-                result.meshBuffer = scope.geom.scene.toMeshShapeBuffer(request.modelSettings);
-                break;
-            case 'glb':
-                result.meshGLB = await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions); 
-                break;
-            case 'svg':
-                result.svg = scope.exporter.exportToSvg(false); // get SVG isometry
-                break;
-            default:
-                throw new Error(`Runner::_getScopeComputeResult(): Unknown model format "${request.modelFormat}"`);
+            result.outputs = await this.getLocalScopeResultOutputs(scope, request);
         }
+        else 
+        {
+            // Older one
+            // Models
+            switch(request.modelFormat)
+            {
+                case 'buffer': // TODO: raw
+                    result.meshBuffer = scope.geom.scene.toMeshShapeBuffer(request.modelSettings);
+                    break;
+                case 'glb':
+                    result.meshGLB = await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions); 
+                    break;
+                case 'svg':
+                    result.svg = scope.exporter.exportToSvg(false); // get SVG isometry
+                    break;
+                default:
+                    throw new Error(`Runner::_getScopeComputeResult(): Unknown model format "${request.modelFormat}"`);
+            }
+        }
+
+        this._addAppInfoToResult(scope, request, result); // add app info to result
         
         // Other data
         result.scenegraph = scope.geom.scene.toGraph();
@@ -798,50 +827,44 @@ export class Runner
         result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
         result.tables = scope.calc?.toTableData(); 
         result.metrics =  scope.calc?.metrics();
-        result.managedParams = scope.ay.paramManager.getOperatedParamsByOperation();
-
-        // TODO: Move this function somewhere else?
-        const getInfo = () => {
-            const shapes = scope.geom.all();
-            const bbox = shapes.length ? shapes.bbox() : undefined;
-            const sceneBbox = bbox ? { min: bbox.min().toArray(), max: bbox.max().toArray() } as ArchiyouAppInfoBbox : undefined;
-    
-            return {
-                units: scope.geom._units,
-                numShapes: shapes.length,
-                bbox: sceneBbox,
-                hasDocs: scope.doc.hasDocs(),
-            } as ArchiyouAppInfo;
-        }
-        result.info = getInfo();
-
-        // New output based on paths in request.outputs
-        console.log('********* NEW OUTPUT FUNCTION ********');
-        console.log(this.constructor.name)
-        
-        if(request.outputs)
-        {
-           result.outputs = await this.getLocalScopeResultOutputs(scope, request);
-        }
-
+        result.managedParams = scope.ay.paramManager.getOperatedParamsByOperation();        
 
         return result;
     }
 
+    /** Set archiyou app info on result */
+    _addAppInfoToResult(scope:any, request:RunnerScriptExecutionRequest, result:ComputeResult):ArchiyouAppInfo
+    {
+        const shapes = scope.geom.all();
+        const bbox = shapes.length ? shapes.bbox() : undefined;
+        const sceneBbox = bbox ? { min: bbox.min().toArray(), max: bbox.max().toArray() } as ArchiyouAppInfoBbox : undefined;
+
+        result.info = {
+            units: scope.geom._units,
+            numShapes: shapes.length,
+            bbox: sceneBbox,
+            hasDocs: scope.doc.hasDocs(),
+        } as ArchiyouAppInfo;
+
+        return result.info;
+    }
+    
+
     /** New method for running specific pipelines and gettings outputs 
      *  Using request.outputs
     */
-    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest):Promise<ExecutionResult>
+    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest):Promise<ExecutionResultOutputs>
     {
         const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
         const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
         console.info(`Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
 
-        const resultTree = { state: {}, pipelines: {}} as ExecutionResult;
+        const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
 
         for(let i = 0; i < pipelines.length; i++)
         {
+            console.info(`Runner::getLocalScopeResultOutputs(): Running extra pipeline "${pipelines[i]}"`);
             const pipeline = pipelines[i];
             
             // Default pipeline is already run, only run others
@@ -852,13 +875,14 @@ export class Runner
             }
 
             // Gather results from pipeline
-            await this._exportModels(scope, request, resultTree); 
-            await this._exportDocs(scope, request, resultTree);
-            await this._exportTables(scope, request, resultTree);
+            await this._exportModels(scope, request, pipeline, resultTree); 
+            await this._exportDocs(scope, request, pipeline, resultTree);
+            await this._exportTables(scope, request, pipeline, resultTree);
         };
 
         return resultTree;
     }
+    
 
     /** Parse output paths to create  */
     _parseRequestOutputPaths(outputs:Array<ExecutionRequestOutputPath>):Array<ExecutionRequestOutput>
@@ -884,14 +908,16 @@ export class Runner
             const pipeline = pathParts[0];
             const entityGroup = pathParts[1]; 
             const entityName = (!isModel) ? pathParts[2] : null; // name of entity or * (not used for model)
-            const outputFormat = pathParts[pathParts.length - 1]; // last part is the output format
-            const optionsString = outputPath.substring(outputPath.indexOf(outputFormat))
+            let outputFormat = pathParts[pathParts.length - 1]; // last part is the output format
+            const optionsString = outputFormat.split('?')[1] || ''; // options are in the last part of the path
+            if(outputFormat.includes('?')){ outputFormat = outputFormat.split('?')[0];} // remove options from format
             const options = optionsString.split('?').reduce((agg,v) => 
                 { 
+                    if(v.length === 0){ return agg; } // skip empty values
                     agg[v.split('=')[0]] = agg[v.split('=')[1]] || true; 
                     return agg
                 }, {})
-            
+
             requestOutputs.push(
                 {
                     path : outputPath,
@@ -908,10 +934,10 @@ export class Runner
     }
 
     /** Export models from given scope using paths in request.outputs and place in ExecutionResult tree */
-    async _exportModels(scope:any, request:RunnerScriptExecutionRequest, result:ExecutionResult):Promise<ExecutionResult>
+    async _exportModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
     {
         const outputs = this._parseRequestOutputPaths(request.outputs)
-                        .filter(o => o.entityGroup === 'models'); 
+                        .filter(o => o.entityGroup === 'models' && o.pipeline === pipeline); // filter for models
 
         for(let i = 0; i < outputs.length; i++)
         {
@@ -944,7 +970,7 @@ export class Runner
                         pipelineResultModels.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
                         break;
                     default:
-                        throw new Error(`Runner::_getScopeComputeResult(): Unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
+                        console.error(`Runner::_getScopeComputeResult(): Skipped unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
                 }
             }
         }
@@ -952,78 +978,138 @@ export class Runner
         return result;
     }
 
-    async _exportDocs(scope: any, request: RunnerScriptExecutionRequest, result: ExecutionResult): Promise<ExecutionResult> {
+    async _exportDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+    {
+        const EXPORT_FORMATS = ['raw', 'pdf'];
+
+        let outputs = this._parseRequestOutputPaths(request.outputs)
+                            .filter(o => o.entityGroup === 'docs' && o.pipeline === pipeline); // filter for docs
+        // checks
+        outputs.forEach((o,i) => {
+            if(!EXPORT_FORMATS.includes(o.outputFormat))
+            {
+                console.warn(`Runner::_exportDocs(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}"`); 
+            }
+        })
+        outputs = outputs.filter(o => EXPORT_FORMATS.includes(o.outputFormat)); // filter for docs
+
+        // Check if we need anything to export for current request and pipeline
+        if(outputs.length === 0)
+        { 
+            console.info(`Runner::_exportDocs(): No docs to export`);
+            return result; // no docs to export
+        } 
+
+        // Check result data structure 
+        let pipelineResult = result.pipelines[pipeline];
+        if (pipelineResult === undefined)
+        {
+            result.pipelines[pipeline] = { docs: {} };
+            pipelineResult = result.pipelines[pipeline];
+        }
+        else (pipelineResult.docs === undefined)
+        {
+            pipelineResult.docs = {};   
+        }
+        const pipelineResultDocs = pipelineResult.docs;
         
-        const outputs = this._parseRequestOutputPaths(request.outputs).filter(o => o.entityGroup === 'docs');
-    
-        for (let i = 0; i < outputs.length; i++) {
-            const output = outputs[i];
-    
-            if (output.entityGroup === 'docs') {
-                let pipelineResult = result.pipelines[output.pipeline];
-                if (pipelineResult === undefined) {
-                    result.pipelines[output.pipeline] = { docs: {} };
-                    pipelineResult = result.pipelines[output.pipeline];
-                }
-                const pipelineResultDocs = pipelineResult.docs;
-    
-                const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL : [output.outputFormat];
-    
-                for (let j = 0; j < outputFormats.length; j++) {
-                    const format = outputFormats[j];
-                    console.info(`Runner::_exportDocs(): Exporting "${output.path}" with export in format: "${format}"`);
-    
-                    switch (format) {
-                        case 'raw':
-                            pipelineResultDocs.raw = { options: output.options, data: await scope.doc.toData() }; // TODO: use options?
-                            break;
-                        case 'pdf':
-                            console.warn(`Runner::_exportDocs(): Exporting PDF not implemented yet. Output path "${output.path}"`);
-                            // pipelineResultDocs.pdf = scope.doc.exportToPDF(request.docSettings);
-                            break;
-                        default:
-                            throw new Error(`Runner::_getScopeComputeResult(): Unknown doc format "${output.outputFormat}" in requested output "${output.path}"`);
-                    }
-                }
-            }
-        }
-    
-        return result;
-    }
-    
-    async _exportTables(scope: any, request: RunnerScriptExecutionRequest, result: ExecutionResult): Promise<ExecutionResult> {
+        // Docs are exported at the same time per format
+        for(let f =0; f < EXPORT_FORMATS.length; f++)
+        {
+            const format = EXPORT_FORMATS[f];
+            let onlyDocNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); // get unique doc names
 
-        const outputs = this._parseRequestOutputPaths(request.outputs).filter(o => o.entityGroup === 'tables'); // filter for tables    
-    
-        for (let i = 0; i < outputs.length; i++) {
-            const output = outputs[i];
-    
-            if (output.entityGroup === 'tables') {
-                let pipelineResult = result.pipelines[output.pipeline];
-                if (pipelineResult === undefined) {
-                    result.pipelines[output.pipeline] = { tables: {} };
-                    pipelineResult = result.pipelines[output.pipeline];
-                }
-                const pipelineResultTables = pipelineResult.tables;
-    
-                const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL : [output.outputFormat];
-    
-                for (let j = 0; j < outputFormats.length; j++) {
-                    const format = outputFormats[j];
-                    console.info(`Runner::_exportTables(): Exporting "${output.path}" with export in format: "${format}"`);
-    
-                    switch (format) {
-                        case 'raw':
-                            pipelineResultTables.raw = { options: output.options, data: await scope.calc.toTableData() }; // TODO: use options?
-                            break;
-                        default:
-                            throw new Error(`Runner::_getScopeComputeResult(): Unknown table format "${output.outputFormat}" in requested output "${output.path}"`);
-                    }
+            if(onlyDocNames.length > 0) // if user requested this format
+            {
+                // if * is present, all docs are selected
+                if(onlyDocNames.includes('*')){ onlyDocNames = []; } // if * is present, all docs are selected
+                // Now do export
+                switch (format)
+                {
+                    case 'raw':
+                        const docsRawByName = await scope.doc.toData(onlyDocNames);
+                        this._setFormatResults(pipelineResultDocs,docsRawByName, format); // set results in pipeline result tree
+                        break;
+                    case 'pdf':
+                        const docsPdfByName = await scope.doc.toPDF(onlyDocNames);
+                        this._setFormatResults(pipelineResultDocs,docsPdfByName, format);
+                        break;
+                    default:
+                        throw new Error(`Runner::_getScopeComputeResult(): Unknown doc export format "${format}"`);
                 }
             }
-        }
-    
+            
+        };
+
         return result;
     }
+    
+    async _exportTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+    {
+        
+        const EXPORT_FORMATS = ['raw', 'xls'];
+
+        const outputs = this._parseRequestOutputPaths(request.outputs).filter(o => o.pipeline === pipeline && o.entityGroup === 'tables'); // filter for tables
+
+        // Check if we need anything to export for current request and pipeline
+        if(outputs.length === 0)
+        { 
+            console.info(`Runner::_exportDocs(): No tables to export`);
+            return result; // no docs to export
+        } 
+
+        // Check result data structure 
+        let pipelineResult = result.pipelines[pipeline];
+        if (pipelineResult === undefined)
+        {
+            result.pipelines[pipeline] = { tables: {} };
+            pipelineResult = result.pipelines[pipeline];
+        }
+        else (pipelineResult.tables === undefined)
+        {
+            pipelineResult.tables = {};   
+        }
+        const pipelineResultTables = pipelineResult.tables;
+        
+        // Tables are exported at the same time per format
+        for(let f =0; f < EXPORT_FORMATS.length; f++)
+        {
+            const format = EXPORT_FORMATS[f];
+            let onlyTableNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); // get unique doc names
+
+            if(onlyTableNames.length > 0)
+            {
+                // if * is present, all docs are selected
+                if(onlyTableNames.includes('*')){ onlyTableNames = []; } // if * is present, all docs are selected
+                // Now do export
+                switch (format)
+                {
+                    case 'raw':
+                        const tablesRawByName = scope.calc.toTableData();
+                        this._setFormatResults(pipelineResultTables,tablesRawByName, format); // set results in pipeline result tree
+                        break;
+                    case 'xls':
+                        console.warn(`Runner::_exportTables(): xls export not implemented yet`);
+                        break;
+                    default:
+                        throw new Error(`Runner::_getScopeComputeResult(): Unknown doc export format "${format}"`);
+                }
+            }
+            
+        };
+
+        return result;
+    }
+
+    // util method
+    _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
+    {
+        Object.keys(resultsByName || {}).forEach((docName) =>
+        {   
+            if(!resultGroup[docName]){ resultGroup[docName] = {}; resultGroup[docName][format] = {}; }
+            resultGroup[docName][format] = { options: {}, data: resultsByName[docName] }; // TODO: do we need options? Rewrite needed if so
+        });
+    }
+
 
 }

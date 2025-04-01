@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Execute Archiyou scripts in different contexts",
   "scripts": {
-    "dev": "nodemon --trace-warnings ./src/index.ts"
+    "dev": "nodemon --trace-warnings ./src/index.ts",
+    "pdf": "nodemon --trace-warnings ./src/pdf.ts"
   },
   "dependencies": {},
   "devDependencies": {

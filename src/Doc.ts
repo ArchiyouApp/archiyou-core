@@ -30,7 +30,8 @@ import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, 
             ArchiyouApp, DocPathStyle, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
             ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs, 
-            isContainerPositionCoordAbs} from './internal' // classes
+            isContainerPositionCoordAbs,
+            DocPDFExporter} from './internal' // classes
 import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
@@ -38,7 +39,7 @@ import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUni
     ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer,
         isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
                 DocGraphicInputLine, DocGraphicInputOrthoLine, isContainerPositionCoordRel,
-                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param
+                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param, PublishParam
             } from './internal'
 
 import { convertValueFromToUnit, isNumeric } from './internal' // utils
@@ -70,6 +71,7 @@ export class Doc
     _settings:DocSettings; // some essential settings like _settings.proxy
     _geom:Geom;
     _calc:any; // Cannot use reference to Calc here, because we don't allow references outside core
+    _pdfExporter:DocPDFExporter;
     
     _docs:Array<string> = []; // multiple documents names (see them as 'files')
     _activeDoc:string; // name of active document
@@ -89,6 +91,7 @@ export class Doc
 
     constructor(settings?:DocSettings, ay?:ArchiyouApp) // null is allowed
     {
+        this._pdfExporter = new DocPDFExporter(); // empty PDF exporter
         this.setArchiyou(ay)
 
         //// DEFAULTS
@@ -165,7 +168,23 @@ export class Doc
             {
                 try {
                     console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
-                    this._ay.worker.funcs.executeFunc(pipelineFn)
+                    
+                    /* IMPORTANT:
+                        Pipeline functions need to set variables using this.myVar = ... to the scope
+                        If using arrow functions this will not work, because we can't bind function to scope
+                            In that case you provided scope argument: (scope) => scope.myVar = ...
+                    */
+
+                    if(!pipelineFn?.prototype)
+                    {
+                        console.warn(`Doc:executePipelines(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)    
+                    }
+                    else {
+                        console.warn('To set variables in scope from pipeline function for later use: this.myVar = ...');
+                    }
+                
+                    pipelineFn.call(this._ay.scope,this._ay.scope);
+                    
                     pipeline.done = true; // set done
                 }
                 catch(e){
@@ -291,7 +310,15 @@ export class Doc
     {
         this.checkAndMakeDefaultDoc();
 
-        if(typeof fn !== 'function'){ throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active document!`); }
+        if(typeof fn !== 'function')
+        { 
+            throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active document!`); 
+        }
+
+        if(!fn.hasOwnProperty('prototype'))
+        {
+            console.warn(`Doc::pipeline(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)
+        }
 
         this._pipelinesByDoc[this._activeDoc] = { fn: fn, done: false } as DocPipeline;
 
@@ -638,29 +665,19 @@ export class Doc
         const PARAM_IS_VALUE_CHAR = ':'
         const PARAM_SEPERATOR_CHAR = ' '
 
-        let params = [] as Array<Param>;
-        if(this?._ay?.worker?.lastExecutionRequest?.script?.params)
-        {
-            // In worker editor
-            params = this?._ay?.worker?.lastExecutionRequest?.script?.params;
-        }
-        else 
-        {
-            // In node worker - combine params with request.params for values
-            const paramValues = this?._ay?.worker?.lastExecutionRequest?.request?.params;
-            params = (Object.values(this?._ay?.worker?.lastExecutionRequest?.params) as Array<Param>).map(p => 
-                {
-                return { ...p, value: paramValues[p.name] }
-                }
-            )
-        }
         
-        if (!params && params.length === 0)
-        {
-            return 'no parameters'
-        }
+        // New consistent way to get params from request
+        // Combine params with request.params for values
+        const params = this?._ay?.worker?._activeExecRequest?.script?.params as Record<string,PublishParam>;
+
+        if (!params || Object.keys(params).length === 0){ return 'no parameters' }
+
+        const paramValues = this?._ay?.worker?._activeExecRequest?.params;
+        const paramAndValues = (Object.values(params) as Array<Param>)
+                                .map((p) => { return { ...p, value: paramValues[p.name] }})
         
-        return params.map(p => {
+        
+        return paramAndValues.map(p => {
             const paramName = p.label || p.name;
             let paramSummaryName;
             if(paramName.length <= PARAM_NAME_MAXCHAR)
@@ -1096,6 +1113,16 @@ export class Doc
 
         return docs;
     }
+
+    /** Export selected or all documents to pdfs
+     *  @returns {[key:string]: Blob} - key = doc name, value = pdf blob
+     */
+    async toPDF(only:Array<string>|any=[]):Promise<Record<string, Blob>>
+    {
+        const data = await this.toData(only);
+        return await this._pdfExporter.export(data);
+    }
+    
 
     //// PRIVATE METHODS ////
 

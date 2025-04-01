@@ -83,6 +83,7 @@ export type PipelineType = 'docs' | '3dprint' | 'cnc' | 'techdraw' | 'laser'
 export interface ArchiyouApp
 {
     worker?: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
+    scope?:any // Scope where th escript is run in
     geom: Geom,
     doc?: Doc,
     console?: Console,
@@ -277,7 +278,7 @@ export interface ComputeResult
     info?:ArchiyouAppInfo, // general metadata 
     managedParams?:Record<ParamOperation, Array<PublishParam>>
     // outputs (NEW)
-    outputs?: ExecutionResult
+    outputs?: ExecutionResultOutputs
 }
 
 
@@ -1088,6 +1089,22 @@ export interface RunnerActiveScope
     name: string
 }
 
+/** Basic structure of scope */
+export interface RunnerScriptScopeState
+{
+    _scope:string // name of scope
+    ay: ArchiyouApp
+    // global references
+    console: Console
+    geom: Geom
+    doc: Doc
+    calc: Calc
+    exporter: Exporter
+    make: Make
+    // Also classes (TODO)
+    // Vector, Point, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection
+}
+
 /** Simplified version of Script(Version) */
 export interface RunnerScript
 {
@@ -1114,6 +1131,8 @@ export interface RunnerScriptExecutionRequest
     modelSettings?:MeshingQualitySettings
     onDone?: ((result:ComputeResult) => any) // callback
 }   
+
+
 
 // path-like structure defining what and how to calculate and output
 //  basic structure: {pipeline|default}/{entity}/{entity name or all=*}/{output format}?{options}
@@ -1157,7 +1176,7 @@ export interface ExecutionRequestOutput
 		}
 	}
 */
-export interface ExecutionResult
+export interface ExecutionResultOutputs
 {
     state?: any // TODO
     pipelines?:Record<string, ExecutionResultPipeline>
@@ -1165,24 +1184,36 @@ export interface ExecutionResult
 
 export interface ExecutionResultOutput
 {
-    options: Record<string,any> // TODO?
-    data: string // text or binary in base64
+    options?: Record<string,any> // TODO?
+    data: any // string, binary Blob or binary in base64
 }
-export type ExecutionResultPipeline = Partial<Record<ExecutionRequestOutputEntityGroup, 
-                                        Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>>>>
 
+// outputs of a pipeline
+// { models: { 
+//              glb: { options: ..., data: ... } 
+//           }, 
+//   docs: { testdoc : pdf : { options: {}, data: ... } }, tables }
+export interface ExecutionResultPipeline 
+{
+    models?:Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>> // {outputformat}.{options, data}
+    docs?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
+    tables?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
+}
+
+export type ExecutionResultPipelineNamed =  Partial<Record<string, // name of doc or table
+                                                    Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>>>>
 
 
 /** Message from Worker to Manager */
 export interface RunnerWorkerMessage
 {
     type: 'init'|'loaded'|'executing'|'stopped'|'executed'|'console'|'save-step'|'save-stl'|'save-gltf'|'save-svg'|'save-svg-2d'
-    payload: Record<string, any>
+    payload: any //Record<string, any>
 }
 
 /** Message from Manager to Worker */
 export interface RunnerManagerMessage 
 {
     type: 'init'|'load'|'execute'|'stop'|'export-to-step'|'export-to-stl'|'export-to-gltf'|'export-to-svg'|'export-to-svg-2d'  
-    payload?: Record<string, any>
+    payload?: any //Record<string, any>
 }

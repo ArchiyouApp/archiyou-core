@@ -31,22 +31,23 @@ export class View extends Container
         }
     }
 
-    resolveShapeNameToSVG(shapes:string):string
+    resolveShapeNameToSVG(shapesRef:string):string
     {
-        if(typeof shapes !== 'string')
+        if(typeof shapesRef !== 'string')
         { 
-            throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapes}" is not a string!`) 
+            throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapesRef}" is not a string!`) 
         } 
 
-        const workerScope = this._page._doc._ay.worker?.self || this._page._doc._ay.worker; // either in Webworker or Nodejs global
+        const workerScope = this._page._doc._ay?.scope || // If run with Runner scope is set, for backwards compatibility look for other locations
+                            this._page._doc._ay.worker?.self || this._page._doc._ay.worker; // either in Webworker or Nodejs global
 
         if (workerScope)
         {
-            const realShapes = workerScope[shapes];
+            const realShapes = workerScope[shapesRef]; // get the real reference to the ShapeCollection or Shape
 
             if(!Shape.isShape(realShapes) && !ShapeCollection.isShapeCollection(realShapes))
             { 
-                throw new Error(`View::resolveShapeNameToSVG(): Given shapes "${shapes}" does not refer to a valid Shape or ShapeCollection!`) 
+                throw new Error(`View::resolveShapeNameToSVG(): Given reference "${shapesRef}" for view "${this.name} = ..." can't be found. Make sure you set it in pipeline function with "this.${shapesRef}". Using without this will not set values on scope!`); 
             } 
             
             const s = ShapeCollection.isShapeCollection(realShapes) ? realShapes : new ShapeCollection(realShapes); // make sure we got a ShapeCollection

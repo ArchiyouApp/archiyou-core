@@ -31,8 +31,9 @@ import { Container, DataRows, DataRowsColumnValue, DocData, DocPathStyle, SVGtoP
 import { PDFLinePath } from './internal' // types
 
 import { jsPDF, GState } from 'jspdf'
-import 'svg2pdf.js' // TODO: load dynamically?
+import 'svg2pdf.js' 
 import autoTable from 'jspdf-autotable' // TODO: load dynamically?
+import { JSDOM } from 'jsdom'; // For xml parsing in Node - browser has native DOMParser
 
 import { OutfitByteString } from '../assets/fonts/Outfit'
 import { OutfitSemiBoldByteString } from '../assets/fonts/OutfitSemiBold'
@@ -475,7 +476,10 @@ export class DocPDFExporter
                     svgRootElem = new DOMParser().parseFromString(img.content.data, 'image/svg+xml').documentElement; 
                 }
                 else {
-                    // TODO: node js solution replacing DOMParser
+                    const dom = new JSDOM(img.content.data, { contentType: 'image/svg+xml' });
+                    svgRootElem = dom.window.document.querySelector('svg');
+                    // svg2pdf uses document from the browser, so we need to set it here
+                    globalThis.document = dom.window.document; // TODO: check if this is needed
                 }
 
                 if(!svgRootElem)
@@ -492,6 +496,7 @@ export class DocPDFExporter
                         y,
                         width: this.relWidthToPoints(img.width, p),
                         height: this.relHeightToPoints(img.height, p),
+                        loadExternalStyleSheets: false, 
                         //preserveAspectRatio : this.getSVGPreserveAspectRatioOption(img)
                     }
                 );
