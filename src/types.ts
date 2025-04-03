@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, BaseAnnotation, ParamManager  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, ParamManager, Obj  } from './internal'
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
 import { Console } from './Console'
 
@@ -1085,12 +1085,12 @@ export interface RunnerOptions
 
 export interface RunnerActiveScope 
 {
-    context: RunnerExecutionContext
     name: string
+    context: RunnerExecutionContext
 }
 
 /** Basic structure of scope */
-export interface RunnerScriptScopeState
+export interface RunnerScriptScopeState extends ProxyConstructor
 {
     _scope:string // name of scope
     ay: ArchiyouApp
@@ -1101,8 +1101,18 @@ export interface RunnerScriptScopeState
     calc: Calc
     exporter: Exporter
     make: Make
-    // Also classes (TODO)
-    // Vector, Point, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection
+    // Also classes (MORE TODO)
+    Vector: typeof Vector
+    Point: typeof Point
+    Bbox: typeof Bbox
+    Edge: typeof Edge
+    Vertex: typeof Vertex
+    Wire: typeof Wire
+    Face: typeof Face
+    Shell: typeof Shell
+    Solid: typeof Solid
+    ShapeCollection: typeof ShapeCollection
+    Obj: typeof Obj
 }
 
 /** Simplified version of Script(Version) */
@@ -1117,6 +1127,7 @@ export interface RunnerScript
 export interface RunnerScriptExecutionRequest
 {
     script:RunnerScript
+    component?:string // name of component if any
     params?:Record<string,any> // param values
     mode?: 'main'|'component'
     // What to calculate and output
@@ -1143,8 +1154,10 @@ export interface RunnerScriptExecutionRequest
 //      - default/docs/spec/pdf
 //
 export type ExecutionRequestOutputPath = string;
-export type ExecutionRequestOutputEntityGroup = 'models'|'tables'|'docs';
-export type ExecutionRequestOutputFormat = 'raw'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
+export type ExecutionRequestOutputEntityGroup = 'model'|'tables'|'docs';
+
+export type ExecutionRequestOutputFormat = 'raw'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
+// raw is original data, buffer is vertex buffer for editor viewer, glb is binary glTF, svg is 2D SVG, step is STEP file, stl is STL file, pdf is PDF file, xls is Excel file
 
 export interface ExecutionRequestOutput 
 {
@@ -1164,7 +1177,7 @@ export interface ExecutionRequestOutput
     	{
 		    cnc: 
             {
-                models: 
+                model: 
                 {
                     dxf : 
                     { 
@@ -1189,13 +1202,13 @@ export interface ExecutionResultOutput
 }
 
 // outputs of a pipeline
-// { models: { 
+// { model: { 
 //              glb: { options: ..., data: ... } 
 //           }, 
 //   docs: { testdoc : pdf : { options: {}, data: ... } }, tables }
 export interface ExecutionResultPipeline 
 {
-    models?:Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>> // {outputformat}.{options, data}
+    model?:Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>> // {outputformat}.{options, data}
     docs?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
     tables?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
 }

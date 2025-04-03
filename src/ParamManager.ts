@@ -51,7 +51,7 @@ export class ParamManager
     setParent(scope:any):this
     {
         this.parent = scope;
-        this.setParamGlobalsOnWorker();
+        this.setParamGlobalsInScope();
         return this
     }
 
@@ -334,15 +334,21 @@ export class ParamManager
      *      on this scope that is not a Proxy. Proxies can only target Objects
             Use $PARAMS.$TEST.set() to set a value
     */
-    setParamGlobalsOnWorker():boolean
+    setParamGlobalsInScope(scope?:any):boolean
     {
         const curParams = this.getParams();
+
+        if(typeof scope !== 'object' || !scope)
+        { 
+            scope = this.parent; // set to parent scope (worker or app)
+        } 
 
         if (!Array.isArray(curParams)){ return false; }
 
         // Make Params with getter and setter with Proxy
-        curParams.forEach( p => {
-            this.parent[this.PARAM_SIGNIFIER + p.name] = p.value ?? p.default;
+        curParams.forEach( p => 
+        {
+            scope[this.PARAM_SIGNIFIER + p.name] = p.value ?? p.default;
         })
     }
 

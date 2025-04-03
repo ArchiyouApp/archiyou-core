@@ -19,7 +19,9 @@ import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBb
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, ComputeResult, CodeParser } from "./internal"
 
-import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, ParamManager } from "./internal"
+import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
+
+import { RunnerComponentImporter } from "./internal"
 
 import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
     EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL
@@ -28,7 +30,7 @@ import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
 
 import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
                 RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage, 
-                ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutputs,
+                ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
                 ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup } from "./types"
 
 import { isComputeResult } from './typeguards'
@@ -42,7 +44,7 @@ export class Runner
     _config: Record<string,any> // environment variables for worker
     _oc: any; // OpenCascade WASM module
     _localScopes: Record<string, any> = {}; // TODO: more specific typing for Proxy
-    _activeScope: RunnerActiveScope;
+    _activeScope: RunnerActiveScope; // scope in given context (local or worker) and name
     _activeExecRequest: RunnerScriptExecutionRequest;
     
     _manageWorker:Worker|null; // the worker that this runner manages (if role is manager)
@@ -420,6 +422,9 @@ export class Runner
         this._addModulesToScopeState(scopeState);
         // Modeling basics into state
         this._addModelingMethodsToScopeState(scopeState)
+        // Special scope methods, for example importing components
+        this._addMetaMethodsToScopeState(scopeState);
+
 
         return scopeState;
     }
@@ -496,6 +501,7 @@ export class Runner
         state.Shell = Shell;
         state.Solid = Solid;
         state.ShapeCollection = ShapeCollection;
+        state.Obj = Obj;
 
         if(!state.geom)
         {
@@ -522,7 +528,20 @@ export class Runner
         return state;
     }
 
-    //// Managing scopes 
+    /** Add specific meta methods */
+    _addMetaMethodsToScopeState(state:Record<string,any>)
+    {
+        // Import component
+        state.$component = (name:string, params:Record<string,any>={}) => 
+        {
+            console.info(`$component: Importing component: "${name}"`);
+            const componentImporter = new RunnerComponentImporter(this, this.getLocalActiveScope(), name, params);
+            // Don't execute yet, wait for componentImporter.get()
+            return componentImporter;
+        }
+    }
+
+    //// MANAGING SCOPES 
     
     /** Select a scope */
     scope(name:string):this
@@ -533,11 +552,30 @@ export class Runner
         return this;
     }
 
-    getLocalScope(name:string):ProxyConstructor
+    getLocalActiveScope():RunnerScriptScopeState
+    {
+        if(!this._activeScope) { throw new Error(`Runner:: scope(): No active scope found`)}
+        return this._localScopes[this._activeScope.name];
+    }
+
+    getLocalScope(name:string):RunnerScriptScopeState
     {
         if(!this._localScopes[name]){ throw new Error(`Runner:: scope(): Scope "${name}" does not exist`)}
         return this._localScopes[name];
     }
+
+    deleteLocalScope(name:string):this
+    {
+        if(!this._localScopes[name]){ throw new Error(`Runner:: scope(): Scope "${name}" does not exist`)}
+        delete this._localScopes[name];
+        this._activeScope = { name: 'default', context: 'local' }; // reset to default scope
+        
+        console.info(`Runner::deleteLocalScope(): Deleted scope: "${name}. Returned to default."`);
+
+        return this;
+    }
+
+
 
     //// Executing scripts
 
@@ -566,6 +604,7 @@ export class Runner
             return await this._executeInWorker(this._activeExecRequest);
         }
     }
+
 
     async _executeInWorker(request: RunnerScriptExecutionRequest):Promise<ComputeResult>
     {
@@ -659,10 +698,10 @@ export class Runner
         // We use a fix that detects type of inner execution function
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
-        const scope = this._localScopes[this._activeScope.name];
+        const scope = this.getLocalActiveScope();
         const code = request.script.code;
 
-        const startRunFunc = (startRun) ? this._executeStartRun : () => {};
+        const startRunFunc = (startRun) ? this._executeStartLocalRun : () => {};
         const outputFunc = (output) 
                             ? this.getLocalScopeResults.bind(this) // bind to this
                             : async () => null; // output or return null
@@ -766,15 +805,96 @@ export class Runner
         return result
     }
 
+    /** For executing component scripts we need to have synchronous execution function
+     *  This is possible only if we use sync methods in the code
+     *  We only allow export methods of raw (which have data already available by definition)
+     */
+    _executeLocalSync(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):ComputeResult|null
+    {
+        if(!this.loaded())
+        { 
+            throw new Error(`Runner::_executeLocalSync(): OpenCascade WASM module not loaded yet`);
+        }
+            
+        console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
+        console.info(`* With execution request settings: { modelFormat: "${this._activeExecRequest.modelFormat}" } *`);
+
+        this._activeExecRequest = request;
+        const executeStartTime = performance.now()
+
+        const scope = this.getLocalActiveScope();
+        const code = request.script.code;
+
+        const startRunFunc = (startRun) ? this._executeStartLocalRun : () => {};
+        const outputFunc = (output) 
+                            ? this.getLocalScopeResultsSync.bind(this) // bind to this
+                            : () => null; // output or return null
+     
+
+        const exec = () =>
+        {
+            try 
+            {
+                return (new Function(  
+                        'request',
+                        'scope', 
+                        'startRunFunc',
+                        'outputFunc',
+                            // function body
+                            `
+                            startRunFunc.call(scope, scope, request); // first is this, the rest args
+                            // To deal with replaced async functions in old JS enviroments
+
+                            // run code in scope
+                            with (scope)
+                            {
+                                "use strict"; 
+                                ${code};
+                            }
+                            // export results
+                            return outputFunc(scope, request);
+            
+                            `
+                    ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as ComputeResult;    
+            }
+            catch(e)
+            {
+                // Any error while executing code is caught here
+                console.error(`Runner::_executeLocal(): Error while executing code: "${e}" : ${e.stack}`);
+                return {
+                    status: 'error',
+                    errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
+                } as ComputeResult
+            }
+        }
+
+        const result = exec();
+        
+        // Set duration if result is ComputeResult
+        if(isComputeResult(result))
+        {
+            result.duration = Math.round(performance.now() - executeStartTime);
+        }
+
+        // Send message to manager if in worker role
+        if(this.role === 'worker')
+        {
+            this._postMessageToManager({ type: 'executed', payload: result });
+        }
+
+        return result;
+    }
+
+
     /** Setup for every execution run 
      *  This is run inside the execution scope
     */
-    _executeStartRun(scope:any, request: RunnerScriptExecutionRequest):void
+    _executeStartLocalRun(scope:any, request: RunnerScriptExecutionRequest):void
     {
         // Setup ParamManager
-        console.info(`Runner::_executeStartRun()[in execution context]: Setting up ParamManager in scope`);
+        console.info(`Runner::_executeStartLocalRun()[in execution context]: Setting up ParamManager in scope`);
         const params = (Array.isArray(request.script.params) && request.script.params.length) ? Object.values(request.script.params) : [];
-        scope.ay.paramManager = new ParamManager(params).setParent(scope);
+        scope.ay.paramManager = new ParamManager(params).setParent(scope); // sets globals in setParent()
         scope.$PARAMS = scope.ay.paramManager;
 
         // Reset some modules
@@ -799,10 +919,10 @@ export class Runner
         {
             result.outputs = await this.getLocalScopeResultOutputs(scope, request);
         }
+        // BACKWARDS COMPATIBILITY: Old request outputs
         else 
         {
-            // Older one
-            // Models
+       
             switch(request.modelFormat)
             {
                 case 'buffer': // TODO: raw
@@ -824,6 +944,33 @@ export class Runner
         // Other data
         result.scenegraph = scope.geom.scene.toGraph();
         result.docs = (request.docs) ? await scope.doc.toData() : undefined,
+        result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
+        result.tables = scope.calc?.toTableData(); 
+        result.metrics =  scope.calc?.metrics();
+        result.managedParams = scope.ay.paramManager.getOperatedParamsByOperation();        
+
+        return result;
+    }
+
+    /** For special cases we need only sync  */
+    getLocalScopeResultsSync(scope:any, request:RunnerScriptExecutionRequest):ComputeResult
+    {
+        console.info('Runner::getLocalScopeResultsSync(): Getting results from execution scope');
+   
+        const result = {} as ComputeResult;
+
+        // New request outputs
+        if(request.outputs)
+        {
+            result.outputs = this.getLocalScopeResultOutputsSync(scope, request);
+        }
+
+        console.log(JSON.stringify(scope.geom.scene.toGraph()));
+      
+        this._addAppInfoToResult(scope, request, result); // add app info to result
+        
+        // Other data
+        result.scenegraph = scope.geom.scene.toGraph();
         result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
         result.tables = scope.calc?.toTableData(); 
         result.metrics =  scope.calc?.metrics();
@@ -864,12 +1011,12 @@ export class Runner
 
         for(let i = 0; i < pipelines.length; i++)
         {
-            console.info(`Runner::getLocalScopeResultOutputs(): Running extra pipeline "${pipelines[i]}"`);
             const pipeline = pipelines[i];
             
             // Default pipeline is already run, only run others
             if(pipeline !== 'default')
             {
+                console.info(`Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);
                 // TODO: run specific pipeline
                 console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
             }
@@ -878,6 +1025,39 @@ export class Runner
             await this._exportModels(scope, request, pipeline, resultTree); 
             await this._exportDocs(scope, request, pipeline, resultTree);
             await this._exportTables(scope, request, pipeline, resultTree);
+        };
+
+        return resultTree;
+    }
+
+    /** Some outputs we can get synchronously
+     *  This is used for running component scripts
+     */
+    getLocalScopeResultOutputsSync(scope:any, request:RunnerScriptExecutionRequest):ExecutionResultOutputs
+    {
+        const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
+        const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
+
+        console.info(`Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
+
+        const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
+
+        for(let i = 0; i < pipelines.length; i++)
+        {
+            const pipeline = pipelines[i];
+            
+            // Default pipeline is already run, only run others
+            if(pipeline !== 'default')
+            {
+                console.info(`Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);
+                console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
+                // TODO: run specific pipeline
+            }
+
+            // Gather results from pipeline
+            // We can use this sync - but some export methods are async
+            this._exportModelsSyncRaw(scope, request, pipeline, resultTree); 
+            // TODO: export docs and tables
         };
 
         return resultTree;
@@ -896,12 +1076,12 @@ export class Runner
             // default pipeline form: model/glb or docs/*/pdf
             if((isModel && pathParts.length === 2) || (!isModel && pathParts.length === 3)) 
             {
-                pathParts.unshift('default');
+                pathParts.unshift('default'); // add default pipeline 
             }
 
             if((isModel && pathParts.length !== 3) || !isModel && pathParts.length !== 4)
             { 
-                console.error(`Runner::_parseRequestOutputPaths(): Malformed output path "${outputPath}". Format should be {pipeline}/{models}/{format} or {pipeline}/{docs|tables}/{name}/{format}`);
+                console.error(`Runner::_parseRequestOutputPaths(): Malformed output path "${outputPath}". Format should be {pipeline}/{model}/{format} or {pipeline}/{docs|tables}/{name}/{format}`);
                 return; // abort
             }	
 
@@ -933,23 +1113,17 @@ export class Runner
         return requestOutputs;
     }
 
+    
     /** Export models from given scope using paths in request.outputs and place in ExecutionResult tree */
     async _exportModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
     {
         const outputs = this._parseRequestOutputPaths(request.outputs)
-                        .filter(o => o.entityGroup === 'models' && o.pipeline === pipeline); // filter for models
+                        .filter(o => o.entityGroup === 'model' && o.pipeline === pipeline); // filter for models
 
         for(let i = 0; i < outputs.length; i++)
         {
             const output = outputs[i];
-
-            let pipelineResult = result.pipelines[output.pipeline];
-            if(pipelineResult === undefined)
-            { 
-                result.pipelines[output.pipeline] = { models : {} }; 
-                pipelineResult = result.pipelines[output.pipeline]; 
-            }
-            const pipelineResultModels = pipelineResult.models;
+            const pipelineResultModel = this._checkResultForModelsOutputs(result, output); // check if we need to create a new model entry in the result tree
             
             const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL : [output.outputFormat];
 
@@ -961,23 +1135,58 @@ export class Runner
                 switch(format)
                 {
                     case 'raw':
-                        pipelineResultModels.raw = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer(request.modelSettings) };
+                        pipelineResultModel.raw = { options: output.options, data:  scope.geom.scene }; // Obj instance with all hierarchy - imported to current scope
+                    case 'buffer':
+                        pipelineResultModel.buffer = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer(request.modelSettings) };
                         break;
                     case 'glb':
-                        pipelineResultModels.glb = { options: output.options, data:  await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions) }; 
+                        pipelineResultModel.glb = { options: output.options, data:  await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions) }; 
                         break;
                     case 'svg':
-                        pipelineResultModels.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
+                        pipelineResultModel.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
                         break;
                     default:
                         console.error(`Runner::_getScopeComputeResult(): Skipped unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
                 }
             }
         }
-
         return result;
     }
 
+    /** Check structure of result for pipeline 
+     *  and return reference to entry where results can be placed */
+    _checkResultForModelsOutputs(result:ExecutionResultOutputs, output:ExecutionRequestOutput): Partial<Record<ExecutionRequestOutputFormat,ExecutionResultOutput>>
+    {
+        let pipelineResult = result.pipelines[output.pipeline];
+        if(pipelineResult === undefined)
+        { 
+            result.pipelines[output.pipeline] = { model : {} }; 
+            pipelineResult = result.pipelines[output.pipeline]; 
+        }
+        const pipelineResultModel = pipelineResult.model;
+        return pipelineResultModel;
+    }
+
+    /** For component we need to export raw but synchronous 
+     *  because there is no await in script execution scope */
+    _exportModelsSyncRaw(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    {
+        const outputs = this._parseRequestOutputPaths(request.outputs)
+                        .filter(o => o.entityGroup === 'model' && o.pipeline === pipeline); // filter for models
+
+        for(let i = 0; i < outputs.length; i++)
+        {
+            const output = outputs[i];
+            const pipelineResultModel = this._checkResultForModelsOutputs(result, output); // check if we need to create a new model entry in the result tree
+            
+            pipelineResultModel.raw = { options: output.options, data: scope.geom.scene.toComponentGraph(request.component) }; // data tree with raw shapes - to be recreated in main scope scene
+            
+        }
+
+        return result;
+    }
+    
+ 
     async _exportDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
     {
         const EXPORT_FORMATS = ['raw', 'pdf'];
@@ -1101,7 +1310,8 @@ export class Runner
         return result;
     }
 
-    // util method
+    // TODO: metrics
+
     _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
     {
         Object.keys(resultsByName || {}).forEach((docName) =>
@@ -1111,5 +1321,21 @@ export class Runner
         });
     }
 
+    //// EXECUTION COMPONENT SCRIPTS ////
+
+    /** Execute a component script in a seperate scope
+     *  This is always done in local context 
+     *   because executing components comes from within execution scope and context
+     *   IMPORTANT: Because we need to wait for it, this needs to be synchonous, 
+     *   await does not use in script execution scope
+     */
+    _executeComponentScript(request:RunnerScriptExecutionRequest): ComputeResult
+    {
+        this.createScope('component'); // automatically becomes current scope
+        const result = this._executeLocalSync(request, true, true); // start run and output
+        this.deleteLocalScope('component'); // delete scope after execution
+        return result;
+    }
 
 }
+
