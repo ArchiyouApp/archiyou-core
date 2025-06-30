@@ -620,7 +620,7 @@ export class Runner
         if(this.role === 'worker' || this.role === 'single') // Do the work here
         {
             //return await this._executeLocal(this._activeExecRequest, startRun, result);
-            return this._executeLocal(this._activeExecRequest, startRun, result);
+            return await this._executeLocal(this._activeExecRequest, startRun, result);
         }
         else if(this.role === 'manager')
         {
@@ -801,7 +801,7 @@ export class Runner
         
         let result:ComputeResult;
 
-        console.info(`Runner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope.name}"`);
+        console.info(`Runner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope?.name}"`);
 
         for(let s = 0; s < statements.length; s++)
         {
@@ -810,11 +810,12 @@ export class Runner
             const output = (s === statements.length -1); // only output on last statement
             const r = await this.execute(
                 { 
-                    script: { 
+                    script: 
+                    { 
                         code: statement.code, 
                         params: request.script.params  // important: we need to have params here, because they need to be set at first run (s === 0)
                     }
-                } as RunnerScriptExecutionRequest, // use script from request
+                } as RunnerScriptExecutionRequest, 
                 (s === 0), 
                 output); // only start run on first and return result on last
             const statementDuration = Math.round(performance.now() - statementStartTime);
@@ -1397,9 +1398,8 @@ export class Runner
         console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
 
         const results = await this.executeInStatements(request); // execute script in active scope
-        return results;
         
-        console.log((results).outputs)
+        return results;
     }
 
     async getScriptFromUrl(url:string):Promise<PublishScript>
