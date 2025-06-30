@@ -3,7 +3,7 @@
 {
   "compilerOptions": 
   {
-    "target": "es2017", 
+    "target": "es2018", 
     "module": "esnext",
     "moduleResolution": "node", // Needed to import libs                   
     "lib": ["es6","dom", "webworker"],        

@@ -8,6 +8,11 @@ import { Runner, RunnerScriptExecutionRequest, ComputeResult } from '../../../sr
 const REQUEST = {
     script: {
         code: `
+
+        console.log('==== TESTING VARS ====');
+        testVar = 10.0;
+        console.log(Math.ceil(testVar))
+
         r = rect(300, 200);
         b = box(10,20,30);
         c = circle(10);
@@ -25,11 +30,13 @@ const REQUEST = {
             //.view('iso').shapes('iso')
             //.width(0.5)
             //.height(0.5)
-            
+        
+       
+        
         `
     },
     outputs: [
-              'models/glb', 
+              'model/glb', 
               // 'cnc/models/dxf?2d', // just a test with options
               'tables/*/raw',
               'docs/*/pdf',

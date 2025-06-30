@@ -345,9 +345,10 @@ export class ParamManager
 
         if (!Array.isArray(curParams)){ return false; }
 
-        // Make Params with getter and setter with Proxy
+        // Set value of param reference ${PARAM_NAME} on scope
         curParams.forEach( p => 
         {
+            console.info(`ParamManager::setParamGlobalsInScope(): Setting global param "${this.PARAM_SIGNIFIER + p.name}" with value "${p.value ?? p.default}"`);
             scope[this.PARAM_SIGNIFIER + p.name] = p.value ?? p.default;
         })
     }

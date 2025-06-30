@@ -33,6 +33,7 @@
     "json-fn": "^1.1.1",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
+    "semver": "^7.7.2",
     "spark-md5": "^3.0.2",
     "string.prototype.matchall": "^4.0.12",
     "svg-path-parser": "^1.1.0",

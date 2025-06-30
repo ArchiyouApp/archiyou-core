@@ -319,16 +319,6 @@ export interface Param
     
 }
 
-/** Extentions of Param for Publishing - data only! */
-export interface PublishParam extends Omit<Param, '_behaviours'>
-{
-    // NOTE: need to nullify private attributes (for example behavious)
-    order?:number // integer, lower is in front
-    iterable?:boolean // for determine param variants
-    description?:string // added for the user
-    _behaviours?: Record<string,string> // stringified function for save to db etc
-}
-
 
 
 /** A way to define nested ParamObjects, either user in a single entry or list
@@ -1066,6 +1056,48 @@ export type ParamOperation = 'new'|'updated'|'deleted'
 
 export type PublishLicense = 'unknown' | 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'
 
+/** Extentions of Param for Publishing - data only! */
+export interface PublishParam extends Omit<Param, '_behaviours'>
+{
+    // NOTE: need to nullify private attributes (for example behavious)
+    order?:number // integer, lower is in front
+    iterable?:boolean // for determine param variants
+    description?:string // added for the user
+    _behaviours?: Record<string,string> // stringified function for save to db etc
+}
+
+export interface PublishScriptSettings extends ArchiyouOutputSettings
+{
+    fulFillments:Array<any> // Will be phased out
+}
+
+// NOTE: This type will superseed any old OCCI and editor app types
+export type PublishScript = {
+    id?:string
+    name:string // always lowercase
+    title?:string // public title
+    author?:string // None
+    org?:string
+    url?:string
+    description?:string
+    created_at?:Date
+    updated_at?:Date
+    version?:string
+    prev_version?:string
+    safe?:boolean
+    published?:boolean
+    units?:string
+    params?:{[key:string]:PublishParam}
+    param_presets?:{[key:string]:{[key:string]:Record<string,any>}}
+    public_code?:boolean // show code in public script
+    public_code_url?:string // url to edit public code
+    code: string
+    cad_engine?:string // archiyou
+    cad_engine_version?:string
+    cad_engine_config?:PublishScriptSettings 
+    meta?:{[key:string]:any}
+}
+
 
 //// RUNNER ////
 
@@ -1123,7 +1155,10 @@ export interface RunnerScript
     // variants
 }
 
-/** Request results from executing a script */
+/** Request results from executing a script 
+ *  
+ * TODO: Will replace ExecutionRequest in the future
+*/
 export interface RunnerScriptExecutionRequest
 {
     script:RunnerScript
@@ -1132,10 +1167,12 @@ export interface RunnerScriptExecutionRequest
     mode?: 'main'|'component'
     // What to calculate and output
     outputs?: Array<ExecutionRequestOutputPath>
-    // Old ==> To be phased out
+    // **** Old ==> To be phased out
     docs?:Array<any>|boolean // documents to process
     pipelines?:Array<any>|boolean // pipelines to process
     tables?:Array<any>|boolean // tables to process
+    // **** End old
+
     // model generation and export settings
     modelFormat?:ModelFormat // TODO: typing
     modelFormatOptions?:ExportGLTFOptions|ExportSVGOptions

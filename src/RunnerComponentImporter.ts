@@ -10,7 +10,7 @@ import type { RunnerScriptExecutionRequest, PublishParam, RunnerScriptScopeState
 export class RunnerComponentImporter
 {
     //// SETTINGS ////
-    DEFAULT_OUTPUTS = ['models/raw']
+    DEFAULT_OUTPUTS = ['models/raw']; 
 
     ////
     
@@ -22,7 +22,6 @@ export class RunnerComponentImporter
     _requestedOutputs:Array<string> = [];  // requested outputs
 
     
-
     constructor(runner:Runner, scope:RunnerScriptScopeState,  name:string, params?:Record<string,any>)
     {
         this._runner = runner; // tied to runner
@@ -86,8 +85,6 @@ export class RunnerComponentImporter
             resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].docs[v].raw.data, {});
             // TODO: metrics
         });
-
-
 
         return result;
     }

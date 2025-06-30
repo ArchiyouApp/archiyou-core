@@ -13,9 +13,12 @@
  //
 
 
+
 import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
                     StatementResult, RunnerScriptScopeState
  } from "./internal"
+
+import { Library }  from "./Library"
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, ComputeResult, CodeParser } from "./internal"
 
@@ -31,7 +34,9 @@ import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
 import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
                 RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage, 
                 ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
-                ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup } from "./types"
+                ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup, 
+                PublishScript,
+                PublishParam} from "./types"
 
 import { isComputeResult } from './typeguards'
 
@@ -418,6 +423,9 @@ export class Runner
         // Archiyou base modules like geom, doc, calc, make etc
         Object.assign(scopeState, { ay: this.initLocalArchiyou()});
 
+        // Add basic globals (like Math)
+        this._addGlobalsToScopeState(scopeState);
+
         // Add Archiyou modules as globals in execution scope state object
         this._addModulesToScopeState(scopeState);
         // Modeling basics into state
@@ -453,6 +461,21 @@ export class Runner
         ay?.beams?.setArchiyou(ay); // Not there currently
 
         return ay;
+    }
+
+    /** Our scopes are very limited. We need to make sure basic globals are availble */
+    _addGlobalsToScopeState(state:Record<string,any>):Record<string,any>
+    {
+        // Add basic globals to the state
+        Object.assign(state,
+            {
+                Math: Math, 
+                Array: Array,
+                Object: Object,
+            }
+        );
+
+        return state;
     }
 
     /** Add Archiyou modules as globals in execution scope state object */
@@ -742,7 +765,7 @@ export class Runner
             catch(e)
             {
                 // Any error while executing code is caught here
-                console.error(`Runner::_executeLocal(): Error while executing code: "${e}" : ${e.stack}`);
+                console.error(`Runner::_executeLocal(): Error while executing code: "${e}"`);
                 return {
                     status: 'error',
                     errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
@@ -784,11 +807,22 @@ export class Runner
         {
             const statementStartTime = performance.now()
             const statement = statements[s];
-            const output = s === statements.length -1; // only output on last statement
-            const r = await this.execute(statement.code, (s === 0), output); // only start run on first and return result on last
+            const output = (s === statements.length -1); // only output on last statement
+            const r = await this.execute(
+                { 
+                    script: { 
+                        code: statement.code, 
+                        params: request.script.params  // important: we need to have params here, because they need to be set at first run (s === 0)
+                    }
+                } as RunnerScriptExecutionRequest, // use script from request
+                (s === 0), 
+                output); // only start run on first and return result on last
             const statementDuration = Math.round(performance.now() - statementStartTime);
-            if(r.status === 'error')
+            if(r?.status === 'error') // r can be null
             {
+                console.error(`Runner::_executeLocalInStatements(): ***** ERROR: "${r.errors[0].message}" in following statement @${statement.lineStart}-${statement.lineEnd}} ****`);
+                console.error(statement.code);
+
                 statementResults.push({ 
                     ...statement,
                     status: 'error',
@@ -893,7 +927,17 @@ export class Runner
     {
         // Setup ParamManager
         console.info(`Runner::_executeStartLocalRun()[in execution context]: Setting up ParamManager in scope`);
-        const params = (Array.isArray(request.script.params) && request.script.params.length) ? Object.values(request.script.params) : [];
+        console.log(JSON.stringify(request));
+    
+        console.log(request.script.params);
+        
+        // Params from script definition and values from request
+        const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params)) ? Object.values(request.script.params) : [];
+        const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
+        params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
+        // NOTE: in paramManager incoming values are validated and set to default if not valid
+        console.log(`**** _executeStartLocalRun(): Params: ${JSON.stringify(params)}`);
+
         scope.ay.paramManager = new ParamManager(params).setParent(scope); // sets globals in setParent()
         scope.$PARAMS = scope.ay.paramManager;
 
@@ -1335,6 +1379,33 @@ export class Runner
         const result = this._executeLocalSync(request, true, true); // start run and output
         this.deleteLocalScope('component'); // delete scope after execution
         return result;
+    }
+
+    //// EXECUTE FROM ARCHIYOU LIBRARY ////
+    async executeUrl(url:string, params?:Record<string,PublishParam>, outputs?:Array<ExecutionRequestOutputPath>):Promise<ComputeResult>
+    {
+        const script = await this.getScriptFromUrl(url);
+        if(!script){ throw new Error(`Runner::executeUrl(): Script not found at URL "${url}"`);}
+
+
+        const request:RunnerScriptExecutionRequest = {
+            script: script,
+            params: params || Object.values(script.params).reduce((agg, p) => { agg[p.name] = p.default; return agg; }, {}), // use default param values if not provided
+            outputs: outputs || ['default/model/glb'], // default output
+        };
+        
+        console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
+
+        const results = await this.executeInStatements(request); // execute script in active scope
+        return results;
+        
+        console.log((results).outputs)
+    }
+
+    async getScriptFromUrl(url:string):Promise<PublishScript>
+    {
+        const library = new Library();
+        return await library.getScriptFromUrl(url); // get script from library
     }
 
 }
