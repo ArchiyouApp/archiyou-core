@@ -15,7 +15,7 @@
 
 
 import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
-                    StatementResult, RunnerScriptScopeState
+                    Statement, StatementResult, RunnerScriptScopeState
  } from "./internal"
 
 import { Library }  from "./Library"
@@ -609,6 +609,8 @@ export class Runner
     */
     async execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
     {
+        console.info(`\x1b[34m**** Runner::execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****\x1b[0m`);
+
         // Convert code to request if needed
         if(typeof request === 'string')
         {
@@ -675,6 +677,22 @@ export class Runner
 
     _checkExecRequestAndAddDefaults(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
     {
+        // check params defs and inputs
+        if(typeof request.script.params === 'object' && Object.keys(request.script.params).length > 0)
+        {
+            // If parameters values are not set, use default from definitions
+            if(!request.params || typeof request !== 'object'){  request.params = {} }; // Create params object if not set 
+
+            Object.values(request.script.params)
+                .forEach((param:PublishParam) =>
+                {
+                    if(!request.params[param.name])
+                    {
+                        request.params[param.name] = param.default; // Set default value
+                    }
+                });
+        }
+
         return {
             modelFormat: this.EXEC_REQUEST_MODEL_FORMAT,
             ...request
@@ -709,7 +727,7 @@ export class Runner
             });
         }
             
-        console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
+        console.info(`\x1b[34mRunner: Executing script in active local context: "${this._activeScope.name}"\x1b[0m`);
         console.info(`* With execution request settings: { modelFormat: "${this._activeExecRequest.modelFormat}" } *`);
 
         this._activeExecRequest = request;
@@ -801,27 +819,29 @@ export class Runner
         
         let result:ComputeResult;
 
-        console.info(`Runner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope?.name}"`);
+        console.info(`\x1b[34mRunner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope?.name}"\x1b[0m`);
 
         for(let s = 0; s < statements.length; s++)
         {
             const statementStartTime = performance.now()
-            const statement = statements[s];
+            const statement = this._preprocessStatement({ ...statements[s] });
             const output = (s === statements.length -1); // only output on last statement
             const r = await this.execute(
                 { 
-                    script: 
-                    { 
-                        code: statement.code, 
-                        params: request.script.params  // important: we need to have params here, because they need to be set at first run (s === 0)
-                    }
+                    ...request, // take from main request
+                    script: {  
+                        code: statement.code,  // only statement code
+                        params: request.script.params || {} // use params from request
+                    },
                 } as RunnerScriptExecutionRequest, 
                 (s === 0), 
-                output); // only start run on first and return result on last
+                output
+            ); // only start run on first and return result on last
+
             const statementDuration = Math.round(performance.now() - statementStartTime);
             if(r?.status === 'error') // r can be null
             {
-                console.error(`Runner::_executeLocalInStatements(): ***** ERROR: "${r.errors[0].message}" in following statement @${statement.lineStart}-${statement.lineEnd}} ****`);
+                console.error(`\x1b[31m !!!! Runner::_executeLocalInStatements(): ***** ERROR: "${r.errors[0].message}" in following statement @${statement.lineStart}-${statement.lineEnd}} !!!! \x1b[0m`);
                 console.error(statement.code);
 
                 statementResults.push({ 
@@ -831,13 +851,40 @@ export class Runner
                     duration: statementDuration 
                 }); 
             }
-            else {
-                console.info(`Runner::_executeLocalInStatements(): Statement "${statement.code.slice(0,50) }]" [index:${s+1} - ${output ? 'with' : 'without'} output] executed in ${statementDuration}ms`);
-                result = r;
-            }
+            
+            console.info(`Runner::_executeLocalInStatements(): Statement #${s+1} - ${output ? 'with' : 'without'} output] executed in ${statementDuration}ms`);
+            result = r;
+            
         }
 
         return result
+    }
+
+    /** Some preprocessing for statements */
+    _preprocessStatement(statement:Statement):Statement
+    {
+        const CODE_REPLACE_RES = [
+            { 
+                // Replace function declarations with function expressions
+                // So the function is assigned to a variable - otherwise it is not available in the local scope
+                from: /function\s+(\w+)\s*\(/g, 
+                to: (match, functionName) => `${functionName} = function(`,
+                msg:  (matches) => {
+                    return `Replacing declaration of "${matches[0]}" in statement "${statement.code}" to fit in local scope! Please use fn = function(){...} instead of function fn(){...} !`
+                }
+            }
+        ]
+        CODE_REPLACE_RES.forEach(ft => 
+        {
+            const originalCode = statement.code; // keep original code for error messages
+            statement.code = statement.code.replace(ft.from, ft.to);
+            if(originalCode !== statement.code)
+            {
+                console.warn(`Runner::_preprocessStatement(): ${ft.msg(originalCode.match(ft.from))}`);
+            }
+        });
+        
+        return statement;
     }
 
     /** For executing component scripts we need to have synchronous execution function
@@ -928,10 +975,7 @@ export class Runner
     {
         // Setup ParamManager
         console.info(`Runner::_executeStartLocalRun()[in execution context]: Setting up ParamManager in scope`);
-        console.log(JSON.stringify(request));
-    
-        console.log(request.script.params);
-        
+                
         // Params from script definition and values from request
         const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params)) ? Object.values(request.script.params) : [];
         const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
@@ -955,7 +999,9 @@ export class Runner
     */
     async getLocalScopeResults(scope:any, request:RunnerScriptExecutionRequest):Promise<ComputeResult>
     {
-        console.info('Runner::getLocalScopeResults(): Getting results from execution scope');
+        console.info('\x1b[32m****Runner::getLocalScopeResults(): Getting results from execution scope ****\x1b[0m');
+        console.info(`\x1b[32mRequest outputs:\x1b[0m`)
+        request.outputs?.forEach(o => console.info(`\x1b[32m * ${o}\x1b[0m`));
    
         const result = {} as ComputeResult;
 
@@ -987,6 +1033,7 @@ export class Runner
         this._addAppInfoToResult(scope, request, result); // add app info to result
         
         // Other data
+        result.status = 'success'; 
         result.scenegraph = scope.geom.scene.toGraph();
         result.docs = (request.docs) ? await scope.doc.toData() : undefined,
         result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
@@ -1050,7 +1097,7 @@ export class Runner
         const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
         const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
-        console.info(`Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
+        console.info(`\x1b[32m**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')} ****\x1b[0m`);
 
         const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
 
@@ -1061,9 +1108,9 @@ export class Runner
             // Default pipeline is already run, only run others
             if(pipeline !== 'default')
             {
-                console.info(`Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);
+                console.info(`'\x1b[32mRunner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"\x1b[0m`);
                 // TODO: run specific pipeline
-                console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
+                console.warn(`'\x1b[31mx1b[0mRunner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet\x1b[0m`);
             }
 
             // Gather results from pipeline
@@ -1238,11 +1285,12 @@ export class Runner
 
         let outputs = this._parseRequestOutputPaths(request.outputs)
                             .filter(o => o.entityGroup === 'docs' && o.pipeline === pipeline); // filter for docs
-        // checks
+        
+                            // checks and warnings
         outputs.forEach((o,i) => {
             if(!EXPORT_FORMATS.includes(o.outputFormat))
             {
-                console.warn(`Runner::_exportDocs(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}"`); 
+                console.warn(`\x1b[31m !!!! Runner::_exportDocs(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}"\x1b[0m !!!!`); 
             }
         })
         outputs = outputs.filter(o => EXPORT_FORMATS.includes(o.outputFormat)); // filter for docs
@@ -1254,7 +1302,7 @@ export class Runner
             return result; // no docs to export
         } 
 
-        // Check result data structure 
+        // Check and setup result data structure 
         let pipelineResult = result.pipelines[pipeline];
         if (pipelineResult === undefined)
         {
@@ -1267,6 +1315,7 @@ export class Runner
         }
         const pipelineResultDocs = pipelineResult.docs;
         
+        // Now generate the docs
         // Docs are exported at the same time per format
         for(let f =0; f < EXPORT_FORMATS.length; f++)
         {
@@ -1277,6 +1326,15 @@ export class Runner
             {
                 // if * is present, all docs are selected
                 if(onlyDocNames.includes('*')){ onlyDocNames = []; } // if * is present, all docs are selected
+
+                // Some sanity checks - if user requested a doc name that does not exist give a warning
+                onlyDocNames.forEach((docName) => {
+                    if(!scope.doc.docs().includes(docName))
+                    {
+                        console.warn(`\x1b[31mRunner::_exportDocs(): Skipped export of doc "${docName}" in format "${format}" because it does not exist!\x1b[0m`);
+                    }
+                });                
+
                 // Now do export
                 switch (format)
                 {
@@ -1397,9 +1455,8 @@ export class Runner
         
         console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
 
-        const results = await this.executeInStatements(request); // execute script in active scope
-        
-        return results;
+        const r = await this.executeInStatements(request); // execute script in active scope
+        return r;
     }
 
     async getScriptFromUrl(url:string):Promise<PublishScript>

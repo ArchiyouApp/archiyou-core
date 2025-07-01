@@ -634,9 +634,11 @@ export class Doc
         // Metric labelblock
         this.labelblock('metrics', this._getMetricSummary(), { y: '11mm', width: TITLEBLOCK_WIDTH, numTextLines: 2 }); // TODO: dynamic param readout
         const metricsBlock = this.lastBlock();
+
         // Param labelblock
         this.labelblock('params', this._getParamSummary(), { y: metricsBlock.bbox[3] + BLOCK_MARGIN, width: TITLEBLOCK_WIDTH, numTextLines: 2 }); // TODO: dynamic param readout
         const paramsBlock = this.lastBlock();
+
         // Info labelblock
         this.labelblock(
                         ['designer', 'design license', 'manual license'], 
@@ -653,8 +655,6 @@ export class Doc
             .width(TITLEBLOCK_WIDTH)
             .position(1, designBlock.bbox[3] + BLOCK_MARGIN*2);
 
-        
-
         return this;
     }
 
@@ -664,8 +664,7 @@ export class Doc
         const PARAM_NAME_MAXCHAR = 4;
         const PARAM_IS_VALUE_CHAR = ':'
         const PARAM_SEPERATOR_CHAR = ' '
-
-        
+    
         // New consistent way to get params from request
         // Combine params with request.params for values
         const params = this?._ay?.worker?._activeExecRequest?.script?.params as Record<string,PublishParam>;
@@ -673,11 +672,16 @@ export class Doc
         if (!params || Object.keys(params).length === 0){ return 'no parameters' }
 
         const paramValues = this?._ay?.worker?._activeExecRequest?.params;
-        const paramAndValues = (Object.values(params) as Array<Param>)
+
+
+
+
+        const paramsWithValues = (Object.values(params) as Array<Param>)
                                 .map((p) => { return { ...p, value: paramValues[p.name] }})
         
+        console.log(paramsWithValues);
         
-        return paramAndValues.map(p => {
+        return paramsWithValues.map(p => {
             const paramName = p.label || p.name;
             let paramSummaryName;
             if(paramName.length <= PARAM_NAME_MAXCHAR)

@@ -10,7 +10,12 @@ new Runner()
         (runner) => 
         {
             runner.executeUrl('https://pub.archiyou.com/archiyou/simplestep')
-           
+           .then((r) => 
+           {
+                console.log('==== DONE ====')
+                console.log(r.status);
+                console.log(JSON.stringify(r.errors));
+            });
         });
 
 
