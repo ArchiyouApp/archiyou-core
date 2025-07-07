@@ -1,5 +1,7 @@
 import { Runner } from './internal';
-import type { RunnerScriptExecutionRequest, PublishParam, RunnerScriptScopeState, Obj } from './internal';
+import type { RunnerScriptExecutionRequest, 
+            RunnerScriptScopeState, Obj, PublishScript, PublishParam } from './internal';
+
 
 /**
  *  Exists in script execution scope
@@ -19,6 +21,7 @@ export class RunnerComponentImporter
     name:string;
     params:Record<string,any>;
     options:Record<string,any>; // TODO
+    script?:PublishScript; // script to execute - will be fetched from library or from disk
     _requestedOutputs:Array<string> = [];  // requested outputs
 
     
@@ -30,30 +33,32 @@ export class RunnerComponentImporter
         this.params = params || {}; // parameters for the component
     }
 
-    /** Really get the script and execute in seperate scope 
-     *  Because we can't use await inside a script this needs to be synchronous
-    */
-    _execute():ImportComponentResult
+    /** Really get the script and execute in seperate scope */
+    async _execute():Promise<ImportComponentResult>
     {
-        // TODO: fetch real script
-        const TEST_COMPONENT_SCRIPT = {
-            code: `p = plane($SIZE)`,
-            params: { size: { type: 'number', default: 100 } as PublishParam }, // TODO: get from component
-        };
         if(!this._runner){ throw new Error('ImportComponentController::_execute(): Runner not set!');}
+        
+        const script = await this._fetchComponentScript();
+    
+        return this._executeScript(script, this.params); // execute script in seperate component scope
+    }
 
+    async _executeScript(script:PublishScript, params:Record<string, PublishParam>):Promise<ImportComponentResult>
+    {
         const request:RunnerScriptExecutionRequest = {
-            script: TEST_COMPONENT_SCRIPT,
+            script: script,
             component: this.name,
+            params: this.params,
             outputs: (this._requestedOutputs.length === 0) ? this.DEFAULT_OUTPUTS : this._requestedOutputs,
         };
+
+        console.info(`$component("${this.name}")::_executeScript(): Executing component script with outputs: "${request.outputs.join(',')}"`);
         
         const r = this._runner._executeComponentScript(request);
         
         // We do some simplication turning ComputeResult into ImportComponentResult
         // If we only have one pipeline we set models, tables, docs, metrics directly on result
         // Other pipelines are set on result by name. i.e. cnc/models, cnc/tables etc
-
         if(r.status === 'error')
         {
             return { status: 'error', errors: r.errors, component: this.name , model: {}, tables: {}, docs: {} };
@@ -87,7 +92,43 @@ export class RunnerComponentImporter
         });
 
         return result;
+
     }
+
+    async _fetchComponentScript():Promise<PublishScript>
+    {
+        if(!this.name){ throw new Error(`$component("${name}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
+
+        // Local file path (in node)
+        if(this.name.includes('.json'))
+        {
+            if(!this._runner.inNode())
+            {
+                throw new Error(`$component("${this.name}")::_fetchComponentScript(): Cannot fetch component script from local file. Runner is not in Node.js context!`);    
+            }
+
+            console.info(`$component("${this.name}")::_fetchComponentScript(): Fetching local component script at "${this.name}"...`);
+            const fs = await import('fs/promises'); // use promises version of fs   
+            
+            const path = await import('path');
+            const currentDirectory = path.dirname('.');
+            console.log(currentDirectory);
+
+            const data = await fs.readFile(this.name, 'utf-8');
+
+            if(!data)
+            { 
+                throw new Error(`\x1b[31m$component("${this.name}")::_fetchComponentScript(): Cannot read component script from file "${this.name}". File not found or empty!\x1b[0m`);
+            }
+            return JSON.parse(data) as PublishScript; // parse JSON script
+        }
+        // Remote URL in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent'
+        else {
+            return await this._runner.getScriptFromUrl(this.name); // get library instance
+        }
+
+    }
+
 
     _recreateComponentObjTree(tree:Object, parentObj?:Obj):Obj
     {
@@ -123,7 +164,7 @@ export class RunnerComponentImporter
     }
 
     /** Request certain outputs based on execution output paths */
-    get(p:string|Array<string>)
+    async get(p:string|Array<string>)
     {
         if (typeof p === 'string') p = [p]; // convert to array if string
 
@@ -140,7 +181,7 @@ export class RunnerComponentImporter
 
         console.log(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
 
-        return this._execute();
+        return await this._execute();
     }
 
 }

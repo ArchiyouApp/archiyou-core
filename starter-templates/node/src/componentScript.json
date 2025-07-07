@@ -1,0 +1,8 @@
+{
+    "id": "testcomponent:1.0",
+    "name" : "testcomponent",
+    "code" : "comp = sphere($SIZE)",
+    "params" : {
+        "SIZE": 100
+    }
+}

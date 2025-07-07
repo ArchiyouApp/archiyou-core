@@ -12,9 +12,9 @@ const REQUEST = {
         b = box(10,20,30);
         // import component 
         // auto imported in scene
-        component = $component('archiyou/testcomponent:0.5', { size: 100 }).get('model');
-        print(component.model); // Obj
-        print(component.model.shapes()); // get shapes
+        //component = await $component('./src/componentScript.json', { size: 100 }).get('model');
+        //print(component.model); // Obj
+        //print(component.model.shapes()); // get shapes
         `
     },
     outputs: [

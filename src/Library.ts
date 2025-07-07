@@ -102,11 +102,13 @@ export class Library
      *  @param url - URL to fetch the script from 
      *     examples: https://pub.archiyou.com/archiyou/simplestep
      *              https://pub.archiyou.com/archiyou/simplestep/0.9.1 or https://pub.archiyou.com/archiyou/simplestep:0.9.1
+     *      only path with default library URL is supported:
+     *             /archiyou/simplestep:0.9.1     
      *  @returns Promise<PublishScript> - The script object with code and params
      */
     async getScriptFromUrl(url:string):Promise<PublishScript>
     {
-        const m = url.match(/^https:\/\/(?<domain>[^/]+)\/(?<library>[^/]+)\/(?<scriptname>[^/:]+)(?:[:/](?<version>[^/]+))?\/?$/);
+        const m = url.match(/^(?:(?<domain>[^/]+)\/)?(?<library>[^/]+)\/(?<scriptname>[^/:]+)(?:[:/](?<version>[^/]+))?\/?$/);
         if(m?.groups)
         {
             let { domain, library, scriptname, version } = m.groups;
@@ -129,7 +131,7 @@ export class Library
                 }
             }
 
-            const scriptUrl = `https://${domain}/${library}/${scriptname}/${version}/script`; // get only script data
+            const scriptUrl = `https://${domain || this.DEFAULT_LIBRARY_URL}/${library}/${scriptname}/${version}/script`; // get only script data
             console.log(`Library::getScriptFromUrl(): Fetching script from URL: ${scriptUrl}`);
     
             try {

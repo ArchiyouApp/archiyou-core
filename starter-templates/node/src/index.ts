@@ -1,6 +1,6 @@
 //import { OcLoader } from '../../../src/internal';
 //import { OcLoader } from 'archiyou-core'
-import { Runner, RunnerScriptExecutionRequest, ComputeResult } from '../../../src/internal'
+import { Runner, RunnerScriptExecutionRequest } from '../../../src/internal'
 
 
 //// TEST REQUEST ////

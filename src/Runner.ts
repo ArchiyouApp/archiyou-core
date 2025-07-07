@@ -15,12 +15,12 @@
 
 
 import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
-                    Statement, StatementResult, RunnerScriptScopeState
+                    Statement, StatementResult, RunnerScriptScopeState, RunnerScript,
  } from "./internal"
 
-import { Library }  from "./Library"
 
-import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, ComputeResult, CodeParser } from "./internal"
+import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, 
+            ComputeResult, CodeParser, Library } from "./internal"
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
@@ -617,6 +617,7 @@ export class Runner
                 request = { script: { code: request } } as RunnerScriptExecutionRequest;    
         }
 
+        // Check request structure (including params defs and values)
         this._activeExecRequest = this._checkExecRequestAndAddDefaults(request);
 
         if(this.role === 'worker' || this.role === 'single') // Do the work here
@@ -678,20 +679,7 @@ export class Runner
     _checkExecRequestAndAddDefaults(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
     {
         // check params defs and inputs
-        if(typeof request.script.params === 'object' && Object.keys(request.script.params).length > 0)
-        {
-            // If parameters values are not set, use default from definitions
-            if(!request.params || typeof request !== 'object'){  request.params = {} }; // Create params object if not set 
-
-            Object.values(request.script.params)
-                .forEach((param:PublishParam) =>
-                {
-                    if(!request.params[param.name])
-                    {
-                        request.params[param.name] = param.default; // Set default value
-                    }
-                });
-        }
+        this._checkRequestParams(request);
 
         return {
             modelFormat: this.EXEC_REQUEST_MODEL_FORMAT,
@@ -699,7 +687,47 @@ export class Runner
         }
     }
 
+       /** Check params in RunnerScriptExecutionRequest
+     *  We need to make sure that param values are there and consistent with param definitions 
+     *  - if param values (request.params) are not set, we use default values from script.params definitions
+     *  - param values (request.params) are put in defs (request.script.params) 
+     
+     * */
+    
+    _checkRequestParams(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
+    {
+        // No param definitions in script
+        if(!request.script.params)
+        {
+            request.params = {}; // no param values in request
+            return request;
+        }
+
+        // Params from script definition and values from request
+        const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params).length > 0) 
+            ? Object.values(request.script.params) : [];
+        // Make sure we got name in param obj definition too
+        params.forEach((pd,i) => 
+        {
+            const name = Object.keys(request.script.params)[i];
+            pd.name = name;
+            if(!name){ console.error(`Runner::_executeStartLocalRun(): Param definition without name found: ${JSON.stringify(pd)}`); }	
+        });
+
+        const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
+        params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
+        // NOTE: in paramManager incoming values are validated and set to default if not valid
+        console.log(`**** _executeStartLocalRun(): Params: ${JSON.stringify(params)}`);
+        
+        // Make sure we have param values too (default if not set)
+        request.params = params.reduce( (agg,p) => { agg[p.name] = p.value; return agg }, {}); 
+
+        return request;
+    }
+    
+
     /** Execute a piece of code or script (and params) in local context 
+     *  IMPORTANT: this = execution context
      *  @request - string with code or object with script and params
      *  @startRun - if true a reset is made of the state to prepare for fresh run
      *  @output - if true, the Archiyou state is returned as ComputeResult
@@ -729,6 +757,7 @@ export class Runner
             
         console.info(`\x1b[34mRunner: Executing script in active local context: "${this._activeScope.name}"\x1b[0m`);
         console.info(`* With execution request settings: { modelFormat: "${this._activeExecRequest.modelFormat}" } *`);
+        console.info(`* With param values: ${JSON.stringify(request.params)} *`);
 
         this._activeExecRequest = request;
         const executeStartTime = performance.now()
@@ -783,7 +812,7 @@ export class Runner
             catch(e)
             {
                 // Any error while executing code is caught here
-                console.error(`Runner::_executeLocal(): Error while executing code: "${e}"`);
+                console.error(`Runner::_executeLocal(): Error while executing code "${code}": "${e}"`);
                 return {
                     status: 'error',
                     errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
@@ -890,6 +919,7 @@ export class Runner
     /** For executing component scripts we need to have synchronous execution function
      *  This is possible only if we use sync methods in the code
      *  We only allow export methods of raw (which have data already available by definition)
+     *  IMPORPTANT: This is run in the local scope, so 'this' is the execution scope
      */
     _executeLocalSync(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):ComputeResult|null
     {
@@ -899,7 +929,8 @@ export class Runner
         }
             
         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
-        console.info(`* With execution request settings: { modelFormat: "${this._activeExecRequest.modelFormat}" } *`);
+        console.info(`* With execution request settings: { params: ${request.params} , 
+                        modelFormat: "${this._activeExecRequest.modelFormat}" }*`);
 
         this._activeExecRequest = request;
         const executeStartTime = performance.now()
@@ -968,21 +999,17 @@ export class Runner
     }
 
 
+
     /** Setup for every execution run 
-     *  This is run inside the execution scope
+     *  IMPORTANT: This is run inside the execution scope - so 'this' is the execution scope
     */
     _executeStartLocalRun(scope:any, request: RunnerScriptExecutionRequest):void
     {
         // Setup ParamManager
-        console.info(`Runner::_executeStartLocalRun()[in execution context]: Setting up ParamManager in scope`);
+        console.info(`Runner::_executeStartLocalRun()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(request.script.params)}"`);
                 
-        // Params from script definition and values from request
-        const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params)) ? Object.values(request.script.params) : [];
-        const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
-        params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
-        // NOTE: in paramManager incoming values are validated and set to default if not valid
-        console.log(`**** _executeStartLocalRun(): Params: ${JSON.stringify(params)}`);
-
+        // TODO: ParamManager takes array of Params. Make consistent
+        const params = (typeof request.script.params === 'object') ? Object.values(request.script.params) : []; // defs with values from request.params
         scope.ay.paramManager = new ParamManager(params).setParent(scope); // sets globals in setParent()
         scope.$PARAMS = scope.ay.paramManager;
 
@@ -1430,11 +1457,12 @@ export class Runner
      *  This is always done in local context 
      *   because executing components comes from within execution scope and context
      *   IMPORTANT: Because we need to wait for it, this needs to be synchonous, 
-     *   await does not use in script execution scope
+     *   using await in execution scope does work, but is ugly. 
      */
     _executeComponentScript(request:RunnerScriptExecutionRequest): ComputeResult
     {
         this.createScope('component'); // automatically becomes current scope
+
         const result = this._executeLocalSync(request, true, true); // start run and output
         this.deleteLocalScope('component'); // delete scope after execution
         return result;
@@ -1464,6 +1492,14 @@ export class Runner
         const library = new Library();
         return await library.getScriptFromUrl(url); // get script from library
     }
+
+    //// UTILS ////
+
+    inNode():boolean
+    {
+        return (typeof process !== 'undefined' && process.versions?.node) ? true : false;
+    }
+
 
 }
 
