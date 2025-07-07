@@ -33,6 +33,36 @@ export class RunnerComponentImporter
         this.params = params || {}; // parameters for the component
     }
 
+    /** This trigger actual component fetching and script execution
+     *  based on data in this instance of RunnerComponentImporter
+     *  @param p - path or array of paths to requested outputs (like 'model', 'cnc/model')  
+     *  !!!! IMPORTANT: This method is called within main script execution scope,
+     *  So we need to avoid a async function here because the user will need to await it 
+     *  Which is not user friendly.
+     *  TODO: We need to pre-fetch all component scripts from main execution scope
+     *  
+     * */
+    async get(p:string|Array<string>)
+    {
+        if (typeof p === 'string') p = [p]; // convert to array if string
+
+        // very simple inputs like 'model' => 'default/models/raw'
+        const outputPaths = p.map((path) =>
+        {
+            if(path.split('/').length === 1 && ['model', 'tables', 'docs'].includes(path))
+            {
+                return `default/${path}/raw`;
+            }
+        }).filter(path => path !== undefined); // remove undefined paths
+        
+        this._requestedOutputs = this._requestedOutputs.concat(outputPaths);
+
+        console.log(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
+
+        return await this._execute();
+    }
+   
+
     /** Really get the script and execute in seperate scope */
     async _execute():Promise<ImportComponentResult>
     {
@@ -163,26 +193,6 @@ export class RunnerComponentImporter
         return newObj;
     }
 
-    /** Request certain outputs based on execution output paths */
-    async get(p:string|Array<string>)
-    {
-        if (typeof p === 'string') p = [p]; // convert to array if string
-
-        // very simple inputs like 'model' => 'default/models/raw'
-        const outputPaths = p.map((path) =>
-        {
-            if(path.split('/').length === 1 && ['model', 'tables', 'docs'].includes(path))
-            {
-                return `default/${path}/raw`;
-            }
-        }).filter(path => path !== undefined); // remove undefined paths
-        
-        this._requestedOutputs = this._requestedOutputs.concat(outputPaths);
-
-        console.log(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
-
-        return await this._execute();
-    }
 
 }
 
