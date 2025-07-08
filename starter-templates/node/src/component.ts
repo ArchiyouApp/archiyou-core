@@ -13,11 +13,19 @@ const REQUEST = {
         // import component 
         // auto imported in scene
         component = $component('./src/componentScript.json', { size: 100 })
-                    .get('model'); // if only one output, directly as output?
-        // component = component.model.shapes() 
+                    .get(['model','metrics', 'docs', 'tables']); 
+        // NOTE: if only one output, directly as output?
+                
+        
+        // Change component shapes
         component.model.shapes().moveZ(30+$SIZE).color('red');
-        //print(component.model); // Obj
-        //print(component.model.shapes()); // get shapes
+                    
+        // Inspect results
+        print(component.model); // Obj
+        print(component.model.shapes()); // get shapes
+        print(JSON.stringify(component.metrics)); // Metrics - TODO
+        print(JSON.stringify(component.docs)); // Docs  
+        print(JSON.stringify(component.tables)); // Tables
         `
     },
     outputs: [

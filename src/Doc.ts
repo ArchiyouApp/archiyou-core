@@ -210,6 +210,8 @@ export class Doc
 
         if(name){ this.name(name) };
 
+        console.info(`Doc::create(): Created new document "${this._activeDoc}" with default settings[in ${this._unitsByDoc[this._activeDoc]} - ${this._pageSizeByDoc[this._activeDoc]} - ${this._pageOrientationByDoc[this._activeDoc]}`)
+
         return this;
     }
 

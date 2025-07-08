@@ -472,6 +472,7 @@ export class Runner
         Object.assign(state,
             {
                 Math: Math, 
+                JSON: JSON,
                 Array: Array,
                 Object: Object,
             }
@@ -1228,13 +1229,12 @@ export class Runner
     /** For special cases we need only sync  */
     getLocalScopeResultsSync(scope:any, request:RunnerScriptExecutionRequest):ComputeResult
     {
-        console.info('Runner::getLocalScopeResultsSync(): Getting results from execution scope');
-   
         const result = {} as ComputeResult;
 
         // New request outputs
         if(request.outputs)
         {
+            console.info(`Runner::getLocalScopeResultsSync(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
             result.outputs = this.getLocalScopeResultOutputsSync(scope, request);
         }
 
@@ -1311,7 +1311,7 @@ export class Runner
         const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
         const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
-        console.info(`Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
+        console.info(`Runner::getLocalScopeResultOutputsSync(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
 
         const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
 
@@ -1322,15 +1322,15 @@ export class Runner
             // Default pipeline is already run, only run others
             if(pipeline !== 'default')
             {
-                console.info(`Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);
-                console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
+                console.info(`Runner::getLocalScopeResultOutputsSync(): Running extra pipeline: "${pipelines[i]}"`);
+                console.warn(`Runner::getLocalScopeResultOutputsSync(): Running pipeline "${pipeline}" not implemented yet`);
                 // TODO: run specific pipeline
             }
 
             // Gather results from pipeline
             // We can use this sync - but some export methods are async
             this._exportModelsSyncRaw(scope, request, pipeline, resultTree); 
-            // TODO: export docs and tables
+            // !!!! TODO: export docs and tables !!!!
         };
 
         return resultTree;
@@ -1467,7 +1467,10 @@ export class Runner
         let outputs = this._parseRequestOutputPaths(request.outputs)
                             .filter(o => o.entityGroup === 'docs' && o.pipeline === pipeline); // filter for docs
         
-                            // checks and warnings
+        console.log('==== EXPORT DOCS ====')
+        console.log(JSON.stringify(this._parseRequestOutputPaths(request.outputs)));
+
+        // checks and warnings
         outputs.forEach((o,i) => {
             if(!EXPORT_FORMATS.includes(o.outputFormat))
             {

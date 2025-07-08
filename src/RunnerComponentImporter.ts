@@ -47,14 +47,35 @@ export class RunnerComponentImporter
     {
         if (typeof p === 'string') p = [p]; // convert to array if string
 
-        // very simple inputs like 'model' => 'default/models/raw'
+        console.log('==== GET COMPONENT ====');
+        console.log(JSON.stringify(p));
+
+        // what to get 
+        // 'model' => 'default/models/raw'
+        // 'docs' => 'default/docs/*'
+        // or default/docs/spec/raw
         const outputPaths = p.map((path) =>
         {
-            if(path.split('/').length === 1 && ['model', 'tables', 'docs'].includes(path))
+            console.log(path.split('/'));
+            // For get we have some simpler paths - like 'model', 'docs', 'tables', 'metrics'
+            // TODO: Manage output paths in a more generic way
+            if(path.split('/').length === 1 && ['model', 'docs', 'tables', 'metrics'].includes(path))
             {
-                return `default/${path}/raw`;
+                if(path === 'model') return `default/${path}/raw`;
+                else return `default/${path}/*/raw`; // 'docs/*' or 'tables/*' or 'metrics/*'
             }
+            // Append format'raw' with paths like 'docs/spec' or 'tables/*' or 'models/cnc'
+            else if(path.split('/').length === 2)
+            {
+                return `default/${path}/raw`; // 'docs/spec/raw' or 'tables/*/raw'
+            }
+            // TODO: correct wrong formats like 'cnc/model/dxf' or 'cnc/tables/*/xlsx'
+
+
         }).filter(path => path !== undefined); // remove undefined paths
+
+        console.log('==== GET ====');
+        console.log(outputPaths);
         
         this._requestedOutputs = this._requestedOutputs.concat(outputPaths);
 
