@@ -33,16 +33,17 @@ export class RunnerComponentImporter
         this.params = params || {}; // parameters for the component
     }
 
-    /** This trigger actual component fetching and script execution
+    /** This trigger actual script execution
      *  based on data in this instance of RunnerComponentImporter
      *  @param p - path or array of paths to requested outputs (like 'model', 'cnc/model')  
+     * 
      *  !!!! IMPORTANT: This method is called within main script execution scope,
      *  So we need to avoid a async function here because the user will need to await it 
-     *  Which is not user friendly.
-     *  TODO: We need to pre-fetch all component scripts from main execution scope
+     *  Which is not user friendly. 
+     *  The component scripts are already prefetched and cached in Runner.fetchComponentScripts()
      *  
      * */
-    async get(p:string|Array<string>)
+    get(p:string|Array<string>)
     {
         if (typeof p === 'string') p = [p]; // convert to array if string
 
@@ -59,21 +60,36 @@ export class RunnerComponentImporter
 
         console.log(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
 
-        return await this._execute();
+        return this._getAndExecute();
     }
    
-
     /** Really get the script and execute in seperate scope */
-    async _execute():Promise<ImportComponentResult>
+    _getAndExecute():ImportComponentResult
     {
         if(!this._runner){ throw new Error('ImportComponentController::_execute(): Runner not set!');}
         
-        const script = await this._fetchComponentScript();
+        const script = this._getComponentScript();
     
-        return this._executeScript(script, this.params); // execute script in seperate component scope
+        if(!script)
+        {
+            throw new Error(`$component("${this.name}")::_getAndExecute(): Cannot find component script in Runner.componentScripts cache. Make sure the component is loaded and available.`);
+        }
+        
+        return this._executeComponentScript(script); // execute script in seperate component scope
     }
 
-    async _executeScript(script:PublishScript, params:Record<string, PublishParam>):Promise<ImportComponentResult>
+    /** Get component script from Runners cache (in Runner.componentScripts) */
+    _getComponentScript():PublishScript|null
+    {
+        return this._runner.getComponentScript(this.name)
+    }
+
+    /** Execute component script with params and requested outputs
+     *  @param script - PublishScript to execute
+     *  @param params - parameters to pass to the script
+     *  @returns Promise<ImportComponentResult> - result of the execution
+     */
+    _executeComponentScript(script:PublishScript):ImportComponentResult
     {
         const request:RunnerScriptExecutionRequest = {
             script: script,
@@ -82,7 +98,9 @@ export class RunnerComponentImporter
             outputs: (this._requestedOutputs.length === 0) ? this.DEFAULT_OUTPUTS : this._requestedOutputs,
         };
 
-        console.info(`$component("${this.name}")::_executeScript(): Executing component script with outputs: "${request.outputs.join(',')}"`);
+        this._runner._checkRequestAndAddDefaults(request); // check request and add defaults if needed
+
+        console.info(`$component("${this.name}")::_executeComponentScript(): Executing component script with outputs: "${request.outputs.join(',')}"`);
         
         const r = this._runner._executeComponentScript(request);
         
@@ -122,40 +140,6 @@ export class RunnerComponentImporter
         });
 
         return result;
-
-    }
-
-    async _fetchComponentScript():Promise<PublishScript>
-    {
-        if(!this.name){ throw new Error(`$component("${name}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
-
-        // Local file path (in node)
-        if(this.name.includes('.json'))
-        {
-            if(!this._runner.inNode())
-            {
-                throw new Error(`$component("${this.name}")::_fetchComponentScript(): Cannot fetch component script from local file. Runner is not in Node.js context!`);    
-            }
-
-            console.info(`$component("${this.name}")::_fetchComponentScript(): Fetching local component script at "${this.name}"...`);
-            const fs = await import('fs/promises'); // use promises version of fs   
-            
-            const path = await import('path');
-            const currentDirectory = path.dirname('.');
-            console.log(currentDirectory);
-
-            const data = await fs.readFile(this.name, 'utf-8');
-
-            if(!data)
-            { 
-                throw new Error(`\x1b[31m$component("${this.name}")::_fetchComponentScript(): Cannot read component script from file "${this.name}". File not found or empty!\x1b[0m`);
-            }
-            return JSON.parse(data) as PublishScript; // parse JSON script
-        }
-        // Remote URL in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent'
-        else {
-            return await this._runner.getScriptFromUrl(this.name); // get library instance
-        }
 
     }
 

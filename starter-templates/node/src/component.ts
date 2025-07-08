@@ -9,10 +9,13 @@ import { Runner, RunnerOps, RunnerScriptExecutionRequest, ComputeResult } from '
 const REQUEST = {
     script: {
         code: `
-        b = box(10,20,30);
+        b = box(10,20,30).color('blue');
         // import component 
         // auto imported in scene
-        //component = await $component('./src/componentScript.json', { size: 100 }).get('model');
+        component = $component('./src/componentScript.json', { size: 100 })
+                    .get('model'); // if only one output, directly as output?
+        // component = component.model.shapes() 
+        component.model.shapes().moveZ(30+$SIZE).color('red');
         //print(component.model); // Obj
         //print(component.model.shapes()); // get shapes
         `

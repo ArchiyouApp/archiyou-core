@@ -51,6 +51,8 @@ export class Runner
     _localScopes: Record<string, any> = {}; // TODO: more specific typing for Proxy
     _activeScope: RunnerActiveScope; // scope in given context (local or worker) and name
     _activeExecRequest: RunnerScriptExecutionRequest;
+
+    _componentScripts: Record<string, PublishScript> = {}; // prefetched component scripts by name=url=path
     
     _manageWorker:Worker|null; // the worker that this runner manages (if role is manager)
     _onWorkerMessageFunc:(m:RunnerWorkerMessage) => any; // function to call when we get a message from the Worker
@@ -151,7 +153,7 @@ export class Runner
         this._manageWorker.postMessage(message);
     }
 
-    /** Setup communition between manager and worker */
+    /** Setup communication between manager and worker */
     _connectToWorker(settings:Record<string,any>={})
     {
         if(!this._manageWorker){ throw new Error(`Runner::_postMessageToWorker(): Worker not found`);}
@@ -367,7 +369,7 @@ export class Runner
         return null; 
     }
 
-    //// SCOPES AND EXECUTION ////
+    //// EXECUTION SCOPES ////
 
     /** Set Execution Scope 
      *  Depending on the execution context we set up a scope in which the script will run 
@@ -557,14 +559,15 @@ export class Runner
         // Import component
         state.$component = (name:string, params:Record<string,any>={}) => 
         {
-            console.info(`$component: Importing component: "${name}"`);
+            console.info(`$component: Importing component: "${name}" with param values: ${JSON.stringify(params)}`);
+
             const componentImporter = new RunnerComponentImporter(this, this.getLocalActiveScope(), name, params);
             // Don't execute yet, wait for componentImporter.get()
             return componentImporter;
         }
     }
 
-    //// MANAGING SCOPES 
+    //// MANAGING EXECUTION SCOPES 
     
     /** Select a scope */
     scope(name:string):this
@@ -600,16 +603,24 @@ export class Runner
 
 
 
-    //// Executing scripts
+    //// REQUESTS AND EXECUTION ////
 
-    /** Execute code or script with params in active scope 
+    /** Start execution of entire code or script with params in active scope 
      *  @request - string with code or object with script and params
      *  @startRun - reset the scope before running the code
      *  @result - return the result of the execution
+     * 
     */
-    async execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
+    async execute(request: string|RunnerScriptExecutionRequest):Promise<ComputeResult>
     {
-        console.info(`\x1b[34m**** Runner::execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****\x1b[0m`);
+        await this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
+        return await this._execute(request, true, true);
+    }
+
+    /** Execute (entire or partial) request on local execution scope or on managed worker */
+    async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
+    {
+        console.info(`**** Runner::_execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****`);
 
         // Convert code to request if needed
         if(typeof request === 'string')
@@ -618,11 +629,10 @@ export class Runner
         }
 
         // Check request structure (including params defs and values)
-        this._activeExecRequest = this._checkExecRequestAndAddDefaults(request);
+        this._activeExecRequest = this._checkRequestAndAddDefaults(request);
 
         if(this.role === 'worker' || this.role === 'single') // Do the work here
         {
-            //return await this._executeLocal(this._activeExecRequest, startRun, result);
             return await this._executeLocal(this._activeExecRequest, startRun, result);
         }
         else if(this.role === 'manager')
@@ -631,7 +641,84 @@ export class Runner
         }
     }
 
+    /** Main entrypoint for execution in statements
+     *  Use this is you need more control of execution and possible errors
+     *  This seperates the code in statements and returns results for each statement
+     *  It still uses execute() internally
+    */
+    async executeInStatements(request: RunnerScriptExecutionRequest):Promise<ComputeResult>
+    {
+        this._activeExecRequest = this._checkRequestAndAddDefaults(request);
+        const statementResults = [] as Array<StatementResult>;
 
+        if(this.role === 'worker' || this.role === 'single')
+        {
+            return await this._executeLocalInStatements(this._activeExecRequest, statementResults);
+        }
+        else
+        {
+            console.warn(`Runner::execute(): Execution by manager not implemented yet`);
+            return null;
+        }
+    }
+
+    /** Check execution request */
+    _checkRequestAndAddDefaults(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
+    {
+        console.info(`Runner::_checkRequestAndAddDefaults(): Checking Execution Request with code "${request.script.code.slice(0, 150)}..."`);
+        // check params defs and inputs
+        this._checkRequestParams(request);
+
+        return {
+            modelFormat: this.EXEC_REQUEST_MODEL_FORMAT,
+            ...request
+        }
+    }
+
+       /** Check params in RunnerScriptExecutionRequest
+     *  We need to make sure that param values are there and consistent with param definitions 
+     *  - if param values (request.params) are not set, we use default values from script.params definitions
+     *  - param values (request.params) are put in defs (request.script.params) 
+     * */
+    _checkRequestParams(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
+    {
+        // No param definitions in script
+        if(!request.script.params)
+        {
+            request.params = {}; // no param values in request
+            return request;
+        }
+        
+        // Do some sanity checks on script param definition
+        if(typeof request.script.params !== 'object')
+        {
+            console.error(`Runner::_checkRequestParams(): Script params should be an object, but got: ${JSON.stringify(request.script.params)}`);
+            request.script.params = {}; // reset to empty object
+        }
+
+        // Params from script definition and values from request
+        const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params).length > 0) 
+            ? Object.values(request.script.params) : [];
+        // Make sure we got name in param obj definition too
+        params.forEach((pd,i) => 
+        {
+            const name = Object.keys(request.script.params)[i];
+            pd.name = name;
+            if(!name){ console.error(`Runner::_checkRequestParams(): Param definition without name found: ${JSON.stringify(pd)}`); }	
+        });
+
+        const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
+        params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
+        // NOTE: in paramManager incoming values are validated and set to default if not valid
+        console.log(`**** _checkRequestParams(): Params: ${JSON.stringify(params)}`);
+        
+        // Make sure we have param values too (default if not set)
+        request.params = params.reduce( (agg,p) => { agg[p.name] = p.value; return agg }, {}); 
+
+        return request;
+    }
+
+    /** Execute a request in a seperate managed worker */
     async _executeInWorker(request: RunnerScriptExecutionRequest):Promise<ComputeResult>
     {
         console.info(`Runner: Executing script in worker`);
@@ -658,81 +745,16 @@ export class Runner
             }, 10000); // 10 seconds timeout
         });
     }
-
-    /** Execute request in statements for easy debugging */
-    async executeInStatements(request: RunnerScriptExecutionRequest):Promise<ComputeResult>
-    {
-        this._activeExecRequest = this._checkExecRequestAndAddDefaults(request);
-        const statementResults = [] as Array<StatementResult>;
-
-        if(this.role === 'worker' || this.role === 'single')
-        {
-            return await this._executeLocalInStatements(this._activeExecRequest, statementResults);
-        }
-        else
-        {
-            console.warn(`Runner::execute(): Execution by manager not implemented yet`);
-            return null;
-        }
-    }
-
-    _checkExecRequestAndAddDefaults(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
-    {
-        // check params defs and inputs
-        this._checkRequestParams(request);
-
-        return {
-            modelFormat: this.EXEC_REQUEST_MODEL_FORMAT,
-            ...request
-        }
-    }
-
-       /** Check params in RunnerScriptExecutionRequest
-     *  We need to make sure that param values are there and consistent with param definitions 
-     *  - if param values (request.params) are not set, we use default values from script.params definitions
-     *  - param values (request.params) are put in defs (request.script.params) 
-     
-     * */
-    
-    _checkRequestParams(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
-    {
-        // No param definitions in script
-        if(!request.script.params)
-        {
-            request.params = {}; // no param values in request
-            return request;
-        }
-
-        // Params from script definition and values from request
-        const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params).length > 0) 
-            ? Object.values(request.script.params) : [];
-        // Make sure we got name in param obj definition too
-        params.forEach((pd,i) => 
-        {
-            const name = Object.keys(request.script.params)[i];
-            pd.name = name;
-            if(!name){ console.error(`Runner::_executeStartLocalRun(): Param definition without name found: ${JSON.stringify(pd)}`); }	
-        });
-
-        const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
-        params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
-        // NOTE: in paramManager incoming values are validated and set to default if not valid
-        console.log(`**** _executeStartLocalRun(): Params: ${JSON.stringify(params)}`);
-        
-        // Make sure we have param values too (default if not set)
-        request.params = params.reduce( (agg,p) => { agg[p.name] = p.value; return agg }, {}); 
-
-        return request;
-    }
     
 
-    /** Execute a piece of code or script (and params) in local context 
-     *  IMPORTANT: this = execution context
+    /** Execute a piece of code or script (and params) in local execution context 
      *  @request - string with code or object with script and params
      *  @startRun - if true a reset is made of the state to prepare for fresh run
      *  @output - if true, the Archiyou state is returned as ComputeResult
      * 
      *  @returns - ComputeResult or null if no output or error string
+     * 
+     *  NOTE: this = execution context (not Runner)
     */
     async _executeLocal(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):Promise<ComputeResult|null>
     {
@@ -755,7 +777,7 @@ export class Runner
             });
         }
             
-        console.info(`\x1b[34mRunner: Executing script in active local context: "${this._activeScope.name}"\x1b[0m`);
+        console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
         console.info(`* With execution request settings: { modelFormat: "${this._activeExecRequest.modelFormat}" } *`);
         console.info(`* With param values: ${JSON.stringify(request.params)} *`);
 
@@ -771,7 +793,7 @@ export class Runner
         const scope = this.getLocalActiveScope();
         const code = request.script.code;
 
-        const startRunFunc = (startRun) ? this._executeStartLocalRun : () => {};
+        const startRunFunc = (startRun) ? this._executionStartRunInScope : () => {};
         const outputFunc = (output) 
                             ? this.getLocalScopeResults.bind(this) // bind to this
                             : async () => null; // output or return null
@@ -840,22 +862,25 @@ export class Runner
 
     /** Run a execution request (with script, params etc) in individual statements 
      *  This is used for debugging and testing in browser
+     *  NOTE: see executeInStatements() for main entrypoint
     */
     async _executeLocalInStatements(request: RunnerScriptExecutionRequest, statementResults:Array<StatementResult>):Promise<ComputeResult>
     {
+        this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
+
         const codeParser = new CodeParser(request.script.code, {}, null); // TODO: config, IO => archiyou?
         const statements = await codeParser.getStatements();
         
         let result:ComputeResult;
 
-        console.info(`\x1b[34mRunner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope?.name}"\x1b[0m`);
+        console.info(`Runner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope?.name}"`);
 
         for(let s = 0; s < statements.length; s++)
         {
             const statementStartTime = performance.now()
             const statement = this._preprocessStatement({ ...statements[s] });
             const output = (s === statements.length -1); // only output on last statement
-            const r = await this.execute(
+            const r = await this._execute(
                 { 
                     ...request, // take from main request
                     script: {  
@@ -863,14 +888,14 @@ export class Runner
                         params: request.script.params || {} // use params from request
                     },
                 } as RunnerScriptExecutionRequest, 
-                (s === 0), 
-                output
-            ); // only start run on first and return result on last
+                (s === 0), // startRun on first statement
+                output // only return output on last statement
+            ); 
 
             const statementDuration = Math.round(performance.now() - statementStartTime);
             if(r?.status === 'error') // r can be null
             {
-                console.error(`\x1b[31m !!!! Runner::_executeLocalInStatements(): ***** ERROR: "${r.errors[0].message}" in following statement @${statement.lineStart}-${statement.lineEnd}} !!!! \x1b[0m`);
+                console.error(`!!!! Runner::_executeLocalInStatements(): ***** ERROR: "${r.errors[0].message}" in following statement @${statement.lineStart}-${statement.lineEnd}} !!!! `);
                 console.error(statement.code);
 
                 statementResults.push({ 
@@ -917,9 +942,10 @@ export class Runner
     }
 
     /** For executing component scripts we need to have synchronous execution function
+     *  Because we don't want to write await $component('name').get() in the code
      *  This is possible only if we use sync methods in the code
      *  We only allow export methods of raw (which have data already available by definition)
-     *  IMPORPTANT: This is run in the local scope, so 'this' is the execution scope
+     *  IMPORTANT: This is run in the local scope, so 'this' is the execution scope
      */
     _executeLocalSync(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):ComputeResult|null
     {
@@ -929,7 +955,7 @@ export class Runner
         }
             
         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
-        console.info(`* With execution request settings: { params: ${request.params} , 
+        console.info(`* With execution request settings: { params: ${JSON.stringify(request.params)} , 
                         modelFormat: "${this._activeExecRequest.modelFormat}" }*`);
 
         this._activeExecRequest = request;
@@ -938,12 +964,11 @@ export class Runner
         const scope = this.getLocalActiveScope();
         const code = request.script.code;
 
-        const startRunFunc = (startRun) ? this._executeStartLocalRun : () => {};
+        const startRunFunc = (startRun) ? this._executionStartRunInScope : () => {};
         const outputFunc = (output) 
                             ? this.getLocalScopeResultsSync.bind(this) // bind to this
                             : () => null; // output or return null
      
-
         const exec = () =>
         {
             try 
@@ -1000,16 +1025,16 @@ export class Runner
 
 
 
-    /** Setup for every execution run 
-     *  IMPORTANT: This is run inside the execution scope - so 'this' is the execution scope
+    /** Setup for every execution run inside execution scope
+     *  IMPORTANT: 'this' is the execution scope
     */
-    _executeStartLocalRun(scope:any, request: RunnerScriptExecutionRequest):void
+    _executionStartRunInScope(scope:any, request: RunnerScriptExecutionRequest):void
     {
         // Setup ParamManager
-        console.info(`Runner::_executeStartLocalRun()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(request.script.params)}"`);
-                
-        // TODO: ParamManager takes array of Params. Make consistent
+        // TODO: ParamManager takes array of Params. Make consistent with map of PublishScript.params
         const params = (typeof request.script.params === 'object') ? Object.values(request.script.params) : []; // defs with values from request.params
+        console.info(`Runner::_executionStartRunInScope()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(params)}"`);
+        
         scope.ay.paramManager = new ParamManager(params).setParent(scope); // sets globals in setParent()
         scope.$PARAMS = scope.ay.paramManager;
 
@@ -1021,14 +1046,143 @@ export class Runner
         scope.ay.gizmos = [];
     }
 
+     //// EXECUTION COMPONENT SCRIPTS ////
+
+    /** Execute a component script in a seperate scope
+     *  This is always done in local context 
+     *   because executing components comes from within execution scope and context
+     *   IMPORTANT: 
+     *      We want to avoid writing in a script: await $component('name').get(..) - which will be ugly and prone to errors
+     *      So a sync function is used to execute component scripts
+     *      This also means that we need to pre-fetch all component scripts before executing them
+     */
+    _executeComponentScript(request:RunnerScriptExecutionRequest): ComputeResult
+    {
+        this.createScope('component'); // automatically becomes current scope
+        const result = this._executeLocalSync(request, true, true); // start run and output
+        this.deleteLocalScope('component'); // delete scope after execution
+        return result;
+    }
+
+    /* Prefetch component scripts from request script code
+        IMPORTANT: How to deal with recursive component imports?
+    */
+    async _prefetchComponentScripts(request:string|RunnerScriptExecutionRequest, noCache:boolean=false):Promise<Record<string,PublishScript>>
+    {
+        const IMPORT_COMPONENT_RE = /\$component\(\s*'(?<name>[^,]+)'[^\)]+/g;
+
+        const scriptCode = (typeof request === 'string') 
+            ? request : (request as RunnerScriptExecutionRequest).script.code;
+        const componentMatches = [...scriptCode.matchAll(IMPORT_COMPONENT_RE)];
+
+        if(componentMatches.length === 0)
+        {
+            console.info(`Runner::_prefetchComponentScripts(): No component scripts found in request script code`);
+            return this._componentScripts; // no components to fetch
+        }
+
+        console.info(`Runner::_prefetchComponentScripts(): Found ${componentMatches.length} component scripts to prefetch in request script code`);
+
+        // Fetch all component scripts
+        for(let i = 0; i < componentMatches.length; i++)
+        {   
+            const match = componentMatches[i];
+            const name = match.groups?.name?.trim();
+            if(!name){ console.warn(`Runner::_prefetchComponentScripts(): Component name not found in match: ${JSON.stringify(match)}`); }
+
+            // Fetch component script
+            const componentScript = await this._fetchComponentScript(name);
+            if(!componentScript){ console.error(`Runner::_prefetchComponentScripts(): Component script "${name}" not found!`);}
+
+            // Add component script to request
+            console.info(`Runner::_prefetchComponentScripts(): Fetched component script and placed in Runners cache "${name}"`);
+            this._componentScripts[name] = componentScript; // add to components
+            // !!!! TODO: possible recurse with component in component scripts !!!!
+        };
+
+        return this._componentScripts; // return all fetched component scripts
+    }
+
+    
+    /** Fetch component script from url or local file path */
+    async _fetchComponentScript(name?:string):Promise<PublishScript>
+    {
+        if(!name){ throw new Error(`$component("${name}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
+
+        // Local file path (in node)
+        if(name.includes('.json'))
+        {
+            if(!this.inNode())
+            {
+                throw new Error(`$component("${name}")::_fetchComponentScript(): Cannot fetch component script from local file. Runner is not in Node.js context!`);    
+            }
+
+            console.info(`$component("${name}")::_fetchComponentScript(): Fetching local component script at "${name}"...`);
+            
+            // Load dynamically to avoid issues in browser
+            const fs = await import('fs/promises'); // use promises version of fs   
+            const data = await fs.readFile(name, 'utf-8');
+
+            if(!data)
+            { 
+                throw new Error(`$component("${name}")::_fetchComponentScript(): Cannot read component script from file "${name}". File not found or empty!`);
+            }
+            return JSON.parse(data) as PublishScript; // parse JSON script
+        }
+        // Remote URL in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent'
+        else {
+            return await this.getScriptFromUrl(name); // get library instance
+        }
+    }
+
+    /** Get component from cache in componentScripts */
+    getComponentScript(name:string):PublishScript|null
+    {
+        if(!this._componentScripts[name])
+        {
+            console.warn(`Runner::getComponentScript(): Component script "${name}" not found in cache`);
+            return null;
+        }
+        return this._componentScripts[name];
+    }
+
+    //// EXECUTION UTILS ////
+
+    /** Execute from URL of Archiyou library */
+    async executeUrl(url:string, params?:Record<string,PublishParam>, outputs?:Array<ExecutionRequestOutputPath>):Promise<ComputeResult>
+    {
+        const script = await this.getScriptFromUrl(url);
+        if(!script){ throw new Error(`Runner::executeUrl(): Script not found at URL "${url}"`);}
+
+
+        const request:RunnerScriptExecutionRequest = {
+            script: script,
+            params: params || Object.values(script.params).reduce((agg, p) => { agg[p.name] = p.default; return agg; }, {}), // use default param values if not provided
+            outputs: outputs || ['default/model/glb'], // default output
+        };
+        
+        console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
+
+        const r = await this.executeInStatements(request); // execute script in active scope
+        return r;
+    }
+
+    async getScriptFromUrl(url:string):Promise<PublishScript>
+    {
+        const library = new Library();
+        return await library.getScriptFromUrl(url); // get script from library
+    }
+
+    //// RESULTS ////
+
     /** Get results out of local execution scope  
      *  This function is bound to the scope - so 'this' is the execution scope
     */
     async getLocalScopeResults(scope:any, request:RunnerScriptExecutionRequest):Promise<ComputeResult>
     {
-        console.info('\x1b[32m****Runner::getLocalScopeResults(): Getting results from execution scope ****\x1b[0m');
-        console.info(`\x1b[32mRequest outputs:\x1b[0m`)
-        request.outputs?.forEach(o => console.info(`\x1b[32m * ${o}\x1b[0m`));
+        console.info('****Runner::getLocalScopeResults(): Getting results from execution scope ****');
+        console.info(`Request outputs:`)
+        request.outputs?.forEach(o => console.info(` * ${o}`));
    
         const result = {} as ComputeResult;
 
@@ -1124,7 +1278,7 @@ export class Runner
         const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
         const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
-        console.info(`\x1b[32m**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')} ****\x1b[0m`);
+        console.info(`**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')} ****`);
 
         const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
 
@@ -1135,9 +1289,9 @@ export class Runner
             // Default pipeline is already run, only run others
             if(pipeline !== 'default')
             {
-                console.info(`'\x1b[32mRunner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"\x1b[0m`);
+                console.info(`'Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);
                 // TODO: run specific pipeline
-                console.warn(`'\x1b[31mx1b[0mRunner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet\x1b[0m`);
+                console.warn(`'x1b[0mRunner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
             }
 
             // Gather results from pipeline
@@ -1317,7 +1471,7 @@ export class Runner
         outputs.forEach((o,i) => {
             if(!EXPORT_FORMATS.includes(o.outputFormat))
             {
-                console.warn(`\x1b[31m !!!! Runner::_exportDocs(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}"\x1b[0m !!!!`); 
+                console.warn(` !!!! Runner::_exportDocs(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}" !!!!`); 
             }
         })
         outputs = outputs.filter(o => EXPORT_FORMATS.includes(o.outputFormat)); // filter for docs
@@ -1358,7 +1512,7 @@ export class Runner
                 onlyDocNames.forEach((docName) => {
                     if(!scope.doc.docs().includes(docName))
                     {
-                        console.warn(`\x1b[31mRunner::_exportDocs(): Skipped export of doc "${docName}" in format "${format}" because it does not exist!\x1b[0m`);
+                        console.warn(`Runner::_exportDocs(): Skipped export of doc "${docName}" in format "${format}" because it does not exist!`);
                     }
                 });                
 
@@ -1440,7 +1594,7 @@ export class Runner
         return result;
     }
 
-    // TODO: metrics
+    // TODO: Export metrics
 
     _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
     {
@@ -1451,47 +1605,6 @@ export class Runner
         });
     }
 
-    //// EXECUTION COMPONENT SCRIPTS ////
-
-    /** Execute a component script in a seperate scope
-     *  This is always done in local context 
-     *   because executing components comes from within execution scope and context
-     *   IMPORTANT: Because we need to wait for it, this needs to be synchonous, 
-     *   using await in execution scope does work, but is ugly. 
-     */
-    _executeComponentScript(request:RunnerScriptExecutionRequest): ComputeResult
-    {
-        this.createScope('component'); // automatically becomes current scope
-
-        const result = this._executeLocalSync(request, true, true); // start run and output
-        this.deleteLocalScope('component'); // delete scope after execution
-        return result;
-    }
-
-    //// EXECUTE FROM ARCHIYOU LIBRARY ////
-    async executeUrl(url:string, params?:Record<string,PublishParam>, outputs?:Array<ExecutionRequestOutputPath>):Promise<ComputeResult>
-    {
-        const script = await this.getScriptFromUrl(url);
-        if(!script){ throw new Error(`Runner::executeUrl(): Script not found at URL "${url}"`);}
-
-
-        const request:RunnerScriptExecutionRequest = {
-            script: script,
-            params: params || Object.values(script.params).reduce((agg, p) => { agg[p.name] = p.default; return agg; }, {}), // use default param values if not provided
-            outputs: outputs || ['default/model/glb'], // default output
-        };
-        
-        console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
-
-        const r = await this.executeInStatements(request); // execute script in active scope
-        return r;
-    }
-
-    async getScriptFromUrl(url:string):Promise<PublishScript>
-    {
-        const library = new Library();
-        return await library.getScriptFromUrl(url); // get script from library
-    }
 
     //// UTILS ////
 

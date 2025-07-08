@@ -3,6 +3,10 @@
     "name" : "testcomponent",
     "code" : "comp = sphere($SIZE)",
     "params" : {
-        "SIZE": 100
+        "SIZE": {
+            "type": "number",
+            "default": 10,
+            "description": "Size of the sphere"   
+        }
     }
 }
