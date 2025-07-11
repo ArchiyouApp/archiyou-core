@@ -159,10 +159,11 @@ export class RunnerComponentImporter
             if(resultTarget === undefined){  resultTarget = result[pipelineName] = {} as ImportComponentResult;}
         
             // We need to recreate the component scene hierarchy and shapes in main scope
-            resultTarget.model = this._recreateComponentObjTree(r.outputs.pipelines[pipelineName].model.raw.data);
+            // TODO: check results
+            resultTarget.model = this._recreateComponentObjTree(r.outputs.pipelines[pipelineName].model.internal.data);
             resultTarget.metrics = r.outputs.pipelines[pipelineName]?.metrics || {}; 
-            resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].tables[v].raw.data, {});
-            resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].docs[v].raw.data, {});
+            resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].tables[v].internal.data, {});
+            resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].docs[v].internal.data, {});
             
         });
 
