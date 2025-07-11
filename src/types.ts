@@ -1,5 +1,7 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, ParamManager, Obj  } from './internal'
-import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
+
+import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View, Table } from './internal'
+
 import { Console } from './Console'
 
 //// SETTINGS ////
@@ -260,6 +262,8 @@ export interface ComputeResult
     task: ComputeTask,
     created_at: Date,
     status:'success'|'error',
+    duration: number
+
     meshes?: Array<MeshShape>, // individual ShapeMeshes: TO BE FASED OUT!
     meshBuffer?: MeshShapeBuffer,
     meshGLB?:ArrayBuffer, // raw GLB file in buffer
@@ -268,17 +272,39 @@ export interface ComputeResult
     statements: Array<StatementResult>
     errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
     messages?: Array<ConsoleMessage>,
+
     gizmos?: Array<Gizmo>,
     annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
-    duration: number
+    
     docs?:{[key:string]:DocData} // Data for generating docs
     pipelines: Array<string>,
     tables?: Record<string, any>, // TS type TODO
     metrics?: Record<string, any>, // TS type TODO
     info?:ArchiyouAppInfo, // general metadata 
     managedParams?:Record<ParamOperation, Array<PublishParam>>
-    // outputs (NEW)
+    
+    // New outputs per pipeline
     outputs?: ExecutionResultOutputs
+}
+
+/** Results of component execution */
+export interface ImportComponentResult
+{
+    status?:'success'|'error'; // status of the execution
+    errors?:Array<any>; // errors if any
+    component?:string // name of component
+    outputs:Record<string, ImportComponentPipelineOutputs> // outputs per pipeline name in internal format
+}
+
+/** Outputs of component execution
+ *  All internal instances for internal use
+ */
+export interface ImportComponentPipelineOutputs
+{
+    model: Obj, 
+    metrics: Record<string, Metric>, // metrics of the model
+    tables: Record<string, Table>
+    docs: Record<string, Doc>,
 }
 
 
@@ -570,6 +596,14 @@ export interface DocData {
     pages:Array<PageData>
     modelUnits:ModelUnits
 }
+
+
+export interface DocPipeline
+{
+    fn:() => any
+    done: boolean
+}
+
 
 
 //// DOC:PAGE ////
@@ -1191,10 +1225,10 @@ export interface RunnerScriptExecutionRequest
 //      - default/docs/spec/pdf
 //
 export type ExecutionRequestOutputPath = string;
-export type ExecutionRequestOutputEntityGroup = 'model'|'tables'|'docs';
+export type ExecutionRequestOutputEntityGroup = 'model'|'metrics'|'tables'|'docs';
 
-export type ExecutionRequestOutputFormat = 'raw'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
-// raw is original data, buffer is vertex buffer for editor viewer, glb is binary glTF, svg is 2D SVG, step is STEP file, stl is STL file, pdf is PDF file, xls is Excel file
+export type ExecutionRequestOutputFormat = 'internal'|'raw'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
+// internal is data direct from local system (so instances, Obj/Shapes etc), raw is pure data, buffer is vertex buffer for editor viewer, glb is binary glTF, svg is 2D SVG, step is STEP file, stl is STL file, pdf is PDF file, xls is Excel file
 
 export interface ExecutionRequestOutput 
 {
@@ -1235,7 +1269,7 @@ export interface ExecutionResultOutputs
 export interface ExecutionResultOutput
 {
     options?: Record<string,any> // TODO?
-    data: any // string, binary Blob or binary in base64
+    data: any // internal, string, binary Blob or binary in base64
 }
 
 // outputs of a pipeline
@@ -1245,9 +1279,10 @@ export interface ExecutionResultOutput
 //   docs: { testdoc : pdf : { options: {}, data: ... } }, tables }
 export interface ExecutionResultPipeline 
 {
-    model?:Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>> // {outputformat}.{options, data}
-    docs?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
+    model?:Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>>|null // {outputformat}.{options, data}
+    metrics?: Record<ExecutionRequestOutputFormat,ExecutionResultOutput> // {name}.{outputformat}.{options, data} - metrics per pipeline
     tables?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
+    docs?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
 }
 
 export type ExecutionResultPipelineNamed =  Partial<Record<string, // name of doc or table

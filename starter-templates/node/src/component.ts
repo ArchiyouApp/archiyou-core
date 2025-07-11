@@ -18,14 +18,17 @@ const REQUEST = {
                 
         
         // Change component shapes
-        component.model.shapes().moveZ(30+$SIZE).color('red');
+        // FIX?
+        //component.model.shapes().moveZ(30+$SIZE).color('red');
                     
         // Inspect results
+        /*
         print(component.model); // Obj
         print(component.model.shapes()); // get shapes
         print(JSON.stringify(component.metrics)); // Metrics - TODO
         print(JSON.stringify(component.docs)); // Docs  
         print(JSON.stringify(component.tables)); // Tables
+        */
         `
     },
     outputs: [
@@ -42,7 +45,7 @@ new Runner()
             runner.execute(REQUEST)
             .then((r) => 
             {
-               new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.model.glb.data, 'test.glb')
+               //new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.model.glb.data, 'test.glb')
             })
         }
     )

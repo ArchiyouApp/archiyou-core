@@ -56,6 +56,8 @@ export * from './CodeParser'
 
 
 export * from './Doc'
+export * from './DocDocument'
+export * from './DocPage'
 export * from './DocPageContainer'
 export * from './DocPageContainerView'
 export * from './DocPageContainerImage'
@@ -63,7 +65,6 @@ export * from './DocPageContainerText'
 export * from './DocPageContainerTextArea'
 export * from './DocPageContainerTable'
 export * from './DocPageContainerGraphic'
-export * from './DocPage'
 export * from './DocUtils'
 
 export * from './DocPDFExporter'

@@ -106,6 +106,14 @@
         return this?.db?.tables();
     }
 
+    /** Get table instances */
+    getTables(only:Array<string>):Array<Table>
+    {
+        const tables = (this?.db?._tables) ? Object.values(this?.db?._tables) : [];
+        return (only.includes('*'))
+            ? tables : tables.filter(t => only.includes(t.name));
+    }
+
     //// CREATION API ////
 
     /** Make or get table with data 

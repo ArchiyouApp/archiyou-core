@@ -1,12 +1,24 @@
 import { Runner } from './internal';
 import type { RunnerScriptExecutionRequest, 
-            RunnerScriptScopeState, Obj, PublishScript, PublishParam } from './internal';
+            RunnerScriptScopeState, Obj, PublishScript, 
+            ImportComponentResult } from './internal';
 
 
 /**
  *  Exists in script execution scope
  *   And gathers all information needed to execute a component script 
  *   and return specific results
+ * 
+ *   Executing component script and getting result (async/sync)
+ *      Script execution is async, but we want to avoid using 
+ *      "await $component(...).get(...)" which is not user friendly
+ *      
+ *      Because all the export functions for raw data (the model Obj/Shapes, table data and doc instances)
+ *      that is by definition always available in the scope    
+ *      We can get away with introducing a sync execution method
+ *      RunnerComponentImporter.get() => Runner._executeComponentScript => Runner._executeLocalSync
+ *      
+ *      
  * 
  */
 export class RunnerComponentImporter
@@ -37,23 +49,17 @@ export class RunnerComponentImporter
      *  based on data in this instance of RunnerComponentImporter
      *  @param p - path or array of paths to requested outputs (like 'model', 'cnc/model')  
      * 
-     *  !!!! IMPORTANT: This method is called within main script execution scope,
-     *  So we need to avoid a async function here because the user will need to await it 
-     *  Which is not user friendly. 
-     *  The component scripts are already prefetched and cached in Runner.fetchComponentScripts()
+     *  Components only work with internal data, so we always get 'internal' format
      *  
      * */
     get(p:string|Array<string>)
     {
         if (typeof p === 'string') p = [p]; // convert to array if string
 
-        console.log('==== GET COMPONENT ====');
-        console.log(JSON.stringify(p));
-
         // what to get 
-        // 'model' => 'default/models/raw'
-        // 'docs' => 'default/docs/*'
-        // or default/docs/spec/raw
+        // 'model' => 'default/models/internal'
+        // 'docs' => 'default/docs/*/internal'
+        // or default/docs/spec/internal
         const outputPaths = p.map((path) =>
         {
             console.log(path.split('/'));
@@ -61,21 +67,19 @@ export class RunnerComponentImporter
             // TODO: Manage output paths in a more generic way
             if(path.split('/').length === 1 && ['model', 'docs', 'tables', 'metrics'].includes(path))
             {
-                if(path === 'model') return `default/${path}/raw`;
-                else return `default/${path}/*/raw`; // 'docs/*' or 'tables/*' or 'metrics/*'
+                if(path === 'model') return `default/${path}/internal`;
+                else return `default/${path}/*/internal`; // 'docs/*' or 'tables/*' or 'metrics/*'
             }
-            // Append format'raw' with paths like 'docs/spec' or 'tables/*' or 'models/cnc'
+            // Append format'internal' with paths like 'docs/spec' or 'tables/*' or 'models/cnc'
             else if(path.split('/').length === 2)
             {
-                return `default/${path}/raw`; // 'docs/spec/raw' or 'tables/*/raw'
+                return `default/${path}/internal`; // 'docs/spec/internal' or 'tables/*/internal'
             }
             // TODO: correct wrong formats like 'cnc/model/dxf' or 'cnc/tables/*/xlsx'
 
 
         }).filter(path => path !== undefined); // remove undefined paths
 
-        console.log('==== GET ====');
-        console.log(outputPaths);
         
         this._requestedOutputs = this._requestedOutputs.concat(outputPaths);
 
@@ -125,18 +129,19 @@ export class RunnerComponentImporter
         
         const r = this._runner._executeComponentScript(request);
         
-        // We do some simplication turning ComputeResult into ImportComponentResult
-        // If we only have one pipeline we set models, tables, docs, metrics directly on result
-        // Other pipelines are set on result by name. i.e. cnc/models, cnc/tables etc
+        // We get a normal ExecutionResult here, convert to a more simpler ImportComponentResult
+        // With only raw data per pipeline name
         if(r.status === 'error')
         {
-            return { status: 'error', errors: r.errors, component: this.name , model: {}, tables: {}, docs: {} };
+            return { status: 'error', errors: r.errors, component: this.name, outputs: {}};
         }
 
+        // Basic structure for result from Component 
         const result:ImportComponentResult = {
                 status: r.status,
                 errors: r.errors,
                 component: this.name,
+                outputs: {},
             };
 
         const singlePipeline = (Object.keys(r.outputs.pipelines).length === 1)  
@@ -150,14 +155,15 @@ export class RunnerComponentImporter
 
         allPipelines.forEach((pipelineName) => 
         {
-            let resultTarget = (pipelineName === singlePipeline) ? result : result[pipelineName]; // set single on result instance 
+            let resultTarget = result[pipelineName]; 
             if(resultTarget === undefined){  resultTarget = result[pipelineName] = {} as ImportComponentResult;}
         
             // We need to recreate the component scene hierarchy and shapes in main scope
             resultTarget.model = this._recreateComponentObjTree(r.outputs.pipelines[pipelineName].model.raw.data);
+            resultTarget.metrics = r.outputs.pipelines[pipelineName]?.metrics || {}; 
             resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].tables[v].raw.data, {});
             resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].docs[v].raw.data, {});
-            // TODO: metrics
+            
         });
 
         return result;
@@ -197,19 +203,5 @@ export class RunnerComponentImporter
         
         return newObj;
     }
-
-
 }
 
-/** Results of component execution */
-export interface ImportComponentResult
-{
-    status?:'success'|'error'; // status of the execution
-    errors?:Array<any>; // errors if any
-    component?:string // name of component
-    model?:Record<string,any>; // default pipeline model data
-    tables?:Record<string,any>; // default pipeline tables data
-    docs?:Record<string,any>; // default pipeline documents data
-    // non-default pipilines are set on object dynamically
-    // cnc/model, cnc/tables etc
-}

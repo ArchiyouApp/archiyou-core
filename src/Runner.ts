@@ -15,7 +15,7 @@
 
 
 import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
-                    Statement, StatementResult, RunnerScriptScopeState, RunnerScript,
+                    Statement, StatementResult, RunnerScriptScopeState, RunnerScript, ExecutionResultPipeline
  } from "./internal"
 
 
@@ -24,7 +24,7 @@ import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO,
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
-import { RunnerComponentImporter } from "./internal"
+import { RunnerComponentImporter, DocDocument } from "./internal"
 
 import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
     EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL
@@ -36,9 +36,9 @@ import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExe
                 ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
                 ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup, 
                 PublishScript,
-                PublishParam} from "./types"
+                PublishParam} from "./internal"
 
-import { isComputeResult } from './typeguards'
+import { isComputeResult } from './internal' // typeguards
 
 
 export class Runner
@@ -942,88 +942,6 @@ export class Runner
         return statement;
     }
 
-    /** For executing component scripts we need to have synchronous execution function
-     *  Because we don't want to write await $component('name').get() in the code
-     *  This is possible only if we use sync methods in the code
-     *  We only allow export methods of raw (which have data already available by definition)
-     *  IMPORTANT: This is run in the local scope, so 'this' is the execution scope
-     */
-    _executeLocalSync(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):ComputeResult|null
-    {
-        if(!this.loaded())
-        { 
-            throw new Error(`Runner::_executeLocalSync(): OpenCascade WASM module not loaded yet`);
-        }
-            
-        console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
-        console.info(`* With execution request settings: { params: ${JSON.stringify(request.params)} , 
-                        modelFormat: "${this._activeExecRequest.modelFormat}" }*`);
-
-        this._activeExecRequest = request;
-        const executeStartTime = performance.now()
-
-        const scope = this.getLocalActiveScope();
-        const code = request.script.code;
-
-        const startRunFunc = (startRun) ? this._executionStartRunInScope : () => {};
-        const outputFunc = (output) 
-                            ? this.getLocalScopeResultsSync.bind(this) // bind to this
-                            : () => null; // output or return null
-     
-        const exec = () =>
-        {
-            try 
-            {
-                return (new Function(  
-                        'request',
-                        'scope', 
-                        'startRunFunc',
-                        'outputFunc',
-                            // function body
-                            `
-                            startRunFunc.call(scope, scope, request); // first is this, the rest args
-                            // To deal with replaced async functions in old JS enviroments
-
-                            // run code in scope
-                            with (scope)
-                            {
-                                "use strict"; 
-                                ${code};
-                            }
-                            // export results
-                            return outputFunc(scope, request);
-            
-                            `
-                    ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as ComputeResult;    
-            }
-            catch(e)
-            {
-                // Any error while executing code is caught here
-                console.error(`Runner::_executeLocal(): Error while executing code: "${e}" : ${e.stack}`);
-                return {
-                    status: 'error',
-                    errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
-                } as ComputeResult
-            }
-        }
-
-        const result = exec();
-        
-        // Set duration if result is ComputeResult
-        if(isComputeResult(result))
-        {
-            result.duration = Math.round(performance.now() - executeStartTime);
-        }
-
-        // Send message to manager if in worker role
-        if(this.role === 'worker')
-        {
-            this._postMessageToManager({ type: 'executed', payload: result });
-        }
-
-        return result;
-    }
-
 
 
     /** Setup for every execution run inside execution scope
@@ -1048,6 +966,7 @@ export class Runner
     }
 
      //// EXECUTION COMPONENT SCRIPTS ////
+     
 
     /** Execute a component script in a seperate scope
      *  This is always done in local context 
@@ -1059,11 +978,95 @@ export class Runner
      */
     _executeComponentScript(request:RunnerScriptExecutionRequest): ComputeResult
     {
-        this.createScope('component'); // automatically becomes current scope
-        const result = this._executeLocalSync(request, true, true); // start run and output
-        this.deleteLocalScope('component'); // delete scope after execution
+        const scopeName = `component:${request.component}`;
+        this.createScope(scopeName); // automatically becomes current scope
+        const result = this._executeLocalComponent(request, true, true); // start run and output
+        this.deleteLocalScope(scopeName); // delete scope after execution
         return result;
     }
+
+     /** For executing component scripts we need to have synchronous execution function
+     *  Because we don't want to write await $component('name').get() in the code
+     *  This is possible only if we use sync methods in the code
+     *  In this case that's no problem because we need the internal instances from Component scope for model, metrics, docs, tables
+     *  
+     *  NOTE: This is run in the local scope, so 'this' is the execution scope
+     */
+     _executeLocalComponent(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):ComputeResult|null
+     {
+         if(!this.loaded())
+         { 
+             throw new Error(`Runner::_executeLocalComponent(): OpenCascade WASM module not loaded yet`);
+         }
+             
+         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
+         console.info(`* With execution request settings: { params: ${JSON.stringify(request.params)} , 
+                         modelFormat: "${this._activeExecRequest.modelFormat}" }*`);
+ 
+         this._activeExecRequest = request;
+         const executeStartTime = performance.now()
+ 
+         const scope = this.getLocalActiveScope();
+         const code = request.script.code;
+ 
+         const startRunFunc = (startRun) ? this._executionStartRunInScope : () => {};
+         const outputFunc = (output) 
+                             ? this.getLocalScopeResultsComponent.bind(this) // <== this is a special sync function only used for Components
+                             : () => null; // output or return null
+      
+         const exec = () =>
+         {
+             try 
+             {
+                 return (new Function(  
+                         'request',
+                         'scope', 
+                         'startRunFunc',
+                         'outputFunc',
+                             // function body
+                             `
+                             startRunFunc.call(scope, scope, request); // first is this, the rest args
+                             // To deal with replaced async functions in old JS enviroments
+ 
+                             // run code in scope
+                             with (scope)
+                             {
+                                 "use strict"; 
+                                 ${code};
+                             }
+                             // export results
+                             return outputFunc(scope, request);
+             
+                             `
+                     ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as ComputeResult;    
+             }
+             catch(e)
+             {
+                 // Any error while executing code is caught here
+                 console.error(`Runner::_executeLocal(): Error while executing code: "${e}" : ${e.stack}`);
+                 return {
+                     status: 'error',
+                     errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
+                 } as ComputeResult
+             }
+         }
+ 
+         const result = exec();
+         
+         // Set duration if result is ComputeResult
+         if(isComputeResult(result))
+         {
+             result.duration = Math.round(performance.now() - executeStartTime);
+         }
+ 
+         // Send message to manager if in worker role
+         if(this.role === 'worker')
+         {
+             this._postMessageToManager({ type: 'executed', payload: result });
+         }
+ 
+         return result;
+     }
 
     /* Prefetch component scripts from request script code
         IMPORTANT: How to deal with recursive component imports?
@@ -1226,28 +1229,30 @@ export class Runner
         return result;
     }
 
-    /** For special cases we need only sync  */
-    getLocalScopeResultsSync(scope:any, request:RunnerScriptExecutionRequest):ComputeResult
+    /**
+     * Get results out of local execution scope synchronously for Components
+     * For special cases like importing components we want to avoid async methods  */
+    getLocalScopeResultsComponent(scope:any, request:RunnerScriptExecutionRequest):ComputeResult
     {
         const result = {} as ComputeResult;
 
-        // New request outputs
+        // Get the requested outputs
         if(request.outputs)
         {
-            console.info(`Runner::getLocalScopeResultsSync(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
-            result.outputs = this.getLocalScopeResultOutputsSync(scope, request);
+            console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
+            result.outputs = this.getLocalScopeResultOutputsInternal(scope, request);
         }
-
-        console.log(JSON.stringify(scope.geom.scene.toGraph()));
       
         this._addAppInfoToResult(scope, request, result); // add app info to result
         
-        // Other data
+        // This is the old structure of results
+        /*
         result.scenegraph = scope.geom.scene.toGraph();
         result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
         result.tables = scope.calc?.toTableData(); 
         result.metrics =  scope.calc?.metrics();
         result.managedParams = scope.ay.paramManager.getOperatedParamsByOperation();        
+        */
 
         return result;
     }
@@ -1270,8 +1275,11 @@ export class Runner
     }
     
 
-    /** New method for running specific pipelines and gettings outputs 
-     *  Using request.outputs
+    /** Get results from local execution scope based on 
+     *  request.outputs paths
+     *  We gather result by pipeline, because we can have multiple pipelines in the request that need to be run
+     *  @scope - execution scope to get results from
+     *  @request - execution request with outputs
     */
     async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest):Promise<ExecutionResultOutputs>
     {
@@ -1289,55 +1297,21 @@ export class Runner
             // Default pipeline is already run, only run others
             if(pipeline !== 'default')
             {
-                console.info(`'Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);
-                // TODO: run specific pipeline
-                console.warn(`'x1b[0mRunner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
-            }
-
-            // Gather results from pipeline
-            await this._exportModels(scope, request, pipeline, resultTree); 
-            await this._exportDocs(scope, request, pipeline, resultTree);
-            await this._exportTables(scope, request, pipeline, resultTree);
-        };
-
-        return resultTree;
-    }
-
-    /** Some outputs we can get synchronously
-     *  This is used for running component scripts
-     */
-    getLocalScopeResultOutputsSync(scope:any, request:RunnerScriptExecutionRequest):ExecutionResultOutputs
-    {
-        const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
-        const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
-
-        console.info(`Runner::getLocalScopeResultOutputsSync(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
-
-        const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
-
-        for(let i = 0; i < pipelines.length; i++)
-        {
-            const pipeline = pipelines[i];
-            
-            // Default pipeline is already run, only run others
-            if(pipeline !== 'default')
-            {
-                console.info(`Runner::getLocalScopeResultOutputsSync(): Running extra pipeline: "${pipelines[i]}"`);
-                console.warn(`Runner::getLocalScopeResultOutputsSync(): Running pipeline "${pipeline}" not implemented yet`);
+                console.info(`'Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);                
+                console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
                 // TODO: run specific pipeline
             }
 
-            // Gather results from pipeline
-            // We can use this sync - but some export methods are async
-            this._exportModelsSyncRaw(scope, request, pipeline, resultTree); 
-            // !!!! TODO: export docs and tables !!!!
+            // Gather results per pipeline
+            await this._exportPipelineModels(scope, request, pipeline, resultTree); 
+            await this._exportPipelineDocs(scope, request, pipeline, resultTree);
+            await this._exportPipelineTables(scope, request, pipeline, resultTree);
         };
 
         return resultTree;
-    }
-    
+    }    
 
-    /** Parse output paths to create  */
+    /** Parse output paths to create ExecutionRequestOutput objects */
     _parseRequestOutputPaths(outputs:Array<ExecutionRequestOutputPath>):Array<ExecutionRequestOutput>
     {
         const requestOutputs = [] as Array<ExecutionRequestOutput>;
@@ -1386,9 +1360,22 @@ export class Runner
         return requestOutputs;
     }
 
+    /** Check structure of result for an output per pipeline 
+     *  and return reference to entry where results can be placed */
+    _checkOutputsResultTree(result:ExecutionResultOutputs, pipeline:string): ExecutionResultPipeline
+    {   
+        let pipelineResult = result.pipelines[pipeline];
+        if(pipelineResult === undefined)
+        { 
+            result.pipelines[pipeline] = { model : {}, tables: {}, metrics: {}, docs: {} } as ExecutionResultPipeline; 
+            pipelineResult = result.pipelines[pipeline]; 
+        }
+        return pipelineResult; // return reference to pipeline result
+    }
+
     
-    /** Export models from given scope using paths in request.outputs and place in ExecutionResult tree */
-    async _exportModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
+    /** Export models from given scope, pipeline and using output paths in request.outputs and place in ExecutionResult tree */
+    async _exportPipelineModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
     {
         const outputs = this._parseRequestOutputPaths(request.outputs)
                         .filter(o => o.entityGroup === 'model' && o.pipeline === pipeline); // filter for models
@@ -1396,14 +1383,14 @@ export class Runner
         for(let i = 0; i < outputs.length; i++)
         {
             const output = outputs[i];
-            const pipelineResultModel = this._checkResultForModelsOutputs(result, output); // check if we need to create a new model entry in the result tree
+            const pipelineResultModel = this._checkOutputsResultTree(result, pipeline).model; // check if we need to create a new model entry in the result tree
             
             const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL : [output.outputFormat];
 
             for(let j = 0; j < outputFormats.length; j++)
             {
                 const format = outputFormats[j];
-                console.info(`Runner::_exportModels(): Exporting "${output.path}" with export in format: "${format}"`);
+                console.info(`Runner::_exportPipelineModels(): Exporting "${output.path}" with export in format: "${format}"`);
 
                 switch(format)
                 {
@@ -1426,78 +1413,125 @@ export class Runner
         return result;
     }
 
-    /** Check structure of result for pipeline 
-     *  and return reference to entry where results can be placed */
-    _checkResultForModelsOutputs(result:ExecutionResultOutputs, output:ExecutionRequestOutput): Partial<Record<ExecutionRequestOutputFormat,ExecutionResultOutput>>
+
+   
+    /** Get outputs for a specific pipeline, entity (metrics,docs,tables) */
+    _getOutputsByPipelineEntityFormats(request:RunnerScriptExecutionRequest, pipeline:string, entity:ExecutionRequestOutputEntityGroup, formats:Array<ExecutionRequestOutputFormat>=[]):Array<ExecutionRequestOutput>
     {
-        let pipelineResult = result.pipelines[output.pipeline];
-        if(pipelineResult === undefined)
-        { 
-            result.pipelines[output.pipeline] = { model : {} }; 
-            pipelineResult = result.pipelines[output.pipeline]; 
-        }
-        const pipelineResultModel = pipelineResult.model;
-        return pipelineResultModel;
-    }
-
-    /** For component we need to export raw but synchronous 
-     *  because there is no await in script execution scope */
-    _exportModelsSyncRaw(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
-    {
-        const outputs = this._parseRequestOutputPaths(request.outputs)
-                        .filter(o => o.entityGroup === 'model' && o.pipeline === pipeline); // filter for models
-
-        for(let i = 0; i < outputs.length; i++)
-        {
-            const output = outputs[i];
-            const pipelineResultModel = this._checkResultForModelsOutputs(result, output); // check if we need to create a new model entry in the result tree
-            
-            pipelineResultModel.raw = { options: output.options, data: scope.geom.scene.toComponentGraph(request.component) }; // data tree with raw shapes - to be recreated in main scope scene
-            
-        }
-
-        return result;
-    }
-    
- 
-    async _exportDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
-    {
-        const EXPORT_FORMATS = ['raw', 'pdf'];
-
         let outputs = this._parseRequestOutputPaths(request.outputs)
-                            .filter(o => o.entityGroup === 'docs' && o.pipeline === pipeline); // filter for docs
+                            .filter(o => o.pipeline === pipeline && o.entityGroup === entity);
         
-        console.log('==== EXPORT DOCS ====')
-        console.log(JSON.stringify(this._parseRequestOutputPaths(request.outputs)));
+        // filters format
+        if(formats.length > 0)
+        {
+            outputs.forEach((o,i) => {
+                if(!formats.includes(o.outputFormat))
+                {
+                    console.warn(` !!!! Runner::_getDocsToExport(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}" !!!!`); 
+                }
+            })
+            outputs = outputs.filter(o => formats.includes(o.outputFormat)); // filter for docs
+        }
 
-        // checks and warnings
-        outputs.forEach((o,i) => {
-            if(!EXPORT_FORMATS.includes(o.outputFormat))
-            {
-                console.warn(` !!!! Runner::_exportDocs(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}" !!!!`); 
-            }
-        })
-        outputs = outputs.filter(o => EXPORT_FORMATS.includes(o.outputFormat)); // filter for docs
+        return outputs;
+    }
+
+    _exportPipelineMetrics(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    {
+        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'metrics'); // get metrics to export for current pipeline
 
         // Check if we need anything to export for current request and pipeline
         if(outputs.length === 0)
         { 
-            console.info(`Runner::_exportDocs(): No docs to export`);
+            console.info(`Runner::_exportPipelineMetrics(): No metrics to export`);
+            return result; // no metrics to export
+        } 
+
+        // Check and setup result data structure 
+        const pipelineResultMetrics = this._checkOutputsResultTree(result, pipeline).metrics; // check if pipeline result exists
+        
+        // Now generate the metrics
+        outputs.forEach((output) => {
+            console.info(`Runner::_exportPipelineMetrics(): Exporting "${output.path}" with format: "${output.outputFormat}"`);
+
+            switch (output.outputFormat)
+            {
+                case 'raw':
+                    pipelineResultMetrics.raw = scope.calc.metrics(); // raw metrics data
+                    break;
+                default:
+                    console.error(`Runner::_exportPipelineMetrics(): Skipped unknown metrics format "${output.outputFormat} in requested output "${output.path}"`); 
+            }
+        });
+
+        return result;
+    }
+    
+     
+    async _exportPipelineTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+    {
+        
+        const EXPORT_FORMATS = ['raw', 'xls'];
+
+        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs'); // all formats
+
+        // Check if we need anything to export for current request and pipeline
+        if(outputs.length === 0)
+        { 
+            console.info(`Runner::_exportPipelineDocs(): No tables to export`);
+            return result;
+        } 
+
+        // Check result data structure 
+        const pipelineResultTables = this._checkOutputsResultTree(result, pipeline).tables; // get reference to tables in pipeline result
+        
+        // Tables are exported at the same time per format
+        for(let f =0; f < EXPORT_FORMATS.length; f++)
+        {
+            const format = EXPORT_FORMATS[f];
+            let onlyTableNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); // get unique doc names
+
+            if(onlyTableNames.length > 0)
+            {
+                // if * is present, all docs are selected
+                if(onlyTableNames.includes('*')){ onlyTableNames = []; } // if * is present, all docs are selected
+                // Now do export
+                switch (format)
+                {
+                    case 'raw':
+                        const tablesRawByName = scope.calc.toTableData();
+                        this._setFormatResults(pipelineResultTables,tablesRawByName, format); // set results in pipeline result tree
+                        break;
+                    case 'xls':
+                        console.warn(`Runner::_exportPipelineTables(): xls export not implemented yet`);
+                        break;
+                    default:
+                        throw new Error(`Runner::_getScopeComputeResult(): Unknown doc export format "${format}"`);
+                }
+            }
+            
+        };
+
+        return result;
+    }
+
+    
+    async _exportPipelineDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+    {
+        const EXPORT_FORMATS = ['raw', 'pdf'];
+
+        // TODO: centrally define what can be outputted
+        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs', ['raw', 'pdf']); // get docs to export for current pipeline
+
+        // Check if we need anything to export for current request and pipeline
+        if(outputs.length === 0)
+        { 
+            console.info(`Runner::_exportPipelineDocs(): No docs to export`);
             return result; // no docs to export
         } 
 
         // Check and setup result data structure 
-        let pipelineResult = result.pipelines[pipeline];
-        if (pipelineResult === undefined)
-        {
-            result.pipelines[pipeline] = { docs: {} };
-            pipelineResult = result.pipelines[pipeline];
-        }
-        else (pipelineResult.docs === undefined)
-        {
-            pipelineResult.docs = {};   
-        }
-        const pipelineResultDocs = pipelineResult.docs;
+        const pipelineResultDocs = this._checkOutputsResultTree(result, pipeline).docs; // check if pipeline result exists
         
         // Now generate the docs
         // Docs are exported at the same time per format
@@ -1515,7 +1549,7 @@ export class Runner
                 onlyDocNames.forEach((docName) => {
                     if(!scope.doc.docs().includes(docName))
                     {
-                        console.warn(`Runner::_exportDocs(): Skipped export of doc "${docName}" in format "${format}" because it does not exist!`);
+                        console.warn(`Runner::_exportPipelineDocs(): Skipped export of doc "${docName}" in format "${format}" because it does not exist!`);
                     }
                 });                
 
@@ -1539,83 +1573,151 @@ export class Runner
 
         return result;
     }
-    
-    async _exportTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+
+  
+    //// INTERNAL DATA OUTPUTS FOR USE WITH COMPONENTS ////
+
+    /** Get internal outputs synchronously per pipeline
+     *  Iterate from outputs and run pipelines where needed
+    */
+    getLocalScopeResultOutputsInternal(scope:any, request:RunnerScriptExecutionRequest):ExecutionResultOutputs
     {
-        
-        const EXPORT_FORMATS = ['raw', 'xls'];
+        const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
+        const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
-        const outputs = this._parseRequestOutputPaths(request.outputs).filter(o => o.pipeline === pipeline && o.entityGroup === 'tables'); // filter for tables
+        console.info(`Runner::getLocalScopeResultOutputsInternal(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
 
-        // Check if we need anything to export for current request and pipeline
-        if(outputs.length === 0)
-        { 
-            console.info(`Runner::_exportDocs(): No tables to export`);
-            return result; // no docs to export
-        } 
+        const pipelineResultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
 
-        // Check result data structure 
-        let pipelineResult = result.pipelines[pipeline];
-        if (pipelineResult === undefined)
+        for(let i = 0; i < pipelines.length; i++)
         {
-            result.pipelines[pipeline] = { tables: {} };
-            pipelineResult = result.pipelines[pipeline];
-        }
-        else (pipelineResult.tables === undefined)
-        {
-            pipelineResult.tables = {};   
-        }
-        const pipelineResultTables = pipelineResult.tables;
-        
-        // Tables are exported at the same time per format
-        for(let f =0; f < EXPORT_FORMATS.length; f++)
-        {
-            const format = EXPORT_FORMATS[f];
-            let onlyTableNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); // get unique doc names
-
-            if(onlyTableNames.length > 0)
-            {
-                // if * is present, all docs are selected
-                if(onlyTableNames.includes('*')){ onlyTableNames = []; } // if * is present, all docs are selected
-                // Now do export
-                switch (format)
-                {
-                    case 'raw':
-                        const tablesRawByName = scope.calc.toTableData();
-                        this._setFormatResults(pipelineResultTables,tablesRawByName, format); // set results in pipeline result tree
-                        break;
-                    case 'xls':
-                        console.warn(`Runner::_exportTables(): xls export not implemented yet`);
-                        break;
-                    default:
-                        throw new Error(`Runner::_getScopeComputeResult(): Unknown doc export format "${format}"`);
-                }
-            }
+            const pipeline = pipelines[i];
             
+            // Default pipeline is already run, only run others
+            if(pipeline !== 'default')
+            {
+                console.info(`Runner::getLocalScopeResultOutputsInternal(): Running extra pipeline: "${pipelines[i]}"`);
+                console.error(`Runner::getLocalScopeResultOutputsInternal(): Running pipeline "${pipeline}" not implemented yet`);
+                // TODO: run specific pipeline
+            }
+
+            // Gather raw results from pipeline
+            this._exportModelsInternal(scope, request, pipeline, pipelineResultTree); 
+            this._exportMetricsInternal(scope, request, pipeline, pipelineResultTree);
+            this._exportDocsInternal(scope, request, pipeline, pipelineResultTree);
         };
 
+        return pipelineResultTree;
+    }
+
+    /** Get internal Obj/Shape model data from local execution scope */
+    _exportModelsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    {
+        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'model', ['internal']); // get models to export for current pipeline
+
+        for(let i = 0; i < outputs.length; i++)
+        {
+            const output = outputs[i];
+            const pipelineResultModel = this._checkOutputsResultTree(result, pipeline).model; // check result structure
+            
+            pipelineResultModel.internal = { 
+                options: output.options,
+                data: scope.geom.scene.toComponentGraph(request.component) 
+            }; // data tree with raw shapes - to be recreated in main scope scene
+        }
         return result;
     }
 
-    // TODO: Export metrics
-
-    _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
+    /** Get internal Doc data from local execution scope and set in result tree */
+    _exportMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
     {
-        Object.keys(resultsByName || {}).forEach((docName) =>
-        {   
-            if(!resultGroup[docName]){ resultGroup[docName] = {}; resultGroup[docName][format] = {}; }
-            resultGroup[docName][format] = { options: {}, data: resultsByName[docName] }; // TODO: do we need options? Rewrite needed if so
+        const pipelineDocOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'metrics', ['internal']); // get docs to export for current pipeline
+
+        for(let i = 0; i < pipelineDocOutputs.length; i++)
+        {
+            const pipelineDocResults = this._checkOutputsResultTree(result, pipeline).metrics; // make sure result structure exists
+            
+            pipelineDocResults.internal = {
+                options: {},
+                data: scope.doc.toData(pipelineDocOutputs[i].entityName) // get internal doc data
+            }; 
+
+            console.info(`Runner::_exportMetricsInternal(): Exported metrics ${JSON.stringify(pipelineDocResults.internal.data)} of Pipeline "${pipeline}" with output request: ${pipelineDocOutputs[i].entityName}`);
+        }
+        
+        return result;
+    }
+ 
+    /** Get internal Doc data from local execution scope and set in result tree */
+    _exportDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    {
+        const pipelineDocOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs', ['internal']); // get docs to export for current pipeline
+        
+        const pipelineDocResults = this._checkOutputsResultTree(result, pipeline).docs; // make sure result structure exists
+
+        // what documents to output
+        const docsToExport = Array.from(new Set(pipelineDocOutputs.map(o => o.entityName))); // get unique doc names
+        // NOTE: toData() is raw data, we need to export internal data
+        const docs = scope.doc.getDocs(docsToExport) as Array<DocDocument>
+        docs.forEach((doc) => {
+            // Set internal doc data in result in path pipelines/docname/internal
+            pipelineDocResults[doc.name] = {
+                internal: {
+                    options: {},
+                    data: doc
+                }
+            }
         });
+        
+        console.info(`Runner::_exportDocsInternal(): Exported ${Object.keys(pipelineDocResults).length} docs of Pipeline "${pipeline}" with output request: ${docsToExport.join(', ')}`);           
+        
+        return result;
+    }
+
+    /** Get internal Table data from local execution scope and set in result tree */
+    _exportTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    {
+        const pipelineTableOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'tables', ['internal']); // get docs to export for current pipeline
+        
+        const pipelineTableResults = this._checkOutputsResultTree(result, pipeline).tables; // make sure result structure exists
+
+        const tablesToExport = Array.from(new Set(pipelineTableOutputs.map(o => o.entityName))); // get unique table names
+        const tables = scope.calc.getTables(tablesToExport) as Array<DocDocument>
+        tables.forEach((table) => {
+            // Set internal table data in result in path pipelines/name/internal
+            pipelineTableResults[table.name] = {
+                internal :
+                {
+                    options: {},
+                    data: table
+                }
+            }
+        });
+        
+        console.info(`Runner::_exportDocsInternal(): Exported ${Object.keys(pipelineTableResults).length} tables of Pipeline "${pipeline}" with output request: "${tablesToExport.join(', ')}"`);           
+        
+        return result;
     }
 
 
+
+
     //// UTILS ////
+
+    
+    _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
+        {
+            Object.keys(resultsByName || {}).forEach((docName) =>
+            {   
+                if(!resultGroup[docName]){ resultGroup[docName] = {}; resultGroup[docName][format] = {}; }
+                resultGroup[docName][format] = { options: {}, data: resultsByName[docName] }; // TODO: do we need options? Rewrite needed if so
+            });
+    }
 
     inNode():boolean
     {
         return (typeof process !== 'undefined' && process.versions?.node) ? true : false;
     }
-
 
 }
 

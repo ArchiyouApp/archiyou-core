@@ -1,6 +1,7 @@
-import { Doc, PageSide, Container, View, WidthHeightInput, ContainerData, PageData,
+import { Doc, DocDocument, PageSide, Container, View, WidthHeightInput, ContainerData, PageData,
     DocUnits, PageSize, PageOrientation, AnyPageContainer, isPageSize,
-    isPageOrientation,  isAnyPageContainer, ValueWithUnitsString} from './internal'
+    isPageOrientation,  isAnyPageContainer, ValueWithUnitsString,
+    } from './internal'
 import { convertValueFromToUnit } from './internal' // utils
  
 
@@ -26,9 +27,9 @@ export class Page
     //// END SETTINGS ////
 
     name:string;
-    _doc:Doc;
-    _document:string; // name of doc in Doc module
-    _units:DocUnits; // taken from _doc module and _document
+    _doc:Doc; // main Doc module
+    _DocDocument:DocDocument; // doc instance to which this page belongs
+    _units:DocUnits; // taken from _doc module and _DocDocument
     _size:PageSize; // ISO page size (A0-A7)
     _width:number; // in doc units (mm,cm,inch)
     _height:number;
@@ -37,18 +38,26 @@ export class Page
     _containers:Array<AnyPageContainer> = [];
     _variables: {[key:string]:any} = {}; // template variables
 
-    constructor(doc:Doc, documentName:string, name:string)
+    constructor(doc:Doc, DocDocumentName:DocDocument, name:string)
     {
         this.name = name;
         this._doc = doc;
-        this._document = documentName;
-        this._units = this._doc._unitsByDoc[this._document];
+        this._DocDocument = DocDocumentName;
+        this.setDefaultsFromDoc();
         this.setDefaults();
+    }
+
+    /** Inherit settings from DocDocument and Doc parents */
+    setDefaultsFromDoc()
+    {
+        /** Set defaults from DocDocument */
+        this._units = this._DocDocument.units || this._doc.DOC_UNITS_DEFAULT;
+        this._size = this._DocDocument.pageSize || this._doc.PAGE_SIZE_DEFAULT;
+        this._orientation = this._DocDocument.pageOrientation || this._doc.PAGE_ORIENTATION_DEFAULT;
     }
 
     setDefaults()
     {
-        this.size(this.DEFAULT_SIZE);
         this.padding(this.DEFAULT_PADDING);
     }
 
@@ -56,10 +65,10 @@ export class Page
     {
         if(!isPageSize(size)){ throw new Error(`Doc::pageSize: Invalid ISO page size. Use: A0-A7`);}
         this._size = size;
-        this._sizeToWidthHeight(this._size); // set width and height in document units
+        this._sizeToWidthHeight(this._size); // set width and height in DocDocument units
     }
 
-    /** Set width of Page in document units */
+    /** Set width of Page in DocDocument units */
     width(n:WidthHeightInput):Page
     {
         if (typeof n === 'number')
@@ -76,10 +85,10 @@ export class Page
                 return this;
             }
         }
-        throw new Error(`Page::width(): Invalid value for width: "${n}". Supply a number (in document units)`)
+        throw new Error(`Page::width(): Invalid value for width: "${n}". Supply a number (in DocDocument units)`)
     }
 
-    /** Set height of Page in document units */
+    /** Set height of Page in DocDocument units */
     height(n:WidthHeightInput):Page
     {
         if (typeof n === 'number')
@@ -96,7 +105,7 @@ export class Page
                 return this;
             }
         }
-        throw new Error(`Page::width(): Invalid value for width: "${n}". Supply a number (in document units)`)
+        throw new Error(`Page::width(): Invalid value for width: "${n}". Supply a number (in DocDocument units)`)
     }
 
     orientation():Page
@@ -177,13 +186,13 @@ export class Page
         return this._containers.some( c => c.name === name);
     }
 
-    /** Transform given ISO page size (A0-A7) to units in document units */
+    /** Transform given ISO page size (A0-A7) to units in DocDocument units */
     _sizeToWidthHeight(size:PageSize)
     {
         let pageWidth = this.PAGE_ISO_SIZE_TO_WIDTH_HEIGHT_MM[size].w;
         let pageHeight = this.PAGE_ISO_SIZE_TO_WIDTH_HEIGHT_MM[size].h;
 
-        // Convert to units in document
+        // Convert to units in DocDocument
         if(this._units === 'cm')
         { 
             pageWidth /= 10;

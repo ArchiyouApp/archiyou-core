@@ -2,7 +2,7 @@
  * 
  *  Doc.ts
  * 
- *     Define documents by code
+ *     Define DocDocuments by code
  * 
  *      Important entities:
  *        - Doc - set of pages
@@ -26,7 +26,7 @@
  *            .position('topleft')         
  */
 
-import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
+import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
             ArchiyouApp, DocPathStyle, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
             ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs, 
@@ -35,22 +35,15 @@ import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, 
 import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
-import { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
-    ContainerTableInput, DocData, isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer,
-        isWidthHeightInput, isContainerTableInput, DocGraphicType, DocGraphicInputBase, DocGraphicInputRect, DocGraphicInputCircle, 
-                DocGraphicInputLine, DocGraphicInputOrthoLine, isContainerPositionCoordRel,
-                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param, PublishParam
+import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
+    ContainerTableInput, DocData, DocGraphicInputRect, DocGraphicInputCircle, 
+                DocGraphicInputOrthoLine,
+                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param, PublishParam, DocPipeline
             } from './internal'
 
-import { convertValueFromToUnit, isNumeric } from './internal' // utils
+import { isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer, isWidthHeightInput, isContainerTableInput } from './internal' // typeguards
 
-//// LOCAL INTEFACES ////
-
-interface DocPipeline
-{
-    fn:() => any
-    done: boolean
-}
+import { convertValueFromToUnit, isNumeric, isContainerPositionCoordRel } from './internal' // utils
 
 
 //// MAIN CLASS ////
@@ -73,16 +66,11 @@ export class Doc
     _calc:any; // Cannot use reference to Calc here, because we don't allow references outside core
     _pdfExporter:DocPDFExporter;
     
-    _docs:Array<string> = []; // multiple documents names (see them as 'files')
-    _activeDoc:string; // name of active document
+    
+    _docs:Array<DocDocument> = []; // multiple DocDocuments names (see them as 'files')
+    
+    _activeDoc:DocDocument; // active DocDocument instance
     _lastBlock:ContainerBlock; // keep track of latest create block
-
-    _pageSizeByDoc:{[key:string]:PageSize} = {};
-    _pageOrientationByDoc:{[key:string]:PageOrientation} = {}; // default orientation
-    _pagesByDoc:{[key:string]:Array<Page>} = {};
-    _unitsByDoc:{[key:string]:DocUnits} = {};
-    _pipelinesByDoc:{[key:string]:DocPipeline} = {};  // by doc name : { fn: fn, done:bool }, see DocPipeline
-
     _activePage:Page
     _activeContainer:AnyPageContainer
 
@@ -130,12 +118,7 @@ export class Doc
     reset()
     {
         this._docs = [];
-        this._pageSizeByDoc = {};
-        this._pageOrientationByDoc = {};
-        this._pagesByDoc = {};
-        this._unitsByDoc = {};
         this._activeDoc = null;
-        this._pipelinesByDoc = {};
     }
 
     _setDefaults():Doc
@@ -152,104 +135,71 @@ export class Doc
     */
     executePipelines(include:Array<string> = [], exclude:Array<string> = [])
     {
-        for (const [docName,pipelineData] of Object.entries(this._pipelinesByDoc))
+        this._docs.forEach((doc) => 
         {
-            const pipeline = pipelineData as DocPipeline
-            const pipelineFn = pipeline.fn;
-            const pipelineDone = pipeline.done;
+            const docName = doc.name;
 
-            if (
-                    !pipelineDone // avoid double execution
-                    &&
-                    typeof pipelineFn === 'function' && 
-                    (include.length === 0 || include.includes(docName)) &&
-                    (exclude.length === 0 || !exclude.includes(docName))
-            )
+            doc._pipelines.forEach((pipeline) => 
             {
-                try {
-                    console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
-                    
-                    /* IMPORTANT:
-                        Pipeline functions need to set variables using this.myVar = ... to the scope
-                        If using arrow functions this will not work, because we can't bind function to scope
-                            In that case you provided scope argument: (scope) => scope.myVar = ...
-                    */
-
-                    if(!pipelineFn?.prototype)
+                    const pipelineFn = pipeline.fn;
+                    const pipelineDone = pipeline.done;
+        
+                    if (
+                            !pipelineDone // avoid double execution
+                            &&
+                            typeof pipelineFn === 'function' && 
+                            (include.length === 0 || include.includes(docName)) &&
+                            (exclude.length === 0 || !exclude.includes(docName))
+                    )
                     {
-                        console.warn(`Doc:executePipelines(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)    
+                        try {
+                            console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
+                            
+                            /* IMPORTANT:
+                                Pipeline functions need to set variables using this.myVar = ... to the scope
+                                If using arrow functions this will not work, because we can't bind function to scope
+                                    In that case you provided scope argument: (scope) => scope.myVar = ...
+                            */
+        
+                            if(!pipelineFn?.prototype)
+                            {
+                                console.warn(`Doc:executePipelines(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)    
+                            }
+                            else {
+                                console.warn('To set variables in scope from pipeline function for later use: this.myVar = ...');
+                            }
+                        
+                            pipelineFn.call(this._ay.scope,this._ay.scope);
+                            
+                            pipeline.done = true; // set done
+                        }
+                        catch(e){
+                            console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: Error: "${e}"`);
+                        }
                     }
-                    else {
-                        console.warn('To set variables in scope from pipeline function for later use: this.myVar = ...');
-                    }
-                
-                    pipelineFn.call(this._ay.scope,this._ay.scope);
-                    
-                    pipeline.done = true; // set done
-                }
-                catch(e){
-                    console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: Error: "${e}"`);
-                }
-            }
-        }
+                });
+
+        })
+        
     }
 
 
     //// DOC API ////
 
-    /** Make a new document with optionally a name */
+    /** Make a new DocDocument with optionally a name */
     create(name?:string):Doc
     {
-        this._activeDoc = `${this.DOC_DEFAULT_NAME}${this._docs.length+1}` // start a unnamed doc
-        this._docs.push(this._activeDoc);
+        const docName = `${this.DOC_DEFAULT_NAME}${this._docs.length+1}` // start a unnamed doc
+        const newDoc = new DocDocument(this, name || docName);
+        this._docs.push(newDoc); // create new DocDocument with default name
+        this._activeDoc = newDoc; // set active DocDocument
 
-        this._unitsByDoc[this._activeDoc] = this.DOC_UNITS_DEFAULT;
-        this._pageSizeByDoc[this._activeDoc] = this.PAGE_SIZE_DEFAULT;
-        this._pageOrientationByDoc[this._activeDoc] = this.PAGE_ORIENTATION_DEFAULT;
-        this._pagesByDoc[this._activeDoc] = [];
-
-        if(name){ this.name(name) };
-
-        console.info(`Doc::create(): Created new document "${this._activeDoc}" with default settings[in ${this._unitsByDoc[this._activeDoc]} - ${this._pageSizeByDoc[this._activeDoc]} - ${this._pageOrientationByDoc[this._activeDoc]}`)
+        console.info(`Doc::create(): Created new DocDocument "${this._activeDoc.name}" with default settings [${newDoc.units} - ${newDoc.pageSize} - ${newDoc.pageOrientation}]`)
 
         return this;
     }
 
-    /** Set name of active document */
-    name(n:string):Doc
-    {
-        // check if name does not exist
-        if( typeof n !== 'string' || n.length === 0 ){ throw new Error(`doc::name: Please supply a valid string as document name!`);}
-        if (this._docs.includes(n)){ throw new Error(`doc::name: Document with name "${n}" already exists!`);}
-        
-        // Check if there is a doc made!
-        this.checkAndMakeDefaultDoc();
-        
-        // replace name of current document in _docs and other byDoc attributes
-        // TODO: improve by using id per document that stays the same?
-        this._docs = this._docs.map( d => (d === this._activeDoc) ? n : d);
-
-        this._pageSizeByDoc[n] = this._pageSizeByDoc[this._activeDoc];
-        delete this._pageSizeByDoc[this._activeDoc];
-
-        this._pageOrientationByDoc[n] = this._pageOrientationByDoc[this._activeDoc];
-        delete this._pageOrientationByDoc[this._activeDoc];
-
-        this._pagesByDoc[n] = this._pagesByDoc[this._activeDoc] || [];
-        this._pagesByDoc;
-        delete this._pagesByDoc[this._activeDoc];
-        
-        
-        
-        this._unitsByDoc[n] = this._unitsByDoc[this._activeDoc];
-        delete this._unitsByDoc[this._activeDoc];
-
-        this._activeDoc = n;
-
-        return this;
-    }
-
-    /** Check if there is an active document, otherwise create a default one */
+    /** Check if there is an active DocDocument, otherwise create a default one */
     checkAndMakeDefaultDoc()
     {
         if(!this._activeDoc)
@@ -262,12 +212,12 @@ export class Doc
 
     //// DOC API ////
 
-    /** Set Unit for active document: 'mm','cm' or 'inch' */
+    /** Set Unit for active DocDocument: 'mm','cm' or 'inch' */
     units(units:DocUnits):Doc
     {
         this.checkAndMakeDefaultDoc();
         if(!isDocUnits(units)){ throw new Error(`doc::pageSize: Invalid units. Use 'mm', 'cm' or 'inch'`);}
-        this._unitsByDoc[this._activeDoc] = units;
+        this._activeDoc.units = units;
 
         return this;
     }
@@ -277,7 +227,7 @@ export class Doc
     {
         this.checkAndMakeDefaultDoc();
         if(!isPageSize(size)){ throw new Error(`doc::pageSize: Invalid ISO page size. Use: A0, A4 etc!`);}
-        this._pageSizeByDoc[this._activeDoc] = size;
+        this._activeDoc.pageSize = size;
 
         return this;
     }
@@ -287,7 +237,7 @@ export class Doc
     {
         this.checkAndMakeDefaultDoc();
         if(!isPageOrientation(o)){ throw new Error(`doc::pageSize: Invalid page orientation. Use 'landscape' or 'portrait'`);}
-        this._pageOrientationByDoc[this._activeDoc] = o;
+        this._activeDoc.pageOrientation = o;
 
         return this;
     }
@@ -297,24 +247,20 @@ export class Doc
     {
         this.checkAndMakeDefaultDoc();
         if(!name){ throw new Error(`Doc::page: Please supply a name to a page!`)}
-        if(this._pageExists(name)){ throw new Error(`Doc::page: Page name "${name}" is already taken. Please use unique names!`)}
         
-        const newPage = new Page(this, this._activeDoc , name);
-        this._pagesByDoc[this._activeDoc].push(newPage);
-        this._setPageDefaults(newPage);
-        this._activePage = newPage;
+        this._activePage = this._activeDoc.createPage(name);
 
         return this;
     }
 
-    /** Define script that is executed before active document is generated */
+    /** Define script that is executed before active DocDocument is generated */
     pipeline(fn: () => any):Doc
     {
         this.checkAndMakeDefaultDoc();
 
         if(typeof fn !== 'function')
         { 
-            throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active document!`); 
+            throw new Error(`Doc::pipeline(): Please supply a function that is executed before generating active DocDocument!`); 
         }
 
         if(!fn.hasOwnProperty('prototype'))
@@ -322,7 +268,7 @@ export class Doc
             console.warn(`Doc::pipeline(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)
         }
 
-        this._pipelinesByDoc[this._activeDoc] = { fn: fn, done: false } as DocPipeline;
+        this._activeDoc.addPipeline({ fn: fn, done: false } as DocPipeline);
 
         return this;
     }
@@ -914,7 +860,7 @@ export class Doc
     /** Set Position of active Container
      *   @param x
      *     - if 0 <= x <= 1 relative to page content area 0.5 center)
-     *     - if > 1 in default document units (mostly mm)
+     *     - if > 1 in default DocDocument units (mostly mm)
      *     - Alignment: topleft, bottom(center)
      *     - absolute with units ('10mm')
      *     - or array [x,y]
@@ -1083,44 +1029,58 @@ export class Doc
     /** Return names of docs present */
     docs():Array<string>
     {
-        return this._docs;
+        return this._docs.map(doc => doc.name);
     }
 
-    async toData(only:Array<string>|any=[]):Promise<{[key:string]:DocData} | undefined>
+    getDocs(only:Array<string>|any=[]):Array<DocDocument>
     {
         // checks
         only = (Array.isArray(only)) ? only : [];
-        const doFilter = only.length > 0;
+        const doFilter = only.length > 0 && only.includes('*') === false; // if onlyDocs is empty or includes '*', we export all docs
 
         this.executePipelines();
 
-        let docs = {};
-
-        for(let i = 0; i < this._docs.length; i++)
+        if(doFilter)
         {
-            const doc = this._docs[i];
-            
-            if(!doFilter || (doFilter && only.includes(doc)))
-            {
-                const docPagesData = [];
-                for(let i = 0; i < this._pagesByDoc[doc].length; i++)
-                {
-                    docPagesData.push(await this._pagesByDoc[doc][i].toData(this._assetsCache));
-                }
+            return this._docs.filter(doc => only.includes(doc.name));
+        }
+        else {
+            return this._docs;
+        }
+    }
 
-                docs[doc] = {
-                    name: doc,
-                    units: this._unitsByDoc[doc],
-                    pages: docPagesData,
-                    modelUnits: this._geom._units, // set model units to calculate scale later
+    /** Export pure data */
+    async toData(onlyDocs:Array<string>|any=[]):Promise<{[key:string]:DocData} | undefined>
+    {
+        // checks
+        onlyDocs = (Array.isArray(onlyDocs)) ? onlyDocs : [];
+        const doFilter = onlyDocs.length > 0 && onlyDocs.includes('*') === false; // if onlyDocs is empty or includes '*', we export all docs
+
+        this.executePipelines();
+
+        const docs = {};
+
+        for(let d = 0; d < this._docs.length; d++) 
+        {
+            const doc = this._docs[d];
+            if(!doFilter || (doFilter && onlyDocs.includes(doc.name)))
+            {
+                const docData = await doc.toData();
+                if(docData)
+                {
+                    docs[doc.name] = docData;
+                    console.info(`Doc::toData(): Exporting doc "${doc.name}" with ${Object.keys(docData).length} pages.`);
                 }
             }
-        }
+            else {
+                console.warn(`Doc::toData(): Skipping doc "${doc.name}" because it is not in the onlyDocs list!`);
+            }
+        };
 
         return docs;
     }
 
-    /** Export selected or all documents to pdfs
+    /** Export selected or all DocDocuments to pdfs
      *  @returns {[key:string]: Blob} - key = doc name, value = pdf blob
      */
     async toPDF(only:Array<string>|any=[]):Promise<Record<string, Blob>>
@@ -1134,7 +1094,7 @@ export class Doc
 
     _units():DocUnits
     {
-        return this._unitsByDoc[this._activeDoc];
+        return this._activeDoc?.units;
     }
 
     //// UTILS ////
@@ -1176,20 +1136,7 @@ export class Doc
         }
     }
 
-    _setPageDefaults(page:Page)
-    {
-        page._size = this._pageSizeByDoc[this._activeDoc];
-        page._orientation = this._pageOrientationByDoc[this._activeDoc];
-
-        return page
-    }
-
-    /** Check if page name exists in active document */
-    _pageExists(name:string):boolean
-    {
-        return this._pagesByDoc[this._activeDoc].some( page => page.name === name);
-    }
-
+    
     _checkPageIsActive()
     {
         if(!this._activePage){ throw new Error(`Doc::padding: Cannot set page ISO size: No page added yet!`);}
@@ -1231,7 +1178,7 @@ export class Doc
         return null; 
      }
  
-     /** Return width or height in relative coords of current Page and document units */
+     /** Return width or height in relative coords of current Page and DocDocument units */
      _resolveValueWithUnitsStringToRel(s:ValueWithUnitsString, page:Page, side:PageSide):number 
      {
         // if given number, fallback to page units (default: mm)
@@ -1269,10 +1216,10 @@ export class Doc
             // convert if units is '"" (short hand for inch)
             if (units === '"') units = 'inch';
 
-            // given unit is not the document unit
-            if(units !== this._unitsByDoc[this._activeDoc])
+            // given unit is not the DocDocument unit
+            if(units !== this._activeDoc?.units)
             {
-                num = convertValueFromToUnit(num, units as DocUnits, this._unitsByDoc[this._activeDoc]);
+                num = convertValueFromToUnit(num, units as DocUnits, this._activeDoc.units);
             }
 
             // We have the num in doc units. Now make relative
