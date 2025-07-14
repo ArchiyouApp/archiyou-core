@@ -1044,6 +1044,7 @@ export interface Metric {
     type:'text'|'bar'|'line'|'radar' // TODO: more
     data: number|string|Array<number|string> // raw data (either value, array<value> or array<object>)
     options: TextMetricOptions // some options per type of Metric
+    _component:string; // name of component that created this Metric
 }
 
 export interface MetricOptionsBase

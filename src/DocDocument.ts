@@ -22,6 +22,7 @@ export class DocDocument
     _pages:Array<Page> = []; // pages in this document
     _pipelines:Array<DocPipeline> = []; // pipelines for this document, see DocPipelin
     _activePage?:Page; // active page in this document
+    _component?:string; // component name if this document is part of a component - used for naming on merge
     
     constructor(doc:Doc, name:string)
     {

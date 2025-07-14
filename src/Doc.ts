@@ -210,8 +210,6 @@ export class Doc
         return this._activeDoc;
     }
 
-    //// DOC API ////
-
     /** Set Unit for active DocDocument: 'mm','cm' or 'inch' */
     units(units:DocUnits):Doc
     {
@@ -271,6 +269,43 @@ export class Doc
         this._activeDoc.addPipeline({ fn: fn, done: false } as DocPipeline);
 
         return this;
+    }
+
+    //// DOCUMENT AGGREGATION OPERATIONS ////
+
+    /** Merge incoming DocDocument instances with current document 
+     *  @d single or collection of DocDocument instance 
+    */
+    merge(d:DocDocument|Array<DocDocument>|Record<string, DocDocument>)
+    {
+        const docsArray = (Array.isArray(d)) ? d 
+                            : d instanceof DocDocument 
+                                ? [d]
+                                : Object.values(d);
+
+        if(docsArray.length === 0){ throw new Error(`Doc::merge: Please supply at least one DocDocument to merge!`); }
+
+        docsArray.forEach((doc, i) => 
+        {
+            if(!(doc instanceof DocDocument)){ console.error(`Doc::merge: Encountered a object of type ${typeof doc} which is not a DocDocument at index ${i}. Skipping it!`)};
+            const mergedDocName= `${doc?._component || ''}${doc.name}`; // use component name if available
+            // Now just add the pages of incoming document to current one
+            doc._pages.forEach((page) =>
+            {
+                const mergedPageName = `${doc?._component || ''}${page.name}`; 
+                if(!this._activeDoc.pageExists(mergedPageName))
+                {
+                    page.name = mergedPageName;
+                    this._activeDoc._pages.push(page); // add page to current document
+                    console.info(`Doc::merge: Merged page "${page.name}" from DocDocument "${mergedDocName}" into active DocDocument "${this._activeDoc.name}"`);
+                }
+                else {
+                    // NOTE: this should not happen! 
+                    console.warn(`Doc::merge: Page "${page.name}" already exists in active DocDocument "${this._activeDoc.name}". Skipping it!`);
+                }
+            });
+
+        })
     }
 
     //// PAGE API ////

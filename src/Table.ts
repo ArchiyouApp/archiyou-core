@@ -23,6 +23,7 @@ export class Table
     _db:Db; // reference to database parent
     _dataframe:DataFrame; // TODO: Remove Danfo stuff
     _dataRows: DataRowsColumnValue; // raw data fallback: [{ col1: v1, col2: v2}, { col1: v3, col2: v4 }]}
+    _component:string; // component name if this table came from a component
 
     /** Make Table from either rows with Objects or Danfo Dataframe */
     constructor(data:DataRows|DataFrame)

@@ -168,9 +168,6 @@ export class RunnerComponentImporter
             // Other outputs by name of document, metric, table etc
             resultTarget.metrics = r.outputs.pipelines[pipelineName]?.metrics || {}; 
 
-            console.log(`==== METREICS FOR PIPELINE ${pipelineName} ====`);
-            console.log(JSON.stringify(resultTarget.metrics));
-
             resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => { agg[v] = r.outputs.pipelines[pipelineName].tables[v].internal.data; return agg }, {});
             resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => { agg[v] = r.outputs.pipelines[pipelineName].docs[v].internal.data; return agg}, {});
             

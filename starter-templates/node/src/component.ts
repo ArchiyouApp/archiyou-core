@@ -41,9 +41,16 @@ const REQUEST = {
         //print(JSON.stringify(await component.docs.test._pages[0].toData())); // Doc:Page
         print(JSON.stringify(await component.docs.test.toData())); // Doc - test data
 
-        
-        
         //print(JSON.stringify(component.tables)); // Tables
+
+
+        //// TEST AGGREGATION OF OUPUTS INTO MAIN ////
+        
+        doc
+            .create('main')
+            .merge(component.docs.test) // merge component doc into main doc
+        
+
         `
     },
     outputs: [

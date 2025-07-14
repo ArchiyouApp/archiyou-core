@@ -1304,8 +1304,10 @@ export class Runner
 
             // Gather results per pipeline
             await this._exportPipelineModels(scope, request, pipeline, resultTree); 
-            await this._exportPipelineDocs(scope, request, pipeline, resultTree);
+            // TODO: Metrics
             await this._exportPipelineTables(scope, request, pipeline, resultTree);
+            await this._exportPipelineDocs(scope, request, pipeline, resultTree);
+            
         };
 
         return resultTree;
@@ -1645,6 +1647,8 @@ export class Runner
                     data: metric // get internal metric data by name of metric
                 }
             }; 
+            // To keep track that this Metric instance came from the component
+            metric._component = request?.component; 
 
             console.info(`Runner::_exportMetricsInternal(): Exported metrics ${JSON.stringify(pipelineMetricResults[metric.name].internal.data)} of Pipeline "${pipeline}"`);
         });
@@ -1656,7 +1660,6 @@ export class Runner
     _exportDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
     {
         const pipelineDocOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs', ['internal']); // get docs to export for current pipeline
-        
         const pipelineDocResults = this._checkOutputsResultTree(result, pipeline).docs; // make sure result structure exists
 
         // what documents to output
@@ -1671,6 +1674,8 @@ export class Runner
                     data: doc
                 }
             }
+            // To keep track that this DocDocument instance came from a component
+            doc._component = request?.component;
         });
         
         console.info(`Runner::_exportDocsInternal(): Exported ${Object.keys(pipelineDocResults).length} docs of Pipeline "${pipeline}" with output request: ${docsToExport.join(', ')}`);           
@@ -1686,7 +1691,8 @@ export class Runner
 
         const tablesToExport = Array.from(new Set(pipelineTableOutputs.map(o => o.entityName))); // get unique table names
         const tables = scope.calc.getTables(tablesToExport) as Array<Table>;
-        tables.forEach((table) => {
+        tables.forEach((table) => 
+        {
             // Set internal table data in result in path pipelines/name/internal
             pipelineTableResults[table._name] = {
                 internal :
@@ -1695,9 +1701,11 @@ export class Runner
                     data: table // table instance with all data
                 }
             }
+            // To keep track that this Table instance came from a component
+            table._component = request?.component; // set component name on table instance
         });
         
-        console.info(`Runner::_exportDocsInternal(): Exported ${Object.keys(pipelineTableResults).length} tables of Pipeline "${pipeline}" with output request: "${tablesToExport.join(', ')}"`);           
+        console.info(`Runner::_exportTablesInternal(): Exported ${Object.keys(pipelineTableResults).length} tables of Pipeline "${pipeline}" with output request: "${tablesToExport.join(', ')}"`);           
         
         return result;
     }
