@@ -349,9 +349,9 @@ export class DocPDFExporter
     {
         /*
             NOTES:
-                - TODO: container width/height based on content
-
+                TODO: container width/height based on content
         */
+
         const DEFAULT_BORDER_STYLE = {  strokeColor: '#999999', lineWidth: 0.5 } as DocPathStyle
 
         const { x, y } = this.containerToPDFPositionInPnts(c, p); // PDF position in pnts, with regard for pivot (also y axis switch)

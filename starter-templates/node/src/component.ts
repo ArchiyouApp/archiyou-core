@@ -12,13 +12,12 @@ const REQUEST = {
         b = box(10,20,30).color('blue');
         
         // import component 
-        // auto imported in scene
         component = $component('./src/componentScript.json', { size: 100 })
                     .get(['model','metrics', 'docs', 'tables']); 
         // NOTE: if only one output, directly as output?
                 
         
-        // Change component shapes
+        // Modeling
         component.model.shapes().moveZ(30+$SIZE).color('red');
                     
         // Inspect results
@@ -44,17 +43,22 @@ const REQUEST = {
         //print(JSON.stringify(component.tables)); // Tables
 
 
-        //// TEST AGGREGATION OF OUPUTS INTO MAIN ////
+        //// AGGREGATION OF OUPUTS INTO MAIN ////
         
         doc
             .create('main')
+            .page('main')
+            .pipeline(() => { iso = b.iso() })
+            .text('Main Document', { size: '10mm', color: 'red' })
+            .view('main')
+            .shapes('iso')
             .merge(component.docs.test) // merge component doc into main doc
-        
 
         `
     },
     outputs: [
               'model/glb',
+              'docs/*/pdf'
             ]
 } as RunnerScriptExecutionRequest
 
@@ -67,7 +71,9 @@ new Runner()
             runner.execute(REQUEST)
             .then((r) => 
             {
-               //new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.model.glb.data, 'test.glb')
+               console.log('**** OUTPUTTING MAIN RESULTS ****');
+               new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.model.glb.data, 'test.glb')
+               new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.docs.main?.pdf?.data, 'test.pdf')
             })
         }
     )

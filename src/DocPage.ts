@@ -52,8 +52,8 @@ export class Page
     {
         /** Set defaults from DocDocument */
         this._units = this._DocDocument.units || this._doc.DOC_UNITS_DEFAULT;
-        this._size = this._DocDocument.pageSize || this._doc.PAGE_SIZE_DEFAULT;
         this._orientation = this._DocDocument.pageOrientation || this._doc.PAGE_ORIENTATION_DEFAULT;
+        this.size(this._DocDocument.pageSize || this._doc.PAGE_SIZE_DEFAULT);
     }
 
     setDefaults()

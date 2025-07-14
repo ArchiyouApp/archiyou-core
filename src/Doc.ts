@@ -288,7 +288,7 @@ export class Doc
         docsArray.forEach((doc, i) => 
         {
             if(!(doc instanceof DocDocument)){ console.error(`Doc::merge: Encountered a object of type ${typeof doc} which is not a DocDocument at index ${i}. Skipping it!`)};
-            const mergedDocName= `${doc?._component || ''}${doc.name}`; // use component name if available
+            const mergedDocName= `${doc?._component || ''}:${doc.name}`; // use component name if available
             // Now just add the pages of incoming document to current one
             doc._pages.forEach((page) =>
             {
