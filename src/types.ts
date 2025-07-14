@@ -294,6 +294,11 @@ export interface ImportComponentResult
     errors?:Array<any>; // errors if any
     component?:string // name of component
     outputs:Record<string, ImportComponentPipelineOutputs> // outputs per pipeline name in internal format
+    // for ease of use we also place the results model, metrics, tables and docs on main level
+    model?:Obj, // model of default pipeline
+    metrics?:Record<string, Metric>,
+    tables?:Record<string, Table>,
+    docs?:Record<string, Doc>,
 }
 
 /** Outputs of component execution

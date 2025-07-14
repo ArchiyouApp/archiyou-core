@@ -40,7 +40,7 @@ export class DocDocument
         const newPage = new Page(this._doc, this, name);
         this._pages.push(newPage);
         this._activePage = newPage; // set active page if not set
-        console.info(`Doc::createPage(): Created new page "${name}" in document "${this.name}" with default settings [${this.units} - ${this.pageSize} - ${this.pageOrientation}]`);
+        console.info(`Doc::createPage(): Created new page "${name}" in document "${this.name}" [#${this._pages.length}] with default settings [${this.units} - ${this.pageSize} - ${this.pageOrientation}]`);
         return newPage;
     }
 
@@ -64,9 +64,16 @@ export class DocDocument
     async toData():Promise<DocData>
     {
         const docPagesData = [];
-        for(let i = 0; i < this._pages.length; i++)
+        
+        if(this._pages.length === 0)
         {
-            docPagesData.push(await this._pages[i].toData(this._doc._assetsCache));
+            console.warn(`DocDocument::toData(): No pages in document "${this.name}". Please create at least one page!`);
+        }
+        else {
+            for(let i = 0; i < this._pages.length; i++)
+            {
+                docPagesData.push(await this._pages[i].toData(this._doc._assetsCache));
+            }
         }
 
         return {

@@ -1069,7 +1069,7 @@ export class Doc
                 if(docData)
                 {
                     docs[doc.name] = docData;
-                    console.info(`Doc::toData(): Exporting doc "${doc.name}" with ${Object.keys(docData).length} pages.`);
+                    console.info(`Doc::toData(): Exporting doc "${doc.name}" with ${docData?.pages?.length || 0} pages.`);
                 }
             }
             else {

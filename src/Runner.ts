@@ -24,7 +24,7 @@ import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO,
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
-import { RunnerComponentImporter, DocDocument } from "./internal"
+import { RunnerComponentImporter, DocDocument, Table } from "./internal"
 
 import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
     EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL
@@ -1604,6 +1604,7 @@ export class Runner
             // Gather raw results from pipeline
             this._exportModelsInternal(scope, request, pipeline, pipelineResultTree); 
             this._exportMetricsInternal(scope, request, pipeline, pipelineResultTree);
+            this._exportTablesInternal(scope,request, pipeline, pipelineResultTree);
             this._exportDocsInternal(scope, request, pipeline, pipelineResultTree);
         };
 
@@ -1628,22 +1629,25 @@ export class Runner
         return result;
     }
 
-    /** Get internal Doc data from local execution scope and set in result tree */
+    /** Get internal Metric data from local execution scope and set in result tree */
     _exportMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
     {
-        const pipelineDocOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'metrics', ['internal']); // get docs to export for current pipeline
+        const pipelineMetricOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'metrics', ['internal']);
+        const pipelineMetricResults = this._checkOutputsResultTree(result, pipeline).metrics; // make sure result structure exists
 
-        for(let i = 0; i < pipelineDocOutputs.length; i++)
+        const metricsToExport = Array.from(new Set(pipelineMetricOutputs.map(o => o.entityName))); // get unique metric names
+        const metrics = (scope.calc as Calc).getMetrics(metricsToExport);
+        metrics.forEach((metric) => 
         {
-            const pipelineDocResults = this._checkOutputsResultTree(result, pipeline).metrics; // make sure result structure exists
-            
-            pipelineDocResults.internal = {
-                options: {},
-                data: scope.doc.toData(pipelineDocOutputs[i].entityName) // get internal doc data
+            pipelineMetricResults[metric.name] = {
+                internal : {
+                    options: {},
+                    data: metric // get internal metric data by name of metric
+                }
             }; 
 
-            console.info(`Runner::_exportMetricsInternal(): Exported metrics ${JSON.stringify(pipelineDocResults.internal.data)} of Pipeline "${pipeline}" with output request: ${pipelineDocOutputs[i].entityName}`);
-        }
+            console.info(`Runner::_exportMetricsInternal(): Exported metrics ${JSON.stringify(pipelineMetricResults[metric.name].internal.data)} of Pipeline "${pipeline}"`);
+        });
         
         return result;
     }
@@ -1678,18 +1682,17 @@ export class Runner
     _exportTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
     {
         const pipelineTableOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'tables', ['internal']); // get docs to export for current pipeline
-        
         const pipelineTableResults = this._checkOutputsResultTree(result, pipeline).tables; // make sure result structure exists
 
         const tablesToExport = Array.from(new Set(pipelineTableOutputs.map(o => o.entityName))); // get unique table names
-        const tables = scope.calc.getTables(tablesToExport) as Array<DocDocument>
+        const tables = scope.calc.getTables(tablesToExport) as Array<Table>;
         tables.forEach((table) => {
             // Set internal table data in result in path pipelines/name/internal
-            pipelineTableResults[table.name] = {
+            pipelineTableResults[table._name] = {
                 internal :
                 {
                     options: {},
-                    data: table
+                    data: table // table instance with all data
                 }
             }
         });
@@ -1698,8 +1701,6 @@ export class Runner
         
         return result;
     }
-
-
 
 
     //// UTILS ////

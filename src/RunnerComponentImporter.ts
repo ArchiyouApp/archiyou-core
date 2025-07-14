@@ -142,6 +142,10 @@ export class RunnerComponentImporter
                 errors: r.errors,
                 component: this.name,
                 outputs: {},
+                model: undefined,
+                metrics: {},
+                tables: {},
+                docs: {}
             };
 
         const singlePipeline = (Object.keys(r.outputs.pipelines).length === 1)  
@@ -151,7 +155,7 @@ export class RunnerComponentImporter
                                     
         const allPipelines = Object.keys(r.outputs.pipelines);
 
-        console.info(`$component("${this.name}")::get(): Got result with pipelines:"${allPipelines.join(',')}. The main pipeline is "${singlePipeline}". Access results with .model, .tables, .docs, .metrics`);
+        console.info(`$component("${this.name}")::get(): Got result with pipelines:"${allPipelines.join(',')}. The main pipeline is "${singlePipeline}". Access results of default pipeline with .model, .tables, .docs, .metrics. Or use .{pipelinename}.model for specific pipeline`);
 
         allPipelines.forEach((pipelineName) => 
         {
@@ -161,10 +165,24 @@ export class RunnerComponentImporter
             // We need to recreate the component scene hierarchy and shapes in main scope
             // TODO: check results
             resultTarget.model = this._recreateComponentObjTree(r.outputs.pipelines[pipelineName].model.internal.data);
+            // Other outputs by name of document, metric, table etc
             resultTarget.metrics = r.outputs.pipelines[pipelineName]?.metrics || {}; 
-            resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].tables[v].internal.data, {});
-            resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => agg[v] = r.outputs.pipelines[pipelineName].docs[v].internal.data, {});
+
+            console.log(`==== METREICS FOR PIPELINE ${pipelineName} ====`);
+            console.log(JSON.stringify(resultTarget.metrics));
+
+            resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => { agg[v] = r.outputs.pipelines[pipelineName].tables[v].internal.data; return agg }, {});
+            resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => { agg[v] = r.outputs.pipelines[pipelineName].docs[v].internal.data; return agg}, {});
             
+            // default on main level result object
+            if(pipelineName === 'default' || pipelineName === singlePipeline)
+            {
+                result.model = resultTarget.model;
+                result.metrics = resultTarget.metrics;
+                result.tables = resultTarget.tables;
+                result.docs = resultTarget.docs;
+            }
+
         });
 
         return result;
