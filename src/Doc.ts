@@ -12,7 +12,8 @@
  *        - View - container that shows CAD shapes
  *      
  *      Example:
- *          doc('myOutput')
+ *          doc
+ *          .create('myDoc')
  *          .units('mm')
  *          .page('isometry')
  *          .size('A4')
@@ -153,23 +154,25 @@ export class Doc
                     )
                     {
                         try {
-                            console.info(`==== EXECUTE DOC PIPELINE FUNCTION "${docName}" ====`)
+                            console.info(`Doc::executePipelines(): Executing pipeline of document "${docName}" ====`)
                             
                             /* IMPORTANT:
                                 Pipeline functions need to set variables using this.myVar = ... to the scope
                                 If using arrow functions this will not work, because we can't bind function to scope
                                     In that case you provided scope argument: (scope) => scope.myVar = ...
                             */
-        
                             if(!pipelineFn?.prototype)
                             {
                                 console.warn(`Doc:executePipelines(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)    
                             }
                             else {
-                                console.warn('To set variables in scope from pipeline function for later use: this.myVar = ...');
+                                console.warn('Doc:executePipelines(): To set variables in scope from pipeline function for later use: this.myVar = ...');
                             }
                         
+                            const startTime = Date.now();
                             pipelineFn.call(this._ay.scope,this._ay.scope);
+
+                            console.info(`Doc:executePipelines(): Pipeline of document "${docName}" executed in ${Date.now() - startTime}ms`);
                             
                             pipeline.done = true; // set done
                         }
@@ -1085,11 +1088,12 @@ export class Doc
     }
 
     /** Export pure data */
-    async toData(onlyDocs:Array<string>|any=[]):Promise<{[key:string]:DocData} | undefined>
+    async toData(onlyDocs:Array<string>|any=[], noCache:boolean=false):Promise<{[key:string]:DocData} | undefined>
     {
-        // checks
         onlyDocs = (Array.isArray(onlyDocs)) ? onlyDocs : [];
         const doFilter = onlyDocs.length > 0 && onlyDocs.includes('*') === false; // if onlyDocs is empty or includes '*', we export all docs
+
+        console.info(`Doc::toData(): Exporting docs: ${onlyDocs.length > 0 ? onlyDocs.join(', ') : 'all'}`);
 
         this.executePipelines();
 
@@ -1100,7 +1104,7 @@ export class Doc
             const doc = this._docs[d];
             if(!doFilter || (doFilter && onlyDocs.includes(doc.name)))
             {
-                const docData = await doc.toData();
+                const docData = await doc.toData(noCache ? this._assetsCache : undefined);
                 if(docData)
                 {
                     docs[doc.name] = docData;

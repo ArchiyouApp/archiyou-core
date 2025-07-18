@@ -157,13 +157,16 @@ export class Page
 
     //// OUTPUTS ////
 
-    async toData(cache?:Record<string,any>):Promise<PageData>
+    async toData(cache?:Record<string,any>|undefined):Promise<PageData>
     {
         // async load (some) containers
         const containersData = [];
         for(let i = 0; i < this._containers.length; i++)
         {
-            containersData.push(await this._containers[i].toData(cache));
+            console.log(`==== LOADING CONTAINER ${this._containers[i].name} ====`);
+            const containerData = await (this._containers[i].toData(cache));
+            if(!containerData){ containersData.push(containerData);}
+            else { console.warn(`Page::toData(): Container "${this._containers[i].name}" has no data!`);}
         }
 
         return {

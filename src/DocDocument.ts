@@ -11,7 +11,7 @@ export class DocDocument
     DOC_UNITS_DEFAULT:DocUnits = 'mm'; // default document units
     DOC_PAGE_SIZE_DEFAULT:PageSize = 'A4'; // default ISO page size (A0-A7)
     DOC_PAGE_ORIENTATION_DEFAULT:PageOrientation = 'landscape'; // default page orientation
-    ////
+    //// END SETTINGS
 
     name:string; // name of document
     pageSize:PageSize; // ISO page size (A0-A7)
@@ -62,7 +62,7 @@ export class DocDocument
 
     //// EXPORT DATA ////
 
-    async toData():Promise<DocData>
+    async toData(cache:Record<string, any>|undefined):Promise<DocData>
     {
         const docPagesData = [];
         
@@ -73,7 +73,8 @@ export class DocDocument
         else {
             for(let i = 0; i < this._pages.length; i++)
             {
-                docPagesData.push(await this._pages[i].toData(this._doc._assetsCache));
+                const pageData = await this._pages[i].toData();
+                docPagesData.push(pageData);
             }
         }
 

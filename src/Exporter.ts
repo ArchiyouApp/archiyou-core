@@ -289,8 +289,15 @@ export class Exporter
         {
             // add special Archiyou data to GLTF
             const startGLTFArchiyouData = performance.now();
+            // archiyouInput contains what to export - NOTE: exporting documents might impact execution time!
+            console.log(' ===== EXPORT ARCHIYOU DATA ===== ');
+            console.log(JSON.stringify(options?.archiyouOutput));
+
             gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._ay, options?.archiyouOutput || {}); 
             console.info(`Exporter::exportToGLTF: Exported archiyou data in ${Math.round(performance.now() - startGLTFArchiyouData)}ms`);	
+        }
+        else {
+            console.info(`Exporter::exportToGLTF: Skipped Archiyou data export. Set export flag data to true and set metrics, tables, docs flags for output`);
         }
 
         console.info(`Exporter::exportToGLTF: Exported extra data in ${Math.round(performance.now() - startGLTFExtra)}ms`);	

@@ -108,8 +108,13 @@ export class Library
      */
     async getScriptFromUrl(url:string):Promise<PublishScript>
     {
-        const m = url.match(/^(?:(?<domain>[^/]+)\/)?(?<library>[^/]+)\/(?<scriptname>[^/:]+)(?:[:/](?<version>[^/]+))?\/?$/);
-        if(m?.groups)
+        const m = url.match(/^(?:https:\/\/)?(?:(?<domain>[^/]+)\/)?(?<library>[^/]+)\/(?<scriptname>[^/:]+)(?:[:/](?<version>[^/]+))?\/?$/);
+
+        if(!m)
+        {
+            throw new Error(`Library::getScriptFromUrl(): Invalid URL format: ${url}`);
+        }
+        else
         {
             let { domain, library, scriptname, version } = m.groups;
 

@@ -229,7 +229,7 @@ export class Container
 
 
     /** Export Data of Container */
-    async toData(cache?:Record<string,any>):Promise<ContainerData>
+    async toData(cache?:Record<string,any>|undefined):Promise<ContainerData>
     {
         // will be overriden by subclasses (DocPageContainerImage, DocPageContainerText etc)
         return null;

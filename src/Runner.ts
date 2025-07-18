@@ -36,7 +36,7 @@ import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExe
                 ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
                 ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup, 
                 PublishScript,
-                PublishParam} from "./internal"
+                PublishParam, ExecutionRequestOutputFormatGLTFOptions} from "./internal"
 
 import { isComputeResult } from './internal' // typeguards
 
@@ -65,6 +65,9 @@ export class Runner
 
     DEFAULT_ROLE: RunnerRole = 'single'
     EXEC_REQUEST_MODEL_FORMAT:ModelFormat = 'glb';
+    OUTPUT_FORMAT_DEFAULTS = {
+        glb: { binary: true, data: true, metrics: true, docs: false, tables: true, pointAndLines: true, shapesAsPointAndLines: true } as ExecutionRequestOutputFormatGLTFOptions,
+    } as Record<ExecutionRequestOutputFormat, Record<string, any>>; // default output formats for each type
 
     /**
      *  Create a new Runner instance on main thread (as manager or single)
@@ -881,6 +884,7 @@ export class Runner
             const statementStartTime = performance.now()
             const statement = this._preprocessStatement({ ...statements[s] });
             const output = (s === statements.length -1); // only output on last statement
+
             const r = await this._execute(
                 { 
                     ...request, // take from main request
@@ -907,7 +911,7 @@ export class Runner
                 }); 
             }
             
-            console.info(`Runner::_executeLocalInStatements(): Statement #${s+1} - ${output ? 'with' : 'without'} output] executed in ${statementDuration}ms`);
+            console.exec(`Runner::_executeLocalInStatements(): Statement #${s+1} - ${output ? 'with' : 'without'} output] executed in ${statementDuration}ms`);
             result = r;
             
         }
@@ -1339,13 +1343,16 @@ export class Runner
             const entityName = (!isModel) ? pathParts[2] : null; // name of entity or * (not used for model)
             let outputFormat = pathParts[pathParts.length - 1]; // last part is the output format
             const optionsString = outputFormat.split('?')[1] || ''; // options are in the last part of the path
+            
             if(outputFormat.includes('?')){ outputFormat = outputFormat.split('?')[0];} // remove options from format
-            const options = optionsString.split('?').reduce((agg,v) => 
-                { 
-                    if(v.length === 0){ return agg; } // skip empty values
-                    agg[v.split('=')[0]] = agg[v.split('=')[1]] || true; 
-                    return agg
-                }, {})
+
+            // Parse URL parameters like string ?param1=value1&param2=value2
+            const options = optionsString.replace('?', '').split('&').reduce((agg,v) => 
+            { 
+                if(v.length === 0){ return agg; } // skip empty values
+                agg[v.split('=')[0]] = this._convertStringValue(v.split('=')[1]) ?? true; // '&param=' => true 
+                return agg
+            }, {})
 
             requestOutputs.push(
                 {
@@ -1375,7 +1382,29 @@ export class Runner
         return pipelineResult; // return reference to pipeline result
     }
 
-    
+   
+    /** Get outputs for a specific pipeline, entity (metrics,docs,tables) */
+    _getOutputsByPipelineEntityFormats(request:RunnerScriptExecutionRequest, pipeline:string, entity:ExecutionRequestOutputEntityGroup, formats:Array<ExecutionRequestOutputFormat>=[]):Array<ExecutionRequestOutput>
+    {
+        let outputs = this._parseRequestOutputPaths(request.outputs)
+                            .filter(o => o.pipeline === pipeline && o.entityGroup === entity);
+        
+        // filters format
+        if(formats.length > 0)
+        {
+            outputs.forEach((o,i) => {
+                if(!formats.includes(o.outputFormat))
+                {
+                    console.warn(` !!!! Runner::_getDocsToExport(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}" !!!!`); 
+                }
+            })
+            outputs = outputs.filter(o => formats.includes(o.outputFormat)); // filter for docs
+        }
+
+        return outputs;
+    }
+
+     
     /** Export models from given scope, pipeline and using output paths in request.outputs and place in ExecutionResult tree */
     async _exportPipelineModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
     {
@@ -1402,7 +1431,21 @@ export class Runner
                         pipelineResultModel.buffer = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer(request.modelSettings) };
                         break;
                     case 'glb':
-                        pipelineResultModel.glb = { options: output.options, data:  await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions) }; 
+                        // convert the flat ExecutionRequestOutputFormatGLTFOptions to ExportGLTFOptions (TODO: use one and the same type)
+                        const inOptions = output?.options as ExecutionRequestOutputFormatGLTFOptions;
+                        const options = {
+                            binary: this.OUTPUT_FORMAT_DEFAULTS.glb.binary, // always binary for now
+                            archiyouFormat: inOptions?.data ?? this.OUTPUT_FORMAT_DEFAULTS.glb.data, 
+                            // quality leave default
+                            archiyouOutput: { 
+                                metrics: inOptions?.metrics ?? this.OUTPUT_FORMAT_DEFAULTS.glb.metrics, 
+                                docs: inOptions?.docs ?? this.OUTPUT_FORMAT_DEFAULTS.glb.docs, 
+                                tables: inOptions?.tables ?? this.OUTPUT_FORMAT_DEFAULTS.glb.tables 
+                            },
+                            includePointsAndLines: inOptions?.pointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.pointAndLines, // export points and lines
+                            extraShapesAsPointLines: inOptions?.shapesAsPointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.shapesAsPointAndLines, // export extra shapes as points and lines
+                        } as ExportGLTFOptions
+                        pipelineResultModel.glb = { options: output.options, data:  await scope.exporter.exportToGLTF(options) }; 
                         break;
                     case 'svg':
                         pipelineResultModel.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
@@ -1415,28 +1458,6 @@ export class Runner
         return result;
     }
 
-
-   
-    /** Get outputs for a specific pipeline, entity (metrics,docs,tables) */
-    _getOutputsByPipelineEntityFormats(request:RunnerScriptExecutionRequest, pipeline:string, entity:ExecutionRequestOutputEntityGroup, formats:Array<ExecutionRequestOutputFormat>=[]):Array<ExecutionRequestOutput>
-    {
-        let outputs = this._parseRequestOutputPaths(request.outputs)
-                            .filter(o => o.pipeline === pipeline && o.entityGroup === entity);
-        
-        // filters format
-        if(formats.length > 0)
-        {
-            outputs.forEach((o,i) => {
-                if(!formats.includes(o.outputFormat))
-                {
-                    console.warn(` !!!! Runner::_getDocsToExport(): Skipped unknown doc format "${o.outputFormat}" in requested output "${o.path}" !!!!`); 
-                }
-            })
-            outputs = outputs.filter(o => formats.includes(o.outputFormat)); // filter for docs
-        }
-
-        return outputs;
-    }
 
     _exportPipelineMetrics(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
     {
@@ -1728,5 +1749,19 @@ export class Runner
         return (typeof process !== 'undefined' && process.versions?.node) ? true : false;
     }
 
+    /**
+     * Convert a string value to its native type if possible.
+     * - "true"/"false" (case-insensitive) => boolean
+     * - Numeric strings => number
+     * - Otherwise, return as string
+     */
+    _convertStringValue(value: string): string | number | boolean {
+        if (typeof value !== 'string') return value;
+        const lower = value.toLowerCase();
+        if (lower === 'true') return true;
+        if (lower === 'false') return false;
+        if (!isNaN(Number(value)) && value.trim() !== '') return Number(value);
+        return value;
+    }
 }
 

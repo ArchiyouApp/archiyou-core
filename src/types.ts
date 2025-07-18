@@ -1226,13 +1226,13 @@ export interface RunnerScriptExecutionRequest
 //  basic structure: {pipeline|default}/{entity}/{entity name or all=*}/{output format}?{options}
 //  examples: 
 //      - default/model/glb (or model/glb)
+//      - default/model/glb?data=true&metrics=false
 //      - default/tables/*/xls 
 //      - cnc/model/dxf?2d 
 //      - default/docs/spec/pdf
 //
 export type ExecutionRequestOutputPath = string;
 export type ExecutionRequestOutputEntityGroup = 'model'|'metrics'|'tables'|'docs';
-
 export type ExecutionRequestOutputFormat = 'internal'|'raw'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
 // internal is data direct from local system (so instances, Obj/Shapes etc), raw is pure data, buffer is vertex buffer for editor viewer, glb is binary glTF, svg is 2D SVG, step is STEP file, stl is STL file, pdf is PDF file, xls is Excel file
 
@@ -1243,8 +1243,20 @@ export interface ExecutionRequestOutput
     entityGroup?:ExecutionRequestOutputEntityGroup
     entityName?:string // name or entity or * for all
     outputFormat?:ExecutionRequestOutputFormat
-    options?:Record<string,any> // options for output format (default)
+    options?:Record<string,any>|ExecutionRequestOutputFormatGLTFOptions // options for output format (default)
 }
+
+export interface ExecutionRequestOutputFormatGLTFOptions
+{
+    binary?:boolean // if true, output is binary glTF - default is true
+    data?:boolean // if true, output Archiyou data in glTF
+    metrics?:boolean // if data, include metric data in output
+    tables?:boolean // if data, include tables data in output
+    docs?:boolean // if data, include docs data in output
+    pointAndLines?:boolean // if true, output points and lines in glTF
+    shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
+}
+
 
 /* Total execution result tree 
     example: 

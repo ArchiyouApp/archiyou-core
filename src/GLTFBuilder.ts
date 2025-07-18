@@ -100,11 +100,10 @@ export class GLTFBuilder
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
     async addArchiyouData(gltfContent:Uint8Array|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<Uint8Array>
     {
-
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
         {
-            // TODO
+            throw new Error('GLTFBuilder::addArchiyouData(): GLTF text format not implemented yet. Please use binary GLTF format');
         }
         else {
             // Open ArrayBuffer and write extra data
@@ -123,7 +122,7 @@ export class GLTFBuilder
                     // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
                     messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
                     // Document data by document name in special format for AY doc viewers (PDF and web)
-                    docs: (settings?.docs !== false) ? (ay?.doc?.toData(settings?.docs) || {}) : {},  // TODO: toData is async: problem?
+                    docs: (settings?.docs !== false) ? (await ay?.doc?.toData(settings?.docs) || {}) : {},
                     pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
                     metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
                     tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
