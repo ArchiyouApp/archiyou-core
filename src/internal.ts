@@ -87,4 +87,6 @@ export * from './Runner'
 export * from './RunnerOps'
 export * from './RunnerComponentImporter'
 
+export * from './Script'
 export * from './Library'
+

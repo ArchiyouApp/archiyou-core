@@ -178,7 +178,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array|string|null>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|null>
     {
         const startGLTFExport = performance.now();
 
@@ -246,19 +246,17 @@ export class Exporter
         ocGLFTWriter.SetForcedUVExport(true); // to output UV coords
         ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
         
-        // TODO: We might need to pick up the seperate bin file for text-based GLTF
-        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (options.binary) ? 'binary' : 'utf8' });
+        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: 'binary' }); // only binary for now
+        let gltfContent =  gltfFile.buffer as ArrayBuffer; // For now only binary
         oc.FS.unlink("./" + filename);
         
-        let gltfContent =  (options.binary) ? new Uint8Array(gltfFile.buffer) : gltfFile;
-
         // clean up OC classes (if any shapes)
         ocShapeTool?.delete();
         ocIncMesh?.delete();
         ocGLFTWriter?.delete();
         ocCoordSystemConverter?.delete();
 
-        console.info(`Exporter::exportToGLTF: Exported OC data in ${Math.round(performance.now() - startGLTFExport)}ms`);
+        console.info(`Exporter::exportToGLTF: Exported ${exportShapes.length} OC Shapes in ${Math.round(performance.now() - startGLTFExport)}ms`);
         const startGLTFExtra = performance.now();
 
         // Force inclusion of points and lines to export
@@ -278,21 +276,22 @@ export class Exporter
         // extra vertices and lines for specific visualization styles
         if (options?.extraShapesAsPointLines)
         {
+            console.info(`Exporter::exportToGLTF: Flag extraShapesAsPointLines: Exporting extra Shapes as Points and Lines. `);
             const startGLTFExtraShapes = performance.now();
             const extraOutputShapes = new ShapeCollection(this._ay.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
-            gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
-            console.info(`Exporter::exportToGLTF: Exported extra ${extraOutputShapes.length} Shapes in ${Math.round(performance.now() - startGLTFExtraShapes)}ms`);
+            if( extraOutputShapes.length > 0)
+            {
+                gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
+            }
+            console.info(`Exporter::exportToGLTF: Exported extra ${extraOutputShapes.length} Shapes in ${Math.round(performance.now() - startGLTFExtraShapes)}ms`);            
         }
 
         // Add special archiyou data in GLTF asset.extras section
         if(options?.archiyouFormat)
         {
-            // add special Archiyou data to GLTF
+            console.info(`Exporter::exportToGLTF: Flag archiyouFormat: Exporting Archiyou data inside GLTF extras. Settings: ${JSON.stringify(options?.archiyouOutput)}`);
+            // We do some performance measurements here
             const startGLTFArchiyouData = performance.now();
-            // archiyouInput contains what to export - NOTE: exporting documents might impact execution time!
-            console.log(' ===== EXPORT ARCHIYOU DATA ===== ');
-            console.log(JSON.stringify(options?.archiyouOutput));
-
             gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._ay, options?.archiyouOutput || {}); 
             console.info(`Exporter::exportToGLTF: Exported archiyou data in ${Math.round(performance.now() - startGLTFArchiyouData)}ms`);	
         }

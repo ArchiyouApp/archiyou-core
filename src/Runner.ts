@@ -13,7 +13,6 @@
  //
 
 
-
 import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
                     Statement, StatementResult, RunnerScriptScopeState, RunnerScript, ExecutionResultPipeline
  } from "./internal"
@@ -58,13 +57,12 @@ export class Runner
     _onWorkerMessageFunc:(m:RunnerWorkerMessage) => any; // function to call when we get a message from the Worker
 
     //// SETTINGS ////
-
-    LOGGING_DEBUG: boolean = false; // directly log into local console, not that of Archiyou
+    LOGGING_DEBUG: boolean = false; // directly log into local console, not that of Archiyo
 
     //// DEFAULTS ////
-
     DEFAULT_ROLE: RunnerRole = 'single'
     EXEC_REQUEST_MODEL_FORMAT:ModelFormat = 'glb';
+    DEFAULT_OUTPUTS = ['default/model/glb']
     OUTPUT_FORMAT_DEFAULTS = {
         glb: { binary: true, data: true, metrics: true, docs: false, tables: true, pointAndLines: true, shapesAsPointAndLines: true } as ExecutionRequestOutputFormatGLTFOptions,
     } as Record<ExecutionRequestOutputFormat, Record<string, any>>; // default output formats for each type
@@ -609,27 +607,31 @@ export class Runner
 
     //// REQUESTS AND EXECUTION ////
 
-    /** Start execution of entire code or script with params in active scope 
+    /** Start execution of entire code or script with params in fresh, active scope 
      *  @request - string with code or object with script and params
-     *  @startRun - reset the scope before running the code
      *  @result - return the result of the execution
-     * 
     */
-    async execute(request: string|RunnerScriptExecutionRequest):Promise<ComputeResult>
+    public async execute(request: string|RunnerScriptExecutionRequest):Promise<ComputeResult>
     {
         await this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
         return await this._execute(request, true, true);
     }
 
     /** Execute (entire or partial) request on local execution scope or on managed worker */
-    async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
+    private async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
     {
         console.info(`**** Runner::_execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****`);
 
         // Convert code to request if needed
         if(typeof request === 'string')
         {
-                request = { script: { code: request } } as RunnerScriptExecutionRequest;    
+            request = { script: { code: request } } as RunnerScriptExecutionRequest;    
+        }
+
+        // If no outputs are defined, use default outputs
+        if(!request.outputs || request.outputs.length === 0)
+        {
+            request.outputs = this.DEFAULT_OUTPUTS;
         }
 
         // Check request structure (including params defs and values)
@@ -1166,7 +1168,7 @@ export class Runner
         const request:RunnerScriptExecutionRequest = {
             script: script,
             params: params || Object.values(script.params).reduce((agg, p) => { agg[p.name] = p.default; return agg; }, {}), // use default param values if not provided
-            outputs: outputs || ['default/model/glb'], // default output
+            outputs: outputs || this.DEFAULT_OUTPUTS, // default output
         };
         
         console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
@@ -1202,7 +1204,6 @@ export class Runner
         // BACKWARDS COMPATIBILITY: Old request outputs
         else 
         {
-       
             switch(request.modelFormat)
             {
                 case 'buffer': // TODO: raw
@@ -1421,7 +1422,7 @@ export class Runner
             for(let j = 0; j < outputFormats.length; j++)
             {
                 const format = outputFormats[j];
-                console.info(`Runner::_exportPipelineModels(): Exporting "${output.path}" with export in format: "${format}"`);
+                console.info(`Runner::_exportPipelineModels(): Exporting "${output.path}"`);
 
                 switch(format)
                 {

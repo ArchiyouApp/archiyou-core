@@ -1,4 +1,4 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, ParamManager, Obj  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, ParamManager, Obj, Script, ScriptData  } from './internal'
 
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View, Table } from './internal'
 
@@ -80,6 +80,52 @@ export type MakeSolidInput = Array<Shell>|ShapeCollection
 export type PipelineType = 'docs' | '3dprint' | 'cnc' | 'techdraw' | 'laser'
 
 //// INTERFACES ////
+
+/** Saved Scripts by Version */
+export interface ScriptVersion 
+{
+    id? : string,
+    file_id? : string,
+    user_id? : string,
+    user_name? : string,
+    file_name? : string,
+    prev_version_id? : string,
+    created_at? : string,
+    updated_at? : string,
+    params? : Array<Param>,
+    code : string,
+    shared?: boolean,
+    shared_version_tag?:string,
+    shared_auto_sync? : boolean,
+    shared_category?: string,
+    shared_description?: string
+}
+
+/** Information on how the Script is published 
+ *  If null then the script is not published
+ *  Before publishing the script is executed and validated, so here we also add information 
+ *  that comes out of execution
+*/
+export interface ScriptPublished
+{
+    url:string // url to the published script - this anticipates different publication urls
+    title:string // nice title of the script
+    published:Date // Date of publication
+    description:string // public description of script
+    public:boolean // if the script is public or not
+    params: Record<string, any>; // the parameters that are public with override configuration, others are default
+
+    
+    // Information after execution of script
+    units: ModelUnits, // units of the script
+    pipelines: Array<string>, // pipelines that are part of the script
+    metrics: Array<Metric>, // metrics that are part of the script
+    tables: Array<Table>, // tables that are part of the script
+    docs: Array<string>, // names of docs that are part of the script
+    execution?: number, // execution time in ms
+    cachable:boolean // if the script can be cached or not
+    safe:boolean // if the script is safe to run
+}
 
 /** A group of all modules of Archiyou for easy access  */
 export interface ArchiyouApp
@@ -187,25 +233,6 @@ export interface ArchiyouData
     tables?:{[key:string]:any}, // raw data tables
 }
 
-/** Saved Scripts by Version */
-export interface ScriptVersion 
-{
-    id? : string,
-    file_id? : string,
-    user_id? : string,
-    user_name? : string,
-    file_name? : string,
-    prev_version_id? : string,
-    created_at? : string,
-    updated_at? : string,
-    params? : Array<Param>,
-    code : string,
-    shared?: boolean,
-    shared_version_tag?:string,
-    shared_auto_sync? : boolean,
-    shared_category?: string,
-    shared_description?: string
-}
 
 export type EngineStateStatus = 'init' | 'loaded' | 'executing' | 'executed'
 
@@ -254,6 +281,7 @@ export interface ComputeTask
     code: string
 }
 
+/** TODO: bring in line with RunnerScriptExecutionRequest */
 export interface ComputeResult
 {
     uuid: string,
@@ -276,6 +304,7 @@ export interface ComputeResult
     gizmos?: Array<Gizmo>,
     annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
     
+    // Old outputs
     docs?:{[key:string]:DocData} // Data for generating docs
     pipelines: Array<string>,
     tables?: Record<string, any>, // TS type TODO
@@ -1201,7 +1230,7 @@ export interface RunnerScript
 */
 export interface RunnerScriptExecutionRequest
 {
-    script:RunnerScript
+    script:RunnerScript|Script|ScriptData // script to execute
     component?:string // name of component if any
     params?:Record<string,any> // param values
     mode?: 'main'|'component'
@@ -1212,11 +1241,12 @@ export interface RunnerScriptExecutionRequest
     pipelines?:Array<any>|boolean // pipelines to process
     tables?:Array<any>|boolean // tables to process
     // **** End old
-
     // model generation and export settings
+    // TODO: formats are part outputs now - DEPRECRATE these options
     modelFormat?:ModelFormat // TODO: typing
     modelFormatOptions?:ExportGLTFOptions|ExportSVGOptions
     modelSettings?:MeshingQualitySettings
+
     onDone?: ((result:ComputeResult) => any) // callback
 }   
 
@@ -1252,7 +1282,7 @@ export interface ExecutionRequestOutputFormatGLTFOptions
     data?:boolean // if true, output Archiyou data in glTF
     metrics?:boolean // if data, include metric data in output
     tables?:boolean // if data, include tables data in output
-    docs?:boolean // if data, include docs data in output
+    docs?:boolean // if data, incoutputs?: ExecutionResultOutputslude docs data in output
     pointAndLines?:boolean // if true, output points and lines in glTF
     shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
 }
@@ -1287,7 +1317,18 @@ export interface ExecutionResultOutputs
 export interface ExecutionResultOutput
 {
     options?: Record<string,any> // TODO?
-    data: any // internal, string, binary Blob or binary in base64
+    data: any|string|ArrayBuffer|ExecutionResultOutputDataBase64 // raw internal, string (and base64) and ArrayBuffer
+}
+
+/** For exporting raw binary data in base64 format 
+ *  see utils.ts 
+*/
+export interface ExecutionResultOutputDataBase64
+{
+    type: 'ArrayBuffer'|'Uint8Array'|'Uint16Array'|'Uint32Array'|'Int8Array'|
+                'Int16Array'|'Int32Array'|'Float32Array'|'Float64Array'|'Buffer' // original data type
+    data: string // base64 encoded data string
+    length: number // length of data in bytes
 }
 
 // outputs of a pipeline

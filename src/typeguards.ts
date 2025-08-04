@@ -2,7 +2,7 @@ import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeColl
             VertexCollection, DimensionLineData, DimensionLevel, DimensionLevelSettings, PipelineType, Beam,  
             DocUnitsWithPerc} from './internal'
 
-import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
+import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
           AnyShapeOrCollection, AnyShapeOrSequence, PointLikeOrAnyShapeOrCollection, ColorInput,
           Pivot, Alignment, BboxAlignment, LinearShapeTail, ThickenDirection, MakeShapeCollectionInput,
@@ -15,7 +15,8 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput,
           BeamBaseLineAlignment, 
           AnnotationAutoDimStrategy,
-          ComputeResult
+          ComputeResult,
+          RunnerScriptExecutionRequest
         } from './internal' // types
 
 import { ParamType, Param, PublishParam } from './internal'
@@ -30,6 +31,7 @@ import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionA
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
 
 import { isNumeric, isRelativeCoordString } from './internal'
+
 
 
 //// TYPE GUARD FUNCTIONS ////
@@ -554,4 +556,19 @@ export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
 export function isComputeResult(r:any): r is ComputeResult
 {
     return r && typeof r === 'object' && (r.meshGLB || r.meshBuffer)
+}
+
+export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutionRequest
+{
+    return o && typeof o === 'object' && 
+        typeof o.script === 'object' && 
+        typeof o.script.name === 'string' &&
+        (typeof o.component === 'string' || o.component === undefined) &&
+        (typeof o.mode === 'string' || o.mode === undefined) &&
+        (o.params === undefined || typeof o.params === 'object') &&
+        (o.outputs === undefined || Array.isArray(o.outputs)) &&
+        (o.docs === undefined || Array.isArray(o.docs) || typeof o.docs === 'boolean') &&
+        (o.pipelines === undefined || Array.isArray(o.pipelines) || typeof o.pipelines === 'boolean') &&
+        (o.tables === undefined || Array.isArray(o.tables) || typeof o.tables === 'boolean') &&
+        (o.onDone === undefined || typeof o.onDone === 'function');
 }

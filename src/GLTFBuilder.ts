@@ -98,7 +98,7 @@ export class GLTFBuilder
     //// SPECIAL ARCHIYOU GLTF ADDITIONS ////
 
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
-    async addArchiyouData(gltfContent:Uint8Array|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<Uint8Array>
+    async addArchiyouData(gltfContent:ArrayBuffer|string, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<ArrayBuffer>
     {
         const io = new WebIO({credentials: 'include'});
         if (typeof gltfContent === 'string')
@@ -109,7 +109,7 @@ export class GLTFBuilder
             // Open ArrayBuffer and write extra data
             try 
             {
-                this.doc = await io.readBinary(new Uint8Array(gltfContent)); // Force Uint8Array from ArrayBuffer
+                this.doc = await io.readBinary(gltfContent); // Force Uint8Array from ArrayBuffer
                 let asset = this.doc.getRoot().getAsset();
 
                 asset.generator = 'Archiyou';
@@ -150,7 +150,7 @@ export class GLTFBuilder
 
 
     /** Add all loose point and line Shapes (Vertex,Edge,Wire) to the GLTF buffer */
-    async addPointsAndLines(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
+    async addPointsAndLines(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<ArrayBuffer>
     {
         const io = new WebIO({credentials: 'include'});
         this.doc = await io.readBinary(gltfContent);
@@ -171,7 +171,7 @@ export class GLTFBuilder
     }
 
     /** Add Vertices of Shape (including just one Vertex) as node to GLTF */
-    _addPoints(shape:AnyShape, gltfBuffer:any)
+    _addPoints(shape:AnyShape, gltfBuffer:ArrayBuffer)
     {
         let vArr:Array<number> = [];
 
@@ -207,7 +207,7 @@ export class GLTFBuilder
         this.doc.getRoot().listScenes()[0].addChild(vertNode); // add node to scene
     }
 
-    _addShapeLines(shape:AnyShape, gltfBuffer:any, quality:MeshingQualitySettings)
+    _addShapeLines(shape:AnyShape, gltfBuffer:ArrayBuffer, quality:MeshingQualitySettings)
     {
         let lineArr:Array<number> = [];
         let edgesOfShape = shape.toMeshEdges(quality); // as EdgeMesh objects
@@ -263,7 +263,7 @@ export class GLTFBuilder
     /** For visualization purposes it's handy output seperate point- and line buffer into the GLTF
      *  So these can be seperately styled in a GLTF viewer
      */
-    async addSeperatePointsAndLinesForShapes(gltfContent:Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
+    async addSeperatePointsAndLinesForShapes(gltfContent:ArrayBuffer, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<ArrayBuffer>
     {
         const io = new WebIO({credentials: 'include'});
         this.doc = await io.readBinary(gltfContent);
@@ -282,7 +282,7 @@ export class GLTFBuilder
     //// READ-ONLY FUNCTIONS ////
 
     /** Get ArchiyouData from GLTF binary */
-    async readArchiyouData(gltf:Uint8Array):Promise<ArchiyouData>
+    async readArchiyouData(gltf:ArrayBuffer):Promise<ArchiyouData>
     {   
         const io = new WebIO();
         const doc = await io.readBinary(gltf);
