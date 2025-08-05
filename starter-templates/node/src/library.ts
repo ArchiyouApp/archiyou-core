@@ -1,6 +1,6 @@
 //import { OcLoader } from '../../../src/internal';
 //import { OcLoader } from 'archiyou-core'
-import { Library } from '../../../src/internal';
+import { LibraryConnector } from '../../../src/internal';
 // import { Runner } from '../../../src/internal'
 
 
@@ -8,7 +8,7 @@ import { Library } from '../../../src/internal';
 
 /*
 
-const lib = new Library();
+const lib = new LibraryConnector();
 await lib.getLibraryOverview();
 
 //// GET SCRIPT FROM URL ////

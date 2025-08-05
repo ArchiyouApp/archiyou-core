@@ -19,7 +19,7 @@ import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBb
 
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, 
-            ComputeResult, CodeParser, Library } from "./internal"
+            ComputeResult, CodeParser, LibraryConnector } from "./internal"
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
@@ -1179,7 +1179,7 @@ export class Runner
 
     async getScriptFromUrl(url:string):Promise<PublishScript>
     {
-        const library = new Library();
+        const library = new LibraryConnector();
         return await library.getScriptFromUrl(url); // get script from library
     }
 

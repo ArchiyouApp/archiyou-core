@@ -5,7 +5,7 @@
 import { PublishScript } from './types';
 import semver from 'semver';
 
-export class Library
+export class LibraryConnector
 {
     //// SETTINGS ////
     DEFAULT_LIBRARY_URL = 'https://pub.archiyou.com'; // default library URL
@@ -112,7 +112,7 @@ export class Library
 
         if(!m)
         {
-            throw new Error(`Library::getScriptFromUrl(): Invalid URL format: ${url}`);
+            throw new Error(`LibraryConnector::getScriptFromUrl(): Invalid URL format: ${url}`);
         }
         else
         {
@@ -128,7 +128,7 @@ export class Library
                         throw new Error(`No versions found for script "${scriptname}" at URL "${url}". Probably the script does not exist!`);
                     }
                     version = versions[versions.length - 1]; // assuming versions are sorted by version number
-                    console.info(`Library::getScriptFromUrl(): No version specified in URL. Got latest "${version}" from  ${versions.join(', ')})`);                
+                    console.info(`LibraryConnector::getScriptFromUrl(): No version specified in URL. Got latest "${version}" from  ${versions.join(', ')})`);                
                 }
                 catch(error)
                 { 
@@ -137,13 +137,13 @@ export class Library
             }
 
             const scriptUrl = `https://${domain || this.DEFAULT_LIBRARY_URL}/${library}/${scriptname}/${version}/script`; // get only script data
-            console.log(`Library::getScriptFromUrl(): Fetching script from URL: ${scriptUrl}`);
+            console.log(`LibraryConnector::getScriptFromUrl(): Fetching script from URL: ${scriptUrl}`);
     
             try {
                 return await (await fetch(scriptUrl)).json() as PublishScript;
             }   
             catch(error) {
-                console.error(`Library::getScriptFromUrl(): Error fetching script from URL "${scriptUrl}":`, error);
+                console.error(`LibraryConnector::getScriptFromUrl(): Error fetching script from URL "${scriptUrl}":`, error);
                 throw new Error(`Failed to fetch script from URL "${scriptUrl}": ${error.message}`);
             }
         }
