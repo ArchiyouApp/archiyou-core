@@ -114,8 +114,8 @@ export class Script
         this.id = data.id;
         this.name = data.name.toLowerCase();
         this.author = data.author.toLowerCase();
+        this.namespace = `${this.author}/${this.name}`.toLowerCase();
         this.version = data.version;
-        this.namespace = data.namespace.toLowerCase();
         this.description = data.description;
         this.tags = Array.isArray(data.tags) ? data.tags : [];
         this.created = data.created ? new Date(data.created) : new Date();
@@ -138,7 +138,6 @@ export class Script
             name: this.name,
             author: this.author,
             version: this.version,
-            namespace: this.namespace,
             description: this.description,
             tags: this.tags,
             created: this.created ? this.created.toISOString() : null,
@@ -161,7 +160,6 @@ export interface ScriptData
     name: string;
     author: string;
     version?: string; // valid semver: can be undefined, then automatically generated
-    namespace: string;
     description: string;
     tags: string[];
     created: string | null;

@@ -178,7 +178,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|null>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array<ArrayBuffer>|null>
     {
         const startGLTFExport = performance.now();
 
@@ -247,7 +247,7 @@ export class Exporter
         ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
         
         const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: 'binary' }); // only binary for now
-        let gltfContent =  gltfFile.buffer as ArrayBuffer; // For now only binary
+        let gltfContent =  new Uint8Array(gltfFile.buffer) as Uint8Array; 
         oc.FS.unlink("./" + filename);
         
         // clean up OC classes (if any shapes)
@@ -301,7 +301,7 @@ export class Exporter
 
         console.info(`Exporter::exportToGLTF: Exported extra data in ${Math.round(performance.now() - startGLTFExtra)}ms`);	
 
-        return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
+        return gltfContent; 
     }
 
     /** Export GLTF (binary or text) to the browser window */
