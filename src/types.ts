@@ -101,6 +101,19 @@ export interface ScriptVersion
     shared_description?: string
 }
 
+/** After execution of the script (on client or server) we fill in some metadata */
+export interface ScriptMeta
+{
+    // Information after execution of script
+    units: ModelUnits, // units of the script
+    pipelines: Array<string>, // pipelines that are part of the script
+    metrics: Array<string>, // metric names that are part of the script
+    tables: Array<string>, // table names that are part of the script
+    docs: Array<string>, // names of docs that are part of the script
+    numShapes?: number
+    bbox?: Array<number|number|number|number|number|number>, // bbox of scene [minX, minY, minZ, maxX, maxY, maxZ]
+}
+
 /** Information on how the Script is published 
  *  If null then the script is not published
  *  Before publishing the script is executed and validated, so here we also add information 
@@ -114,17 +127,6 @@ export interface ScriptPublished
     description:string // public description of script
     public:boolean // if the script is public or not
     params: Record<string, any>; // the parameters that are public with override configuration, others are default
-
-    
-    // Information after execution of script
-    units: ModelUnits, // units of the script
-    pipelines: Array<string>, // pipelines that are part of the script
-    metrics: Array<Metric>, // metrics that are part of the script
-    tables: Array<Table>, // tables that are part of the script
-    docs: Array<string>, // names of docs that are part of the script
-    execution?: number, // execution time in ms
-    cachable:boolean // if the script can be cached or not
-    safe:boolean // if the script is safe to run
 }
 
 /** A group of all modules of Archiyou for easy access  */
@@ -179,7 +181,7 @@ export interface ConsoleMessage
 }
 
 /** Special Archiyou data inserted into asset.archiyou
-    TODO: We use ComputeResult internally - which has a lot of overlap with this
+    TODO: We use RunnerScriptExecutionResult internally - which has a lot of overlap with this
     When we start using GLB format internally these types will merge
 */
 export interface ArchiyouData
@@ -195,14 +197,6 @@ export interface ArchiyouData
     managedParams?:Record<ParamOperation, Array<PublishParam>>
 }
 
-/** Data structure on the current state of the Archiyou App (mostly inside a worker) */
-export interface ArchiyouAppInfo
-{
-    units?:ModelUnits // units of Geom._units
-    numShapes?:number
-    bbox?:ArchiyouAppInfoBbox // bbox of all shapes in scene
-    hasDocs?:boolean // if there are docs part of the script
-}
 
 /** TODO */
 export interface ExportSVGOptions 
@@ -249,26 +243,6 @@ export interface MeshingQuality
 
 }
 
-/** Settings on what to compute in a ExecutionRequest */
-export interface ExecutionRequestCompute
-{
-    doc:boolean
-    pipelines:boolean
-}
-
-export interface ExecutionRequest
-{
-    script: ScriptVersion
-    createdAtString:string
-    mode: 'main'|'local' // executing in main or in some component (for example keep meshes local or not)
-    compute: ExecutionRequestCompute
-    meshingQuality: MeshingQualitySettings,
-    outputFormat?: 'buffer'|'glb'|'svg' // null = default
-    outputOptions?: ExportGLTFOptions|ExportSVGOptions // TODO: more options per output
-    onDone?: ((result:ComputeResult) => any)
-}
-
-
 export interface ComputeTask
 {
     uuid?: string,
@@ -282,37 +256,25 @@ export interface ComputeTask
 }
 
 /** TODO: bring in line with RunnerScriptExecutionRequest */
-export interface ComputeResult
+export interface RunnerScriptExecutionResult
 {
-    uuid: string,
-    user_id : string,
-    broker_id : string,
-    task: ComputeTask,
     created_at: Date,
     status:'success'|'error',
     duration: number
+    request: RunnerScriptExecutionRequest,
 
-    meshes?: Array<MeshShape>, // individual ShapeMeshes: TO BE FASED OUT!
-    meshBuffer?: MeshShapeBuffer,
-    meshGLB?:ArrayBuffer, // raw GLB file in buffer
-    svg?:string, // SVG output is any
     scenegraph: SceneGraphNode
+    gizmos?: Array<Gizmo>,
+    annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
+    managedParams?:Record<ParamOperation, Array<PublishParam>>
+
     statements: Array<StatementResult>
     errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
     messages?: Array<ConsoleMessage>,
-
-    gizmos?: Array<Gizmo>,
-    annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
     
-    // Old outputs
-    docs?:{[key:string]:DocData} // Data for generating docs
-    pipelines: Array<string>,
-    tables?: Record<string, any>, // TS type TODO
-    metrics?: Record<string, any>, // TS type TODO
-    info?:ArchiyouAppInfo, // general metadata 
-    managedParams?:Record<ParamOperation, Array<PublishParam>>
+    meta: ScriptMeta, // meta information on the script execution
     
-    // New outputs per pipeline
+    // All outputs in clear structure
     outputs?: ExecutionResultOutputs
 }
 
@@ -1236,18 +1198,8 @@ export interface RunnerScriptExecutionRequest
     mode?: 'main'|'component'
     // What to calculate and output
     outputs?: Array<ExecutionRequestOutputPath>
-    // **** Old ==> To be phased out
-    docs?:Array<any>|boolean // documents to process
-    pipelines?:Array<any>|boolean // pipelines to process
-    tables?:Array<any>|boolean // tables to process
-    // **** End old
-    // model generation and export settings
-    // TODO: formats are part outputs now - DEPRECRATE these options
-    modelFormat?:ModelFormat // TODO: typing
-    modelFormatOptions?:ExportGLTFOptions|ExportSVGOptions
-    modelSettings?:MeshingQualitySettings
-
-    onDone?: ((result:ComputeResult) => any) // callback
+    meta?: ScriptMeta | null // Metadata on pipelines, metrics, tables, docs etc
+    onDone?: ((result:RunnerScriptExecutionResult) => any) // callback
 }   
 
 

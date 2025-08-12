@@ -13,13 +13,13 @@
  //
 
 
-import type { ArchiyouApp, ExportGLTFOptions, ArchiyouAppInfo, ArchiyouAppInfoBbox, 
-                    Statement, StatementResult, RunnerScriptScopeState, RunnerScript, ExecutionResultPipeline
+import type { ArchiyouApp, ExportGLTFOptions, Statement, 
+                StatementResult, RunnerScriptScopeState, RunnerScript, ExecutionResultPipeline
  } from "./internal"
 
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, 
-            ComputeResult, CodeParser, LibraryConnector } from "./internal"
+            RunnerScriptExecutionResult, CodeParser, LibraryConnector } from "./internal"
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
@@ -35,9 +35,9 @@ import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExe
                 ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
                 ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup, 
                 PublishScript,
-                PublishParam, ExecutionRequestOutputFormatGLTFOptions} from "./internal"
+                PublishParam, ExecutionRequestOutputFormatGLTFOptions, ScriptMeta} from "./internal"
 
-import { isComputeResult } from './internal' // typeguards
+import { isRunnerScriptExecutionResult } from './internal' // typeguards
 
 
 export class Runner
@@ -61,7 +61,6 @@ export class Runner
 
     //// DEFAULTS ////
     DEFAULT_ROLE: RunnerRole = 'single'
-    EXEC_REQUEST_MODEL_FORMAT:ModelFormat = 'glb';
     DEFAULT_OUTPUTS = ['default/model/glb']
     OUTPUT_FORMAT_DEFAULTS = {
         glb: { binary: true, data: true, metrics: true, docs: false, tables: true, pointAndLines: true, shapesAsPointAndLines: true } as ExecutionRequestOutputFormatGLTFOptions,
@@ -611,14 +610,14 @@ export class Runner
      *  @request - string with code or object with script and params
      *  @result - return the result of the execution
     */
-    public async execute(request: string|RunnerScriptExecutionRequest):Promise<ComputeResult>
+    public async execute(request: string|RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
         await this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
         return await this._execute(request, true, true);
     }
 
     /** Execute (entire or partial) request on local execution scope or on managed worker */
-    private async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<ComputeResult>
+    private async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<RunnerScriptExecutionResult>
     {
         console.info(`**** Runner::_execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****`);
 
@@ -652,7 +651,7 @@ export class Runner
      *  This seperates the code in statements and returns results for each statement
      *  It still uses execute() internally
     */
-    async executeInStatements(request: RunnerScriptExecutionRequest):Promise<ComputeResult>
+    async executeInStatements(request: RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
         this._activeExecRequest = this._checkRequestAndAddDefaults(request);
         const statementResults = [] as Array<StatementResult>;
@@ -676,7 +675,6 @@ export class Runner
         this._checkRequestParams(request);
 
         return {
-            modelFormat: this.EXEC_REQUEST_MODEL_FORMAT,
             ...request
         }
     }
@@ -725,7 +723,7 @@ export class Runner
     }
 
     /** Execute a request in a seperate managed worker */
-    async _executeInWorker(request: RunnerScriptExecutionRequest):Promise<ComputeResult>
+    async _executeInWorker(request: RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
         console.info(`Runner: Executing script in worker`);
 
@@ -739,7 +737,7 @@ export class Runner
                 if (message.type === 'executed')
                 {
                     this._manageWorker.removeEventListener('message', handleMessage); // Clean up listener
-                    resolve(message.payload as ComputeResult); // Resolve the promise with the payload
+                    resolve(message.payload as RunnerScriptExecutionResult); // Resolve the promise with the payload
                 }
             };
             // Add the message event listener
@@ -756,13 +754,13 @@ export class Runner
     /** Execute a piece of code or script (and params) in local execution context 
      *  @request - string with code or object with script and params
      *  @startRun - if true a reset is made of the state to prepare for fresh run
-     *  @output - if true, the Archiyou state is returned as ComputeResult
+     *  @output - if true, the Archiyou state is returned as RunnerScriptExecutionResult
      * 
-     *  @returns - ComputeResult or null if no output or error string
+     *  @returns - RunnerScriptExecutionResult or null if no output or error string
      * 
      *  NOTE: this = execution context (not Runner)
     */
-    async _executeLocal(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):Promise<ComputeResult|null>
+    async _executeLocal(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):Promise<RunnerScriptExecutionResult|null>
     {
         if(!this.loaded())
         { 
@@ -784,7 +782,6 @@ export class Runner
         }
             
         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
-        console.info(`* With execution request settings: { modelFormat: "${this._activeExecRequest.modelFormat}" } *`);
         console.info(`* With param values: ${JSON.stringify(request.params)} *`);
 
         this._activeExecRequest = request;
@@ -835,7 +832,7 @@ export class Runner
                                         : outputFunc(scope, request);
             
                             `
-                    ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as Promise<ComputeResult>|ComputeResult;    
+                    ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as Promise<RunnerScriptExecutionResult>|RunnerScriptExecutionResult;    
             }
             catch(e)
             {
@@ -844,14 +841,14 @@ export class Runner
                 return {
                     status: 'error',
                     errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
-                } as ComputeResult
+                } as RunnerScriptExecutionResult
             }
         }
 
         const result = await exec();
         
-        // Set duration if result is ComputeResult
-        if(isComputeResult(result))
+        // Set duration if result is RunnerScriptExecutionResult
+        if(isRunnerScriptExecutionResult(result))
         {
             result.duration = Math.round(performance.now() - executeStartTime);
         }
@@ -870,14 +867,14 @@ export class Runner
      *  This is used for debugging and testing in browser
      *  NOTE: see executeInStatements() for main entrypoint
     */
-    async _executeLocalInStatements(request: RunnerScriptExecutionRequest, statementResults:Array<StatementResult>):Promise<ComputeResult>
+    async _executeLocalInStatements(request: RunnerScriptExecutionRequest, statementResults:Array<StatementResult>):Promise<RunnerScriptExecutionResult>
     {
         this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
 
         const codeParser = new CodeParser(request.script.code, {}, null); // TODO: config, IO => archiyou?
         const statements = await codeParser.getStatements();
         
-        let result:ComputeResult;
+        let result:RunnerScriptExecutionResult;
 
         console.info(`Runner::_executeLocalInStatements(): Executing script in ${statements.length} statements in active local context: "${this._activeScope?.name}"`);
 
@@ -982,7 +979,7 @@ export class Runner
      *      So a sync function is used to execute component scripts
      *      This also means that we need to pre-fetch all component scripts before executing them
      */
-    _executeComponentScript(request:RunnerScriptExecutionRequest): ComputeResult
+    _executeComponentScript(request:RunnerScriptExecutionRequest): RunnerScriptExecutionResult
     {
         const scopeName = `component:${request.component}`;
         this.createScope(scopeName); // automatically becomes current scope
@@ -998,7 +995,7 @@ export class Runner
      *  
      *  NOTE: This is run in the local scope, so 'this' is the execution scope
      */
-     _executeLocalComponent(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):ComputeResult|null
+     _executeLocalComponent(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):RunnerScriptExecutionResult|null
      {
          if(!this.loaded())
          { 
@@ -1006,9 +1003,8 @@ export class Runner
          }
              
          console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
-         console.info(`* With execution request settings: { params: ${JSON.stringify(request.params)} , 
-                         modelFormat: "${this._activeExecRequest.modelFormat}" }*`);
- 
+         console.info(`* With execution request settings: { params: ${JSON.stringify(request.params)} and outputs: ${JSON.stringify(request.outputs)} }`);
+
          this._activeExecRequest = request;
          const executeStartTime = performance.now()
  
@@ -1044,7 +1040,7 @@ export class Runner
                              return outputFunc(scope, request);
              
                              `
-                     ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as ComputeResult;    
+                     ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as RunnerScriptExecutionResult;    
              }
              catch(e)
              {
@@ -1053,14 +1049,14 @@ export class Runner
                  return {
                      status: 'error',
                      errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
-                 } as ComputeResult
+                 } as RunnerScriptExecutionResult
              }
          }
  
          const result = exec();
          
-         // Set duration if result is ComputeResult
-         if(isComputeResult(result))
+         // Set duration if result is RunnerScriptExecutionResult
+         if(isRunnerScriptExecutionResult(result))
          {
              result.duration = Math.round(performance.now() - executeStartTime);
          }
@@ -1159,7 +1155,7 @@ export class Runner
     //// EXECUTION UTILS ////
 
     /** Execute from URL of Archiyou library */
-    async executeUrl(url:string, params?:Record<string,PublishParam>, outputs?:Array<ExecutionRequestOutputPath>):Promise<ComputeResult>
+    async executeUrl(url:string, params?:Record<string,PublishParam>, outputs?:Array<ExecutionRequestOutputPath>):Promise<RunnerScriptExecutionResult>
     {
         const script = await this.getScriptFromUrl(url);
         if(!script){ throw new Error(`Runner::executeUrl(): Script not found at URL "${url}"`);}
@@ -1185,51 +1181,55 @@ export class Runner
 
     //// RESULTS ////
 
+    _addMetaToResult(scope, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):RunnerScriptExecutionResult
+    {
+        const shapes = scope.geom.all();
+        const bbox = shapes.length ? shapes.bbox() : undefined;
+        const bboxArr = bbox ? bbox.min().toArray().concat(bbox.max().toArray()) : undefined;
+
+        // Add meta info to result
+        result.meta = {
+            units: scope.geom._units,
+            docs : scope.doc.docs(), // available doc names
+            pipelines : scope.geom.getPipelineNames(),  // names of defined pipelines
+            tables:scope.calc.getTableNames(), // names of available tables
+            metrics : scope.calc.getMetricNames(),
+            bbox : bboxArr, 
+            numShapes: shapes.length,
+        } as ScriptMeta;
+
+        return result;
+    }
+
     /** Get results out of local execution scope  
      *  This function is bound to the scope - so 'this' is the execution scope
     */
-    async getLocalScopeResults(scope:any, request:RunnerScriptExecutionRequest):Promise<ComputeResult>
+    async getLocalScopeResults(scope:any, request:RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
         console.info('****Runner::getLocalScopeResults(): Getting results from execution scope ****');
         console.info(`Request outputs:`)
         request.outputs?.forEach(o => console.info(` * ${o}`));
    
-        const result = {} as ComputeResult;
+        const result = {} as RunnerScriptExecutionResult;
 
-        // New request outputs
+        // Main data
+        result.status = 'success'; 
+        //result.errors = scope.console.getErrors();
+        result.scenegraph = scope.geom.scene.toGraph();
+        result.duration = scope.geom._duration; // duration of the last operation
+        result.request = request;
+
+        // Outputs
         if(request.outputs)
         {
             result.outputs = await this.getLocalScopeResultOutputs(scope, request);
         }
-        // BACKWARDS COMPATIBILITY: Old request outputs
-        else 
-        {
-            switch(request.modelFormat)
-            {
-                case 'buffer': // TODO: raw
-                    result.meshBuffer = scope.geom.scene.toMeshShapeBuffer(request.modelSettings);
-                    break;
-                case 'glb':
-                    result.meshGLB = await scope.exporter.exportToGLTF(request?.modelFormatOptions as ExportGLTFOptions); 
-                    break;
-                case 'svg':
-                    result.svg = scope.exporter.exportToSvg(false); // get SVG isometry
-                    break;
-                default:
-                    throw new Error(`Runner::_getScopeComputeResult(): Unknown model format "${request.modelFormat}"`);
-            }
+        else {
+            throw new Error(`Runner::getLocalScopeResults(): No outputs requested`);
         }
 
-        this._addAppInfoToResult(scope, request, result); // add app info to result
-        
-        // Other data
-        result.status = 'success'; 
-        result.scenegraph = scope.geom.scene.toGraph();
-        result.docs = (request.docs) ? await scope.doc.toData() : undefined,
-        result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
-        result.tables = scope.calc?.toTableData(); 
-        result.metrics =  scope.calc?.metrics();
-        result.managedParams = scope.ay.paramManager.getOperatedParamsByOperation();        
+        // Meta
+        this._addMetaToResult(scope, request, result);
 
         return result;
     }
@@ -1237,46 +1237,21 @@ export class Runner
     /**
      * Get results out of local execution scope synchronously for Components
      * For special cases like importing components we want to avoid async methods  */
-    getLocalScopeResultsComponent(scope:any, request:RunnerScriptExecutionRequest):ComputeResult
+    getLocalScopeResultsComponent(scope:any, request:RunnerScriptExecutionRequest):RunnerScriptExecutionResult
     {
-        const result = {} as ComputeResult;
+        const result = {} as RunnerScriptExecutionResult;
 
-        // Get the requested outputs
+        // Outputs
         if(request.outputs)
         {
             console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
             result.outputs = this.getLocalScopeResultOutputsInternal(scope, request);
         }
-      
-        this._addAppInfoToResult(scope, request, result); // add app info to result
-        
-        // This is the old structure of results
-        /*
-        result.scenegraph = scope.geom.scene.toGraph();
-        result.pipelines = scope.geom.getPipelineNames(),  // names of defined pipelines
-        result.tables = scope.calc?.toTableData(); 
-        result.metrics =  scope.calc?.metrics();
-        result.managedParams = scope.ay.paramManager.getOperatedParamsByOperation();        
-        */
+
+        // Meta
+        this._addMetaToResult(scope, request, result);
 
         return result;
-    }
-
-    /** Set archiyou app info on result */
-    _addAppInfoToResult(scope:any, request:RunnerScriptExecutionRequest, result:ComputeResult):ArchiyouAppInfo
-    {
-        const shapes = scope.geom.all();
-        const bbox = shapes.length ? shapes.bbox() : undefined;
-        const sceneBbox = bbox ? { min: bbox.min().toArray(), max: bbox.max().toArray() } as ArchiyouAppInfoBbox : undefined;
-
-        result.info = {
-            units: scope.geom._units,
-            numShapes: shapes.length,
-            bbox: sceneBbox,
-            hasDocs: scope.doc.hasDocs(),
-        } as ArchiyouAppInfo;
-
-        return result.info;
     }
     
 
@@ -1291,7 +1266,7 @@ export class Runner
         const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
         const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
 
-        console.info(`**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')} ****`);
+        console.info(`**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Available pipelines: ${pipelines.join(',')} ****`);
 
         const resultTree = { state: {}, pipelines: {}} as ExecutionResultOutputs;
 
@@ -1309,7 +1284,7 @@ export class Runner
 
             // Gather results per pipeline
             await this._exportPipelineModels(scope, request, pipeline, resultTree); 
-            // TODO: Metrics
+            this._exportMetricsInternal(scope, request, pipeline, resultTree); // no await needed, only internal formats
             await this._exportPipelineTables(scope, request, pipeline, resultTree);
             await this._exportPipelineDocs(scope, request, pipeline, resultTree);
             
@@ -1429,7 +1404,7 @@ export class Runner
                     case 'raw':
                         pipelineResultModel.raw = { options: output.options, data:  scope.geom.scene }; // Obj instance with all hierarchy - imported to current scope
                     case 'buffer':
-                        pipelineResultModel.buffer = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer(request.modelSettings) };
+                        pipelineResultModel.buffer = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer() };
                         break;
                     case 'glb':
                         // convert the flat ExecutionRequestOutputFormatGLTFOptions to ExportGLTFOptions (TODO: use one and the same type)
@@ -1452,7 +1427,7 @@ export class Runner
                         pipelineResultModel.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
                         break;
                     default:
-                        console.error(`Runner::_getScopeComputeResult(): Skipped unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
+                        console.error(`Runner::_getScopeRunnerScriptExecutionResult(): Skipped unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
                 }
             }
         }
@@ -1497,7 +1472,7 @@ export class Runner
         
         const EXPORT_FORMATS = ['raw', 'xls'];
 
-        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs'); // all formats
+        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'tables'); // all formats
 
         // Check if we need anything to export for current request and pipeline
         if(outputs.length === 0)
@@ -1530,7 +1505,7 @@ export class Runner
                         console.warn(`Runner::_exportPipelineTables(): xls export not implemented yet`);
                         break;
                     default:
-                        throw new Error(`Runner::_getScopeComputeResult(): Unknown doc export format "${format}"`);
+                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown doc export format "${format}"`);
                 }
             }
             
@@ -1589,7 +1564,7 @@ export class Runner
                         this._setFormatResults(pipelineResultDocs,docsPdfByName, format);
                         break;
                     default:
-                        throw new Error(`Runner::_getScopeComputeResult(): Unknown doc export format "${format}"`);
+                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown doc export format "${format}"`);
                 }
             }
             
@@ -1720,7 +1695,7 @@ export class Runner
                 internal :
                 {
                     options: {},
-                    data: table // table instance with all data
+                    data: table.toData() // table instance with all data
                 }
             }
             // To keep track that this Table instance came from a component

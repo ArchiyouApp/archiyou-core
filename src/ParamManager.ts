@@ -13,7 +13,7 @@
  *      - [App scope] Script has params that go to ParamMenu
  *      - [Worker scope] ParamManager instance is created every run, new ParamManagerOperators are created based on current Params
  *      - [Worker scope] During script execution ParamManager is used to define or edit params
- *      - [Worker scope] At end of script execution, params that are managed are added to ComputeResult at managedParams and send to app. 
+ *      - [Worker scope] At end of script execution, params that are managed are added to RunnerScriptExecutionResult at managedParams and send to app. 
  *                       The managedParams are stateless, so every run, with same param values they emit the same managedParams
  *      - [App scope: editor or configurator] managedParams are put in store and picked up by ParamMenu to change menu params. 
  *                      It is the responsibility of receiver to compare existing params with incoming ManagedParams. 

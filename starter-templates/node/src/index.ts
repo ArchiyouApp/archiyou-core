@@ -55,7 +55,7 @@ new Runner()
                 console.log('==== DONE ====')
                 console.log(r.status);
                 console.log(JSON.stringify(r.errors));
-                //console.log(JSON.stringify((r as ComputeResult).outputs));
+                //console.log(JSON.stringify((r as RunnerScriptExecutionResult).outputs));
                 console.log(JSON.stringify(r.outputs.pipelines.default.tables));
             })
         }

@@ -114,6 +114,11 @@
             ? tables : tables.filter(t => only.includes(t.name));
     }
 
+    getTableNames():Array<string>
+    {
+        return this.tables();
+    }
+
     //// CREATION API ////
 
     /** Make or get table with data 
@@ -210,6 +215,11 @@
             Object.values(this._metrics).map(m => { return [m?.label || m.name, m.data] }),
             ['name', 'value']
         ) as Table
+    }
+
+    getMetricNames():Array<string>
+    {
+        return Object.keys(this._metrics);
     }
 
     //// UTILS ////

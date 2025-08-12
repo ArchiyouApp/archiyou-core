@@ -8,7 +8,7 @@
 import { uuidv4 } from './internal' // utils
 import semver from 'semver'; // for version validation
 
-import type { Param, PublishParam, ScriptPublished,  } from "./internal";
+import type { Param, PublishParam, ScriptPublished, ScriptMeta } from "./internal";
 
 
 export class Script 
@@ -27,6 +27,8 @@ export class Script
     code:string;
     params:Record<string, Param> = {}; // TODO
     presets:Record<string, Record<string, PublishParam>> = {}; // TODO: Presets of parameter values
+
+    meta: ScriptMeta|null;  // To be filled in by client or server after execution
 
     published: ScriptPublished|null; // Information on the published script (if null, not published)
     previousId?:string; // uuid of the previous script version, if any

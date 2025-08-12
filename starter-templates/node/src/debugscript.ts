@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 
-import { Runner, RunnerScriptExecutionRequest, RunnerOps, ComputeResult } from '../../../src/internal'
+import { Runner, RunnerScriptExecutionRequest, RunnerOps, RunnerScriptExecutionResult } from '../../../src/internal'
 
 
 
@@ -105,7 +105,7 @@ new Runner()
                 console.log('==== DONE ====')
                 console.log(r.status);
                 console.log(JSON.stringify(r.errors));
-                console.log(JSON.stringify((r as ComputeResult).outputs));
+                console.log(JSON.stringify((r as RunnerScriptExecutionResult).outputs));
                 console.log(r.outputs.pipelines.default.docs.test?.pdf?.data);
                 new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.docs.spec?.pdf?.data, 'test.pdf')
             })

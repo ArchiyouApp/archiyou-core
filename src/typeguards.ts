@@ -15,7 +15,7 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput,
           BeamBaseLineAlignment, 
           AnnotationAutoDimStrategy,
-          ComputeResult,
+          RunnerScriptExecutionResult,
           RunnerScriptExecutionRequest
         } from './internal' // types
 
@@ -553,22 +553,22 @@ export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
 
 //// EXECUTION ////
 
-export function isComputeResult(r:any): r is ComputeResult
+export function isRunnerScriptExecutionResult(r:any): r is RunnerScriptExecutionResult
 {
-    return r && typeof r === 'object' && (r.meshGLB || r.meshBuffer)
+    return r && typeof r === 'object' && (r.outputs)  // TODO: better
 }
 
 export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutionRequest
 {
     return o && typeof o === 'object' && 
         typeof o.script === 'object' && 
-        typeof o.script.name === 'string' &&
-        (typeof o.component === 'string' || o.component === undefined) &&
-        (typeof o.mode === 'string' || o.mode === undefined) &&
-        (o.params === undefined || typeof o.params === 'object') &&
-        (o.outputs === undefined || Array.isArray(o.outputs)) &&
-        (o.docs === undefined || Array.isArray(o.docs) || typeof o.docs === 'boolean') &&
-        (o.pipelines === undefined || Array.isArray(o.pipelines) || typeof o.pipelines === 'boolean') &&
-        (o.tables === undefined || Array.isArray(o.tables) || typeof o.tables === 'boolean') &&
-        (o.onDone === undefined || typeof o.onDone === 'function');
+        typeof o?.script?.name === 'string' &&
+        (!o?.component || typeof o?.component === 'string') &&
+        (typeof o?.mode === 'string' || !o?.mode) &&
+        (!o?.params || typeof o.params === 'object') &&
+        (!o?.outputs || Array.isArray(o.outputs)) &&
+        (!o?.docs || Array.isArray(o.docs) || typeof o.docs === 'boolean') &&
+        (!o?.pipelines || Array.isArray(o.pipelines) || typeof o.pipelines === 'boolean') &&
+        (!o?.tables || Array.isArray(o.tables) || typeof o.tables === 'boolean') &&
+        (!o?.onDone || typeof o.onDone === 'function');
 }

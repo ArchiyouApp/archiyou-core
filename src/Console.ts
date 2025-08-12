@@ -224,4 +224,8 @@ export class Console
                     : this.buffer.filter(m => types.includes(m.type))
     }
 
+    getErrors():Array<ConsoleMessage>
+    {
+        return this?.buffer?.filter(m => m.type === 'error') || [];
+    }
 }

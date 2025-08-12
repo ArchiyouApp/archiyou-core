@@ -1,7 +1,6 @@
 /**
  *  Table.ts
  *     A table object holds data and enables easy adding, modifiying of data
- *     !!!! WIP !!!! We need to refactor the dependancy of Danfo, which is a bit too heavy for this context
  * 
 */
 
@@ -10,7 +9,6 @@ import { isDataRowsValues, isDataRowsColumnValue } from './internal';
 import { DbCompareStatement } from './internal'; // types.ts
 import * as StringMatchAll from 'string.prototype.matchall' // polyfill for es5
 
-type DataFrame = any; // avoid problems
 
 export class Table
 {
@@ -19,57 +17,41 @@ export class Table
     //// END SETTINGS
 
     _name:string;
-    _danfo:any; // Danfo module
     _db:Db; // reference to database parent
-    _dataframe:DataFrame; // TODO: Remove Danfo stuff
     _dataRows: DataRowsColumnValue; // raw data fallback: [{ col1: v1, col2: v2}, { col1: v3, col2: v4 }]}
     _component:string; // component name if this table came from a component
 
-    /** Make Table from either rows with Objects or Danfo Dataframe */
-    constructor(data:DataRows|DataFrame)
+    /** Make Table from rows with Objects or values */
+    constructor(data:DataRows, columns:Array<string>=null)
     {
-        if(this._danfo)
+        if(isDataRowsValues(data)) 
         {
-            this._dataframe = (Array.isArray(data)) ? new this._danfo.DataFrame(data) : data;
-            console.info(`Table: Created a table with ${this.numRows()} rows and ${this.numColumns()} columns`);
+            // only rows with values [[r1v1,r1v2],[r2v1,r2v2]], make up column names
+            // Set the columns later with setColumns()
+            console.info(`Table::constructor(): Creating table with ${data.length} rows and ${data[0].length} columns`);
+            this._dataRows = data.map((row,rowIndex) => row.reduce((acc,val,valIndex) => 
+            {
+                // accumulator is the new row
+                acc[`${this.DEFAULT_COL_NAME}${valIndex}`] = val;
+                return acc
+            }, {}))
+            console.info(`Table::constructor(): Created table with data ${JSON.stringify(this._dataRows)}`);
+        }
+        else if(isDataRowsColumnValue(data))
+        {
+            this._dataRows = data;
         }
         else {
-            console.warn(`Table: Danfo module is disabled! Fall back to raw DataRows as data format. Analytic functions don't work!`)
-            if(isDataRowsValues(data)) 
-            {
-                // only rows with values [[r1v1,r1v2],[r2v1,r2v2]], make up column names
-                // Set the columns later with setColumns()
-                this._dataRows = data.map((row,rowIndex) => row.reduce((acc,val,valIndex) => 
-                {
-                    // accumulator is the new row
-                    acc[`${this.DEFAULT_COL_NAME}${valIndex}`] = val;
-                    return acc
-                }, {}))
-            }
-            else if(isDataRowsColumnValue(data))
-            {
-                this._dataRows = data;
-            }
-            else {
-                console.info(`Table: Can't create table. Unknown data format. Please supply [{ col1:v1, col2:v2 }, ...] or [[r1v1,r1v2],...]`);
-            }
+            console.info(`Table: Can't create table. Unknown data format. Please supply [{ col1:v1, col2:v2 }, ...] or [[r1v1,r1v2],...]`);
         }
+    
     }
 
-    /** Check if Danfo is available, if not throw error analytic methods */
-    checkDanfo():boolean
-    {
-        if(!this._danfo)
-        {
-            throw new Error(`Table: Danfo is not available. This method does not work!`);
-        }
-        return true;
-    }
-
+    
     /** Print table to console */
     print()
     {
-        return (!this._danfo) ?  this._dataRows : this._dataframe.print();
+        return this._dataRows;
     }
 
     /** Get/set name */
@@ -136,17 +118,14 @@ export class Table
         }
 
         this._dataRows = this._dataRows.map( row => {
-            const newRow = { ...row };
+            const newRow = {};
             for (const [colName,val] of Object.entries(row))
             {
                 const i = Object.keys(row).indexOf(colName);
-                delete newRow[colName];
                 newRow[names[i] || colName] = val;
             } 
             return newRow;
         })
-
-
         return this;
     }
 
@@ -192,232 +171,7 @@ export class Table
     }
 
     //// SLICING AND DICING ////
-    // TODO: Remove Danfo stuff
-
-    head(amount:number):Table
-    {
-        this.checkDanfo();
-        return new Table(this._dataframe.head(amount));
-    }
-
-    tail(amount:number):Table
-    {
-        this.checkDanfo();
-        return new Table(this._dataframe.tail(amount));
-    }
-
-    /** Get general statistics of Table */
-    describe()
-    {
-        this.checkDanfo();
-        this?._dataframe?.describe()?.print();
-    }
-
-    /** Slice rows based on start and end index */
-    slice(startIndex:number, endIndex:number=null):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
-
-        // see Danfo docs: https://danfo.jsdata.org/api-reference/dataframe/danfo.dataframe.iloc
-        endIndex = (endIndex == 0 ) ? null : endIndex; // protect against zero, otherwise an error occurs
-
-        if (endIndex == null)
-        {
-            return new Table(this._dataframe.iloc({ rows: [startIndex] }));
-        }
-        else 
-        {
-            return new Table(this._dataframe.iloc({ rows: [ `${startIndex}:${endIndex}`]}));
-        }
-        
-    }
-
-    /** Select specific column labels */
-    select(columns:string|Array<string>):Table
-    {
-        this.checkDanfo();
-
-        if (typeof columns == 'string')
-        {
-            columns = [ columns ];
-        }
-
-        return new Table(this._dataframe.loc({ columns : columns }));
-    }
-
-    /** Sorting of Table */
-    sort(columns:string|Array<string>, ascending:boolean):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
-
-        const DEFAULT_ORDER = true; // true = ascending, false = descending
-
-        ascending = ascending || DEFAULT_ORDER;
-
-        return new Table( this._dataframe.sort_values({ by: columns, ascending: ascending, inplace: false }));
-    }
-
-    /** Filter a Table 
-     *  @param filter   
-     *      - can be original Danfo query Object: { "column", "is", "to" }. Example: { "column": "B", "is": ">", "to": 5 }
-     *      - can be a string we turn into Danfo query Object:  'B > 5' or 'type = Edge or type = Shell'
-    */
-
-    filter(query:string|Object):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
-
-        let dfQueries = []; 
-
-        if (query instanceof Object)
-        {
-            if (!this._checkDfQuery(query))
-            {
-                console.error(`Table::filter: Please input a Danfo Query Object ({column, is, to}) or a string! Returned the original Table!`);
-                return this;
-            }
-            else 
-            {
-                dfQueries = [query];
-            }
-        }
-        else if(typeof query == 'string')
-        {
-            // we convert a expression to one or more DfQueryObjects
-            dfQueries = this._stringToDfQueries(query);
-
-        }
-        else {
-            console.error(`Table::filter: Please input a Danfo Query Object ({column, is, to}) or a string! Returned the original Table!`);
-            return this;
-        }
-
-        // We have one or more Danfo query objects. We combine them into one dataframe
-        let currentDf = this._dataframe;
-        dfQueries.forEach( query => 
-        {
-            if (!query.combine || query.combine == 'and' || query.combine == '&&')
-            {
-                // AND logic: filter the currentDf, not the original
-                currentDf = currentDf.query(query);
-            }
-            else {
-                // OR logic: query original DF and concat to current
-                currentDf = this._danfo.concat({ dfList: [currentDf, this._dataframe.query(query)], axis: 0 }) as DataFrame; // TS FIX DataFrame|Series
-            }
-        
-        });
-
-        return new Table(currentDf);
-
-    }
-
-    /** Iterate over rows with a function and write new values 
-     *  Danfo does not offer something like this. Got inspiration from PETL
-    */
-    apply(func:(row:Object,index?:number,all?:Array<any>) => void):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
-
-        // For example: write a certain value to column 'x': apply( (row,df) => row.x = '1' );
-        // NOTE: Danfo has limited options here, only the gather crude apply. Fallback on JS/TS functions
-        let rowObjs = this.toDataRows();
-        // map over rows to create new DF
-        rowObjs.forEach(func);
-
-        return new Table( new this._danfo.DataFrame(rowObjs) );
-    }
-
-
-
-    /** GroupBy: Grouping rows by column values and run aggregate functions */
-    groupBy(columns:string|Array<string>, aggFuncs:string|Array<string>, aggColumns:string|Array<string>):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
-        // TODO: agg reducer functions 
-
-        // see more: https://danfo.jsdata.org/api-reference/dataframe
-        const AGG_FUNCTIONS_TO_DANFO = {
-            'sum' : 'sum',
-            'max' : 'max',
-            'min' : 'min',
-            'mean' : 'mean',
-            'median' : 'median',
-            'avg' : 'mean',
-            'var' : 'var',
-        }
-
-        // check columns input
-        if (!(columns instanceof Array))
-        {
-            if (typeof columns == 'string'){
-                columns = [ columns ]; // put into array
-            }
-            else {
-                console.error(`Table::groupBy: Please supply a single or list of valid column names to group by!`);
-                return null;
-            }
-        }
-
-        // check values of columns
-        let checkedColumns = this._checkColumns(columns);
-        if (checkedColumns.length != columns.length ){
-            console.warn(`Table::groupBy: We detected some unknown columns and dropped them. Please check!`);
-        }
-
-        // check aggFuncs
-        aggFuncs = ( aggFuncs instanceof Array ) ? aggFuncs : [ aggFuncs ];
-        let checkedAggFuncs = aggFuncs.filter( f => Object.keys(AGG_FUNCTIONS_TO_DANFO).includes(f) );
-        if (checkedAggFuncs.length != aggFuncs.length)
-        {
-            console.error(`Table::groupBy: Detected unknown aggregate functions: Please choose one or these: [${Object.values(AGG_FUNCTIONS_TO_DANFO).join(',')}]`);
-            return null;    
-        }
-
-        aggColumns = (aggColumns instanceof Array) ? aggColumns : [aggColumns];
-        let checkedAggArgCols = this._checkColumns(aggColumns);
-
-        if(checkedAggArgCols.length != checkedAggFuncs.length){ 
-            console.error(`Table::groupBy: Please supply equal aggregate functions (#${checkedAggFuncs.length}) as column names (#${checkedAggArgCols.length}) to apply them on!`);
-        }
-
-        // now do the Danfo operation
-        let groups = this._dataframe.groupby(checkedColumns);
-        let newTable;
-        // for every group add an aggregate function on a specific column:
-        checkedAggFuncs.forEach( (funcName, index) => {
-            let aggColumns = checkedAggArgCols[index];
-            let funcNameDf = AGG_FUNCTIONS_TO_DANFO[funcName];
-            if (index == 0){
-                newTable = new Table(groups.col([aggColumns])[funcNameDf]()); // see: https://danfo.jsdata.org/api-reference/groupby/groupby.col
-            }
-            else {
-                // append specific
-                let addTable = new Table(groups.col([aggColumns])[funcNameDf]());
-                let lastColName = addTable.columns()[addTable.columns().length - 1];
-                // last column as table
-                addTable = addTable.select([checkedColumns[0], lastColName]); // use first column that we grouped on as key
-                newTable = newTable.join(addTable, checkedColumns[0]);
-            }
-            
-        });
-
-        return newTable;
-
-    }
-
-    /** Join two table on a specific key or multiple keys */
-    join(other:Table, keys:string|Array<string>):Table
-    {
-        this.checkDanfo(); // TODO: make work without danfo
-
-        return new Table( this._danfo.merge(
-                            { left : this._dataframe, 
-                              right : other._dataframe, 
-                              on : (keys instanceof Array) ? keys : [keys], 
-                              how : 'inner' } ) ); // see: https://danfo.jsdata.org/api-reference/general-functions/danfo.merge
-    }
-
+    // TODO: Implement now danfo is gone
 
     // ==== OUTPUT ====
 
@@ -433,10 +187,12 @@ export class Table
         return this._dataRows.map(row => row[columnName]); 
     }
 
-    /** Output raw data in rows */
+    /** Output raw data in rows 
+     * in format { [col1: row1val, col2: row1val2], [col1: row2val, ..] ... }
+     * */
     toData():DataRows
     {
-        return this._dataRows;
+        return this._dataRows
     }
 
     // ==== utils ====
