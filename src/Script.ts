@@ -8,8 +8,8 @@
 import { uuidv4 } from './internal' // utils
 import semver from 'semver'; // for version validation
 
-import type { Param, PublishParam, ScriptPublished, ScriptMeta } from "./internal";
-
+import type { ScriptParamData, ScriptPublished, ScriptMeta } from './internal';
+import { ScriptParam } from './internal'
 
 export class Script 
 {
@@ -25,8 +25,8 @@ export class Script
     updated: Date;
 
     code:string;
-    params:Record<string, Param> = {}; // TODO
-    presets:Record<string, Record<string, PublishParam>> = {}; // TODO: Presets of parameter values
+    params:Record<string,ScriptParam> = {}; 
+    presets:Record<string, Record<string, ScriptParamData>> = {}; // TODO: Presets of parameter values
 
     meta: ScriptMeta|null;  // To be filled in by client or server after execution
 
@@ -39,7 +39,7 @@ export class Script
 
 
 
-    constructor(author?:string, name?:string, version?:string, code?:string, params?:Record<string, Param>, presets?:Record<string, Record<string, PublishParam>>)
+    constructor(author?:string, name?:string, version?:string, code?:string, params?:Record<string,ScriptParam>, presets?:Record<string, Record<string, ScriptParamData>>)
     {
         if (!name || !author)
         {
@@ -67,8 +67,11 @@ export class Script
     //// VALIDATION AND DEFAULTS ////
 
     validate()
-    {
-       if(!this._validateBasics()) throw new Error("Script.validate(): Script validation failed: Basic attributes are not valid");
+    {   
+        if(!this._validateBasics()) 
+        {
+            throw new Error("Script.validate(): Script validation failed: Basic attributes are not valid");
+        }
     }
 
     _setDefaults()
@@ -96,8 +99,8 @@ export class Script
             this.created instanceof Date,
             this.updated instanceof Date,
             typeof this.code === "string",
-            typeof this.params === "object" && !Array.isArray(this.params),
-            typeof this.presets === "object" && !Array.isArray(this.presets),
+            typeof this.params === "object",
+            typeof this.presets === "object",
         ]
 
         this._valid = VALIDATIONS.every((v) => v === true);
@@ -106,7 +109,118 @@ export class Script
 
     //// PUBLISH ////
 
-    // TODO
+    validateParamValues(paramValues:Record<string,any>):boolean
+    {
+        for(const [key, value] of Object.entries(paramValues))
+        {
+            const param = this.params[key];
+            
+            if(!param)
+            {
+                console.error(`Script.validateParamValues(): Invalid param name "${key}"`);
+                return false;
+            }
+            else if(!param.validateValue(value))
+            {
+                console.error(`Script.validateParamValues(): Invalid value for param "${key}": ${value}`);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** When a script is executed with a set of params we generate a hash
+     *  to uniquely identify the variant of the script. For example for caching
+     */
+    async getVariantId(paramValues: Record<string,any>): Promise<string> 
+    {
+        const HASH_LENGTH_TRUNCATE = 11;
+        const { createHash } = await import('crypto'); // NOTE: only for node right now!
+
+        // generate string based on the param names and values
+        // in format: {param1:value1,param2:value2,...}
+        const input = JSON.stringify(paramValues);
+        const hash = createHash('md5').update(input).digest();
+
+        // Convert to base64 URL-safe format and truncate
+        return hash.toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '')
+            .substring(0, HASH_LENGTH_TRUNCATE);
+    }
+
+    /** Get number of possible variants */
+    getNumVariants():number
+    {
+        // No parameters, only one variant
+        if(!this.params || typeof this.params !== 'object') return 1;
+
+        if(Object.values(this.params).find(param => !param.isIterable()))
+        {
+            return Infinity;
+        }
+
+        return Object.values(this.params).reduce((acc, param) => {
+            acc *= param.numValues();
+            return acc;
+        }, 1);
+    }
+
+    /** Iterate over all possible parameter variants
+     *  @params params Array of parameter names to iterate over, others are kept to default
+     */
+    *iterateVariants(only?:Array<string>):Generator<Record<string,any>>
+    {
+        if(!this.params){ throw new Error("Script::iterateVariants: No parameters defined"); }
+
+        only = only || Object.keys(this.params); // all
+
+        // The params that we iterate
+        const iterParams = Object.values(this.params).filter(p => p.isIterable() && only.includes(p.name));
+        const staticParams = Object.values(this.params).filter(p => !p.isIterable() || !only.includes(p.name));
+        const staticParamValues = Object.fromEntries(staticParams.map(p => [p.name, p.default]));
+
+        // No params to iterate through
+        if(iterParams.length === 0) 
+        {
+            // No iterable parameters, return static variant
+            yield staticParamValues;
+            return;
+        }
+
+        // Now start iterating along every parameter
+        yield* this._generateCombinations(iterParams, staticParamValues);
+
+    }
+
+    /** Generate all parameter combinations
+     *  This function uses recursion to generate all possible combinations of parameter values.
+    */
+    *_generateCombinations(params: Array<ScriptParam>, staticValues: Record<string,any>): Generator<Record<string,any>> 
+    {
+        if (params.length === 0) {
+            yield staticValues;
+            return;
+        }
+        
+        const [firstParam, ...restParams] = params;
+        
+        for (const value of firstParam.iterateValues()) 
+        {
+            const currentValues = { ...staticValues, [firstParam.name]: value };
+            
+            if (restParams.length === 0) 
+            {
+                yield currentValues;
+            } 
+            else 
+            {
+                yield* this._generateCombinations(restParams, currentValues);
+            }
+        }
+    }
+
 
 
     //// IO ////
@@ -123,7 +237,16 @@ export class Script
         this.created = data.created ? new Date(data.created) : new Date();
         this.updated = data.updated ? new Date(data.updated) : new Date();
         this.code = data.code;
-        this.params = data.params || {};
+        this.params = (typeof data.params === 'object') 
+            ? Object.entries(data.params).reduce((acc, [key, value]) => {
+                    try {
+                        acc[key] = new ScriptParam().fromData({ name:key, ...value }); // inject name 
+                    }
+                    catch(e) {
+                        console.error(`Script::fromData(): Skipping param "${key}":`, e);
+                    }
+                return acc;
+            }, {} as Record<string, ScriptParam>) : {};
         this.presets = data.presets || {};
         this.published = data.published || null;
 
@@ -145,7 +268,11 @@ export class Script
             created: this.created ? this.created.toISOString() : null,
             updated: this.updated ? this.updated.toISOString() : null,
             code: this.code,
-            params: this.params,
+            params: (typeof this.params === 'object') 
+                ? Object.entries(this.params).reduce((acc, [key, value]) => {
+                    acc[key] = { name:key, ...value.toData() }; // inject name into ParamData
+                    return acc;
+                }, {} as Record<string, ScriptParamData>) : {},
             presets: this.presets,
             published: this.published,
         };
@@ -167,7 +294,7 @@ export interface ScriptData
     created: string | null;
     updated: string | null;
     code: string;
-    params: Record<string, Param>;
-    presets: Record<string, Record<string, PublishParam>>;
+    params: Record<string,ScriptParamData>;
+    presets: Record<string, Record<string, ScriptParamData>>;
     published: ScriptPublished | null;
 }

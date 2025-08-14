@@ -35,7 +35,7 @@ import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExe
                 ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
                 ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup, 
                 PublishScript,
-                PublishParam, ExecutionRequestOutputFormatGLTFOptions, ScriptMeta} from "./internal"
+                ScriptParamData, ExecutionRequestOutputFormatGLTFOptions, ScriptMeta} from "./internal"
 
 import { isRunnerScriptExecutionResult } from './internal' // typeguards
 
@@ -752,11 +752,11 @@ export class Runner
     
 
     /** Execute a piece of code or script (and params) in local execution context 
-     *  @request - string with code or object with script and params
-     *  @startRun - if true a reset is made of the state to prepare for fresh run
-     *  @output - if true, the Archiyou state is returned as RunnerScriptExecutionResult
+     *  @param {RunnerScriptExecutionRequest} [request] - string with code or object with script and params
+     *  @param {boolean} [startRun] - if true a reset is made of the state to prepare for fresh run
+     *  @param {boolean} [output] - if true, the Archiyou state is returned as RunnerScriptExecutionResult
      * 
-     *  @returns - RunnerScriptExecutionResult or null if no output or error string
+     *  @returns - RunnerScriptExecutionResult or error string or null if no output 
      * 
      *  NOTE: this = execution context (not Runner)
     */
@@ -800,7 +800,6 @@ export class Runner
         const outputFunc = (output) 
                             ? this.getLocalScopeResults.bind(this) // bind to this
                             : async () => null; // output or return null
-     
 
         const exec = async () =>
         {
@@ -837,10 +836,12 @@ export class Runner
             catch(e)
             {
                 // Any error while executing code is caught here
-                console.error(`Runner::_executeLocal(): Error while executing code "${code}": "${e}"`);
+                const errorMessage = `Error while executing code "${code}": **** ERROR:"${e}" ****`;
+                console.error(`Runner::_executeLocal(): ${errorMessage}`);
                 return {
                     status: 'error',
-                    errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
+                    errors: [{ status: 'error', message: errorMessage, code: code } as StatementResult],
+                    request: request, // original request in response for debugging
                 } as RunnerScriptExecutionResult
             }
         }
@@ -848,14 +849,12 @@ export class Runner
         const result = await exec();
         
         // Set duration if result is RunnerScriptExecutionResult
-        if(isRunnerScriptExecutionResult(result))
-        {
+        if(isRunnerScriptExecutionResult(result)){
             result.duration = Math.round(performance.now() - executeStartTime);
         }
 
         // Send message to manager if in worker role
-        if(this.role === 'worker')
-        {
+        if(this.role === 'worker'){
             this._postMessageToManager({ type: 'executed', payload: result });
         }
 
@@ -1155,7 +1154,7 @@ export class Runner
     //// EXECUTION UTILS ////
 
     /** Execute from URL of Archiyou library */
-    async executeUrl(url:string, params?:Record<string,PublishParam>, outputs?:Array<ExecutionRequestOutputPath>):Promise<RunnerScriptExecutionResult>
+    async executeUrl(url:string, params?:Record<string,ScriptParamData>, outputs?:Array<ExecutionRequestOutputPath>):Promise<RunnerScriptExecutionResult>
     {
         const script = await this.getScriptFromUrl(url);
         if(!script){ throw new Error(`Runner::executeUrl(): Script not found at URL "${url}"`);}
@@ -1203,6 +1202,7 @@ export class Runner
 
     /** Get results out of local execution scope  
      *  This function is bound to the scope - so 'this' is the execution scope
+     *  If this method is run only if there were no errors during execution
     */
     async getLocalScopeResults(scope:any, request:RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
@@ -1212,12 +1212,15 @@ export class Runner
    
         const result = {} as RunnerScriptExecutionResult;
 
-        // Main data
-        result.status = 'success'; 
-        //result.errors = scope.console.getErrors();
-        result.scenegraph = scope.geom.scene.toGraph();
+        // Basic data
+        result.status = 'success'; // if this method is run, this means no errors were thrown
+        result.request = request; // Keep the original request
+        result.errors = []; // no errors by definition
         result.duration = scope.geom._duration; // duration of the last operation
-        result.request = request;
+
+        // Basic Archiyou data
+        result.scenegraph = scope.geom.scene.toGraph();
+        
 
         // Outputs
         if(request.outputs)

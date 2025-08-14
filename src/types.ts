@@ -1,6 +1,11 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, ParamManager, Obj, Script, ScriptData  } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, 
+        Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, 
+        ParamManager, Obj, Script, ScriptParam, ScriptData  } from './internal'
 
-import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View, Table } from './internal'
+import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, 
+            Exporter, Make, Calc, View, Table } from './internal'
+
+import type { ScriptParamData } from './internal'
 
 import { Console } from './Console'
 
@@ -92,7 +97,7 @@ export interface ScriptVersion
     prev_version_id? : string,
     created_at? : string,
     updated_at? : string,
-    params? : Array<Param>,
+    params? : Array<ScriptParam>,
     code : string,
     shared?: boolean,
     shared_version_tag?:string,
@@ -194,7 +199,7 @@ export interface ArchiyouData
     messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
     metrics?: Record<string, Metric>,  
     tables?:{[key:string]:any}, // raw data tables
-    managedParams?:Record<ParamOperation, Array<PublishParam>>
+    managedParams?:Record<ParamOperation, Array<ScriptParamData>>
 }
 
 
@@ -251,11 +256,10 @@ export interface ComputeTask
     broker_id? : string,
     client_id?: string,
     created_at?: Date,
-    params? : Array<Param>,
+    params? : Array<ScriptParam>,
     code: string
 }
 
-/** TODO: bring in line with RunnerScriptExecutionRequest */
 export interface RunnerScriptExecutionResult
 {
     created_at: Date,
@@ -263,16 +267,16 @@ export interface RunnerScriptExecutionResult
     duration: number
     request: RunnerScriptExecutionRequest,
 
-    scenegraph: SceneGraphNode
+    scenegraph?: SceneGraphNode
     gizmos?: Array<Gizmo>,
     annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
-    managedParams?:Record<ParamOperation, Array<PublishParam>>
+    managedParams?:Record<ParamOperation, Array<ScriptParamData>>
 
-    statements: Array<StatementResult>
+    statements?: Array<StatementResult>
     errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
     messages?: Array<ConsoleMessage>,
     
-    meta: ScriptMeta, // meta information on the script execution
+    meta?: ScriptMeta, // meta information on the script execution
     
     // All outputs in clear structure
     outputs?: ExecutionResultOutputs
@@ -305,48 +309,21 @@ export interface ImportComponentPipelineOutputs
 
 
 //// PARAMS ////
+// See ScriptParam for base class and ScriptParamData
 
-// NOTE: We put these in the core library because of the ParamManager 
+export type ParamType = 'number'|'boolean'|'text'|'options'|'list'|'object' 
 
-export type ParamType = 'number'|'text'|'options'|'boolean'|'list'|'object' 
-
+export type ParamOperation = 'new'|'updated'|'deleted'
 /** Target of a Param behaviour  */
 export type ParamBehaviourTarget = 'visible' | 'enable' | 'value' | 'values' | 'start' | 'end' | 'options'
-
-/** Param inside the application */
-export interface Param
-{ 
-    id?: string
-    type: ParamType
-    listElem?: Param, // definition of list content (also a Param)
-    name: string // always a name!
-    enabled?:boolean // enabled or not
-    visible?:boolean // Param is visible or not
-    label: string // publically visible name
-    default?: any // Default value: can be string or number
-    value?: any // Can be string or number
-    values?: Array<any> // active values in list
-    start?: number // for ParamInputNumber
-    end?: number // for ParamInputNumber
-    step?: number // for ParamInputNumber
-    schema?: ParamObjectSchema // object definition
-    options?: Array<string> // for ParamInputOptions
-    length?: number // for ParamInputText, ParamInputList    
-    units?:ModelUnits
-    // internal data for ParamManager
-    // _manageOperation?: ParamOperation // Not used
-    _definedProgrammatically?: boolean // this Param is defined programmatically in script
-    // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
-    _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
-    
-}
-
-
 
 /** A way to define nested ParamObjects, either user in a single entry or list
  *  NOTE: For now we don't allow nested structures (so no ParamObj containing other ParamObj field)
 */
-export type ParamObjectSchema = Record<string,Param> // TODO: use something like base Param here
+export type ParamObjectSchema = Record<string,ScriptParam> // TODO: use something like base Param here
+
+
+///// SHAPES/GEOMETRY BASICS /////
 
 /** All possible attributes for Shapes */
 // TODO: Can we allow user attributes??
@@ -399,25 +376,6 @@ export interface SceneGraphNodeDetails {
     numWires?:number,
 }
 
-/** The Script seperated into statements */
-export interface Statement
-{
-    code:string; // the real code
-    startIndex?: number;
-    endIndex?: number;
-    lineStart?:number; // the line the statement starts (it can actually span multiple lines)
-    lineEnd?:number;
-    columnStartIndex?:number;
-    columnEndIndex?:number;
-}
-
-export interface StatementResult extends Statement
-{
-    status: 'error'|'success'
-    message?: string,
-    duration?: number
-    durationPerc?:number // Added by Archiyou app ProfilingMenu
-}
 
 export interface BaseStyle 
 {
@@ -512,6 +470,28 @@ export interface ShapeClone
     transformations:Array<any> // TODO
 }
 
+//// SCRIPT CODE STATEMENTS ////
+
+/** The Script seperated into statements */
+export interface Statement
+{
+    code:string; // the real code
+    startIndex?: number;
+    endIndex?: number;
+    lineStart?:number; // the line the statement starts (it can actually span multiple lines)
+    lineEnd?:number;
+    columnStartIndex?:number;
+    columnEndIndex?:number;
+}
+
+export interface StatementResult extends Statement
+{
+    status: 'error'|'success'
+    message?: string,
+    duration?: number
+    durationPerc?:number // Added by Archiyou app ProfilingMenu
+}
+
 //// ANNOTATIONS ////
 
 /** Bring all annotations in one type */
@@ -599,8 +579,6 @@ export interface DocPipeline
     fn:() => any
     done: boolean
 }
-
-
 
 //// DOC:PAGE ////
 
@@ -1078,24 +1056,11 @@ export interface CalcData
     metrics: Object // { name : Metric, name2: Metric }
 }
 
-//// PARAM MANAGER ////
-// NOTE: See above for general types around Params
-
-export type ParamOperation = 'new'|'updated'|'deleted'
 
 //// PUBLISH TYPES ////
 
 export type PublishLicense = 'unknown' | 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'
 
-/** Extentions of Param for Publishing - data only! */
-export interface PublishParam extends Omit<Param, '_behaviours'>
-{
-    // NOTE: need to nullify private attributes (for example behavious)
-    order?:number // integer, lower is in front
-    iterable?:boolean // for determine param variants
-    description?:string // added for the user
-    _behaviours?: Record<string,string> // stringified function for save to db etc
-}
 
 export interface PublishScriptSettings extends ArchiyouOutputSettings
 {
@@ -1118,7 +1083,7 @@ export type PublishScript = {
     safe?:boolean
     published?:boolean
     units?:string
-    params?:{[key:string]:PublishParam}
+    params?:{[key:string]:ScriptParamData}
     param_presets?:{[key:string]:{[key:string]:Record<string,any>}}
     public_code?:boolean // show code in public script
     public_code_url?:string // url to edit public code
@@ -1182,7 +1147,7 @@ export interface RunnerScriptScopeState extends ProxyConstructor
 export interface RunnerScript
 {
     code:string // code to execute
-    params?:Record<string,PublishParam> // param settings
+    params?:Record<string,ScriptParamData> // param settings
     // variants
 }
 
@@ -1195,6 +1160,7 @@ export interface RunnerScriptExecutionRequest
     script:RunnerScript|Script|ScriptData // script to execute
     component?:string // name of component if any
     params?:Record<string,any> // param values
+    variantId?:string // hash of param values for identifying unique requests - is filled in on submission
     mode?: 'main'|'component'
     // What to calculate and output
     outputs?: Array<ExecutionRequestOutputPath>

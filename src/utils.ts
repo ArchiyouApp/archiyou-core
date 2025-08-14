@@ -4,21 +4,22 @@
  * 
  */
 
+import type { ScriptParamData } from './internal';
 
 import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, isDocUnitsWithPerc,
-        Param, PublishParam, isPublishParam, isParam, UnitsWithPerc, ExecutionResultOutputDataBase64} from './internal'
+        ScriptParam, isScriptParamData, isScriptParam, UnitsWithPerc, ExecutionResultOutputDataBase64} from './internal'
 
 //// PARAMS ////
 
-/** Turn data PublishParam into Param by recreating functions 
- *  NOTE: PublishParam is used as data - internally make sure to use Param
+/** Turn data ScriptParamData into Param by recreating functions 
+ *  NOTE: ScriptParamData is used as data - internally make sure to use Param
 */
-export function publishParamToParam(param:Param|PublishParam):Param
+export function ScriptParamDataToParam(param:ScriptParam|ScriptParamData):ScriptParam
 {
-    if(!isPublishParam(param))
+    if(!isScriptParamData(param))
     {
-        console.warn(`ParamManager::publishParamToParam: param "${param.name}" already a Param!`)
-        return { ...param };
+        console.warn(`ParamManager::ScriptParamDataToParam: param "${param.name}" already a Param!`)
+        return param; // return original
     }
 
     const funcBehaviours = {};
@@ -33,28 +34,28 @@ export function publishParamToParam(param:Param|PublishParam):Param
     const newParam = { 
         ...param, 
         _behaviours : funcBehaviours, 
-    } as Param
+    } as ScriptParam;
 
     return newParam;
 }
 
-/** Turn param into PublishParam */
-export function paramToPublishParam(param:Param|PublishParam):PublishParam
+/** Turn param into ScriptParamData */
+export function paramToScriptParamData(param:ScriptParam|ScriptParamData):ScriptParamData
 {
-    if(!isParam(param)){ console.error(`ParamManager:paramToPublishParam. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
-    if(isPublishParam(param)){ return param }; // already PublishParam
+    if(!isScriptParam(param)){ console.error(`ParamManager:ScriptParamToScriptParamData. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
+    if(isScriptParamData(param)){ return param }; // already ScriptParamData
 
     const behaviourData = {};
     for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
-    const publishParam = { ...param } as PublishParam; 
+    const ScriptParamData = { ...param } as ScriptParamData; 
     // remove all private fields (_{{prop}})
-    Object.keys(publishParam)
+    Object.keys(ScriptParamData)
         .filter(prop => prop[0] === '_')
-        .forEach((private_prop) => delete publishParam[private_prop]);
+        .forEach((private_prop) => delete ScriptParamData[private_prop]);
 
-    publishParam._behaviours = behaviourData; // TODO: remove _
+    ScriptParamData._behaviours = behaviourData; // TODO: remove _
     
-    return publishParam
+    return ScriptParamData
 }
 
 //// Working with types ////

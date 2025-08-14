@@ -8,13 +8,13 @@
  *  
  *  It provides a operator interface in scope of script
  * 
- *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).visibleIf(...)
- *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).enableIf(...)
- *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).enableIf(...)
+ *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).visibleIf(...)
+ *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).enableIf(...)
+ *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).enableIf(...)
  *  
  *  it also provides getters and setters of properties of Param
- *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).value
- *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).type
+ *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).value
+ *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).type
  *      ...etc
  *  
  *  
@@ -24,7 +24,7 @@
  * */
 
 import { ParamManager, ParamOperation } from "./internal";
-import { Param, PublishParam } from "./internal";
+import { Param, ScriptParamData } from "./internal";
 
 import deepEqual from 'deep-is'
 
@@ -43,13 +43,13 @@ export class ParamManagerOperator
     }
 
     name:string
-    originalParam:Param
-    targetParam:Param
+    originalParam:ScriptParam
+    targetParam:ScriptParam
     value:any // reference to targetParam.value
     manager: ParamManager
-    operation:ParamOperation // undefined (none), new, update, delete
+    operation:ScriptParamOperation // undefined (none), new, update, delete
 
-    constructor(manager:ParamManager, p?:Param)
+    constructor(manager:ScriptParamManager, p?:ScriptParam)
     {
         if(!p){ throw new Error(`ParamManagerEntryController::constructor(): Please supply a Param obj for init`) }
         
@@ -63,7 +63,7 @@ export class ParamManagerOperator
 
     //// GETTERS/SETTERS ////
 
-    setOperation(op:ParamOperation)
+    setOperation(op:ScriptParamOperation)
     {
         this.operation = op;
     }
@@ -144,7 +144,7 @@ export class ParamManagerOperator
     }
     
     /** Set behaviour that controls value attribute of this Param */    
-    valueOn(fn:(curParam:Param, params?:Record<string, Param>) => boolean)
+    valueOn(fn:(curParam:ScriptParam, params?:Record<string,ScriptParam>) => boolean)
     {
         // Disabled behaviours
         //this.targetParam._behaviours['value '] = fn;
@@ -190,7 +190,7 @@ export class ParamManagerOperator
      *  @params a map for easy access: params.TEST.value
     */
    /*
-    evaluateBehaviours(params:Record<ParamBehaviourTarget,Param>):null|Param
+    evaluateBehaviours(params:Record<ParamBehaviourTarget,ScriptParam>):null|Param
     {
         let changedParam = null;
         if(this?.target?._behaviours)
@@ -218,7 +218,7 @@ export class ParamManagerOperator
     
     //// IO ////
 
-    paramToData(param:Param):PublishParam
+    paramToData(param:ScriptParam):ScriptParamData
     {
         const behaviourData = {};
         for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
@@ -230,9 +230,9 @@ export class ParamManagerOperator
     }
 
     /** Export to raw Param data for output 
-     *  NOTE: We use PublishParam here that is used for IO, but in App it is transformed back to Param
+     *  NOTE: We use ScriptParamData here that is used for IO, but in App it is transformed back to Param
     */
-    toData():PublishParam
+    toData():ScriptParamData
     {
         return this.paramToData(this.targetParam);
     }
@@ -255,7 +255,7 @@ export class ParamManagerOperator
     }
 
     /** Check Param input, if param is not set, the target Param is used */
-    _checkParamInput(v:any, p?:Param):boolean
+    _checkParamInput(v:any, p?:ScriptParam):boolean
     {
         p = p ?? this.targetParam;
         const checkFnName = this.BASE_TYPE_PARAM_CHECKS[p.type];
@@ -268,33 +268,33 @@ export class ParamManagerOperator
 
     }
 
-    _checkNumParamInput(v:any, p?:Param):boolean
+    _checkNumParamInput(v:any, p?:ScriptParam):boolean
     {
         p = p ?? this.targetParam;
         
         return (typeof v === 'number' && isFinite(v)) && v >= p.start && v <= p.end;
     }
 
-    _checkBoolParamInput(v:any, p?:Param):boolean
+    _checkBoolParamInput(v:any, p?:ScriptParam):boolean
     {
         p = p ?? this.targetParam;
         return typeof v === 'boolean'
     }
 
-    _checkOptionsParamInput(v:any, p?:Param):boolean
+    _checkOptionsParamInput(v:any, p?:ScriptParam):boolean
     {
         p = p ?? this.targetParam;
         return p.options.includes(v);
     }
 
-    _checkListParamInput(v, p?:Param)
+    _checkListParamInput(v, p?:ScriptParam)
     {
         p = p ?? this.targetParam;
         return this._checkParamInput(v, p.listElem);
     }
 
     /** Check input against schema */
-    _checkObjParamInput(v:any, p?:Param):boolean
+    _checkObjParamInput(v:any, p?:ScriptParam):boolean
     {
         p = p ?? this.targetParam;
 
@@ -335,7 +335,7 @@ export class ParamManagerOperator
     }
 
     
-    _checkParam(p:Param):Param
+    _checkParam(p:ScriptParam):ScriptParam
     {
         if ( typeof p !== 'object' || !p?.name || !p?.type)
         {
@@ -345,7 +345,7 @@ export class ParamManagerOperator
                     - text: { length }
                     - options: { values }
                     - list: { length }
-                    - objects: { schema: Record<string,Param> }`)
+                    - objects: { schema: Record<string,ScriptParam> }`)
         }
 
         if(p.type === 'number')

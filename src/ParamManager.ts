@@ -21,8 +21,8 @@
  * 
  */
 
-import { Param, PublishParam, ParamOperation, ParamManagerOperator,  } from './internal'
-import { publishParamToParam, paramToPublishParam } from './internal' // utils
+import { Param, ScriptParamData, ParamOperation, ParamManagerOperator,  } from './internal'
+import { ScriptParamDataToParam, paramToScriptParamData } from './internal' // utils
 
 import deepEqual from 'deep-is'
 
@@ -39,11 +39,11 @@ export class ParamManager
     paramOperators:Array<ParamManagerOperator> = [];
 
     /** Set up ParamManager with current params */
-    constructor(params?:Array<PublishParam|Param>)
+    constructor(params?:Array<ScriptParamData|ScriptParam>)
     {
         if(Array.isArray(params) && params.length > 0)
         {
-            this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(publishParamToParam(p)))); // always make sure we use Param internally
+            this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(ScriptParamDataToParam(p)))); // always make sure we use Param internally
             this.paramOperators.forEach( p => this[p.name] = p) // set param access
         }
     }
@@ -61,10 +61,10 @@ export class ParamManager
      *  If needed forcing reactivity by creating copies
      *  returns new or changed params 
      */
-    static updateParamsWithManaged(currentParams:Array<Param|PublishParam>, managedParams:Record<ParamOperation, Array<PublishParam>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<Param>
+    static updateParamsWithManaged(currentParams:Array<Param|ScriptParamData>, managedParams:Record<ParamOperation, Array<ScriptParamData>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<ScriptParam>
     {
         const allManagedParams = [...managedParams.new, ...managedParams.updated];
-        const paramsToChange:Array<Param> = []
+        const paramsToChange:Array<ScriptParam> = []
 
         allManagedParams.forEach( managedParam => 
         {
@@ -72,13 +72,13 @@ export class ParamManager
             if(!presentParam)
             {
                 // new param
-                paramsToChange.push(publishParamToParam(managedParam));
+                paramsToChange.push(ScriptParamDataToParam(managedParam));
             }
             else {
                 // existing param: check if changed
-                if(!deepEqual(paramToPublishParam(ParamManager.validateParam(presentParam)), ParamManager.validateParam(managedParam)))
+                if(!deepEqual(paramToScriptParamData(ParamManager.validateParam(presentParam)), ParamManager.validateParam(managedParam)))
                 { 
-                    paramsToChange.push(publishParamToParam(ParamManager.validateParam(managedParam)))
+                    paramsToChange.push(ScriptParamDataToParam(ParamManager.validateParam(managedParam)))
                 }
             }
         })
@@ -103,7 +103,7 @@ export class ParamManager
     //// MANAGING PARAMS ////
 
     /** Add or update Param and return what was done (update, new, null)  */
-    addParam(p:Param):ParamOperation|null
+    addParam(p:ScriptParam):ScriptParamOperation|null
     {
         if(this._paramNameExists(p))
         { 
@@ -134,7 +134,7 @@ export class ParamManager
     }
 
     /** Update ParamEntryController if needed and return updated or not */
-    updateParam(p:Param):boolean
+    updateParam(p:ScriptParam):boolean
     {
         if(this._paramNameExists(p))
         {
@@ -158,26 +158,26 @@ export class ParamManager
         }
     }
 
-    _paramNameExists(p:Param):boolean
+    _paramNameExists(p:ScriptParam):boolean
     {
         return Object.keys(this.getParamsMap()).includes(p.name.toUpperCase()) 
     }
 
     /** Utility to easily get target Params */
-    getParams():Array<Param>
+    getParams():Array<ScriptParam>
     {
         return this.paramOperators.map(pc => pc.targetParam)
     }
 
     /** Utility to easily get target Params by name */
-    getParamsMap():Record<string, Param>
+    getParamsMap():Record<string,ScriptParam>
     {
         const map = {};
         this.paramOperators.forEach(pc => { map[pc.name] = pc.targetParam })
         return map;
     }
 
-    getParamController(name:string):ParamManagerOperator
+    getParamController(name:string):ScriptParamManagerOperator
     {
         return this.paramOperators.find(pc => pc.name === name)
     }
@@ -195,9 +195,9 @@ export class ParamManager
      *                h: { type: 'number', default: 200, start: 50, end: 300 } 
      *   }})
     */
-    define(p:Param)
+    define(p:ScriptParam)
     {
-        if(!p){ throw new Error(`ParamManager::define(p:Param): Please supply valid Param object! Got ${JSON.stringify(p)}`); }
+        if(!p){ throw new Error(`ParamManager::define(p:ScriptParam): Please supply valid Param object! Got ${JSON.stringify(p)}`); }
         if(!p?.name){ throw new Error(`ParamManager::define(): Please supply at least a name for this Param!`); }
 
         const checkedParam = this._validateParam(p);
@@ -213,15 +213,15 @@ export class ParamManager
         return this;
     }
 
-    /** Check Param or PublishParam input and fill in defaults
+    /** Check Param or ScriptParamData input and fill in defaults
      *  We try to make anything work here, except if nothing is given
      *  See also checkParam in ParamEntryController
      */
-    static validateParam<TParam extends Param|PublishParam>(p:TParam):TParam
+    static validateParam<TParam extends Param|ScriptParamData>(p:TParam):TParam
     {
         if(!p)
         {
-            console.error(`ParamManager::validateParam(p:Param): Please supply valid Param object! Got null/undefined!`);
+            console.error(`ParamManager::validateParam(p:ScriptParam): Please supply valid Param object! Got null/undefined!`);
             return null;
         }
 
@@ -296,7 +296,7 @@ export class ParamManager
         return checkedParam;
     }
 
-    _validateParam(p:Param):Param
+    _validateParam(p:ScriptParam):ScriptParam
     {
         return ParamManager.validateParam(p);
     }
@@ -304,7 +304,7 @@ export class ParamManager
     //// EVALUATE ////
 
     /** Return Params that we operated upon */
-    getOperatedParamsByOperation():Record<ParamOperation, Array<PublishParam>>
+    getOperatedParamsByOperation():Record<ParamOperation, Array<ScriptParamData>>
     {
         const changedParamsByOperation = this.paramOperators
                                     .filter((po) => po.paramOperated())
@@ -313,7 +313,7 @@ export class ParamManager
                                             acc[po.operation as ParamOperation].push(po.toData())
                                             return acc
                                         }, 
-                                        { new: [] as Array<PublishParam>, updated: [] as Array<PublishParam>, deleted: [] as Array<PublishParam> })
+                                        { new: [] as Array<ScriptParamData>, updated: [] as Array<ScriptParamData>, deleted: [] as Array<ScriptParamData> })
 
         console.info('**** ParamManager::getOperatedParamsByOperation ****')
         console.info(changedParamsByOperation);
@@ -353,12 +353,12 @@ export class ParamManager
         })
     }
 
-    /** Compare two params (either Param or PublishParam) */
-    equalParams(param1:Param|PublishParam, param2:Param|PublishParam):boolean
+    /** Compare two params (either Param or ScriptParamData) */
+    equalParams(param1:ScriptParam|ScriptParamData, param2:ScriptParam|ScriptParamData):boolean
     {
-        const publishParam1 = JSON.parse(JSON.stringify(paramToPublishParam(param1)));
-        const publishParam2 = JSON.parse(JSON.stringify(paramToPublishParam(param2)));
-        return deepEqual(publishParam1,publishParam2);
+        const ScriptParamData1 = JSON.parse(JSON.stringify(paramToScriptParamData(param1)));
+        const ScriptParamData2 = JSON.parse(JSON.stringify(paramToScriptParamData(param2)));
+        return deepEqual(ScriptParamData1,ScriptParamData2);
     }
 
     /** Set quick references from this instance to the values of params 

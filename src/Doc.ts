@@ -39,7 +39,7 @@ import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, Con
 import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, DocGraphicInputRect, DocGraphicInputCircle, 
                 DocGraphicInputOrthoLine,
-                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param, PublishParam, DocPipeline
+                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param, ScriptParamData, DocPipeline
             } from './internal'
 
 import { isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer, isWidthHeightInput, isContainerTableInput } from './internal' // typeguards
@@ -653,7 +653,7 @@ export class Doc
     
         // New consistent way to get params from request
         // Combine params with request.params for values
-        const params = this?._ay?.worker?._activeExecRequest?.script?.params as Record<string,PublishParam>;
+        const params = this?._ay?.worker?._activeExecRequest?.script?.params as Record<string,ScriptParamData>;
 
         if (!params || Object.keys(params).length === 0){ return 'no parameters' }
 
@@ -662,7 +662,7 @@ export class Doc
 
 
 
-        const paramsWithValues = (Object.values(params) as Array<Param>)
+        const paramsWithValues = (Object.values(params) as Array<ScriptParam>)
                                 .map((p) => { return { ...p, value: paramValues[p.name] }})
         
         console.log(paramsWithValues);

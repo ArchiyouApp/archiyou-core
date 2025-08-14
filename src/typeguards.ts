@@ -19,7 +19,7 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           RunnerScriptExecutionRequest
         } from './internal' // types
 
-import { ParamType, Param, PublishParam } from './internal'
+import { ParamType, ScriptParam, ScriptParamData } from './internal'
 
 import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
@@ -44,23 +44,23 @@ import { isNumeric, isRelativeCoordString } from './internal'
 
 */
 
-export function isParamType(o:any): o is ParamType
+export function isScriptParamType(o:any): o is ParamType
 {
     return ['number','text','options','boolean','list','object'].includes(o)
 }
 
-export function isParam(o:any): o is Param
+export function isScriptParam(o:any): o is ScriptParam
 {
     return (typeof o === 'object') &&
-        isParamType(o?.type) &&
+        isScriptParamType(o?.type) &&
         typeof o?.name  === 'string'
         // NOTE: value and default are optional
         // TODO: add _behaviours?
 }
 
-export function isPublishParam(o:any): o is PublishParam
+export function isScriptParamData(o:any): o is ScriptParamData
 {
-    return isParam(o) && 
+    return isScriptParam(o) && 
         o?._behaviours &&
         typeof o?._behaviours === 'object' &&
         Object.values(o._behaviours).every(v => typeof v === 'string') // function stringified
