@@ -1,6 +1,6 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, 
             VertexCollection, DimensionLineData, DimensionLevel, DimensionLevelSettings, PipelineType, Beam,  
-            DocUnitsWithPerc} from './internal'
+            DocUnitsWithPerc , View, Container } from './internal'
 
 import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
@@ -21,11 +21,11 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
 
 import { ParamType, ScriptParam, ScriptParamData } from './internal'
 
-import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
-            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
+import type { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
+            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer,
             ContainerHAlignment, ContainerVAlignment, MetricName,
             ContainerTableInput, ContainerPositionLike, ContainerPositionCoordRel, ContainerPositionCoordAbs, 
-            OrientationXY
+            OrientationXY, ExecutionResultOutputDataBase64
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
@@ -571,4 +571,14 @@ export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutio
         (!o?.pipelines || Array.isArray(o.pipelines) || typeof o.pipelines === 'boolean') &&
         (!o?.tables || Array.isArray(o.tables) || typeof o.tables === 'boolean') &&
         (!o?.onDone || typeof o.onDone === 'function');
+}
+
+//// EXECUTION RESULTS ////
+
+export function isExecutionResultOutputDataBase64(o:any): o is ExecutionResultOutputDataBase64
+{
+    return o && typeof o === 'object' 
+        && ['ArrayBuffer','Uint8Array','Uint16Array','Uint32Array','Int8Array',
+                'Int16Array','Int32Array','Float32Array','Float64Array','Buffer'].includes(o.type)
+                && typeof o.data === 'string';
 }

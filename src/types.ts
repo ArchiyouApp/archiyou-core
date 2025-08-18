@@ -1151,21 +1151,19 @@ export interface RunnerScript
     // variants
 }
 
-/** Request results from executing a script 
- *  
- * TODO: Will replace ExecutionRequest in the future
-*/
+/** Request results from executing a script */
 export interface RunnerScriptExecutionRequest
 {
-    script:RunnerScript|Script|ScriptData // script to execute
+    script:Script|ScriptData // script to execute
     component?:string // name of component if any
     params?:Record<string,any> // param values
     variantId?:string // hash of param values for identifying unique requests - is filled in on submission
     mode?: 'main'|'component'
     // What to calculate and output
     outputs?: Array<ExecutionRequestOutputPath>
-    meta?: ScriptMeta | null // Metadata on pipelines, metrics, tables, docs etc
-    onDone?: ((result:RunnerScriptExecutionResult) => any) // callback
+    cache?:boolean // enable caching. Default is true (TODO: Implement)
+
+    _onDone?: ((result:RunnerScriptExecutionResult) => any) // internal callback 
 }   
 
 
@@ -1279,3 +1277,4 @@ export interface RunnerManagerMessage
     type: 'init'|'load'|'execute'|'stop'|'export-to-step'|'export-to-stl'|'export-to-gltf'|'export-to-svg'|'export-to-svg-2d'  
     payload?: any //Record<string, any>
 }
+

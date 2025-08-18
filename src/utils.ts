@@ -402,11 +402,11 @@ export function uuidv4(): string
  * @param currentDepth - Current recursion depth (internal use)
  * @returns Transformed object with binary data as base64 strings
  */
-export function prepareBinaryForJSON<T>(obj: T, maxDepth: number = 10, currentDepth: number = 0): number|string|Array<any>|Object|ExecutionResultOutputDataBase64
+export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentDepth: number = 0): number|string|Array<any>|Object|ExecutionResultOutputDataBase64
 {
     // Prevent infinite recursion
     if (currentDepth >= maxDepth) {
-        console.warn('prepareBinaryForJSON: Maximum recursion depth reached');
+        console.warn('convertBinaryToBase64: Maximum recursion depth reached');
         return obj;
     }
 
@@ -435,7 +435,7 @@ export function prepareBinaryForJSON<T>(obj: T, maxDepth: number = 10, currentDe
             length: obj.length
         } as ExecutionResultOutputDataBase64;
     }
-
+ 
     // Handle Buffer (Node.js)
     if (typeof Buffer !== 'undefined' && obj instanceof Buffer) {
         return {
@@ -446,12 +446,12 @@ export function prepareBinaryForJSON<T>(obj: T, maxDepth: number = 10, currentDe
     }
     // Don't do dates
     // Don't do functions
-    if (typeof obj === 'function'){ console.warn('prepareBinaryForJSON: Function serialization is not supported!');}
+    if (typeof obj === 'function'){ console.warn('convertBinaryToBase64: Function serialization is not supported!');}
 
     // Handle original primitives
     if (typeof obj !== 'object') { return obj;}
     if (Array.isArray(obj)) {
-        return obj.map(item => prepareBinaryForJSON(item, maxDepth, currentDepth + 1));
+        return obj.map(item => convertBinaryToBase64(item, maxDepth, currentDepth + 1));
     }
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -459,7 +459,7 @@ export function prepareBinaryForJSON<T>(obj: T, maxDepth: number = 10, currentDe
         if (typeof value === 'function') {
             continue; // Skip functions in objects unless we want to serialize them
         }
-        result[key] = prepareBinaryForJSON(value, maxDepth, currentDepth + 1);
+        result[key] = convertBinaryToBase64(value, maxDepth, currentDepth + 1);
     }
 
     return result;
@@ -472,14 +472,19 @@ export function prepareBinaryForJSON<T>(obj: T, maxDepth: number = 10, currentDe
  * @param obj - The object to restore
  * @returns Object with restored binary data
  */
-export function restoreBinaryFromJSON<T>(obj: any): T 
+export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64): Buffer|ArrayBuffer|Uint8Array|null
 {
-    if (obj === null || obj === undefined) {
-        return obj;
+    if (obj === null || obj === undefined) 
+    {
+        console.error('utils::restoreBinaryFromBase64(): Invalid input');
+        return null;
     }
+    
+    console.info(`utils::restoreBinaryFromBase64(): Restoring to binary "${obj?.type}" with length ${obj?.length}`);
 
     // Handle primitives
-    if (typeof obj !== 'object') {
+    if (typeof obj !== 'object') 
+    {
         return obj;
     }
 
@@ -489,7 +494,7 @@ export function restoreBinaryFromJSON<T>(obj: any): T
         switch (obj.type)
         {
             case 'ArrayBuffer':
-                const binaryString = atob(obj._data);
+                const binaryString = atob(obj.data);
                 const buffer = new ArrayBuffer(binaryString.length);
                 const view = new Uint8Array(buffer);
                 for (let i = 0; i < binaryString.length; i++) {
@@ -498,30 +503,31 @@ export function restoreBinaryFromJSON<T>(obj: any): T
                 return buffer as any;
 
             case 'Uint8Array':
-                const uint8Buffer = restoreBinaryFromJSON({ _type: 'ArrayBuffer', _data: obj._data }) as ArrayBuffer;
-                return new Uint8Array(uint8Buffer, 0, obj._length) as any;
+                const uint8Buffer = restoreBinaryFromBase64({ type: 'ArrayBuffer', data: obj.data, length: obj.length }) as ArrayBuffer;
+                return new Uint8Array(uint8Buffer, 0, obj.length) as any;
 
             case 'Buffer':
-                if (typeof Buffer !== 'undefined') {
-                    return Buffer.from(obj._data, 'base64') as any;
+                if (typeof Buffer !== 'undefined')
+                {
+                    return Buffer.from(obj.data, 'base64') as any;
                 }
                 break;
 
             default:
-                console.warn(`restoreBinaryFromJSON: Unknown type ${obj._type}`);
-                return obj;
+                console.warn(`restoreBinaryFromBase64: Unknown type ${obj.type}`);
+                return null;
         }
     }
 
     // Handle Arrays
     if (Array.isArray(obj)) {
-        return obj.map(item => restoreBinaryFromJSON(item)) as any;
+        return obj.map(item => restoreBinaryFromBase64(item)) as any;
     }
 
     // Handle plain objects
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
-        result[key] = restoreBinaryFromJSON(value);
+        result[key] = restoreBinaryFromBase64(value);
     }
 
     return result;
