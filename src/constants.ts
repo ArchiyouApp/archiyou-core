@@ -100,7 +100,7 @@ export const DOC_CONTAINER_CAPTION_TEXT_HEIGHT = 3; // in mm
 export const DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR = 2; // applied to text height
 
 export const EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL = ['glb', 'stl', 'step', 'svg']; // TODO: more
-export const EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL = ['raw','pdf']; // TODO: more
+export const EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL = ['json','pdf']; // TODO: more
 
 
 //// DRAWING STYLES

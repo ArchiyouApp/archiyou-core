@@ -157,10 +157,21 @@
         return newTable;
     }
 
+    //// IO ////
+
     /** Output raw data */
-    toTableData():{[key:string]:Object}
+    toTableData(only:Array<string>=null):Record<string, Object>
     {   
-        return this?.db?.toTableData(); 
+        return this?.db?.toTableData(only); 
+    }
+
+    toMetricsData(only:Array<string>=null):Record<string, Metric>
+    {
+        const metrics = this.getMetrics(only);
+        return metrics.reduce((acc, metric) => {
+            acc[metric.name] = metric;
+            return acc;
+        }, {} as Record<string, Metric>);
     }
 
     //// METRIC BOARD ////
@@ -174,9 +185,9 @@
     /** Get internal metric objects with filtering
      * @param only - array of metric names to filter by, or '*' to get all metrics
       */
-    getMetrics(only:Array<string> = []):Array<Metric>
+    getMetrics(only?:Array<string>):Array<Metric>
     {
-        if(only.length === 0 || only.includes('*')) return Object.values(this._metrics);
+        if(!only || only.length === 0 || only.includes('*')) return Object.values(this._metrics); // all
         return Object.values(this._metrics).filter(m => only.includes(m.name));
     }
 

@@ -555,7 +555,7 @@ export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
 
 export function isRunnerScriptExecutionResult(r:any): r is RunnerScriptExecutionResult
 {
-    return r && typeof r === 'object' && (r.outputs)  // TODO: better
+    return r && typeof r === 'object' && (r.status)  // TODO: better
 }
 
 export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutionRequest

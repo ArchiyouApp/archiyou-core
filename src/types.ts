@@ -1157,11 +1157,12 @@ export interface RunnerScriptExecutionRequest
     script:Script|ScriptData // script to execute
     component?:string // name of component if any
     params?:Record<string,any> // param values
+    preset?:string // TODO: preset - overrides param values
     variantId?:string // hash of param values for identifying unique requests - is filled in on submission
     mode?: 'main'|'component'
     // What to calculate and output
     outputs?: Array<ExecutionRequestOutputPath>
-    cache?:boolean // enable caching. Default is true (TODO: Implement)
+    cache?:boolean // enable caching. Default is true
 
     _onDone?: ((result:RunnerScriptExecutionResult) => any) // internal callback 
 }   
@@ -1179,8 +1180,21 @@ export interface RunnerScriptExecutionRequest
 //
 export type ExecutionRequestOutputPath = string;
 export type ExecutionRequestOutputEntityGroup = 'model'|'metrics'|'tables'|'docs';
-export type ExecutionRequestOutputFormat = 'internal'|'raw'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
-// internal is data direct from local system (so instances, Obj/Shapes etc), raw is pure data, buffer is vertex buffer for editor viewer, glb is binary glTF, svg is 2D SVG, step is STEP file, stl is STL file, pdf is PDF file, xls is Excel file
+/* 
+    Any data that is exchanged between Runner Execution scope and other (internal or external) systems
+
+    internal is data direct from local system (so instances, Obj/Shapes etc): only for use with shared context
+    json is JSON serializable data, 
+    buffer is vertex buffer for editor viewer, 
+    glb is binary glTF, 
+    svg is 2D SVG, 
+    step is STEP file, 
+    stl is STL file, 
+    pdf is PDF file, 
+    xls is Excel file
+*/
+export type ExecutionRequestOutputFormat = 'internal'|'json'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
+
 
 export interface ExecutionRequestOutput 
 {
@@ -1227,6 +1241,7 @@ export interface ExecutionRequestOutputFormatGLTFOptions
 export interface ExecutionResultOutputs
 {
     state?: any // TODO
+    warnings: Array<string>, // simple messages
     pipelines?:Record<string, ExecutionResultPipeline>
 }
 

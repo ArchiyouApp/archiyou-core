@@ -50,7 +50,6 @@ export class Db
     {
         // add reference to the parent database in every Table instance
         Table.prototype._db = this;
-        Table.prototype._danfo = this._danfo; // if available
     
         let shapesDataRows = this.generateShapesData();
         
@@ -119,21 +118,17 @@ export class Db
     // ==== OUTPUTS ====
 
     /** Output tables as json data */
-    toTableData():{[key:string]:Object}
+    toTableData(only?:Array<string>):Record<string, Object>
     {
-        let data = {}; // key: data
+        only = Array.isArray(only) ? only : null;
 
-        for (const [key,tableObj] of Object.entries(this._tables))
-        {
-            if (tableObj)
+        return Object.keys(this._tables).reduce((data, tableName) => {
+            if (!only || only.includes(tableName))
             {
-                data[tableObj.name()] = tableObj.toData();
+                data[tableName] = this._tables[tableName].toData();
             }
-            else {
-                console.warn(`Got a undefined Table under name ${key}`)
-            }
-        }
-        return data;
+            return data;
+        }, {} as Record<string, Object>);
     }
 
     /** Export Database with saves Tables to Json format */
