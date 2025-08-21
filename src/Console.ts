@@ -215,7 +215,7 @@ export class Console
         return `${t.toLocaleTimeString()}.${t.getMilliseconds()}`;
     }
 
-    getBufferedMessages(types?:any|Array<ConsoleMessageType>)
+    getBufferedMessages(types:Array<ConsoleMessageType>=undefined):Array<ConsoleMessage>
     {
         types = (Array.isArray(types) ? 
                     (types.length > 0) ? types : undefined 

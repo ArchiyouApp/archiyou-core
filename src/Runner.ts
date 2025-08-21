@@ -39,6 +39,8 @@ import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExe
 
 import { isRunnerScriptExecutionResult } from './internal' // typeguards
 
+import { roundTo, toRad, toDeg } from './internal' // utils
+
 
 export class Runner
 {
@@ -472,6 +474,9 @@ export class Runner
         Object.assign(state,
             {
                 Math: Math, 
+                roundTo: roundTo,
+                toRad: toRad,
+                toDeg: toDeg,
                 JSON: JSON,
                 Array: Array,
                 Object: Object,
@@ -507,8 +512,8 @@ export class Runner
         // That console still has a reference for global console for debugging
         globalThis.console = state.console;
 
-        state.print = (m:string) => state.console.log(m);
-        state.log = (m:string) => state.console.log(m);
+        state.print = (m:string) => state.console.user(m);
+        state.log = (m:string) => state.console.info(m);
         
         return state;
     }
@@ -835,14 +840,7 @@ export class Runner
             }
             catch(e)
             {
-                // Any error while executing code is caught here
-                const errorMessage = `Error while executing code "${code}": **** ERROR:"${e}" ****`;
-                console.error(`Runner::_executeLocal(): ${errorMessage}`);
-                return {
-                    status: 'error',
-                    errors: [{ status: 'error', message: errorMessage, code: code } as StatementResult],
-                    request: request, // original request in response for debugging
-                } as RunnerScriptExecutionResult
+               return this._handleExecutionError(scope, this._activeExecRequest, code, e);
             }
         }
 
@@ -854,11 +852,87 @@ export class Runner
         }
 
         // Send message to manager if in worker role
-        if(this.role === 'worker'){
+        if(this.role === 'worker')
+        {
             this._postMessageToManager({ type: 'executed', payload: result });
         }
 
         return result;
+    }
+
+    _handleExecutionError(scope: RunnerScriptScopeState, request:RunnerScriptExecutionRequest,code:string, e:Error):RunnerScriptExecutionResult
+    {
+        // NOTE: code can be just a small part of the request.script.code
+        // Get context of error by parsing the stack trace
+        const context = this._extractScriptContextFromErrorStack(e, code);
+        const errorMessage = `
+**** EXECUTION ERROR ****
+- error: "${e.message}" 
+- context: 
+${context}
+**** END ERROR ****`;
+
+        // Also add to local console
+        console.error(errorMessage);
+
+        return {
+            status: 'error',
+            errors: [{ status: 'error', message: errorMessage, code: code } as StatementResult],
+            // get all messages out too, this could help debugging
+            messages: scope.console.getBufferedMessages(['user', 'exec','warn', 'error']),
+            request: request, // original request in response for debugging
+        } as RunnerScriptExecutionResult
+    }
+
+    _extractScriptContextFromErrorStack(e:Error, code:string):string|null
+    {
+        /* Within eval we get something like:
+         
+            TypeError: roundTo is not a function
+            at eval (eval at <anonymous> (file:///app/lib/archiyou-core/src/Runner.ts:1:13312), <anonymous>:216:14)
+            at exec (/app/lib/archiyou-core/src/Runner.ts:834:21)
+            at Runner._executeLocal (/app/lib/archiyou-core/src/Runner.ts:854:30)
+            ...
+
+            <anonymous>:216:14 contains line and column number of error. Extract that from the code
+
+        */
+        const CONTEXT_LINES_BEFORE = 3;
+        const CONTEXT_LINES_AFTER = 3;
+        // shift line number because we wrap in eval - TODO:check this
+        const CORRECT_LINES_FOR_EVAL_WRAP = -11; 
+
+        // TODO: there seems to be a discrepancy between the line numbers in the error stack and the actual code
+        const matches = e.stack.match(/<anonymous>:(\d+):(\d+)/);
+        if(matches && matches.length === 3)
+        {
+            const line = parseInt(matches[1]) + CORRECT_LINES_FOR_EVAL_WRAP;
+            const column = parseInt(matches[2]);
+
+            if(line < 0 || column < 0) {
+                console.error(`Runner::_extractScriptContextFromErrorStack(): Invalid line or column number extracted from stack trace: ${line}, ${column}`);
+                return null;
+            }
+
+            // Extract the code around the error
+            const lines = code.split('\n');
+            const contextLines = lines.slice(
+                                    Math.max(0, line - CONTEXT_LINES_BEFORE), 
+                                    Math.min(lines.length, line + CONTEXT_LINES_AFTER));
+            let context = contextLines.join('\n');
+
+            // Try to highlight error
+            const stringOverlap = this._stringOverlap(context, e.message);
+            if(stringOverlap){
+                context = context.replace(stringOverlap, `\x1b[31m >>>> ${stringOverlap} <<<<\x1b[0m`);
+            }
+
+            return context;
+        }
+        else {
+            console.error(`Runner::_extractScriptContextFromErrorStack(): Failed to extract line and column from stack trace: ${e.stack}`);
+            return null;
+        }
     }
 
 
@@ -1043,12 +1117,8 @@ export class Runner
              }
              catch(e)
              {
-                 // Any error while executing code is caught here
-                 console.error(`Runner::_executeLocal(): Error while executing code: "${e}" : ${e.stack}`);
-                 return {
-                     status: 'error',
-                     errors: [{ status: 'error', message: e.message, code: code } as StatementResult],
-                 } as RunnerScriptExecutionResult
+                // Any error while executing code is caught here
+                return this._handleExecutionError(scope, this._activeExecRequest, code, e);
              }
          }
  
@@ -1221,7 +1291,6 @@ export class Runner
         // Basic Archiyou data
         result.scenegraph = scope.geom.scene.toGraph();
         
-
         // Outputs
         if(request.outputs)
         {
@@ -1233,6 +1302,12 @@ export class Runner
 
         // Meta
         this._addMetaToResult(scope, request, result);
+
+        // Console messages
+        if(request.messages && Array.isArray(result.messages))
+        {
+            result.messages = scope.console.getBufferedMessages(request.messages && []);
+        }
 
         return result;
     }
@@ -1774,6 +1849,23 @@ export class Runner
         if (lower === 'false') return false;
         if (!isNaN(Number(value)) && value.trim() !== '') return Number(value);
         return value;
+    }
+
+    /**
+    * Returns the longest substring that is both a suffix of str1 and a prefix of str2.
+    */
+    _stringOverlap(str1: string, str2: string): string 
+    {
+        let longest = '';
+        for (let i = 0; i < str1.length; i++) {
+            for (let j = i + 1; j <= str1.length; j++) {
+                const substr = str1.slice(i, j);
+                if (substr.length > longest.length && str2.includes(substr)) {
+                    longest = substr;
+                }
+            }
+        }
+        return longest;
     }
 }
 

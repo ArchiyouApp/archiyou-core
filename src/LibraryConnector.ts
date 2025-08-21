@@ -1,5 +1,7 @@
 /**
  *  Access the Archiyou library of scripts for execution by Runner 
+ *  The library can connect to the older publishing library (python)
+ *  or an instance of the new one (ts/js)
  */
 
 import { PublishScript } from './types';
@@ -9,26 +11,41 @@ export class LibraryConnector
 {
     //// SETTINGS ////
     DEFAULT_LIBRARY_URL = 'https://pub.archiyou.com'; // default library URL
-    LIBRARY_ENDPOINTS_ALL_SCRIPTS = '/search';
+    LIBRARY_ENDPOINTS = {
+        old: { 
+                all: '/search' // all scripts 
+            },
+        new: {
+            all: '/scripts' // all scripts
+        }
+    }
+    //// END SETTINGS ////
+    
+    url:string;
+    version:'old'|'new';
 
-    constructor()
+    constructor(url?:string)
     {
+        this.url = url || this.DEFAULT_LIBRARY_URL;
 
-
+        if(!this.url){ throw new Error(`LibraryConnector::constructor(): Please supply a valid url of the library`)}
+        
     }
 
     /** Just request base url and see if we get some results */
-    async connectTest():Promise<Record<string, any>>
+    async connect():Promise<boolean>
     {
-        return fetch(`${this.DEFAULT_LIBRARY_URL}`)
-            .then((response) => {
+        return fetch(this.url)
+            .then((response) => 
+            {
                 if (!response.ok) {
                     throw new Error(`Library connection failed: ${response.statusText}`);
                 }
                 return response.json();
             }).then((data) => {
-                console.log('Library connection successful:', data);
-                return data;
+                this.version = this._getLibraryVersion(data);
+                console.log(`Library connection successful. Connected to ${this.url}: Library version: "${this.version}"`);
+                return true;
             })
             .catch((error) => {
                 console.error('Error connecting to library:', error);
@@ -36,10 +53,18 @@ export class LibraryConnector
             });
     }
 
+    _getLibraryVersion(info?:Record<string,any>):'old'|'new'|null
+    {
+        // Old library return { library, maintainer, maintainer_email }
+        // New one: { success, data: { name, version, maintainer, email }}
+        if(!info) return null;
+        return (info?.success) ? 'new' : 'old';
+    }
+
     /** Get all script versions */
     async getAllScripts():Promise<Array<PublishScript>>
     {
-        return fetch(`${this.DEFAULT_LIBRARY_URL}${this.LIBRARY_ENDPOINTS_ALL_SCRIPTS}`)
+        return fetch(`${this.DEFAULT_LIBRARY_URL}${this.LIBRARY_ENDPOINTS[this.version].all}`)
             .then((response) => {   
                 if (!response.ok) {
                     throw new Error(`Failed to fetch scripts: ${response.statusText}`);
@@ -77,7 +102,7 @@ export class LibraryConnector
     /** Readout basic info on Library */
     async getLibraryOverview():Promise<void>
     {
-        const baseInfo = await this.connectTest();
+        const baseInfo = await this.connect();
         if(baseInfo)
         {
             console.log('Library Overview:');

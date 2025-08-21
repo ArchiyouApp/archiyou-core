@@ -285,16 +285,18 @@ export class Script
 
 export interface ScriptData
 {
-    id: string;
-    name: string;
-    author: string;
-    version?: string; // valid semver: can be undefined, then automatically generated
+    id: string; // all scripts have a id
+    name?: string; // most script have name
+    author?: string; 
+    // valid semver version - we use automatic versioning (TODO)
+    // The user can provide major version when publishing
+    version?: string; 
     description: string;
-    tags: string[];
+    tags?: string[];
     created: string | null;
     updated: string | null;
     code: string;
     params: Record<string,ScriptParamData>;
-    presets: Record<string, Record<string, ScriptParamData>>;
+    presets?: Record<string, Record<string, ScriptParamData>>;
     published: ScriptPublished | null;
 }

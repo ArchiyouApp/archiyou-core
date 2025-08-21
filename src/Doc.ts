@@ -202,6 +202,14 @@ export class Doc
         return this;
     }
 
+    /** Set name of current document (might be the default) */
+    name(name:string):Doc
+    {
+        const activeDoc = this.checkAndMakeDefaultDoc();
+        activeDoc.name = name;
+        return this;
+    }
+
     /** Check if there is an active DocDocument, otherwise create a default one */
     checkAndMakeDefaultDoc()
     {

@@ -136,24 +136,28 @@ export class ScriptParam
             throw new Error(`ScriptParam::validateStructure: Invalid param: ${JSON.stringify(param)}`);
         }
 
-        // default needs to be present always
-        if(!param?.default){
-            throw new Error(`ScriptParam::validateStructure: Default value is required for param "${param?.name}"`);
-        }
-
         switch(param?.type)
         {
             case 'number':
-                param.step = param.step || 1; // default step
+                param.default = param?.default ?? 0 // default can be 0
+                param.step = param?.step || 1; // default step
                 const rmin = isNumeric(param?.min);
                 const rmax = isNumeric(param?.max);
                 const rstep = isNumeric(param?.step);
-                if(!rmin) console.error(`ScriptParam::validateStructure: Value "${param?.min}" is invalid for param "${param?.name}"`);
-                if(!rmax) console.error(`ScriptParam::validateStructure: Value "${param?.max}" is invalid for param "${param?.name}"`);
-                if(!rstep) console.error(`ScriptParam::validateStructure: Value "${param?.step}" is invalid for param "${param?.name}"`);
+                if(!rmin) console.error(`ScriptParam::validateStructure(): Value min "${param?.min}" is invalid for param "${param?.name}"`);
+                if(!rmax) console.error(`ScriptParam::validateStructure(): Value max "${param?.max}" is invalid for param "${param?.name}"`);
+                if(!rstep) console.error(`ScriptParam::validateStructure(): Value step "${param?.step}" is invalid for param "${param?.name}"`);
+                // some other tests
+                if(param.default < param.min || param.default > param.max)
+                {
+                    console.error('ScriptParam::validateStructure(): Default value is out of bounds');
+                    param.default = param.min;
+                }
+
 
                 return rmin && rmax && rstep;
             case 'boolean':
+                param.default = param?.default ?? false // default is false
                 return true; // no structure
             case 'text':
                 param.length = param.length || this.MAX_TEXT_LENGTH;

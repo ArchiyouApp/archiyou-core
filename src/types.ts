@@ -126,12 +126,14 @@ export interface ScriptMeta
 */
 export interface ScriptPublished
 {
+    version:string // valid semver
     url:string // url to the published script - this anticipates different publication urls
     title:string // nice title of the script
     published:Date // Date of publication
     description:string // public description of script
     public:boolean // if the script is public or not
     params: Record<string, any>; // the parameters that are public with override configuration, others are default
+    presets: Array<string>; // presets that are public
 }
 
 /** A group of all modules of Archiyou for easy access  */
@@ -274,8 +276,8 @@ export interface RunnerScriptExecutionResult
 
     statements?: Array<StatementResult>
     errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
-    messages?: Array<ConsoleMessage>,
-    
+    messages?: Array<ConsoleMessage>, // based on settings in request you find the relevant messages
+
     meta?: ScriptMeta, // meta information on the script execution
     
     // All outputs in clear structure
@@ -1163,6 +1165,7 @@ export interface RunnerScriptExecutionRequest
     // What to calculate and output
     outputs?: Array<ExecutionRequestOutputPath>
     cache?:boolean // enable caching. Default is true
+    messages?:Array<ConsoleMessageType>; // output messages of given types
 
     _onDone?: ((result:RunnerScriptExecutionResult) => any) // internal callback 
 }   

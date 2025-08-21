@@ -11,6 +11,7 @@
  *  see https://github.com/CadQuery/cadquery/blob/master/cadquery/occ_impl/shapes.py:361 for inspiration
  */
 
+import { USE_GARBAGE_COLLECTION } from './internal';
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
             SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
@@ -149,7 +150,8 @@ export class Shape
     _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
     {
         // Can be overriden by subclass
-        if(ocShape && !ocShape?.IsNull())
+        // Only manage this when garbage collection is active
+        if(USE_GARBAGE_COLLECTION && ocShape && !ocShape?.IsNull())
         {
             this._clearOcShape(); // clear previous
             this._ocShape = ocShape;
@@ -161,7 +163,7 @@ export class Shape
     /** Manually clear existing OC Shape */
     _clearOcShape()
     {
-        if(this._ocShape)
+        if(USE_GARBAGE_COLLECTION &&this._ocShape)
         {
             removeOcTargetForGarbageCollection(this._ocShape);
             this?._ocShape?.delete();
