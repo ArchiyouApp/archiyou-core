@@ -4,9 +4,6 @@
  * 
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
 
 import { Buffer } from 'buffer';
 
@@ -25,6 +22,12 @@ export class RunnerOps
     async saveBlobToFile(blob: Blob|ArrayBuffer|Uint8Array, filePath: string, overwrite:boolean=true): Promise<void> 
     {
         console.info(`saveBlobToFile::saveBlobToFile(): Saving blob to ${filePath}`);
+
+        // Avoid problems in browser contexts
+        const FS_LIB = 'fs'; // avoid problems with older build systems preparsing import(..) statements
+        const PATH_LIB = 'path'
+        const fs  = (await import(FS_LIB))?.default;
+        const path = (await import(PATH_LIB))?.default;
         
         let buffer: Buffer;     
 
