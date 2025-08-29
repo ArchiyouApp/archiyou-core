@@ -1195,7 +1195,8 @@ ${context}
             console.info(`$component("${name}")::_fetchComponentScript(): Fetching local component script at "${name}"...`);
             
             // Load dynamically to avoid issues in browser
-            const fs = await import('fs/promises'); // use promises version of fs   
+            const FS_PROMISES_LIB = 'fs/promises'; // avoid problems with older build systems preparsing import statement
+            const fs = await import(FS_PROMISES_LIB); // use promises version of fs
             const data = await fs.readFile(name, 'utf-8');
 
             if(!data)

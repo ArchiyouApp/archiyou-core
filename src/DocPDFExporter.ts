@@ -33,7 +33,6 @@ import { PDFLinePath } from './internal' // types
 import { jsPDF, GState } from 'jspdf'
 import 'svg2pdf.js' 
 import autoTable from 'jspdf-autotable' // TODO: load dynamically?
-import { JSDOM } from 'jsdom'; // For xml parsing in Node - browser has native DOMParser
 
 import { OutfitByteString } from '../assets/fonts/Outfit'
 import { OutfitSemiBoldByteString } from '../assets/fonts/OutfitSemiBold'
@@ -71,6 +70,7 @@ export class DocPDFExporter
     _jsPDF:any // the module
     _jsPDFDoc:any // doc constructor - TODO: TS typing fix
     _hasJsPDF:boolean = false;
+    _jsdomNode; // dynamically loaded jsdom parser for node
 
     /** Make DocPDFExporter instance either empty or with data and onDone function */
     constructor(data?:DocData|Record<string, DocData>, onDone?:(blobs:Record<string,Blob>) => any)
@@ -476,7 +476,14 @@ export class DocPDFExporter
                     svgRootElem = new DOMParser().parseFromString(img.content.data, 'image/svg+xml').documentElement; 
                 }
                 else {
-                    const dom = new JSDOM(img.content.data, { contentType: 'image/svg+xml' });
+                    if(!this._jsdomNode)
+                    {
+                        
+                        const JSDOM_LIB = 'jsdom'; // to trick webpack 4 not to parse dynamic imports
+                        this._jsdomNode = (await import(JSDOM_LIB));
+                    }
+
+                    const dom = new this._jsdomNode.JSDOM(img.content.data, { contentType: 'image/svg+xml' });
                     svgRootElem = dom.window.document.querySelector('svg');
                     // svg2pdf uses document from the browser, so we need to set it here
                     globalThis.document = dom.window.document; // TODO: check if this is needed
