@@ -1166,6 +1166,7 @@ export interface RunnerScriptExecutionRequest
     outputs?: Array<ExecutionRequestOutputPath>
     cache?:boolean // enable caching. Default is true
     messages?:Array<ConsoleMessageType>; // output messages of given types
+    forceFileResponse?:boolean // if true, force response as file download (either single file or multiple files in zip)
 
     _onDone?: ((result:RunnerScriptExecutionResult) => any) // internal callback 
 }   

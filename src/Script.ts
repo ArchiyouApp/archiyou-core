@@ -17,8 +17,7 @@ export class Script
     id: string; // uuid for the script - this is primary because script names can be changed
     name: string; // always lowercase 
     author: string; // always lowercase
-    version: string;  // valid semver version
-    private namespace: string; // unique namespace for the script {author}/{name} - automatically generated from author and name
+    // version is only assigned when published
     description: string;
     tags: string[] = []; // array of tags for the script
     created: Date;
@@ -47,7 +46,7 @@ export class Script
         }
         else
         {
-            this.name = name?.toLowerCase();
+            this.name = name.toLowerCase();
             this.author = author?.toLowerCase();
             this.version = version;
             this.code = code;
@@ -77,10 +76,14 @@ export class Script
     _setDefaults()
     {
         this.id = this.id ?? uuidv4();
+        
+        // TODO: move version checking to published
+        /*
         this.version =  (this.version) ? this.version 
                             : (this.previousVersion && semver.valid(this.previousVersion)) 
                                 ? semver.inc(this.previousVersion) : undefined; 
-        this.namespace = this.namespace ?? `${this.author}/${this.name}`.toLowerCase();
+        */
+        
         this.description = this.description ?? '';
         this.created = this.created ?? new Date();
         this.updated = this.updated ?? new Date();
@@ -92,8 +95,6 @@ export class Script
             this.id && typeof this.id === "string",
             this.name && typeof this.name === "string" && this.name.length > 0,
             this.author && typeof this.author === "string" && this.author.length > 0,
-            // this.version && typeof this.version === "string", // can be undefined
-            this.namespace && typeof this.namespace === "string" && this.namespace.length > 0,
             typeof this.description === "string", // Allow empty description
             Array.isArray(this.tags),
             this.created instanceof Date,
@@ -230,8 +231,6 @@ export class Script
         this.id = data.id;
         this.name = data.name.toLowerCase();
         this.author = data.author.toLowerCase();
-        this.namespace = `${this.author}/${this.name}`.toLowerCase();
-        this.version = data.version;
         this.description = data.description;
         this.tags = Array.isArray(data.tags) ? data.tags : [];
         this.created = data.created ? new Date(data.created) : new Date();
@@ -248,7 +247,10 @@ export class Script
                 return acc;
             }, {} as Record<string, ScriptParam>) : {};
         this.presets = data.presets || {};
+
+        // TODO: validate published
         this.published = data.published || null;
+        
 
         // Validate the script after loading
         this.validate();
@@ -262,7 +264,6 @@ export class Script
             id: this.id,
             name: this.name,
             author: this.author,
-            version: this.version,
             description: this.description,
             tags: this.tags,
             created: this.created ? this.created.toISOString() : null,
@@ -286,11 +287,9 @@ export class Script
 export interface ScriptData
 {
     id: string; // all scripts have a id
-    name?: string; // most script have name
+    name?: string; // most script have name - lowercase
     author?: string; 
-    // valid semver version - we use automatic versioning (TODO)
-    // The user can provide major version when publishing
-    version?: string; 
+    // The user provides an version when publishing, see published
     description: string;
     tags?: string[];
     created: string | null;

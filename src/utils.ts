@@ -472,7 +472,7 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
  * @param obj - The object to restore
  * @returns Object with restored binary data
  */
-export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64): Buffer|ArrayBuffer|Uint8Array|null
+export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64, forceBuffer: boolean=false): Buffer|ArrayBuffer|Uint8Array|null
 {
     if (obj === null || obj === undefined) 
     {
@@ -500,11 +500,17 @@ export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64): B
                 for (let i = 0; i < binaryString.length; i++) {
                     view[i] = binaryString.charCodeAt(i);
                 }
-                return buffer as any;
+                return (forceBuffer) 
+                        ? Buffer.from(buffer)
+                        : buffer as any;
+
 
             case 'Uint8Array':
-                const uint8Buffer = restoreBinaryFromBase64({ type: 'ArrayBuffer', data: obj.data, length: obj.length }) as ArrayBuffer;
-                return new Uint8Array(uint8Buffer, 0, obj.length) as any;
+                const b = restoreBinaryFromBase64({ type: 'ArrayBuffer', data: obj.data, length: obj.length }) as ArrayBuffer;
+                const u8 = new Uint8Array(b, 0, obj.length)
+                return (forceBuffer) 
+                        ? Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength)
+                        : u8;
 
             case 'Buffer':
                 if (typeof Buffer !== 'undefined')

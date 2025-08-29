@@ -16,7 +16,8 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           BeamBaseLineAlignment, 
           AnnotationAutoDimStrategy,
           RunnerScriptExecutionResult,
-          RunnerScriptExecutionRequest
+          RunnerScriptExecutionRequest,
+          ExecutionRequestOutputFormat,
         } from './internal' // types
 
 import { ParamType, ScriptParam, ScriptParamData } from './internal'
@@ -574,6 +575,11 @@ export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutio
 }
 
 //// EXECUTION RESULTS ////
+
+export function isExecutionRequestOutputFormat(o:any): o is ExecutionRequestOutputFormat
+{
+    return ['internal','json','buffer','glb','svg','step','stl','pdf','xls'].includes(o);
+}
 
 export function isExecutionResultOutputDataBase64(o:any): o is ExecutionResultOutputDataBase64
 {
