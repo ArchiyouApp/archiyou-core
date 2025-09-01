@@ -33,12 +33,11 @@ export class Script
     previousId?:string; // uuid of the previous script version, if any
     previousVersion?:string; // version of the previous script version, if any
 
-
     _valid = false; // internal validation flag
 
 
 
-    constructor(author?:string, name?:string, version?:string, code?:string, params?:Record<string,ScriptParam>, presets?:Record<string, Record<string, ScriptParamData>>)
+    constructor(author?:string, name?:string, code?:string, params?:Record<string,ScriptParam>, presets?:Record<string, Record<string, ScriptParamData>>)
     {
         if (!name || !author)
         {
@@ -48,7 +47,7 @@ export class Script
         {
             this.name = name.toLowerCase();
             this.author = author?.toLowerCase();
-            this.version = version;
+            // version is at published.version
             this.code = code;
             this.params = params || {};
             this.presets = presets || {};
@@ -77,13 +76,6 @@ export class Script
     {
         this.id = this.id ?? uuidv4();
         
-        // TODO: move version checking to published
-        /*
-        this.version =  (this.version) ? this.version 
-                            : (this.previousVersion && semver.valid(this.previousVersion)) 
-                                ? semver.inc(this.previousVersion) : undefined; 
-        */
-        
         this.description = this.description ?? '';
         this.created = this.created ?? new Date();
         this.updated = this.updated ?? new Date();
@@ -91,21 +83,67 @@ export class Script
 
     _validateBasics():boolean
     {
-        const VALIDATIONS = [
-            this.id && typeof this.id === "string",
-            this.name && typeof this.name === "string" && this.name.length > 0,
-            this.author && typeof this.author === "string" && this.author.length > 0,
-            typeof this.description === "string", // Allow empty description
-            Array.isArray(this.tags),
-            this.created instanceof Date,
-            this.updated instanceof Date,
-            typeof this.code === "string",
-            typeof this.params === "object",
-            typeof this.presets === "object",
-        ]
+        const VALIDATIONS = {
+            id: this.id && typeof this.id === "string",
+            name : this.name && typeof this.name === "string" && this.name.length > 0,
+            author: this.author && typeof this.author === "string" && this.author.length > 0,
+            description: typeof this.description === "string", // Allow empty description
+            tags: Array.isArray(this.tags),
+            created: this.created instanceof Date,
+            updated: this.updated instanceof Date,
+            code: typeof this.code === "string",
+            params: typeof this.params === "object",
+            presets: typeof this.presets === "object",
+        }
 
-        this._valid = VALIDATIONS.every((v) => v === true);
-        return this._valid;
+        const isValidBasic = Object.values(VALIDATIONS).every((v) => v === true)
+        if(!isValidBasic)
+        {
+            const firstErrorIndex = Object.values(VALIDATIONS).findIndex(v => v !== true);
+            console.error(`Script._validateBasics(): Basic validation failed: ${Object.keys(VALIDATIONS)[firstErrorIndex]}`);
+        }
+        
+        return this._valid = isValidBasic && this._validatePublished();
+    }
+
+    /** Validated ScriptPublished */
+    _validatePublished():boolean
+    {
+        if(!this.published) return true; // If not published, no validation needed
+        if(typeof this.published !== "object"){ return false; }
+
+        const VALIDATIONS = {
+            title: this.published.title && typeof this.published.title === "string" && this.published.title.length > 0,
+            version : typeof this.published?.version === "string" && semver.valid(this.published.version) !== null, // see docs semver - valid return null if invalid, string if valid
+            // libraryUrl: this.published?.libraryUrl && typeof this.published.libraryUrl === "string" && this.published.libraryUrl.length > 0,
+            // url: this.published?.url && typeof this.published.url === "string" && this.published.url.length > 0,
+            // published : this.published.published instanceof Date,
+            // description: this.published.description && typeof this.published.description === "string",
+            params: typeof this.published.params === "object",
+        }
+
+        const isValidPublished = Object.values(VALIDATIONS).every((v) => v === true);
+        
+        if(!isValidPublished)
+        {
+            const firstErrorIndex = Object.values(VALIDATIONS).findIndex((v) => v !== true); // trigger on anything that is not a true
+            console.error(`Script._validatePublished(): Published validation failed: ${Object.keys(VALIDATIONS)[firstErrorIndex]}`);
+        }
+
+        return isValidPublished
+    }
+
+    /** Used by library to set public url of this script */
+    setPublishedUrl(rootUrl:string)
+    {
+        if(this.published)
+        {
+            this.published.libraryUrl = rootUrl; // without trailing slash
+            this.published.url = `/${this.author}/${this.name}:${this.published.version}`;
+        }
+        else {
+            console.warn("Script.setPublishedUrl(): Cannot set published URL, script is not published yet.");
+        }
     }
 
     //// PUBLISH ////
@@ -248,9 +286,7 @@ export class Script
             }, {} as Record<string, ScriptParam>) : {};
         this.presets = data.presets || {};
 
-        // TODO: validate published
-        this.published = data.published || null;
-        
+        this.published = data.published || null; // will be validated in validate()     
 
         // Validate the script after loading
         this.validate();
