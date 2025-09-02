@@ -163,10 +163,15 @@ export class Page
         const containersData = [];
         for(let i = 0; i < this._containers.length; i++)
         {
-            console.log(`==== LOADING CONTAINER ${this._containers[i].name} ====`);
             const containerData = await (this._containers[i].toData(cache));
-            if(!containerData){ containersData.push(containerData);}
-            else { console.warn(`Page::toData(): Container "${this._containers[i].name}" has no data!`);}
+            if(containerData)
+            { 
+                containersData.push(containerData);
+            }
+            else 
+            { 
+                console.warn(`Page::toData(): Container "${this._containers[i].name}" has no data!`);
+            }
         }
 
         return {

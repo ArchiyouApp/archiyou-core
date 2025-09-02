@@ -106,7 +106,7 @@ export class DocPDFExporter
         this.activePDFDoc = undefined;
     }
 
-    async export(data:DocData|Record<string,DocData>): Promise<Record<string, Blob>>
+    async export(data:DocData|Record<string,DocData>): Promise<Record<string, ArrayBuffer>>
     {
         this.reset();
         try {  
@@ -122,8 +122,18 @@ export class DocPDFExporter
         if(!this.DEBUG)
         {
             const blobs = await this.run(data);
+            console.info(`DocPDFExporter::export(): Exported documents:`);
+            blobs && Object.keys(blobs).forEach( 
+                (k) => console.info(` - ${k}: ${ (blobs[k]?.size) } bytes`));
+
             if (this.isBrowser()){ this._saveBlobToBrowserFile() }; // Start file save in browser
-            return blobs;
+            
+            // Turn all into ArrayBuffers for futher processing
+            const docsByNameArrayBuffer = {};
+            Object.entries(blobs).forEach(async  ([k, blob]) => {
+                docsByNameArrayBuffer[k] = await blob.arrayBuffer();
+            });
+            return docsByNameArrayBuffer;
         }
         else {
             this.generateTestDoc();
@@ -211,7 +221,6 @@ export class DocPDFExporter
             {
                 this.inDocs = data as Record<string,DocData>;
             }
-
             // parse docs sequentially
             for( const docData of Object.values(this.inDocs))
             {

@@ -416,7 +416,8 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
     }
 
     // Handle ArrayBuffer
-    if (obj instanceof ArrayBuffer) {
+    if (obj instanceof ArrayBuffer) 
+    {
         return {
             type: 'ArrayBuffer',
             data: arrayBufferToBase64(obj),
@@ -444,25 +445,49 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
             length: obj.length
         } as ExecutionResultOutputDataBase64;
     }
-    // Don't do dates
+
     // Don't do functions
-    if (typeof obj === 'function'){ console.warn('convertBinaryToBase64: Function serialization is not supported!');}
+    if (typeof obj === 'function')
+    { 
+        console.warn('convertBinaryToBase64: Function serialization is not supported!');
+    }
 
     // Handle original primitives
-    if (typeof obj !== 'object') { return obj;}
-    if (Array.isArray(obj)) {
-        return obj.map(item => convertBinaryToBase64(item, maxDepth, currentDepth + 1));
-    }
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-        // Skip non-enumerable properties and functions (unless explicitly handling them above)
-        if (typeof value === 'function') {
-            continue; // Skip functions in objects unless we want to serialize them
-        }
-        result[key] = convertBinaryToBase64(value, maxDepth, currentDepth + 1);
+    if (typeof obj !== 'object')
+    { 
+        return obj;
     }
 
-    return result;
+    // Arrays - resurse
+    if (Array.isArray(obj))
+    {
+        return obj.map(item => convertBinaryToBase64(item, maxDepth, currentDepth + 1));
+    }
+
+
+    // Object
+    if(typeof obj === 'object')
+    {
+        // Avoid any instances of classes
+        if (Object.getPrototypeOf(obj) !== Object.prototype)
+        {
+            console.warn('convertBinaryToBase64: Class instances are not supported! Returned null');
+            return null;
+        }
+
+        const result: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+            // Skip non-enumerable properties and functions (unless explicitly handling them above)
+            if (typeof value === 'function') {
+                continue; // Skip functions in objects unless we want to serialize them
+            }
+            result[key] = convertBinaryToBase64(value, maxDepth, currentDepth + 1);
+        }
+        return result;
+    }
+
+
+    
 }
 
 

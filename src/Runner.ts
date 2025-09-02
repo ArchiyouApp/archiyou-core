@@ -719,7 +719,6 @@ export class Runner
         const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
         params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
         // NOTE: in paramManager incoming values are validated and set to default if not valid
-        console.log(`**** _checkRequestParams(): Params: ${JSON.stringify(params)}`);
         
         // Make sure we have param values too (default if not set)
         request.params = params.reduce( (agg,p) => { agg[p.name] = p.value; return agg }, {}); 
@@ -1237,7 +1236,7 @@ ${context}
             outputs: outputs || this.DEFAULT_OUTPUTS, // default output
         };
         
-        console.log(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
+        console.info(`Runner::executeUrl(): Executing script from URL "${url}" with params ${JSON.stringify(request.params)}`);
 
         const r = await this.executeInStatements(request); // execute script in active scope
         return r;
@@ -1824,11 +1823,14 @@ ${context}
 
     
     _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
-        {
+    {
             Object.keys(resultsByName || {}).forEach((entityName) =>
             {   
                 if(!resultGroup[entityName]){ resultGroup[entityName] = {}; resultGroup[entityName][format] = {}; }
+                
                 resultGroup[entityName][format] = { options: {}, data: resultsByName[entityName] }; // TODO: do we need options? Rewrite needed if so
+
+                console.info(`Runner::_setFormatResults(): Set results for "${entityName}" in format "${format}" with data type ${ resultsByName[entityName]?.constructor?.name || typeof resultsByName[entityName]}`);
             });
     }
 

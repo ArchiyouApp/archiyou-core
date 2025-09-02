@@ -32,14 +32,14 @@ import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
             ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs, 
             isContainerPositionCoordAbs,
-            DocPDFExporter} from './internal' // classes
+            DocPDFExporter, ScriptParam} from './internal' // classes
 import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
 import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, DocGraphicInputRect, DocGraphicInputCircle, 
                 DocGraphicInputOrthoLine,
-                ContainerBlock, TitleBlockInput, LabelBlockOptions, Param, ScriptParamData, DocPipeline
+                ContainerBlock, TitleBlockInput, LabelBlockOptions, ScriptParamData, DocPipeline
             } from './internal'
 
 import { isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer, isWidthHeightInput, isContainerTableInput } from './internal' // typeguards
@@ -667,13 +667,8 @@ export class Doc
 
         const paramValues = this?._ay?.worker?._activeExecRequest?.params;
 
-
-
-
         const paramsWithValues = (Object.values(params) as Array<ScriptParam>)
                                 .map((p) => { return { ...p, value: paramValues[p.name] }})
-        
-        console.log(paramsWithValues);
         
         return paramsWithValues.map(p => {
             const paramName = p.label || p.name;
@@ -1130,7 +1125,7 @@ export class Doc
     /** Export selected or all DocDocuments to pdfs
      *  @returns {[key:string]: Blob} - key = doc name, value = pdf blob
      */
-    async toPDF(only:Array<string>|any=[]):Promise<Record<string, Blob>>
+    async toPDF(only:Array<string>|any=[]):Promise<Record<string, ArrayBuffer>>
     {
         const data = await this.toData(only);
         return await this._pdfExporter.export(data);
