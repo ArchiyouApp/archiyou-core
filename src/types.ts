@@ -1172,7 +1172,15 @@ export interface RunnerScriptExecutionRequest
     _onDone?: ((result:RunnerScriptExecutionResult) => any) // internal callback 
 }   
 
+//// SCRIPT OUTPUT MANAGER
 
+// WIP
+export type ScriptOutputCategory = 'model'|'metrics'|'tables'|'docs'
+export type ScriptOutputFormat = 'internal'; // basics
+export type ScriptOutputFormatModel = ScriptOutputFormat & 'brep'|'glb'|'step'|'stl'|'svg';
+export type ScriptOutputFormatMetric = ScriptOutputFormat & 'json'|'xls';
+export type ScriptOutputFormatTable = ScriptOutputFormat & 'json'|'xls';
+export type ScriptOutputFormatDoc = ScriptOutputFormat & 'json'|'pdf';
 
 // path-like structure defining what and how to calculate and output
 //  basic structure: {pipeline|default}/{entity}/{entity name or all=*}/{output format}?{options}

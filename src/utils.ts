@@ -58,7 +58,7 @@ export function paramToScriptParamData(param:ScriptParam|ScriptParamData):Script
     return ScriptParamData
 }
 
-//// Working with types ////
+//// WORKING WITH TYPES ////
 
 export function flattenEntitiesToArray(entities:any):Array<any>
 {
@@ -99,8 +99,8 @@ export function flattenEntities(arr:Array<any>)
 }
 
 
- 
-//// Working with numbers ////
+
+//// WORKING WITH NUMBERS ////
 
 // see: https://github.com/sindresorhus/round-to
 export function roundTo(number:number, precision:number):number
@@ -344,6 +344,21 @@ export function mmToPoints(m:number):number
 }
 
 //// DATA ENCODING ////
+
+ /**
+ * Convert a string value to its native type if possible.
+ * - "true"/"false" (case-insensitive) => boolean
+ * - Numeric strings => number
+ * - Otherwise, return as string
+ */
+export function convertStringValue(value: string): string | number | boolean {
+    if (typeof value !== 'string') return value;
+    const lower = value.toLowerCase();
+    if (lower === 'true') return true;
+    if (lower === 'false') return false;
+    if (!isNaN(Number(value)) && value.trim() !== '') return Number(value);
+    return value;
+}
 
 // taken from https://github.com/niklasvh/base64-arraybuffer/blob/master/src/index.ts
 export const arrayBufferToBase64 = (arraybuffer: ArrayBuffer): string => 

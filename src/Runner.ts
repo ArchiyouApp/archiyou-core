@@ -1837,7 +1837,7 @@ ${context}
     inNode():boolean
     {
         return (typeof process !== 'undefined' && process.versions?.node) ? true : false;
-    }
+    }isScriptOutputCategory
 
     /**
      * Convert a string value to its native type if possible.
