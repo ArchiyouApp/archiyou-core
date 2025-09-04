@@ -282,7 +282,7 @@ export interface RunnerScriptExecutionResult
     meta?: ScriptMeta, // meta information on the script execution
     
     // All outputs in flat array with request path and data
-    outputs?: Array<ScriptPathOutputData>
+    outputs?: Array<ScriptOutputPathData>
 }
 
 /** Results of component execution */
@@ -1184,23 +1184,14 @@ export type ScriptOutputFormatDoc = 'json'|'pdf';
 export type ScriptOutputFormat = ScriptOutputFormatInternal|ScriptOutputFormatModel|ScriptOutputFormatMetric|ScriptOutputFormatTable|ScriptOutputFormatDoc
 
 
-export interface ExecutionRequestOutputFormatGLTFOptions
-{
-    binary?:boolean // if true, output is binary glTF - default is true
-    data?:boolean // if true, output Archiyou data in glTF
-    metrics?:boolean // if data, include metric data in output
-    tables?:boolean // if data, include tables data in output
-    docs?:boolean // if data, incoutputs?: ExecutionResultOutputslude docs data in output
-    pointAndLines?:boolean // if true, output points and lines in glTF
-    shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
-}
 
-export interface ScriptPathOutputData
+export interface ScriptOutputPathData
 {
     path: ScriptOutputPath // original requested and resolved path
     warnings?: Array<string> // warnings if any
     data: ScriptOutputDataWrapper
 }
+
 
 /** Wraps different output data with information 
  *  TODO: see what is really needed
@@ -1214,6 +1205,17 @@ export interface ScriptOutputDataWrapper
     //mime?: string // mime type of data
     data: any|string|ArrayBuffer // internal, string (and base64) and ArrayBuffer for binary data
     //length?: number // length of data in bytes
+}
+
+export interface ExecutionRequestOutputFormatGLTFOptions
+{
+    binary?:boolean // if true, output is binary glTF - default is true
+    data?:boolean // if true, output Archiyou data in glTF
+    metrics?:boolean // if data, include metric data in output
+    tables?:boolean // if data, include tables data in output
+    docs?:boolean // if data, incoutputs?: ExecutionResultOutputslude docs data in output
+    pointAndLines?:boolean // if true, output points and lines in glTF
+    shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
 }
 
 /** For exporting raw binary data in base64 format 

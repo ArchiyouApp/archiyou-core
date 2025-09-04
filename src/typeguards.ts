@@ -17,6 +17,7 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           AnnotationAutoDimStrategy,
           RunnerScriptExecutionResult,
           RunnerScriptExecutionRequest,
+          ScriptOutputFormat
         } from './internal' // types
 
 import { ParamType, ScriptParam, ScriptParamData } from './internal'
@@ -28,7 +29,9 @@ import type { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPosi
             OrientationXY, ExecutionResultOutputDataBase64
         } from './internal' // NOTE: Position is a DOC type
 
-import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
+import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, 
+        SIDE_TO_AXIS, METRICS, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_METRIC_FORMATS, SCRIPT_OUTPUT_TABLE_FORMATS,
+    SCRIPT_OUTPUT_DOC_FORMATS } from './internal' // types
 
 import { isNumeric, isRelativeCoordString } from './internal'
 
@@ -574,6 +577,14 @@ export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutio
 }
 
 //// EXECUTION RESULTS ////
+
+export function isScriptOutputFormat(o:any): o is ScriptOutputFormat
+{
+    return SCRIPT_OUTPUT_MODEL_FORMATS.includes(o) 
+        || SCRIPT_OUTPUT_METRIC_FORMATS.includes(o)
+        || SCRIPT_OUTPUT_TABLE_FORMATS.includes(o)
+        || SCRIPT_OUTPUT_DOC_FORMATS.includes(o);
+}
 
 export function isExecutionResultOutputDataBase64(o:any): o is ExecutionResultOutputDataBase64
 {

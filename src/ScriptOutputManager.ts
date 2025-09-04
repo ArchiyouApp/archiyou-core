@@ -258,7 +258,6 @@ import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_ME
                                         // validate the entity name - otherwise return empty array - so next loop is skipped
                                         : (this._metaHasEntityName(meta, category as ScriptOutputCategory, this.entityName)) ? [this.entityName] : []; 
 
-                    console.log((this._metaHasEntityName(meta, category as ScriptOutputCategory, this.entityName)));
                     // give a warning if entity name is not valid
                     if(entities.length === 0)
                     {
@@ -306,7 +305,6 @@ import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_ME
         {
             this.resolvedPath += '?' + optionsKeys.map( (k) => `${k}=${this.formatOptions[k]}` ).join('&');
         }
-        console.log(`ScriptOutputPath::setResolved(): Resolved output path: "${this.rawPath}" to "${this.resolvedPath}"`);
         return this;
     }
     
