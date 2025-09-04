@@ -7,33 +7,31 @@
 */
  //      - default/models/glb: get the default model in GLB format with default options
  //      - default/models/dxf?2d: get the default model in DXF format with 2D options
- //      - 'default/docs/*/pdf' // get all documents in PDF format
- //      - [WIP] sketch/tables/*/*  // execute sketch pipeline and get all tables in all formats
+ //      - default/docs/*/pdf // get all documents in PDF format
+ //      - sketch/tables/*/*  // execute sketch pipeline and get all tables in all formats
  //      - [WIP] */*/*/* // execute all pipelines, all entities and all formats (for example for cache purposes)
  //
 
 
 import type { ArchiyouApp, ExportGLTFOptions, Statement, 
-                StatementResult, RunnerScriptScopeState, RunnerScript, ExecutionResultPipeline
+                StatementResult, RunnerScriptScopeState, ScriptOutputPath, ScriptOutputFormatModel, ScriptPathOutputData, ScriptOutputFormat
  } from "./internal"
 
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, 
-            RunnerScriptExecutionResult, CodeParser, LibraryConnector } from "./internal"
+            RunnerScriptExecutionResult, CodeParser, LibraryConnector, 
+            ScriptOutputManager} from "./internal"
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
 import { RunnerComponentImporter, DocDocument, Table } from "./internal"
 
-import { GEOM_METHODS_INTO_GLOBAL, EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL,
-    EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL
+import { GEOM_METHODS_INTO_GLOBAL, SCRIPT_OUTPUT_MODEL_FORMATS
  } from "./internal" // from constants
 
 
 import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
                 RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage, 
-                ExecutionRequestOutputPath, ExecutionRequestOutput, ExecutionResultOutput, ExecutionResultOutputs,
-                ExecutionRequestOutputFormat, ExecutionRequestOutputEntityGroup, 
                 PublishScript,
                 ScriptParamData, ExecutionRequestOutputFormatGLTFOptions, ScriptMeta} from "./internal"
 
@@ -66,7 +64,7 @@ export class Runner
     DEFAULT_OUTPUTS = ['default/model/glb']
     OUTPUT_FORMAT_DEFAULTS = {
         glb: { binary: true, data: true, metrics: true, docs: false, tables: true, pointAndLines: true, shapesAsPointAndLines: true } as ExecutionRequestOutputFormatGLTFOptions,
-    } as Record<ExecutionRequestOutputFormat, Record<string, any>>; // default output formats for each type
+    } as Record<ScriptOutputFormat, Record<string, any>>; // default output formats for each type
 
     /**
      *  Create a new Runner instance on main thread (as manager or single)
@@ -1224,7 +1222,7 @@ ${context}
     //// EXECUTION UTILS ////
 
     /** Execute from URL of Archiyou library */
-    async executeUrl(url:string, params?:Record<string,ScriptParamData>, outputs?:Array<ExecutionRequestOutputPath>):Promise<RunnerScriptExecutionResult>
+    async executeUrl(url:string, params?:Record<string,ScriptParamData>, outputs?:Array<string>):Promise<RunnerScriptExecutionResult>
     {
         const script = await this.getScriptFromUrl(url);
         if(!script){ throw new Error(`Runner::executeUrl(): Script not found at URL "${url}"`);}
@@ -1290,18 +1288,19 @@ ${context}
 
         // Basic Archiyou data
         result.scenegraph = scope.geom.scene.toGraph();
+
+        // Meta
+        this._addMetaToResult(scope, request, result);
         
-        // Outputs
+        // Outputs (needs to be after meta, because we need that info)
         if(request.outputs)
         {
-            result.outputs = await this.getLocalScopeResultOutputs(scope, request);
+            result.outputs = await this.getLocalScopeResultOutputs(scope, request, result.meta);
         }
         else {
             throw new Error(`Runner::getLocalScopeResults(): No outputs requested`);
         }
 
-        // Meta
-        this._addMetaToResult(scope, request, result);
 
         // Console messages
         if(request.messages && Array.isArray(result.messages))
@@ -1312,26 +1311,6 @@ ${context}
         return result;
     }
 
-    /**
-     * Get results out of local execution scope synchronously for Components
-     * For special cases like importing components we want to avoid async methods  */
-    getLocalScopeResultsComponent(scope:any, request:RunnerScriptExecutionRequest):RunnerScriptExecutionResult
-    {
-        const result = {} as RunnerScriptExecutionResult;
-
-        // Outputs
-        if(request.outputs)
-        {
-            console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
-            result.outputs = this.getLocalScopeResultOutputsInternal(scope, request);
-        }
-
-        // Meta
-        this._addMetaToResult(scope, request, result);
-
-        return result;
-    }
-    
 
     /** Get results from local execution scope based on 
      *  request.outputs paths
@@ -1339,14 +1318,15 @@ ${context}
      *  @scope - execution scope to get results from
      *  @request - execution request with outputs
     */
-    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest):Promise<ExecutionResultOutputs>
+    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest, meta:ScriptMeta):Promise<Array<ScriptPathOutputData>>
     {
-        const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
-        const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
+        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+
+        const pipelines = outputManager.getPipelines();
 
         console.info(`**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Available pipelines: ${pipelines.join(',')} ****`);
 
-        const resultTree = { state: {}, warnings: [], pipelines: {}} as ExecutionResultOutputs;
+        const outputs = [] as Array<ScriptPathOutputData>;
 
         for(let i = 0; i < pipelines.length; i++)
         {
@@ -1355,333 +1335,228 @@ ${context}
             // Default pipeline is already run, only run others
             if(pipeline !== 'default')
             {
+                // TODO: run specific pipeline
                 console.info(`'Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);                
                 console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
-                // TODO: run specific pipeline
+                
             }
 
-            // Gather results per pipeline
-            await this._exportPipelineModels(scope, request, pipeline, resultTree); 
-            await this._exportPipelineMetrics(scope, request, pipeline, resultTree); // no await needed, only internal formats
-            await this._exportPipelineTables(scope, request, pipeline, resultTree);
-            await this._exportPipelineDocs(scope, request, pipeline, resultTree);
-            
+            // Gather results per pipeline and add to array
+            outputs.push(...await this._exportPipelineModels(scope, request, pipeline, meta)); 
+            outputs.push(...await this._exportPipelineMetrics(scope, request, pipeline, meta));
+            outputs.push(...await this._exportPipelineTables(scope, request, pipeline, meta));
+            outputs.push(...await this._exportPipelineDocs(scope, request, pipeline, meta));
+
         };
 
-        return resultTree;
+        return outputs;
     }    
 
-    /** Parse output paths to create ExecutionRequestOutput objects */
-    _parseRequestOutputPaths(outputs:Array<ExecutionRequestOutputPath>):Array<ExecutionRequestOutput>
+    /**
+     * Get results out of local execution scope synchronously for Components
+     * For special cases like importing components we want to avoid async methods  */
+    getLocalScopeResultsComponent(scope:any, request:RunnerScriptExecutionRequest):RunnerScriptExecutionResult
     {
-        const requestOutputs = [] as Array<ExecutionRequestOutput>;
-        outputs.forEach((outputPath) => 
-        {   
-            const pathParts = outputPath.split('/');
+        const result = {} as RunnerScriptExecutionResult;
 
-            const isModel = outputPath.includes('model');
-            // default pipeline form: model/glb or docs/*/pdf
-            if((isModel && pathParts.length === 2) || (!isModel && pathParts.length === 3)) 
-            {
-                pathParts.unshift('default'); // add default pipeline 
-            }
+        // Meta
+        this._addMetaToResult(scope, request, result);
 
-            if((isModel && pathParts.length !== 3) || !isModel && pathParts.length !== 4)
-            { 
-                console.error(`Runner::_parseRequestOutputPaths(): Malformed output path "${outputPath}". Format should be {pipeline}/{model}/{format} or {pipeline}/{docs|tables}/{name}/{format}`);
-                return; // abort
-            }	
-
-            const pipeline = pathParts[0];
-            const entityGroup = pathParts[1]; 
-            const entityName = (!isModel) ? pathParts[2] : null; // name of entity or * (not used for model)
-            let outputFormat = pathParts[pathParts.length - 1]; // last part is the output format
-            const optionsString = outputFormat.split('?')[1] || ''; // options are in the last part of the path
-            
-            if(outputFormat.includes('?')){ outputFormat = outputFormat.split('?')[0];} // remove options from format
-
-            // Parse URL parameters like string ?param1=value1&param2=value2
-            const options = optionsString.replace('?', '').split('&').reduce((agg,v) => 
-            { 
-                if(v.length === 0){ return agg; } // skip empty values
-                agg[v.split('=')[0]] = this._convertStringValue(v.split('=')[1]) ?? true; // '&param=' => true 
-                return agg
-            }, {})
-
-            requestOutputs.push(
-                {
-                    path : outputPath,
-                    pipeline: pipeline,
-                    entityGroup: entityGroup,
-                    entityName: entityName,
-                    outputFormat: outputFormat,
-                    options: options    
-                } as ExecutionRequestOutput
-            );
-        });
-
-        return requestOutputs;
-    }
-
-    /** Check structure of result for an output per pipeline 
-     *  and return reference to entry where results can be placed */
-    _checkOutputsResultTree(result:ExecutionResultOutputs, pipeline:string): ExecutionResultPipeline
-    {   
-        let pipelineResult = result.pipelines[pipeline];
-        if(pipelineResult === undefined)
-        { 
-            result.pipelines[pipeline] = { model : {}, tables: {}, metrics: {}, docs: {} } as ExecutionResultPipeline; 
-            pipelineResult = result.pipelines[pipeline]; 
-        }
-        return pipelineResult; // return reference to pipeline result
-    }
-
-   
-    /** Get outputs for a specific pipeline, entity (metrics,docs,tables) */
-    _getOutputsByPipelineEntityFormats(request:RunnerScriptExecutionRequest, pipeline:string, entity:ExecutionRequestOutputEntityGroup, formats:Array<ExecutionRequestOutputFormat>=[]):Array<ExecutionRequestOutput>
-    {
-        let outputs = this._parseRequestOutputPaths(request.outputs)
-                            .filter(o => o.pipeline === pipeline && o.entityGroup === entity);
-        
-        // filters format
-        if(formats.length > 0)
+        // Outputs
+        if(request.outputs)
         {
-            outputs.forEach((o,i) => {
-                if(!formats.includes(o.outputFormat))
-                {
-                    console.warn(` !!!! Runner::_getDocsToExport(): Skipped unknown format "${o.outputFormat}" in requested output "${o.path}" !!!!`); 
-                }
-            })
-            outputs = outputs.filter(o => formats.includes(o.outputFormat));
+            console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
+            result.outputs = this.getLocalScopeResultOutputsInternal(scope, request, result.meta);
         }
+        return result;
+    }
 
+        
+    /** Export models from given scope, pipeline and using output paths in request.outputs and place in ExecutionResult tree */
+    async _exportPipelineModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Promise<Array<ScriptPathOutputData>>
+    {
+        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const outputPaths = outputManager.getOutputsByPipelineCategory(pipeline, 'model') as Array<ScriptOutputPath>;
+
+        const outputs = [] as Array<ScriptPathOutputData>;
+
+        for(let m = 0; m < outputPaths.length; m++)
+        {
+            const outputPath = outputPaths[m];
+
+            switch(outputPath.format as ScriptOutputFormatModel)
+            {
+                // NOTE: No internal here, use _exportPipelineModelsInternal()
+                case 'buffer':
+                    outputs.push({ 
+                            path: outputPath, 
+                            data: {
+                                data :scope.geom.scene.toMeshShapeBuffer()
+                            }
+                        } as ScriptPathOutputData);
+                    break;
+                case 'glb':
+                    // convert the flat ExecutionRequestOutputFormatGLTFOptions to ExportGLTFOptions (TODO: use one and the same type)
+                    const inOptions = outputPath?.formatOptions as ExecutionRequestOutputFormatGLTFOptions;
+                    const options = {
+                        binary: this.OUTPUT_FORMAT_DEFAULTS.glb.binary, // always binary for now
+                        archiyouFormat: inOptions?.data ?? this.OUTPUT_FORMAT_DEFAULTS.glb.data, 
+                        // quality leave default
+                        archiyouOutput: { 
+                            metrics: inOptions?.metrics ?? this.OUTPUT_FORMAT_DEFAULTS.glb.metrics, 
+                            docs: inOptions?.docs ?? this.OUTPUT_FORMAT_DEFAULTS.glb.docs, 
+                            tables: inOptions?.tables ?? this.OUTPUT_FORMAT_DEFAULTS.glb.tables 
+                        },
+                        includePointsAndLines: inOptions?.pointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.pointAndLines, // export points and lines
+                        extraShapesAsPointLines: inOptions?.shapesAsPointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.shapesAsPointAndLines, // export extra shapes as points and lines
+                    } as ExportGLTFOptions
+                    outputs.push({
+                        path: outputPath,
+                        data: {
+                            data: await scope.exporter.exportToGLTF(options) 
+                        }
+                        }); 
+                    break;
+                case 'svg':
+                    outputs.push({
+                        path:outputPath, 
+                        data: {
+                            data: scope.exporter.exportToSvg(false) 
+                        }
+                    });
+                    break;
+                default:
+                    console.error(`Runner::_getScopeRunnerScriptExecutionResult(): Skipped unknown model format "${outputPath.format}" in requested output "${outputPath.resolvedPath}"`); 
+            }
+            
+        }
         return outputs;
     }
 
-     
-    /** Export models from given scope, pipeline and using output paths in request.outputs and place in ExecutionResult tree */
-    async _exportPipelineModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
+
+    async _exportPipelineMetrics(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Promise<Array<ScriptPathOutputData>>
     {
-        const outputs = this._parseRequestOutputPaths(request.outputs)
-                        .filter(o => o.entityGroup === 'model' && o.pipeline === pipeline); // filter for models
+        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const outputPathsMetrics = outputManager.getOutputsByPipelineCategory(pipeline, 'metrics') as Array<ScriptOutputPath>;
 
-        for(let i = 0; i < outputs.length; i++)
-        {
-            const output = outputs[i];
-            const pipelineResultModel = this._checkOutputsResultTree(result, pipeline).model; // check if we need to create a new model entry in the result tree
-            
-            const outputFormats = (output.outputFormat === '*') ? EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL : [output.outputFormat];
-
-            for(let j = 0; j < outputFormats.length; j++)
-            {
-                const format = outputFormats[j];
-                console.info(`Runner::_exportPipelineModels(): Exporting "${output.path}"`);
-
-                switch(format)
-                {
-                    // NOTE: No internal here, use _exportPipelineModelsInternal()
-                    case 'buffer':
-                        pipelineResultModel.buffer = { options: output.options, data:  scope.geom.scene.toMeshShapeBuffer() };
-                        break;
-                    case 'glb':
-                        // convert the flat ExecutionRequestOutputFormatGLTFOptions to ExportGLTFOptions (TODO: use one and the same type)
-                        const inOptions = output?.options as ExecutionRequestOutputFormatGLTFOptions;
-                        const options = {
-                            binary: this.OUTPUT_FORMAT_DEFAULTS.glb.binary, // always binary for now
-                            archiyouFormat: inOptions?.data ?? this.OUTPUT_FORMAT_DEFAULTS.glb.data, 
-                            // quality leave default
-                            archiyouOutput: { 
-                                metrics: inOptions?.metrics ?? this.OUTPUT_FORMAT_DEFAULTS.glb.metrics, 
-                                docs: inOptions?.docs ?? this.OUTPUT_FORMAT_DEFAULTS.glb.docs, 
-                                tables: inOptions?.tables ?? this.OUTPUT_FORMAT_DEFAULTS.glb.tables 
-                            },
-                            includePointsAndLines: inOptions?.pointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.pointAndLines, // export points and lines
-                            extraShapesAsPointLines: inOptions?.shapesAsPointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.shapesAsPointAndLines, // export extra shapes as points and lines
-                        } as ExportGLTFOptions
-                        pipelineResultModel.glb = { options: output.options, data:  await scope.exporter.exportToGLTF(options) }; 
-                        break;
-                    case 'svg':
-                        pipelineResultModel.svg = { options: output.options, data:  scope.exporter.exportToSvg(false) }; // get SVG isometry
-                        break;
-                    default:
-                        console.error(`Runner::_getScopeRunnerScriptExecutionResult(): Skipped unknown model format "${output.outputFormat} in requested output "${output.path}"`); 
-                }
-            }
-        }
-        return result;
-    }
-
-
-    async _exportPipelineMetrics(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):Promise<ExecutionResultOutputs>
-    {
-        const EXPORT_FORMATS = ['json'];
-        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'metrics'); // get metrics to export for current pipeline
+        // real results
+        const outputs = [] as Array<ScriptPathOutputData>;
 
         // Check if we need anything to export for current request and pipeline
-        if(outputs.length === 0)
+        if(outputPathsMetrics.length === 0)
         { 
             console.info(`Runner::_exportPipelineMetrics(): No metrics to export`);
-            return result; // no metrics to export
+            return []; // no metrics to export
         } 
 
-        // Check and setup result data structure 
-        const pipelineResultMetrics = this._checkOutputsResultTree(result, pipeline).metrics; // check if pipeline result exists
-        
-        // Metrics are exported at the same time per format
-        for(let f =0; f < EXPORT_FORMATS.length; f++)
+        for (let m = 0; m < outputPathsMetrics.length; m++)
         {
-            const format = EXPORT_FORMATS[f];
-            // get unique metric names - this includes wildcard *
-            let onlyMetricNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); 
-
-            if(onlyMetricNames.length > 0)
+            const outputPathMetric = outputPathsMetrics[m];
+            // Now do export
+            switch (outputPathMetric.format)
             {
-                // if * is present, all metrics are selected
-                if(onlyMetricNames.includes('*')){ onlyMetricNames = null; } // if * is present, all metrics are selected
-
-                // if user requested a metric name that does not exist give a warning
-                onlyMetricNames?.forEach((metricName) => 
-                {
-                    if(!scope.calc.getMetricNames().includes(metricName))
-                    {
-                        console.warn(`Runner::_exportPipelineMetrics(): Skipped export of metric "${metricName}" in format "${format}" because it does not exist!`);
-                        result?.warnings?.push(`Skipped export of metric "${metricName}" in format "${format}" because it does not exist!`);
-                    }
-                });
-
-                // Now do export
-                switch (format)
-                {
                     case 'json':
-                        const metricsByName = scope.calc.toMetricsData(onlyMetricNames); // by name
-                        this._setFormatResults(pipelineResultMetrics, metricsByName, format); // set results in pipeline result tree
+                        outputs.push({
+                            path: outputPathMetric,
+                            data: {
+                                data: scope.calc.toMetricsData(outputPathMetric.entityName) // by name
+                            }
+                        });
                         break;
+                    // TODO: more
                     default:
-                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown metric export format "${format}"`);
-                }
+                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown metric export format "${outputPathMetric.format}"`);
             }
-            
-        };
-
-        return result;
+        }
+        return outputs;
     }
     
      
-    async _exportPipelineTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+    async _exportPipelineTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, meta:ScriptMeta): Promise<Array<ScriptPathOutputData>>
     {
-        
-        const EXPORT_FORMATS = ['json', 'xls'];
-
-        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'tables'); // all formats
+        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        // All table output paths for this pipeline
+        const outputPathsTables = outputManager.getOutputsByPipelineCategory(pipeline, 'tables') as Array<ScriptOutputPath>;
+        // real table outputs
+        const outputs = [] as Array<ScriptPathOutputData>;
 
         // Check if we need anything to export for current request and pipeline
         if(outputs.length === 0)
         { 
             console.info(`Runner::_exportPipelineTables(): No tables to export`);
-            return result;
+            return [];
         } 
-
-        // Check result data structure 
-        const pipelineResultTables = this._checkOutputsResultTree(result, pipeline).tables; // get reference to tables in pipeline result
         
-        // Tables are exported at the same time per format
-        for(let f =0; f < EXPORT_FORMATS.length; f++)
+        for (let t = 0; t < outputPathsTables.length; t++)
         {
-            const format = EXPORT_FORMATS[f];
-            let onlyTableNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); // get unique table names (also *)
-
-            if(onlyTableNames.length > 0)
+            const outputPathTable = outputPathsTables[t];
+            // Now do export
+            switch (outputPathTable.format)
             {
-                // if * is present, all tables are selected
-                if(onlyTableNames.includes('*')){ onlyTableNames = null; } // if * is present, all docs are selected
-
-                // if user requested a table name that does not exist give a warning
-                onlyTableNames?.forEach((tableName) => {
-                    if(!scope.calc.getTableNames().includes(tableName))
-                    {
-                        console.warn(`Runner::_exportPipelineTables(): Skipped export of table "${tableName}" in format "${format}" because it does not exist!`);
-                        result?.warnings?.push(`Skipped export of table "${tableName}" in format "${format}" because it does not exist!`);
-                    }
-                });
-
-                // Now do export
-                switch (format)
-                {
-                    case 'json':
-                        const tablesRawByName = scope.calc.toTableData(onlyTableNames);
-                        this._setFormatResults(pipelineResultTables,tablesRawByName, format); // set results in pipeline result tree
-                        break;
-                    case 'xls':
-                        console.warn(`Runner::_exportPipelineTables(): xls export not implemented yet`);
-                        break;
-                    default:
-                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown table export format "${format}"`);
-                }
+                case 'json':
+                    outputs.push({
+                        path: outputPathTable,
+                        data: {
+                            data: scope.calc.toTableData(outputPathTable.entityName) // by name
+                        }
+                    });
+                    break;
+                case 'xls':
+                    console.warn(`Runner::_exportPipelineTables(): xls export not implemented yet`);
+                    break;
+                default:
+                    throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown table export format "${outputPathTable.format}"`);
             }
-            
         };
 
-        return result;
+        return outputs;
     }
 
     
-    async _exportPipelineDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, result: ExecutionResultOutputs): Promise<ExecutionResultOutputs> 
+    async _exportPipelineDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, meta: ScriptMeta): Promise<Array<ScriptPathOutputData>>
     {
-        const EXPORT_FORMATS = ['json', 'pdf'];
+        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        // All table output paths for this pipeline
+        const outputPathsDocs = outputManager.getOutputsByPipelineCategory(pipeline, 'docs') as Array<ScriptOutputPath>;
+        // real doc outputs
+        const outputs = [] as Array<ScriptPathOutputData>;
 
-        // TODO: centrally define what can be outputted
-        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs', ['json', 'pdf']); // get docs to export for current pipeline
-
-        // Check if we need anything to export for current request and pipeline
-        if(outputs.length === 0)
+        // Check if we need anything to export for current pipeline and tables
+        if(outputPathsDocs.length === 0)
         { 
             console.info(`Runner::_exportPipelineDocs(): No docs to export`);
-            return result; // no docs to export
+            return []; // no docs to export
         } 
-
-        // Check and setup result data structure 
-        const pipelineResultDocs = this._checkOutputsResultTree(result, pipeline).docs; // check if pipeline result exists
         
         // Now generate the docs
-        // Docs are exported at the same time per format
-        for(let f =0; f < EXPORT_FORMATS.length; f++)
+        for(let d = 0; d < outputPathsDocs.length; d++)
         {
-            const format = EXPORT_FORMATS[f];
-            let onlyDocNames = Array.from(new Set(outputs.filter(o => o.outputFormat === format).map(o => o.entityName))); // get unique doc names
-
-            if(onlyDocNames.length > 0) // if user requested this format
+            const outputPathDoc = outputPathsDocs[d];
+            // Now do export
+            switch (outputPathDoc.format)
             {
-                // if * is present, all docs are selected
-                if(onlyDocNames.includes('*')){ onlyDocNames = []; } // if * is present, all docs are selected
-
-                // Some sanity checks - if user requested a doc name that does not exist give a warning
-                onlyDocNames.forEach((docName) => {
-                    if(!scope.doc.docs().includes(docName))
-                    {
-                        console.warn(`Runner::_exportPipelineDocs(): Skipped export of doc "${docName}" in format "${format}" because it does not exist!`);
-                        result?.warnings?.push(`Skipped export of doc "${docName}" in format "${format}" because it does not exist!`);
-                    }
-                });                
-
-                // Now do export
-                switch (format)
-                {
-                    case 'json':
-                        const docsRawByName = await scope.doc.toData(onlyDocNames);
-                        this._setFormatResults(pipelineResultDocs,docsRawByName, format); // set results in pipeline result tree
-                        break;
-                    case 'pdf':
-                        const docsPdfByName = await scope.doc.toPDF(onlyDocNames);
-                        this._setFormatResults(pipelineResultDocs,docsPdfByName, format);
-                        break;
-                    default:
-                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown doc export format "${format}"`);
-                }
+                case 'json':
+                    outputs.push({
+                        path:outputPathDoc,
+                        data: {
+                            data: await scope.doc.toData(outputPathDoc.entityName),
+                        }
+                    });
+                    break;
+                case 'pdf':
+                    outputs.push({
+                        path: outputPathDoc,
+                        data: {
+                            data: await scope.doc.toPDF(outputPathDoc.entityName),
+                        }
+                    });
+                    break;
+                default:
+                        throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown doc export format "${outputPathDoc.format}"`);
             }
-            
         };
 
-        return result;
+        return outputs;
     }
 
   
@@ -1690,14 +1565,14 @@ ${context}
     /** Get internal outputs synchronously per pipeline
      *  Iterate from outputs and run pipelines where needed
     */
-    getLocalScopeResultOutputsInternal(scope:any, request:RunnerScriptExecutionRequest):ExecutionResultOutputs
+    getLocalScopeResultOutputsInternal(scope:any, request:RunnerScriptExecutionRequest, meta:ScriptMeta):Array<ScriptPathOutputData>
     {
-        const requestedOutputs = this._parseRequestOutputPaths(request.outputs);
-        const pipelines = Array.from(new Set(requestedOutputs.map(o => o.pipeline))); // pipelines to run
+        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const pipelines = outputManager.getPipelines();
 
         console.info(`Runner::getLocalScopeResultOutputsInternal(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
 
-        const pipelineResultTree = { state: {}, warnings: [], pipelines: {}} as ExecutionResultOutputs;
+        const outputs = [] as Array<ScriptPathOutputData>;
 
         for(let i = 0; i < pipelines.length; i++)
         {
@@ -1712,132 +1587,137 @@ ${context}
             }
 
             // Gather raw results from pipeline
-            this._exportPipelineModelsInternal(scope, request, pipeline, pipelineResultTree); 
-            this._exportPipelineMetricsInternal(scope, request, pipeline, pipelineResultTree);
-            this._exportPipelineTablesInternal(scope,request, pipeline, pipelineResultTree);
-            this._exportPipelineDocsInternal(scope, request, pipeline, pipelineResultTree);
+            this._exportPipelineModelsInternal(scope, request, pipeline, meta);
+            this._exportPipelineMetricsInternal(scope, request, pipeline, meta);
+            this._exportPipelineTablesInternal(scope,request, pipeline, meta);
+            this._exportPipelineDocsInternal(scope, request, pipeline, meta);
         };
 
-        return pipelineResultTree;
+        return outputs;
     }
 
     /** Get internal Obj/Shape model data from local execution scope */
-    _exportPipelineModelsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    _exportPipelineModelsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptPathOutputData>
     {
-        const outputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'model', ['internal']); // get models to export for current pipeline
+        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputPaths = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'model', ['internal']); // get the models to export for current pipeline
 
-        for(let i = 0; i < outputs.length; i++)
+        const outputs = [] as Array<ScriptPathOutputData>;
+
+        for(let i = 0; i < outputPaths.length; i++)
         {
-            const output = outputs[i];
-            const pipelineResultModel = this._checkOutputsResultTree(result, pipeline).model; // check result structure
-            
-            pipelineResultModel.internal = { 
-                options: output.options,
-                data: scope.geom.scene.toComponentGraph(request.component) 
-            }; // data tree with raw shapes - to be recreated in main scope scene
+            const outputPath = outputPaths[i];
+
+            outputs.push({
+                path: outputPath,
+                data: {
+                    data: scope.geom.scene.toComponentGraph(request.component)
+                }
+            })
         }
-        return result;
+        return outputs;
     }
 
     /** Get internal Metric data from local execution scope and set in result tree */
-    _exportPipelineMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    _exportPipelineMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptPathOutputData>
     {
-        const pipelineMetricOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'metrics', ['internal']);
-        const pipelineMetricResults = this._checkOutputsResultTree(result, pipeline).metrics; // make sure result structure exists
+        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputPathsForMetrics = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'metrics', ['internal']); // get the metrics to export for current pipeline
+        const outputs = [] as Array<ScriptPathOutputData>;
 
-        const metricsToExport = Array.from(new Set(pipelineMetricOutputs.map(o => o.entityName))); // get unique metric names
+        const metricsToExport = Array.from(new Set(outputPathsForMetrics.map(o => o.entityName))); // get unique metric names
         const metrics = (scope.calc as Calc).getMetrics(metricsToExport);
+
         metrics.forEach((metric) => 
         {
-            pipelineMetricResults[metric.name] = {
-                internal : {
-                    options: {},
-                    data: metric // get internal metric data by name of metric
-                }
-            }; 
             // To keep track that this Metric instance came from the component
-            metric._component = request?.component; 
+            metric._component = request?.component;
 
-            console.info(`Runner::_exportPipelineMetricsInternal(): Exported metrics ${JSON.stringify(pipelineMetricResults[metric.name].internal.data)} of Pipeline "${pipeline}"`);
-        });
-        
-        return result;
-    }
- 
-    /** Get internal Doc data from local execution scope and set in result tree */
-    _exportPipelineDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
-    {
-        const pipelineDocOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'docs', ['internal']); // get docs to export for current pipeline
-        const pipelineDocResults = this._checkOutputsResultTree(result, pipeline).docs; // make sure result structure exists
-
-        // what documents to output
-        const docsToExport = Array.from(new Set(pipelineDocOutputs.map(o => o.entityName))); // get unique doc names
-        // NOTE: toData() is raw data, we need to export internal data
-        const docs = scope.doc.getDocs(docsToExport) as Array<DocDocument>
-        docs.forEach((doc) => {
-            // Set internal doc data in result in path pipelines/docname/internal
-            pipelineDocResults[doc.name] = {
-                internal: {
-                    options: {},
-                    data: doc
+            outputs.push({
+                path: outputPathsForMetrics.find(o => o.entityName === metric.name),
+                data: {
+                    data: metric
                 }
-            }
-            // To keep track that this DocDocument instance came from a component
-            doc._component = request?.component;
+            });
         });
-        
-        console.info(`Runner::_exportPipelineDocsInternal(): Exported ${Object.keys(pipelineDocResults).length} docs of Pipeline "${pipeline}" with output request: ${docsToExport.join(', ')}`);           
-        
-        return result;
+
+        console.info(`Runner::_exportPipelineMetricsInternal(): Exported metrics ${JSON.stringify(outputs)} of Pipeline "${pipeline}"`);
+
+        return outputs;
     }
+
 
     /** Get internal Table data from local execution scope and set in result tree */
-    _exportPipelineTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:ExecutionResultOutputs):ExecutionResultOutputs
+    _exportPipelineTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptPathOutputData>
     {
-        const pipelineTableOutputs = this._getOutputsByPipelineEntityFormats(request, pipeline, 'tables', ['internal']); // get docs to export for current pipeline
-        const pipelineTableResults = this._checkOutputsResultTree(result, pipeline).tables; // make sure result structure exists
-
-        const tablesToExport = Array.from(new Set(pipelineTableOutputs.map(o => o.entityName))); // get unique table names
-        const tables = scope.calc.getTables(tablesToExport) as Array<Table>;
-        tables.forEach((table) => 
+        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        // Get all table outputs for this pipeline in internal format
+        const outputPathsForTables = outputManager.getOutputsByPipelineCategory(pipeline, 'tables') as Array<ScriptOutputPath>;
+        
+        if(outputPathsForTables.length === 0)
         {
-            // Set internal table data in result in path pipelines/name/internal
-            pipelineTableResults[table._name] = {
-                internal :
-                {
-                    options: {},
-                    data: table.toData() // table instance with all data
-                }
-            }
+            console.info(`Runner::_exportPipelineTablesInternal(): No tables to export`);
+            return []; // no tables to export
+        }
+
+        // Filter out doubles
+        const outputs = [] as Array<ScriptPathOutputData>;
+        
+        outputPathsForTables.forEach((path) => 
+        {
+            const table = scope.calc.getTable(path.entityName);
             // To keep track that this Table instance came from a component
             table._component = request?.component; // set component name on table instance
+            
+            outputs.push({
+                path: path,
+                data: {
+                    data: table // get table by name
+                }
+            });
+
         });
-        
-        console.info(`Runner::_exportPipelineTablesInternal(): Exported ${Object.keys(pipelineTableResults).length} tables of Pipeline "${pipeline}" with output request: "${tablesToExport.join(', ')}"`);           
-        
-        return result;
+
+        console.info(`Runner::_exportPipelineTablesInternal(): Exported ${outputs.length} tables of Pipeline "${pipeline}" with output request: "${outputPathsForTables.map(o => o.entityName).join(', ')}"`);
+
+        return outputs;
     }
+
+ 
+    /** Get internal Doc data from local execution scope and set in result tree */
+    _exportPipelineDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptPathOutputData>
+    {
+        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputPathsForDocs = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'docs', ['internal']); // get the docs to export for current pipeline
+        const outputs = [] as Array<ScriptPathOutputData>;
+
+        // what documents to output
+        // NOTE: toData() is raw data, we need to export internal data
+        
+        outputPathsForDocs.forEach((pathDoc) => {
+            const doc = scope.doc.getDoc(pathDoc.entityName)
+            // To keep track that this DocDocument instance came from a component
+            doc._component = request?.component;
+            // Set internal doc data in result in path pipelines/docname/internal
+            outputs.push({
+                path: pathDoc,
+                data: { data: doc }
+            });
+            
+        });
+
+        console.info(`Runner::_exportPipelineDocsInternal(): Exported ${outputs.length} docs of Pipeline "${pipeline}" with output request: ${outputPathsForDocs.map(d => d.entityName).join(', ')}`);
+        return outputs;
+    }
+
 
 
     //// UTILS ////
 
-    
-    _setFormatResults = (resultGroup:Record<string,any>, resultsByName:Record<string,any>, format:ExecutionRequestOutputFormat) => 
-    {
-            Object.keys(resultsByName || {}).forEach((entityName) =>
-            {   
-                if(!resultGroup[entityName]){ resultGroup[entityName] = {}; resultGroup[entityName][format] = {}; }
-                
-                resultGroup[entityName][format] = { options: {}, data: resultsByName[entityName] }; // TODO: do we need options? Rewrite needed if so
-
-                console.info(`Runner::_setFormatResults(): Set results for "${entityName}" in format "${format}" with data type ${ resultsByName[entityName]?.constructor?.name || typeof resultsByName[entityName]}`);
-            });
-    }
-
     inNode():boolean
     {
         return (typeof process !== 'undefined' && process.versions?.node) ? true : false;
-    }isScriptOutputCategory
+    }
 
     /**
      * Convert a string value to its native type if possible.

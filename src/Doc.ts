@@ -1073,6 +1073,12 @@ export class Doc
         return this._docs.map(doc => doc.name);
     }
 
+    getDoc(name:string):DocDocument|null
+    {
+        const doc = this._docs.find(d => d.name === name);
+        return doc || null;
+    }
+
     getDocs(only:Array<string>|any=[]):Array<DocDocument>
     {
         // checks

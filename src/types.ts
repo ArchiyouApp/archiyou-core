@@ -5,7 +5,7 @@ import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell,
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, 
             Exporter, Make, Calc, View, Table } from './internal'
 
-import type { ScriptParamData } from './internal'
+import type { ScriptOutputPath, ScriptParamData } from './internal'
 
 import { Console } from './Console'
 
@@ -281,8 +281,8 @@ export interface RunnerScriptExecutionResult
 
     meta?: ScriptMeta, // meta information on the script execution
     
-    // All outputs in clear structure
-    outputs?: ExecutionResultOutputs
+    // All outputs in flat array with request path and data
+    outputs?: Array<ScriptPathOutputData>
 }
 
 /** Results of component execution */
@@ -1164,7 +1164,7 @@ export interface RunnerScriptExecutionRequest
     variantId?:string // hash of param values for identifying unique requests - is filled in on submission
     mode?: 'main'|'component'
     // What to calculate and output
-    outputs?: Array<ExecutionRequestOutputPath>
+    outputs?: Array<string> // requested output paths
     cache?:boolean // enable caching. Default is true
     messages?:Array<ConsoleMessageType>; // output messages of given types
     forceFileResponse?:boolean // if true, force response as file download (either single file or multiple files in zip)
@@ -1174,50 +1174,15 @@ export interface RunnerScriptExecutionRequest
 
 //// SCRIPT OUTPUT MANAGER
 
-// WIP
 export type ScriptOutputCategory = 'model'|'metrics'|'tables'|'docs'
-export type ScriptOutputFormat = 'internal'; // basics
-export type ScriptOutputFormatModel = ScriptOutputFormat & 'brep'|'glb'|'step'|'stl'|'svg';
-export type ScriptOutputFormatMetric = ScriptOutputFormat & 'json'|'xls';
-export type ScriptOutputFormatTable = ScriptOutputFormat & 'json'|'xls';
-export type ScriptOutputFormatDoc = ScriptOutputFormat & 'json'|'pdf';
+export type ScriptOutputFormatInternal = 'internal'; // basics
 
-// path-like structure defining what and how to calculate and output
-//  basic structure: {pipeline|default}/{entity}/{entity name or all=*}/{output format}?{options}
-//  examples: 
-//      - default/model/glb (or model/glb)
-//      - default/model/glb?data=true&metrics=false
-//      - default/tables/*/xls 
-//      - cnc/model/dxf?2d 
-//      - default/docs/spec/pdf
-//
-export type ExecutionRequestOutputPath = string;
-export type ExecutionRequestOutputEntityGroup = 'model'|'metrics'|'tables'|'docs';
-/* 
-    Any data that is exchanged between Runner Execution scope and other (internal or external) systems
+export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'; // TODO:brep,dxf
+export type ScriptOutputFormatMetric = 'json'|'xls';
+export type ScriptOutputFormatTable = 'json'|'xls';
+export type ScriptOutputFormatDoc = 'json'|'pdf';
+export type ScriptOutputFormat = ScriptOutputFormatInternal|ScriptOutputFormatModel|ScriptOutputFormatMetric|ScriptOutputFormatTable|ScriptOutputFormatDoc
 
-    internal is data direct from local system (so instances, Obj/Shapes etc): only for use with shared context
-    json is JSON serializable data, 
-    buffer is vertex buffer for editor viewer, 
-    glb is binary glTF, 
-    svg is 2D SVG, 
-    step is STEP file, 
-    stl is STL file, 
-    pdf is PDF file, 
-    xls is Excel file
-*/
-export type ExecutionRequestOutputFormat = 'internal'|'json'|'buffer'|'glb'|'svg'|'step'|'stl'|'pdf'|'xls'|'*'; // TODO: * = export all formats
-
-
-export interface ExecutionRequestOutput 
-{
-    path:string // original path
-    pipeline?:string // pipeline name (default)
-    entityGroup?:ExecutionRequestOutputEntityGroup
-    entityName?:string // name or entity or * for all
-    outputFormat?:ExecutionRequestOutputFormat
-    options?:Record<string,any>|ExecutionRequestOutputFormatGLTFOptions // options for output format (default)
-}
 
 export interface ExecutionRequestOutputFormatGLTFOptions
 {
@@ -1230,38 +1195,25 @@ export interface ExecutionRequestOutputFormatGLTFOptions
     shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
 }
 
-
-/* Total execution result tree 
-    example: 
-    {
-        state: { ... },
-        pipelines: 
-    	{
-		    cnc: 
-            {
-                model: 
-                {
-                    dxf : 
-                    { 
-                        options: {},
-                        data: ....					
-                    }
-                }   
-            }		
-		}
-	}
-*/
-export interface ExecutionResultOutputs
+export interface ScriptPathOutputData
 {
-    state?: any // TODO
-    warnings: Array<string>, // simple messages
-    pipelines?:Record<string, ExecutionResultPipeline>
+    path: ScriptOutputPath // original requested and resolved path
+    warnings?: Array<string> // warnings if any
+    data: ScriptOutputDataWrapper
 }
 
-export interface ExecutionResultOutput
+/** Wraps different output data with information 
+ *  TODO: see what is really needed
+*/
+export interface ScriptOutputDataWrapper
 {
-    options?: Record<string,any> // TODO?
-    data: any|string|ArrayBuffer|ExecutionResultOutputDataBase64 // raw internal, string (and base64) and ArrayBuffer
+    // type of data in string - used to decode/encode 
+    //type?: string|'ArrayBuffer'|'Uint8Array'|'Uint16Array'|'Uint32Array'|'Int8Array'|
+    //            'Int16Array'|'Int32Array'|'Float32Array'|'Float64Array'|'Buffer' // original data type
+    //binary?:boolean // if true, data is binary format
+    //mime?: string // mime type of data
+    data: any|string|ArrayBuffer // internal, string (and base64) and ArrayBuffer for binary data
+    //length?: number // length of data in bytes
 }
 
 /** For exporting raw binary data in base64 format 
@@ -1274,22 +1226,6 @@ export interface ExecutionResultOutputDataBase64
     data: string // base64 encoded data string
     length: number // length of data in bytes
 }
-
-// outputs of a pipeline
-// { model: { 
-//              glb: { options: ..., data: ... } 
-//           }, 
-//   docs: { testdoc : pdf : { options: {}, data: ... } }, tables }
-export interface ExecutionResultPipeline 
-{
-    model?:Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>>|null // {outputformat}.{options, data}
-    metrics?: Record<ExecutionRequestOutputFormat,ExecutionResultOutput> // {name}.{outputformat}.{options, data} - metrics per pipeline
-    tables?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
-    docs?: ExecutionResultPipelineNamed // {name}.{outputformat}.{options, data}
-}
-
-export type ExecutionResultPipelineNamed =  Partial<Record<string, // name of doc or table
-                                                    Partial<Record<ExecutionRequestOutputFormat, ExecutionResultOutput>>>>
 
 
 /** Message from Worker to Manager */

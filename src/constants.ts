@@ -9,7 +9,15 @@ import { DocPathStyle } from './internal'
 export const USE_GARBAGE_COLLECTION = false; // if true, we will use garbage collection for OpenCascade objects
 export const SHAPE_CACHE_ENABLED = false;
 
-//// MISC SETTINGS
+//// EXECUTION AND OUTPUT SETTINGS ////
+
+export const SCRIPT_OUTPUT_CATEGORIES = ['model','metrics','tables','docs'] // see types: ScriptOutputCategory
+export const SCRIPT_OUTPUT_MODEL_FORMATS = ['glb','step','stl','svg'] // see types: ScriptOutputModelFormat
+export const SCRIPT_OUTPUT_METRIC_FORMATS = ['json','xls'] // see types: ScriptOutputMetricFormat
+export const SCRIPT_OUTPUT_TABLE_FORMATS = ['json','xls'] // see types: ScriptOutputTableFormat
+export const SCRIPT_OUTPUT_DOC_FORMATS = ['json','pdf'] // see types: ScriptOutputDocFormat
+
+//// MESH SETTINGS
 
 export const MESHING_MAX_DEVIATION = 0.1;
 export const MESHING_ANGULAR_DEFLECTION = 0.5;
@@ -98,9 +106,6 @@ export const DOC_DIMENSION_LINES_TEXT_HEIGHT = 2.5; // in mm
 export const DOC_CONTAINER_TITLE_TEXT_HEIGHT = 6; // in mm
 export const DOC_CONTAINER_CAPTION_TEXT_HEIGHT = 3; // in mm
 export const DOC_CONTAINER_CAPTION_TEXT_PADDING_FACTOR = 2; // applied to text height
-
-export const EXECUTE_OUTPUT_MODEL_FORMATS_DEFAULT_ALL = ['glb', 'stl', 'step', 'svg']; // TODO: more
-export const EXECUTE_OUTPUT_DOC_FORMATS_DEFAULT_ALL = ['json','pdf']; // TODO: more
 
 
 //// DRAWING STYLES

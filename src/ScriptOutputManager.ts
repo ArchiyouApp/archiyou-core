@@ -31,7 +31,7 @@
  *  So for example:
  *   - default/model/glb?data=true - run default pipeline and export scene as GLTF binary while exporting extra data
  *   - cnc/model/dxf?flatten
- *   - default/metrics/internal - internal are the raw internal values (used for in-scope communition)
+ *   - default/metrics/internal - internal are the rawPath internal values (used for in-scope communition)
  *   - default/tables/parts/xls
  *   - default/docs/spec/pdf
  *  
@@ -47,54 +47,101 @@
  *   1. Any wildcards are resolved (using a script meta property containing the available pipelines, metrics, tables and docs )
  *   2. All the requested data is extracted from the execution scope (see Runner.ts)
  *
- *
  */
 
  import type { ScriptOutputCategory, ScriptOutputFormatModel, ScriptOutputFormatMetric,
-            ScriptOutputFormatTable, ScriptOutputFormatDoc, ScriptMeta
+            ScriptOutputFormatTable, ScriptOutputFormatDoc, ScriptMeta,
+            RunnerScriptExecutionRequest
   } from './internal'
 
  import { convertStringValue } from './internal'
+import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_METRIC_FORMATS,
+         SCRIPT_OUTPUT_TABLE_FORMATS, SCRIPT_OUTPUT_DOC_FORMATS } from './constants';
 
- class ScriptOutputManager
+ export class ScriptOutputManager
  {
-    requestedOutputs: Array<ScriptOutput> = [] // unresolved output requests paths
-    resolvedOutputs: Array<ScriptOutput> = []  // resolved output requests paths
+    requestedOutputPaths: Array<ScriptOutputPath> = [] // unresolved output requests paths
+    resolvedOutputsPaths: Array<ScriptOutputPath> = []  // resolved output requests paths
 
     constructor()
     {
         
     }
 
-    public request(outputs:Array<string>)
+    /** Load incoming request that contains output request paths 
+     *  @returns number of valid (resolved) output paths generated 
+    */
+    public loadRequest(request:RunnerScriptExecutionRequest, meta:ScriptMeta):this
     {
+        const requestedOutputPaths = Array.isArray(request.outputs) ? request.outputs : [];
+        if(requestedOutputPaths.length === 0)
+        { 
+            console.warn(`ScriptOutputManager::loadRequest(): Request has no output paths!`);
+            return this;
+        }
+        requestedOutputPaths.forEach( (path) => 
+        {
+            const output = new ScriptOutputPath(path);
+            if(output.valid)
+            {
+                this.requestedOutputPaths.push(output);
+            }
+            else 
+            {
+                console.warn(`ScriptOutputManager::loadRequest(): Ignoring invalid output path: "${path}"`);
+            }
+        });
+        // Resolve wildcards in the requested outputs
+        this.requestedOutputPaths.forEach( (output) => 
+        {
+            this.resolvedOutputsPaths = []; // reset
+            this.resolvedOutputsPaths.push(...output.resolve(meta) );
+        });
 
+        return this;
     }
 
-    private _parseOutputPaths()
-    {
+    //// GET RESULTS FROM PARSED OUTPUTS ////
 
+    public getPipelines():Array<string>
+    {
+        return Array.from(new Set(this.resolvedOutputsPaths.map(o => o.pipeline)));
     }
 
+    public getOutputsByPipeline(pipeline:string):Array<ScriptOutputPath>
+    {
+        return this.resolvedOutputsPaths.filter(o => o.pipeline === pipeline);
+    }
+    
+    public getOutputsByPipelineCategory(pipeline:string, category:ScriptOutputCategory):Array<ScriptOutputPath>
+    {
+        return this.resolvedOutputsPaths.filter(o => o.pipeline === pipeline && o.category === category);
+    }
+
+    public getOutputsByPipelineEntityFormats(pipeline:string, category:ScriptOutputCategory, formats:Array<string>):Array<ScriptOutputPath>
+    {
+        return this.resolvedOutputsPaths.filter(o => o.pipeline === pipeline && o.category === category && formats.includes(o.format as string) );
+    }
 
 
  }
 
- class ScriptOutput
+ export class ScriptOutputPath
  {
-    public raw: string; // original output path
+    public rawPath: string; // original output path
+    public resolvedPath: string; // resolved path without wildcards
     public valid: boolean;
     public resolved:boolean; // doesn't contain any wildcards anymore
     public pipeline:null|string;
-    public category:null|ScriptOutputCategory;
-    public entityName:null|string; // name of metric, table or doc
-    public format: null|ScriptOutputFormatModel | ScriptOutputFormatMetric | ScriptOutputFormatTable | ScriptOutputFormatDoc|null;
+    public category:null|'*'|ScriptOutputCategory;
+    public entityName:null|'*'|string; // name of metric, table or doc
+    public format: null|'*'|ScriptOutputFormatModel | ScriptOutputFormatMetric | ScriptOutputFormatTable | ScriptOutputFormatDoc|null;
     public formatOptions: Record<string, any>; // TODO: TS typing
 
     constructor(outputPath:string)
     {
         // parse a string like 'default/model/glb?data=true'
-        this.raw = outputPath;
+        this.rawPath = outputPath;
         const PATH_REGEX = /^(?<pipeline>[^\/]+)\/(?<category>[^\/]+)(?:\/(?<entity>[^\/]+))?\/(?<format>[^\/\?]+)(?:\?(?<options>.*))?$/;
         const match = outputPath.match(PATH_REGEX);
 
@@ -105,39 +152,210 @@
         else 
         {
             this.pipeline = match.groups.pipeline;
-            this.category = isScriptOutputCategory(match.groups.category) ? match.groups.category : null;
+
+            if(match.groups.format === '*' || isScriptOutputCategory(match.groups.category))
+            {
+                this.category = match.groups.category as ScriptOutputCategory | '*';
+            }
+            else
+            {
+                console.error(`ScriptOutput::constructor(): Invalid output category "${match.groups.category}" in path: "${outputPath}. Valid ones: ${SCRIPT_OUTPUT_CATEGORIES.join(', ')}"`);
+                this.category = null;
+            }
+
             this.entityName = match.groups.entity;
-            this.format = isScriptOutputFormat(match.groups.format) ? match.groups.format : null;
+
+            if(match.groups.format === '*' || isScriptOutputFormat(match.groups.format))
+            {
+                this.format = match.groups.format;
+            } 
+            else 
+            {
+                console.error(`ScriptOutput::constructor(): Invalid output format "${match.groups.format}" in path: "${outputPath}"`);
+                this.format = null;
+            }
+
             this.formatOptions = this._parseFormatOptions(match.groups.options);
             
             this._validate();
         }
     }
 
+    copy():ScriptOutputPath
+    {
+        return new ScriptOutputPath(this.rawPath);
+    }
+
     private _validate(): boolean
     {
         if (!this.pipeline || !this.category || !this.format)
         {
-            console.warn(`ScriptOutput::validate(): Output path "${this.raw}" is missing required fields!`);
-            this.valid = false;
-            return false;
+            console.warn(`ScriptOutputPath::validate(): Output path "${this.rawPath}" is missing required fields!`);
+            return this.valid = false;
         }
+
+        // For now only allow wildcards for categories, entities and formats 
+        if(this.pipeline.includes('*'))
+        {
+            console.warn(`ScriptOutputPath::wildCardsAt(): Wildcards in pipeline names are not supported! (${this.rawPath})`);
+            return this.valid = false;
+        }
+        
         this.valid = true;
         return true;
     }
 
-    //// RESOLVING WILDCARDS ////
-
-    /** Resolve any wildcards by filling in the entity names
-     * return one or multiple new Script Output instances */
-    public resolve(meta: ScriptMeta): Array<this>
+    private checkValid():boolean
     {
-        // TODO
+        if(!this.valid)
+        { 
+            console.warn(`ScriptOutputPath::resolve(): Cannot process output path: "${this.rawPath}"`);
+        }
+        return this.valid;
     }
 
-    public setResolved()
+    //// RESOLVING WILDCARDS ////
+
+    /** Resolve any wildcards in request output path by filling in the entity names
+     * return one or multiple new Script Output instances */
+    public resolve(meta: ScriptMeta): Array<ScriptOutputPath>
+    {
+        if(this.checkValid())
+        {
+            // No wildcards
+            if(!this.hasWildCard())
+            {
+                // check entity name
+                if (this.category !== 'model' && !this._metaHasEntityName(meta, this.category as ScriptOutputCategory, this.entityName))
+                {
+                    console.warn(`ScriptOutputPath::resolve(): Invalid entity name "${this.entityName}" for category "${this.category}". Skipped!`);
+                    return [];
+                }
+                return [this.copy().setResolved()]; // No wildcards, return copy of self
+            }
+
+            // Make a big resolve loop
+            const wildcardsAt = this.wildCardsAt();
+            const resolvedOutputsPaths: Array<ScriptOutputPath> = [];
+            const categories = wildcardsAt.includes('category') 
+                                ? ['model','metrics','tables','docs'] as Array<ScriptOutputCategory> 
+                                : [this.category];
+
+            categories.forEach((category) =>
+            {
+                const resolvedOutputOfCategory = this.copy() // always copy first instance
+                resolvedOutputOfCategory.category = category;
+
+                // Some verbose checking for clarity
+                let entities = [];
+                if(wildcardsAt.includes('entity'))
+                {
+                    entities = this._getEntitiesFromMeta(meta, category as ScriptOutputCategory);
+                }
+                else {
+                    entities = (category === 'model') 
+                                        ? [null] // model has no entity name
+                                        // validate the entity name - otherwise return empty array - so next loop is skipped
+                                        : (this._metaHasEntityName(meta, category as ScriptOutputCategory, this.entityName)) ? [this.entityName] : []; 
+
+                    console.log((this._metaHasEntityName(meta, category as ScriptOutputCategory, this.entityName)));
+                    // give a warning if entity name is not valid
+                    if(entities.length === 0)
+                    {
+                        console.warn(`ScriptOutput::resolve(): Invalid entity name "${this.entityName}" for category "${category}. Skipped!"`);
+                    }
+                }
+                                    
+                entities.forEach((entity, i) =>
+                {
+                    const resolvedOutputOfEntityName = (i === 0) 
+                                                        ?  resolvedOutputOfCategory // no multiple - keep working on original output instance
+                                                        : resolvedOutputOfCategory.copy()
+                    resolvedOutputOfEntityName.entityName = entity;
+
+                    // Finally formats
+                    const formats = wildcardsAt.includes('format') 
+                                        ? this._getFormatsByCategory(category as ScriptOutputCategory)
+                                        : [this.format as string];
+
+                    formats.forEach((format, j) =>
+                    {
+                        const resolvedOutputOfFormat = (j === 0) 
+                                                        ?  resolvedOutputOfEntityName // no multiple - keep working on original output instance
+                                                        : resolvedOutputOfEntityName.copy()
+                        resolvedOutputOfFormat.format = format as ScriptOutputFormatModel | ScriptOutputFormatMetric | ScriptOutputFormatTable | ScriptOutputFormatDoc; 
+                        resolvedOutputsPaths.push(resolvedOutputOfFormat.setResolved()); // set resolved!
+                    });
+
+                });
+
+            })
+
+            return resolvedOutputsPaths;
+
+        }
+    }
+
+    public setResolved():ScriptOutputPath
     {
         this.resolved = true;
+        // also generate resolved path
+        this.resolvedPath = `${this.pipeline}/${this.category}${this.entityName ? '/'+this.entityName : '' }/${this.format}`;
+        const optionsKeys = Object.keys(this.formatOptions);
+        if(optionsKeys.length > 0)
+        {
+            this.resolvedPath += '?' + optionsKeys.map( (k) => `${k}=${this.formatOptions[k]}` ).join('&');
+        }
+        console.log(`ScriptOutputPath::setResolved(): Resolved output path: "${this.rawPath}" to "${this.resolvedPath}"`);
+        return this;
+    }
+    
+
+    public hasWildCard():boolean
+    {
+        return this.checkValid() && this.wildCardsAt().length > 0;
+    }
+
+    public wildCardsAt():Array<string>
+    {
+        if(this.checkValid())
+        {
+            const wildCardsAt: Array<string> = [];
+            if(this.category.includes('*')) wildCardsAt.push('category');
+            if(this.entityName?.includes('*')) wildCardsAt.push('entity');
+            if(this.format.includes('*')) wildCardsAt.push('format');
+            return wildCardsAt;
+        }
+        return [];
+    }
+
+    private _getEntitiesFromMeta(meta:ScriptMeta, category:ScriptOutputCategory):Array<string>|null
+    {
+        if(category === 'model') return null;
+        if(typeof meta !== 'object') throw new Error(`ScriptOutputPath::getEntitiesFromMeta(): Cannot get entities from invalid meta data!`);
+        return meta[category]; 
+    }
+
+    /** Get all available formats by category
+     *  set flag internal to true to also include 'internal' format
+     */
+    private _getFormatsByCategory(category:ScriptOutputCategory, internal:boolean=false):Array<string>
+    {
+        switch(category)
+        {
+            case 'model': return (internal ? ['internal'] : []).concat(SCRIPT_OUTPUT_MODEL_FORMATS);
+            case 'metrics': return (internal ? ['internal'] : []).concat(SCRIPT_OUTPUT_METRIC_FORMATS);
+            case 'tables': return (internal ? ['internal'] : []).concat(SCRIPT_OUTPUT_TABLE_FORMATS);
+            case 'docs': return (internal ? ['internal'] : []).concat(SCRIPT_OUTPUT_DOC_FORMATS);
+            default: return [];
+        }
+    }
+
+    private _metaHasEntityName(meta:ScriptMeta, category:ScriptOutputCategory, entityName:string):boolean
+    {
+        if(!entityName) return false;
+        const entities = this._getEntitiesFromMeta(meta, category);
+        return entities ? entities.includes(entityName) : false;
     }
 
     //// UTILS ////
