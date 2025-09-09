@@ -1531,9 +1531,12 @@ ${context}
             switch (outputPathDoc.format)
             {
                 case 'json':
+                    const docOutputsByName = await (scope.doc as Doc).toData(outputPathDoc.entityName) as Record<string, DocData> // by name. TODO: remove name key?
+                    const docOutput = Object.values(docOutputsByName)[0]; // single doc name return single result object
+
                     outputs.push({
                         path: outputPathDoc.toData(),
-                        output: await (scope.doc as Doc).toData(outputPathDoc.entityName) as Record<string, DocData> // by name. TODO: remove name key?
+                        output: docOutput 
                     });
                     break;
                 case 'pdf':
@@ -1543,8 +1546,6 @@ ${context}
                         path: outputPathDoc.toData(),
                         output: pdfBuffer as ArrayBuffer
                     });
-                    
-
                     break;
                 default:
                         throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown doc export format "${outputPathDoc.format}"`);
