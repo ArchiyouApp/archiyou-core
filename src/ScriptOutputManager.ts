@@ -135,7 +135,7 @@ import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_ME
     public pipeline:null|string;
     public category:null|'*'|ScriptOutputCategory;
     public entityName:null|'*'|string; // name of metric, table or doc
-    public format: null|'*'|ScriptOutputFormatModel | ScriptOutputFormatMetric | ScriptOutputFormatTable | ScriptOutputFormatDoc|null;
+    public format: null|'*'|ScriptOutputFormat|null;
     public formatOptions: Record<string, any>; // TODO: TS typing
 
     constructor(outputPath:string)
@@ -165,9 +165,10 @@ import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_ME
 
             this.entityName = match.groups.entity;
 
-            if(match.groups.format === '*' || isScriptOutputFormat(match.groups.format))
+            if(!match.groups.format || match.groups.format === '*' || isScriptOutputFormat(match.groups.format))
             {
-                this.format = match.groups.format;
+                // If format is null, we set it to wildcard
+                this.format = match.groups.format as ScriptOutputFormat || '*';
             } 
             else 
             {

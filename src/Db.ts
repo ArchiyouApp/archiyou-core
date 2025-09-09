@@ -118,9 +118,11 @@ export class Db
     // ==== OUTPUTS ====
 
     /** Output tables as json data */
-    toTableData(only?:Array<string>):Record<string, Object>
+    toTableData(only?:string|Array<string>):Record<string, Object>
     {
-        only = Array.isArray(only) ? only : null;
+        only = Array.isArray(only) 
+                ? only 
+                : typeof only === 'string' ? [only] : null;
 
         return Object.keys(this._tables).reduce((data, tableName) => {
             if (!only || only.includes(tableName))

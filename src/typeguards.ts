@@ -586,6 +586,6 @@ export function isScriptOutputFormat(o:any): o is ScriptOutputFormat
 export function isScriptOutputDataWrapper(o:any): o is ScriptOutputDataWrapper
 {
     return o && typeof o === 'object' 
-        && typeof o.data === 'string'
+        && o.data // can be string, object, Buffer
         && typeof o.type === 'string';
 }

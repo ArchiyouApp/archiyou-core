@@ -451,6 +451,7 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
         obj instanceof Float32Array || obj instanceof Float64Array) {
         return {
             type: obj.constructor.name,
+            encoding: 'base64',
             data: arrayBufferToBase64(obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength) as ArrayBuffer),
             length: obj.length
         } as ScriptOutputDataWrapper;

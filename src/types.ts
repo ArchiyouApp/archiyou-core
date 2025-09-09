@@ -1199,7 +1199,7 @@ export interface ScriptOutputPathData
 export interface ScriptOutputData
 {
     path:ScriptOutputPathData
-    output: ScriptOutputDataWrapper // contains data and encoding info
+    output: any|ScriptOutputDataWrapper // raw data or wrapped data with metadata
 }
 
 

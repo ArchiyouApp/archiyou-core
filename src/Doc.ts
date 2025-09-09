@@ -1097,9 +1097,11 @@ export class Doc
     }
 
     /** Export pure data */
-    async toData(onlyDocs:Array<string>|any=[], noCache:boolean=false):Promise<{[key:string]:DocData} | undefined>
+    async toData(onlyDocs:string|Array<string>, noCache:boolean=false):Promise<{[key:string]:DocData} | undefined>
     {
-        onlyDocs = (Array.isArray(onlyDocs)) ? onlyDocs : [];
+        onlyDocs = (Array.isArray(onlyDocs)) 
+                ? onlyDocs : typeof onlyDocs === 'string' ? [onlyDocs] : [];
+
         const doFilter = onlyDocs.length > 0 && onlyDocs.includes('*') === false; // if onlyDocs is empty or includes '*', we export all docs
 
         console.info(`Doc::toData(): Exporting docs: ${onlyDocs.length > 0 ? onlyDocs.join(', ') : 'all'}`);
@@ -1129,12 +1131,20 @@ export class Doc
     }
 
     /** Export selected or all DocDocuments to pdfs
-     *  @returns {[key:string]: Blob} - key = doc name, value = pdf blob
+     *  @param only string/Array of doc names to export. Default is all
+     *  @returns Either single pdf ArrayBuffer or Record of ArrayBuffers if multiple docs are exported
      */
-    async toPDF(only:Array<string>|any=[]):Promise<Record<string, ArrayBuffer>>
+    async toPDF(only:string|Array<string>):Promise<ArrayBuffer | Record<string, ArrayBuffer>>
     {
-        const data = await this.toData(only);
-        return await this._pdfExporter.export(data);
+        console.info(`Doc::toPDF(): Exporting docs to PDF: ${only ? (Array.isArray(only) ? only.join(', ') : only) : 'all'}`);
+
+        const onlyDocs = (Array.isArray(only)) ? only : (typeof only === 'string') ? [only] : [];
+        const data = await this.toData(onlyDocs); // by doc name
+        const pdfBuffersByDocName = await this._pdfExporter.export(data);
+
+        return (Object.keys(pdfBuffersByDocName).length === 1)
+                ? Object.values(pdfBuffersByDocName)[0] // single buffer
+                : pdfBuffersByDocName; // multiple buffers by doc name
     }
     
 

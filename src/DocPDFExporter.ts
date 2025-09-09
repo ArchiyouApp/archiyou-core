@@ -121,18 +121,19 @@ export class DocPDFExporter
    
         if(!this.DEBUG)
         {
-            const blobs = await this.run(data);
+            const blobsByName = await this.run(data); 
             console.info(`DocPDFExporter::export(): Exported documents:`);
-            blobs && Object.keys(blobs).forEach( 
-                (k) => console.info(` - ${k}: ${ (blobs[k]?.size) } bytes`));
+            blobsByName && Object.keys(blobsByName).forEach( 
+                (k) => console.info(` - ${k}: ${ (blobsByName[k]?.size) } bytes`));
 
             if (this.isBrowser()){ this._saveBlobToBrowserFile() }; // Start file save in browser
             
             // Turn all into ArrayBuffers for futher processing
             const docsByNameArrayBuffer = {};
-            Object.entries(blobs).forEach(async  ([k, blob]) => {
+            for(const [k, blob] of Object.entries(blobsByName))
+            {
                 docsByNameArrayBuffer[k] = await blob.arrayBuffer();
-            });
+            };
             return docsByNameArrayBuffer;
         }
         else {

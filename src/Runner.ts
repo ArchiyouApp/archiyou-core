@@ -15,7 +15,7 @@
 
 import type { ArchiyouApp, ExportGLTFOptions, Statement, 
                 StatementResult, RunnerScriptScopeState, ScriptOutputPath, ScriptOutputFormatModel, ScriptOutputPathData, 
-                ScriptOutputFormat, ScriptOutputData, ScriptOutputDataWrapper
+                ScriptOutputFormat, ScriptOutputData, DocData,
  } from "./internal"
 
 
@@ -1390,9 +1390,7 @@ ${context}
                 case 'buffer':
                     outputs.push({ 
                             path: outputPath.toData(),
-                            output: {
-                                data: scope.geom.scene.toMeshShapeBuffer() 
-                            } as ScriptOutputDataWrapper
+                            output: scope.geom.scene.toMeshShapeBuffer(),
                         } as ScriptOutputData);
                     break;
                 case 'glb':
@@ -1412,17 +1410,13 @@ ${context}
                     } as ExportGLTFOptions
                     outputs.push({
                         path: outputPath.toData(),
-                        output: {
-                            data: await (scope.exporter as Exporter).exportToGLTF(options) 
-                            } as ScriptOutputDataWrapper
-                        } as ScriptOutputData); 
+                        output: await (scope.exporter as Exporter).exportToGLTF(options)
+                    });
                     break;
                 case 'svg':
                     outputs.push({
                         path: outputPath.toData(),
-                        output: {
-                            data: scope.exporter.exportToSvg(false) 
-                        } as ScriptOutputDataWrapper
+                        output: scope.exporter.exportToSvg(false)
                     } as ScriptOutputData);
                     break;
                 default:
@@ -1460,9 +1454,7 @@ ${context}
                     case 'json':
                         outputs.push({
                             path: outputPathMetric.toData(),
-                            output: {
-                                data: scope.calc.toMetricsData(outputPathMetric.entityName) // by name
-                            } as ScriptOutputDataWrapper
+                            output: scope.calc.toMetricsData(outputPathMetric.entityName) // by name
                         });
                         break;
                     // TODO: more
@@ -1484,7 +1476,7 @@ ${context}
         const outputs = [] as Array<ScriptOutputData>;
 
         // Check if we need anything to export for current request and pipeline
-        if(outputs.length === 0)
+        if(outputPathsTables.length === 0)
         { 
             console.info(`Runner::_exportPipelineTables(): No tables to export`);
             return [];
@@ -1500,9 +1492,7 @@ ${context}
                 case 'json':
                     outputs.push({
                         path: outputPathTable.toData(),
-                        output: {
-                            data: scope.calc.toTableData(outputPathTable.entityName) // by name
-                        } as ScriptOutputDataWrapper
+                        output: scope.calc.toTableData(outputPathTable.entityName) // by name
                     } as ScriptOutputData);
                     break;
                 case 'xls':
@@ -1537,25 +1527,24 @@ ${context}
         {
             const outputPathDoc = outputPathsDocs[d];
 
-
             // Now do export
             switch (outputPathDoc.format)
             {
                 case 'json':
                     outputs.push({
                         path: outputPathDoc.toData(),
-                        output: {
-                            data: await scope.doc.toData(outputPathDoc.entityName),
-                        }
+                        output: await (scope.doc as Doc).toData(outputPathDoc.entityName) as Record<string, DocData> // by name. TODO: remove name key?
                     });
                     break;
                 case 'pdf':
+                    const pdfBuffer = await (scope.doc as Doc).toPDF(outputPathDoc.entityName) as ArrayBuffer // single doc name return single result buffer
+
                     outputs.push({
                         path: outputPathDoc.toData(),
-                        output: {
-                            data: await scope.doc.toPDF(outputPathDoc.entityName),
-                        }
+                        output: pdfBuffer as ArrayBuffer
                     });
+                    
+
                     break;
                 default:
                         throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown doc export format "${outputPathDoc.format}"`);
@@ -1616,9 +1605,7 @@ ${context}
 
             outputs.push({
                 path: outputPath.toData(),
-                output: {
-                    data: scope.geom.scene.toComponentGraph(request.component)
-                }
+                output: scope.geom.scene.toComponentGraph(request.component)
             })
         }
         return outputs;
@@ -1645,9 +1632,7 @@ ${context}
             // TODO: test
             outputs.push({
                 path: outputPath.toData(),
-                output: {
-                    data: metric
-                }
+                output: metric,
             });
         });
 
@@ -1681,10 +1666,7 @@ ${context}
             
             outputs.push({
                 path: path.toData(),
-                output: 
-                {
-                    data: table // get table by name    
-                }
+                output: table // get table by name    
             });
 
         });
@@ -1713,9 +1695,7 @@ ${context}
             // Set internal doc data in result in path pipelines/docname/internal
             outputs.push({
                 path: outputPath.toData(),
-                output: {
-                    data: doc
-                }
+                output: doc
             });
             
         });
