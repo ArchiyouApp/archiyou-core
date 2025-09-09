@@ -17,7 +17,7 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           AnnotationAutoDimStrategy,
           RunnerScriptExecutionResult,
           RunnerScriptExecutionRequest,
-          ScriptOutputFormat
+          ScriptOutputFormat, ScriptOutputDataWrapper
         } from './internal' // types
 
 import { ParamType, ScriptParam, ScriptParamData } from './internal'
@@ -26,7 +26,7 @@ import type { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPosi
             ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer,
             ContainerHAlignment, ContainerVAlignment, MetricName,
             ContainerTableInput, ContainerPositionLike, ContainerPositionCoordRel, ContainerPositionCoordAbs, 
-            OrientationXY, ExecutionResultOutputDataBase64
+            OrientationXY
         } from './internal' // NOTE: Position is a DOC type
 
 import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, 
@@ -563,16 +563,13 @@ export function isRunnerScriptExecutionResult(r:any): r is RunnerScriptExecution
 
 export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutionRequest
 {
-    return o && typeof o === 'object' && 
-        typeof o.script === 'object' && 
+    return o && typeof o === 'object'
+        && typeof o.script === 'object' && 
         typeof o?.script?.name === 'string' &&
         (!o?.component || typeof o?.component === 'string') &&
         (typeof o?.mode === 'string' || !o?.mode) &&
         (!o?.params || typeof o.params === 'object') &&
         (!o?.outputs || Array.isArray(o.outputs)) &&
-        (!o?.docs || Array.isArray(o.docs) || typeof o.docs === 'boolean') &&
-        (!o?.pipelines || Array.isArray(o.pipelines) || typeof o.pipelines === 'boolean') &&
-        (!o?.tables || Array.isArray(o.tables) || typeof o.tables === 'boolean') &&
         (!o?.onDone || typeof o.onDone === 'function');
 }
 
@@ -586,10 +583,9 @@ export function isScriptOutputFormat(o:any): o is ScriptOutputFormat
         || SCRIPT_OUTPUT_DOC_FORMATS.includes(o);
 }
 
-export function isExecutionResultOutputDataBase64(o:any): o is ExecutionResultOutputDataBase64
+export function isScriptOutputDataWrapper(o:any): o is ScriptOutputDataWrapper
 {
     return o && typeof o === 'object' 
-        && ['ArrayBuffer','Uint8Array','Uint16Array','Uint32Array','Int8Array',
-                'Int16Array','Int32Array','Float32Array','Float64Array','Buffer'].includes(o.type)
-                && typeof o.data === 'string';
+        && typeof o.data === 'string'
+        && typeof o.type === 'string';
 }

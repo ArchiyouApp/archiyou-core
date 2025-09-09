@@ -282,7 +282,7 @@ export interface RunnerScriptExecutionResult
     meta?: ScriptMeta, // meta information on the script execution
     
     // All outputs in flat array with request path and data
-    outputs?: Array<ScriptOutputPathData>
+    outputs?: Array<ScriptOutputData>
 }
 
 /** Results of component execution */
@@ -1183,28 +1183,39 @@ export type ScriptOutputFormatTable = 'json'|'xls';
 export type ScriptOutputFormatDoc = 'json'|'pdf';
 export type ScriptOutputFormat = ScriptOutputFormatInternal|ScriptOutputFormatModel|ScriptOutputFormatMetric|ScriptOutputFormatTable|ScriptOutputFormatDoc
 
-
-
+/** Data only representation of ScriptOutputPath class */
 export interface ScriptOutputPathData
 {
-    path: ScriptOutputPath // original requested and resolved path
-    warnings?: Array<string> // warnings if any
-    data: ScriptOutputDataWrapper
+    requestedPath: string;
+    resolvedPath: string;
+    pipeline: string | null;
+    category: ScriptOutputCategory | null;
+    entityName: string | null;
+    format: ScriptOutputFormat | null;
+    formatOptions: Record<string, any>;
+}
+
+/** Data output of a script based on given path */
+export interface ScriptOutputData
+{
+    path:ScriptOutputPathData
+    output: ScriptOutputDataWrapper // contains data and encoding info
 }
 
 
+
+
 /** Wraps different output data with information 
- *  TODO: see what is really needed
+ *  When we apply an encoding (like base64) we apply extra data to the wrapper
 */
 export interface ScriptOutputDataWrapper
 {
-    // type of data in string - used to decode/encode 
-    //type?: string|'ArrayBuffer'|'Uint8Array'|'Uint16Array'|'Uint32Array'|'Int8Array'|
-    //            'Int16Array'|'Int32Array'|'Float32Array'|'Float64Array'|'Buffer' // original data type
+    type?: string // original type (string, ArrayBuffer etc)
+    encoding?: 'base64'  // any special encoding
     //binary?:boolean // if true, data is binary format
     //mime?: string // mime type of data
     data: any|string|ArrayBuffer // internal, string (and base64) and ArrayBuffer for binary data
-    //length?: number // length of data in bytes
+    length?: number // length of data in bytes
 }
 
 export interface ExecutionRequestOutputFormatGLTFOptions
@@ -1218,16 +1229,6 @@ export interface ExecutionRequestOutputFormatGLTFOptions
     shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
 }
 
-/** For exporting raw binary data in base64 format 
- *  see utils.ts 
-*/
-export interface ExecutionResultOutputDataBase64
-{
-    type: 'ArrayBuffer'|'Uint8Array'|'Uint16Array'|'Uint32Array'|'Int8Array'|
-                'Int16Array'|'Int32Array'|'Float32Array'|'Float64Array'|'Buffer' // original data type
-    data: string // base64 encoded data string
-    length: number // length of data in bytes
-}
 
 
 /** Message from Worker to Manager */

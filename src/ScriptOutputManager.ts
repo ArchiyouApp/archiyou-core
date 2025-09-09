@@ -51,7 +51,7 @@
 
  import type { ScriptOutputCategory, ScriptOutputFormatModel, ScriptOutputFormatMetric,
             ScriptOutputFormatTable, ScriptOutputFormatDoc, ScriptMeta,
-            RunnerScriptExecutionRequest
+            RunnerScriptExecutionRequest, ScriptOutputPathData, ScriptOutputFormat
   } from './internal'
 
  import { convertStringValue } from './internal'
@@ -92,10 +92,10 @@ import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_ME
             }
         });
         // Resolve wildcards in the requested outputs
+        this.resolvedOutputsPaths = []; // reset
         this.requestedOutputPaths.forEach( (output) => 
         {
-            this.resolvedOutputsPaths = []; // reset
-            this.resolvedOutputsPaths.push(...output.resolve(meta) );
+            this.resolvedOutputsPaths.push(...output.resolve(meta) ); // resolving can return multiple paths
         });
 
         return this;
@@ -184,6 +184,19 @@ import { SCRIPT_OUTPUT_CATEGORIES, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_ME
     copy():ScriptOutputPath
     {
         return new ScriptOutputPath(this.rawPath);
+    }
+
+    toData():ScriptOutputPathData
+    {
+        return {
+            resolvedPath: this.resolvedPath,
+            requestedPath: this.rawPath,
+            pipeline: this.pipeline,
+            category: this.category as ScriptOutputCategory,
+            entityName: this.entityName,
+            format: this.format as ScriptOutputFormat, // no wild cards after resolve
+            formatOptions: this.formatOptions
+        }
     }
 
     private _validate(): boolean

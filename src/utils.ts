@@ -7,7 +7,8 @@
 import type { ScriptParamData } from './internal';
 
 import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, isDocUnitsWithPerc,
-        ScriptParam, isScriptParamData, isScriptParam, UnitsWithPerc, ExecutionResultOutputDataBase64} from './internal'
+        ScriptParam, isScriptParamData, isScriptParam, UnitsWithPerc, ScriptOutputDataWrapper,
+        } from './internal'
 
 //// PARAMS ////
 
@@ -412,12 +413,14 @@ export function uuidv4(): string
 
 /**
  * Recursively transforms binary data in an object to base64 strings for JSON serialization
+ *  We use an instance of ScriptOutputDataWrapper to keep track of original type and length for easy decoding
+ * 
  * @param obj - The object to transform
  * @param maxDepth - Maximum recursion depth to prevent infinite loops (default: 10)
  * @param currentDepth - Current recursion depth (internal use)
  * @returns Transformed object with binary data as base64 strings
  */
-export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentDepth: number = 0): number|string|Array<any>|Object|ExecutionResultOutputDataBase64
+export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentDepth: number = 0): number|string|Array<any>|Object|ScriptOutputDataWrapper
 {
     // Prevent infinite recursion
     if (currentDepth >= maxDepth) {
@@ -435,9 +438,10 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
     {
         return {
             type: 'ArrayBuffer',
+            encoding: 'base64',
             data: arrayBufferToBase64(obj),
             length: obj.byteLength
-        } as ExecutionResultOutputDataBase64;
+        } as ScriptOutputDataWrapper;
     }
 
     // Handle Uint8Array and other TypedArrays
@@ -449,16 +453,17 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
             type: obj.constructor.name,
             data: arrayBufferToBase64(obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength) as ArrayBuffer),
             length: obj.length
-        } as ExecutionResultOutputDataBase64;
+        } as ScriptOutputDataWrapper;
     }
  
     // Handle Buffer (Node.js)
     if (typeof Buffer !== 'undefined' && obj instanceof Buffer) {
         return {
             type: 'Buffer',
+            encoding: 'base64',
             data: obj.toString('base64'),
             length: obj.length
-        } as ExecutionResultOutputDataBase64;
+        } as ScriptOutputDataWrapper;
     }
 
     // Don't do functions
@@ -512,14 +517,13 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
  * @param obj - The object to restore
  * @returns Object with restored binary data
  */
-export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64, forceBuffer: boolean=false): Buffer|ArrayBuffer|Uint8Array|null
+export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffer: boolean=false): Buffer|ArrayBuffer|Uint8Array|null
 {
     if (obj === null || obj === undefined) 
     {
         console.error('utils::restoreBinaryFromBase64(): Invalid input');
         return null;
     }
-    
     console.info(`utils::restoreBinaryFromBase64(): Restoring to binary "${obj?.type}" with length ${obj?.length}`);
 
     // Handle primitives
@@ -527,7 +531,6 @@ export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64, fo
     {
         return obj;
     }
-
     // Check if this is a serialized binary object
     if (obj.type && obj.data !== undefined)
     {
@@ -543,15 +546,12 @@ export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64, fo
                 return (forceBuffer) 
                         ? Buffer.from(buffer)
                         : buffer as any;
-
-
             case 'Uint8Array':
                 const b = restoreBinaryFromBase64({ type: 'ArrayBuffer', data: obj.data, length: obj.length }) as ArrayBuffer;
                 const u8 = new Uint8Array(b, 0, obj.length)
                 return (forceBuffer) 
                         ? Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength)
                         : u8;
-
             case 'Buffer':
                 if (typeof Buffer !== 'undefined')
                 {
@@ -564,12 +564,10 @@ export function restoreBinaryFromBase64(obj: ExecutionResultOutputDataBase64, fo
                 return null;
         }
     }
-
     // Handle Arrays
     if (Array.isArray(obj)) {
         return obj.map(item => restoreBinaryFromBase64(item)) as any;
     }
-
     // Handle plain objects
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
