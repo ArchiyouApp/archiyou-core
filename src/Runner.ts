@@ -1419,6 +1419,21 @@ ${context}
                         output: scope.exporter.exportToSvg(false)
                     } as ScriptOutputData);
                     break;
+
+                case 'step':
+                    outputs.push({
+                        path: outputPath.toData(),
+                        output: await (scope.exporter as Exporter).exportToStep()
+                    });
+                    break;
+
+                case 'stl':
+                    outputs.push({
+                        path: outputPath.toData(),
+                        output: await (scope.exporter as Exporter).exportToStl()
+                    });
+                    break;
+
                 default:
                     console.error(`Runner::_getScopeRunnerScriptExecutionResult(): Skipped unknown model format "${outputPath.format}" in requested output "${outputPath.resolvedPath}"`); 
             }   

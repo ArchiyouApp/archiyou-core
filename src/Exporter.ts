@@ -124,16 +124,16 @@ export class Exporter
 
     exportToStl():Uint8Array
     {
-        // !!!! TODO: is seperate triangulation needed? !!!!
-        /* See OC docs: 
-            - https://dev.opencascade.org/doc/refman/html/class_stl_a_p_i.html
-        */
-
         const oc = this._ay.geom._oc;
         const filename = this._getFileName() + '.stl';
+
+        const visibleShapes = this._ay.geom.all().filter(s => s.visible());
         
-        let sceneCompoundShape = new ShapeCollection(
-                                        this._ay.geom.all().filter(s => s.visible())).toOcCompound();
+        // IMPORTANT: Make sure all shapes are triangulated before exporting to STL
+        // TODO: avoid doing this multiple times if already done before GLTF
+        this._triangulateShapes(visibleShapes);
+
+        const sceneCompoundShape = visibleShapes.toOcCompound();
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
         const ocStlWriter = new oc.StlAPI_Writer();
@@ -178,7 +178,7 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array<ArrayBuffer>|null>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|null>
     {
         const startGLTFExport = performance.now();
 
@@ -301,7 +301,28 @@ export class Exporter
 
         console.info(`Exporter::exportToGLTF: Exported extra data in ${Math.round(performance.now() - startGLTFExtra)}ms`);	
 
-        return gltfContent; 
+        return gltfContent.buffer as ArrayBuffer; // convert Uint8Array to ArrayBuffer
+    }
+
+    /** Needs to be called before before STL 
+     *  Also with GLTF but keep it seperate for now
+     *  Return OcIncMesh instance to be able to delete them
+     */
+    _triangulateShapes(shapes:ShapeCollection, meshingQuality?:MeshingQualitySettings):Array<any>
+    {
+        const oc = this._ay.geom._oc;
+        meshingQuality = meshingQuality || this.DEFAULT_MESH_QUALITY;
+        const ocIncMeshes = [] as Array<any>;
+        new ShapeCollection(shapes)
+        .forEach(entity => {
+            if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
+            {
+                const ocShape = entity._ocShape;
+                const ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
+                ocIncMeshes.push(ocIncMesh);
+            }
+        });
+        return ocIncMeshes;
     }
 
     /** Export GLTF (binary or text) to the browser window */

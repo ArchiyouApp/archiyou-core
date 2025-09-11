@@ -73,7 +73,7 @@ export class DocPDFExporter
     _jsdomNode; // dynamically loaded jsdom parser for node
 
     /** Make DocPDFExporter instance either empty or with data and onDone function */
-    constructor(data?:DocData|Record<string, DocData>, onDone?:(blobs:Record<string,Blob>) => any)
+    constructor(data?:DocData|Record<string, DocData>, onDone?:(buffers:Record<string,ArrayBuffer>) => any)
     {
         if(!data)
         { 
@@ -86,11 +86,11 @@ export class DocPDFExporter
         else {
             this.export(data)
                 .catch((e) => console.error(e))
-                .then((blobs) => 
+                .then((buffers) => 
                     {
-                        if(typeof onDone === 'function' && blobs)
+                        if(typeof onDone === 'function' && buffers)
                         {
-                            onDone(blobs);
+                            onDone(buffers);
                         }
                     })
         }
@@ -643,6 +643,7 @@ export class DocPDFExporter
         // Convert special props that need to be get in GState instead directly on jsPDF doc in activePDFDoc
         const STYLE_PROPS_TO_GSTATE = {
             strokeOpacity : 'stroke-opacity',
+            lineOpacity: 'CA', // stroking operations opacity
             fillOpacity: 'opacity',
         }
 
