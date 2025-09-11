@@ -18,9 +18,9 @@
  *  - model
  *      - formats: buffer(for editor viewer), glb, step, stl, svg (More are coming!)
  *  - metrics
- *      - formats: json, xls (...)
+ *      - formats: json, xlsx (...)
  *  - tables
- *      - formats: json, xls (...)
+ *      - formats: json, xlsx (...)
  *  - docs
  *      - formats: pdf (...)
  * 
@@ -32,12 +32,12 @@
  *   - default/model/glb?data=true - run default pipeline and export scene as GLTF binary while exporting extra data
  *   - cnc/model/dxf?flatten
  *   - default/metrics/internal - internal are the rawPath internal values (used for in-scope communition)
- *   - default/tables/parts/xls
+ *   - default/tables/parts/xlsx
  *   - default/docs/spec/pdf
  *  
  *  Wildcards * are also possible:
 */    
-//   - default/metrics/*/xls
+//   - default/metrics/*/xlsx
 //   - default/docs/*/pdf
 //   - default/tables/*/xsl
 //   - default/*  - everything of default pipeline in all available formats
@@ -393,7 +393,13 @@ function isScriptOutputCategory(o:any):o is ScriptOutputCategory
     return typeof o === "string" && ['model','metrics','tables','docs'].includes(o);
 }
 
+/** Main typeguard for OutputFormat - Please update constants.ts when introducing a new format! */
 function isScriptOutputFormat(o:any):o is ScriptOutputFormatModel | ScriptOutputFormatMetric | ScriptOutputFormatTable | ScriptOutputFormatDoc
 {
-    return typeof o === "string" && ['buffer','internal', 'glb','step','stl','svg','json','xls','pdf'].includes(o);
+    const ALL_FORMATS = [...SCRIPT_OUTPUT_MODEL_FORMATS, ...SCRIPT_OUTPUT_METRIC_FORMATS, ...SCRIPT_OUTPUT_TABLE_FORMATS, ...SCRIPT_OUTPUT_DOC_FORMATS, 'internal']
+    const r = typeof o === "string" && ALL_FORMATS.includes(o);
+    if(!r){
+        console.error(`isScriptOutputFormat: Unknown output format "${o}". Valid formats: ${ALL_FORMATS.join(', ')}`);
+    }
+    return r;
 }
