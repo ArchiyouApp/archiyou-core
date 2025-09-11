@@ -70,8 +70,8 @@ export * from './DocUtils'
 export * from './DocPDFExporter'
 
 
-export * from './Table'
-export * from './Db'
+export * from './CalcTable'
+export * from './CalcDb'
 export * from './Calc'
 
 

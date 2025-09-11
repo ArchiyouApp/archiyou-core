@@ -9,19 +9,18 @@ export class Db
     DEBUG = false;
     UNNAMED_TABLE = 'Table'
 
-    _danfo:any; // dynamic Danfo module
     _geom:Geom; // bind to geom module to d data of Shapes and Scene
-    _tables:Object = {}; // name : Table
+    _tables:Object = {}; // { name : Table }
+    
     shapes:Table; // all Shapes in the current model (see _geom)
     objects:Table; // all Obj containing Shapes in the Scene ( through _geom)
 
     data:Object; // output data { tablename : [datarows] }
 
 
-    constructor(geom:Geom, danfo:any)
+    constructor(geom:Geom)
     {
         this._geom = geom;
-        this._danfo = danfo;
 
         this.init(); // try to init immediately. Maybe there are not Shapes in Geom instance. When there are use init()
     }
@@ -84,6 +83,7 @@ export class Db
         delete this._tables[oldName];
     }
 
+    /** Get names of tables */
     tables():Array<string>
     {
         return Object.keys(this._tables);
@@ -115,9 +115,9 @@ export class Db
         return this._geom.allObjs().map(obj => obj.toData());
     }
 
-    // ==== OUTPUTS ====
+    //// OUTPUTS ////
 
-    /** Output tables as json data */
+    /** Output tables as raw data */
     toTableData(only?:string|Array<string>):Record<string, Object>
     {
         only = Array.isArray(only) 
@@ -133,30 +133,27 @@ export class Db
         }, {} as Record<string, Object>);
     }
 
-    /** Export Database with saves Tables to Json format */
-    requestData(onDone : (data:Object) => void )
+    /** Output tables as Excel file buffers  */
+    async toTableExcel(only?:string|Array<string>):Promise<Record<string, ArrayBuffer>>
     {
-        this.data = {}; // reset data (if needed)
-        for (const [key,tableObj] of Object.entries(this._tables))
-        {
-            this.data[key] = null; // make key ( so we can check the results )
-            let tableName = tableObj.name();
-            tableObj.toData().then( (tableData) => this.handleTableData(tableData,tableName,onDone));
-        }
-    }
+        only = Array.isArray(only) 
+                ? only 
+                : typeof only === 'string' ? [only] : null;
 
-    handleTableData(tableData:Object,table:string,onDone:(data:Object)=> void )
-    {
-        // save data when Promise is resolved. Then set in this.data - check if all results are in and run onDone
-        this.data[table] = tableData;
-        if( !Object.values(this.data).includes(null) )
+        const tableNames = this.tables();
+        const tableBufferByName: Record<string, ArrayBuffer> = {};
+
+        for(let t = 0; t < tableNames.length; t++)
         {
-            // we are done
-            if (onDone){
-                onDone(this.data);
+            const table = this._tables[tableNames[t]];
+            if (!only || only.includes(tableNames[t]))
+            {
+                tableBufferByName[tableNames[t]] = await table.toExcel();
             }
         }
-    }   
+
+        return tableBufferByName;
+    }
 
     //// DEBUG OUTPUT METHODS ////
 

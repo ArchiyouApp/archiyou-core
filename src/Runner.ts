@@ -14,12 +14,12 @@
 
 
 import type { ArchiyouApp, ExportGLTFOptions, Statement, 
-                StatementResult, RunnerScriptScopeState, ScriptOutputPath, ScriptOutputFormatModel, ScriptOutputPathData, 
+                StatementResult, RunnerScriptScopeState, ScriptOutputPath, ScriptOutputFormatModel, 
                 ScriptOutputFormat, ScriptOutputData, DocData,
  } from "./internal"
 
 
-import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, IO, 
+import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, Db, 
             RunnerScriptExecutionResult, CodeParser, LibraryConnector, 
             ScriptOutputManager} from "./internal"
 
@@ -1490,13 +1490,18 @@ ${context}
             switch (outputPathTable.format)
             {
                 case 'json':
+                    const tableData = scope.calc.toTableData(outputPathTable.entityName); // table data by name
                     outputs.push({
                         path: outputPathTable.toData(),
-                        output: scope.calc.toTableData(outputPathTable.entityName) // by name
+                        output: (typeof tableData === 'object') ? Object.values(tableData)[0] : null // force only one table without name key
                     } as ScriptOutputData);
                     break;
-                case 'xls':
-                    console.warn(`Runner::_exportPipelineTables(): xls export not implemented yet`);
+                case 'xlsx':
+                    const xlsxBuffer = await (scope.calc.db as Db).toTableExcel(outputPathTable.entityName);
+                    outputs.push({
+                        path: outputPathTable.toData(),
+                        output: (typeof xlsxBuffer === 'object') ? Object.values(xlsxBuffer)[0] : null
+                    } as ScriptOutputData);
                     break;
                 default:
                     throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown table export format "${outputPathTable.format}"`);

@@ -1045,14 +1045,6 @@ export interface TableLocation
     data: any|Array<any>, // any data - format to be defined more clear
 }
 
-export interface DbCompareStatement 
-{
-    column: string,
-    comparator: string,
-    value: any,
-    combine: string,
-}
-
 export interface CalcData
 {
     tables: Object // { tablename: [{col, val}] }
@@ -1178,8 +1170,8 @@ export type ScriptOutputCategory = 'model'|'metrics'|'tables'|'docs'
 export type ScriptOutputFormatInternal = 'internal'; // basics
 
 export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'; // TODO:brep,dxf
-export type ScriptOutputFormatMetric = 'json'|'xls';
-export type ScriptOutputFormatTable = 'json'|'xls';
+export type ScriptOutputFormatMetric = 'json'|'xlsx';
+export type ScriptOutputFormatTable = 'json'|'xlsx';
 export type ScriptOutputFormatDoc = 'json'|'pdf';
 export type ScriptOutputFormat = ScriptOutputFormatInternal|ScriptOutputFormatModel|ScriptOutputFormatMetric|ScriptOutputFormatTable|ScriptOutputFormatDoc
 

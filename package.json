@@ -39,7 +39,8 @@
     "svg-path-parser": "^1.1.0",
     "svg2pdf.js": "^2.5.0",
     "txml": "^5.1.1",
-    "typedoc": "^0.23.7"
+    "typedoc": "^0.23.7",
+    "write-excel-file": "^2.3.4"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.0",

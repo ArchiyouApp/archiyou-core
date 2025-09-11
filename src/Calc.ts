@@ -12,10 +12,8 @@
  export class Calc
  {
     //// SETTINGS ////
-    ENABLE_DANFO = false;
+    
     //// END SETTINGS ////
-
-    _danfo;
     _geom;
     db:Db // the virtual database with table in there
     dbData:Object // raw outputted data 
@@ -24,74 +22,13 @@
     constructor(geom:Geom = null)
     {
         this._geom = geom; // needed to get data from the model
-
-        if(this.ENABLE_DANFO)
-        {
-            this.loadDanfo()
-                .catch(this.handleFailedDanfoImport)
-                .then(() => this.init());
-        }
-        else {
-            this.init();
-        }
-
-    }
-
-    /** Load Danfo module dynamically based on enviroment */
-    async loadDanfo():Promise<any> // TODO TS typing
-    {   
-        // detect context of JS
-        const DANFO_MODULE = 'danfojs';
-        const isBrowser = typeof window === 'object'
-        let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
-        const isNode = !isWorker && !isBrowser;
-
-        if(isWorker || isBrowser)
-        {
-            console.log('==== LOAD DANFO FOR BROWSER/WORKER ====')
-            this._danfo = await import(DANFO_MODULE)
-        }
-        else {
-            console.log('==== LOAD DANFO FOR NODE ====')
-            // keep this out import(..) to avoid being picked up by Webpack in client
-            // looks like NodeJS can search node_modules in webworker for the danfojs-node library
-            const nodeDanfoPath = 'danfojs-node'; 
-            this._danfo = await import(nodeDanfoPath)
-        }
-
-        if(this._danfo)
-        {
-            console.info('==== DANFO LOADED ====');
-        }
- 
-        return this._danfo;
-    }
-
-    hasDanfo():boolean
-    {
-        return (this._danfo !== undefined)
-    }
-
-    handleFailedDanfoImport(e)
-    {
-        console.error(`!!!! Calc: Cannot import Danfo module: "${e}"
-        Calc will have limited abilities. Add danfojs or danfojs-node to your node_modules!!!!`);
+        this.init();
     }
 
     /** We need to know when we can load the Shapes */
     init()
     {
-        this.db = new Db(this._geom, this._danfo);
-    }
-
-    /** Automatically calc.init() when user uses calc module */
-    autoInit()
-    {
-        // NOTE: We can't init without danfo loaded!
-        if(this.hasDanfo() && !this.db.isInitiated())
-        {
-            this?.db?.init();
-        }
+        this.db = new Db(this._geom);
     }
 
     reset()
@@ -127,7 +64,6 @@
     */
     table(name:string, data?:DataRows, columns?:Array<string>):Calc|Table
     {   
-        //this.autoInit(); // Not needed: Danfo is disabled
 
         if(!name){ throw new Error(`Calc::table: Please supply a table name`); }
 
@@ -201,9 +137,6 @@
         {
             console.warn(`Calc::metric: Your metric "${name}" is not part of official ones: ${METRICS.join(', ')}`);
         }
-
-        //this.autoInit(); // Disabled because we don't need Danfo
-
         // make metric data structure
         const metric = {  
                 name: name,

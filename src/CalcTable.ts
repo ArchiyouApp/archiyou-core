@@ -6,9 +6,8 @@
 
 import { Db, DataRowsColumnValue, DataRowColumnValue, DataRows } from './internal';
 import { isDataRowsValues, isDataRowsColumnValue } from './internal';
-import { DbCompareStatement } from './internal'; // types.ts
-import * as StringMatchAll from 'string.prototype.matchall' // polyfill for es5
 
+import writeXlsxFile from 'write-excel-file' // see: https://www.npmjs.com/package/write-excel-file
 
 export class Table
 {
@@ -81,7 +80,7 @@ export class Table
         return this;
     }
 
-    // ==== getting basic properties ====
+    //// BASIC PROPERTIES ////
 
     firstRow():DataRowColumnValue
     {
@@ -129,6 +128,7 @@ export class Table
         return this;
     }
 
+    /** Get column names */
     columns():Array<string>
     {
         return this._dataRows.reduce( (agg, row) => 
@@ -171,9 +171,34 @@ export class Table
     }
 
     //// SLICING AND DICING ////
-    // TODO: Implement now danfo is gone
+    
+    // TODO filtering, sorting, groupby, joins, merges, etc
 
-    // ==== OUTPUT ====
+    //// OUTPUT ////
+
+    /** Output raw data in rows 
+     * in format { [col1: row1val, col2: row1val2], [col1: row2val, ..] ... }
+    * */
+    toData():DataRows
+    {
+        return this._dataRows
+    }
+
+    /** Export this Table to Excel format in ArrayBuffer 
+     * We use write-excel-file (https://www.npmjs.com/package/write-excel-file)
+     *  And use automatic value type detection
+    */
+    async toExcel():Promise<ArrayBuffer>
+    {
+        // header row
+        const headerRow = this.columns().map( colName => ({ value: colName, fontWeight: 'bold' }) );
+        const dataRows = this._dataRows.map( row => 
+            this.columns().map( colName => ({ value: row[colName] }) ) // no type, automatic detection
+        );
+
+        const blob = await writeXlsxFile([headerRow, ...dataRows], {}); // see options: https://gitlab.com/catamphetamine/write-excel-file
+        return blob.arrayBuffer();
+    }
 
     /** Output to Row objects */
     toDataRows():DataRowsColumnValue // TODO: TS typing
@@ -187,15 +212,7 @@ export class Table
         return this._dataRows.map(row => row[columnName]); 
     }
 
-    /** Output raw data in rows 
-     * in format { [col1: row1val, col2: row1val2], [col1: row2val, ..] ... }
-     * */
-    toData():DataRows
-    {
-        return this._dataRows
-    }
-
-    // ==== utils ====
+    //// UTILS ////
 
     _protectNullUndefined(value:any)
     {
@@ -221,39 +238,6 @@ export class Table
         return obj;
     }
 
-    _stringToDfQueries(input:string):Array<Object> // TODO: interface
-    {
-        const MAP_EXPRESSION_TO_DF_QUERY = {
-            column : 'column',
-            comparator: 'is',
-            value: 'to',
-            combine: 'combine',
-        }
-
-        let expressions:Array<DbCompareStatement> = this._getExpressions(input);
-
-        if(expressions.length == 0)
-        {
-            return null;
-        }
-        else {
-            let dfQueries = []
-            expressions.forEach( expr =>
-            {
-                if(!this._checkColumn(expr.column))
-                {
-                    console.warn(`Table::_stringToDfQuery: You used column "${expr.column}" in an expression. But it does not exist on this Table!`);
-                }
-                else {
-                   dfQueries.push(this._remapObject( expr, MAP_EXPRESSION_TO_DF_QUERY));
-                }
-            });
-
-            return dfQueries;
-        }
-
-    }
-
     _checkColumn(name:string)
     {
         return this.columns().includes(name);
@@ -274,28 +258,6 @@ export class Table
         }
 
         return newObj;
-    }
-
-    _getExpressions(input:string):Array<DbCompareStatement> // TODO: make expression Interface
-    {
-        const LOGIC = ['==', '>=', '<=', '>', '<']; // NOTE: order is important, otherwise '>' in '>=' is matched earlier!
-        const EXPRESSION_COMBINE_LOGIC = ['and', 'or', '\|\|', '&&'];
-        const EXPRESSION_RE = new RegExp( `(?<combine>${EXPRESSION_COMBINE_LOGIC.join('|')})?(^|[ ]+)(?<column>[^ ]+)[ |${LOGIC.join('|')}]*(?<comparator>${LOGIC.join('|')})[ ]*(?<value>[^ ]+)([ ]+)?`, 'g');
-
-        // get conditional expressions
-        // NOTE: polyfilled for String.matchAll
-        let expressions:Array<DbCompareStatement> = Array.from(StringMatchAll(input, EXPRESSION_RE)).map( m => { 
-            return { 
-                // avoiding some TS errors: TODO: Get Match Interface?
-                column : (m as any).groups.column.trim(), 
-                comparator : (m as any).groups.comparator.trim(), 
-                value : this._makeRealValue((m as any).groups.value.trim()),
-                combine: ((m as any).groups.combine) ? (m as any).groups.combine.trim() : null,
-                }
-        });
-
-        return expressions;
-
     }
 
     /** We need to convert some values into their real type */
@@ -326,11 +288,6 @@ export class Table
 
     }
 
-    _checkDfQuery(obj:Object):boolean
-    {
-        return this._checkObject(obj, ['column','is', 'to']);
-    }
-
     _checkObject(obj:Object,columns:Array<string>)
     {
         for (let i = 0; i < columns.length; i++)
@@ -347,8 +304,4 @@ export class Table
     {
         return Array.from({length: (endIndex - startIndex)}, (v, k) => k + startIndex);
     }
-
-
-    
-
 }
