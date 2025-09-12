@@ -106,9 +106,7 @@ export class Image extends Container
             // Do fetch
             try 
             {
-                console.log('DO FETCH');
-                const r = await fetch(fetchUrl, fetchSettings);
-                console.log('FETCH RESULT', r);
+                const r = await fetch(fetchUrl, fetchSettings);                
 
                 if(r.status !== 200) 
                 {

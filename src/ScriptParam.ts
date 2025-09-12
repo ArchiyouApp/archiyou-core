@@ -21,7 +21,7 @@ export class ScriptParam
 
     id:string;
     type:ParamType;
-    name:string;
+    name:string; // always uppercase
     
     enabled?:boolean
     visible?:boolean // Param is visible or not
@@ -121,6 +121,9 @@ export class ScriptParam
         {
             throw new Error(`ScriptParam::validateInput: Invalid param structure: ${JSON.stringify(param)} for "${param.name}"`);
         }
+
+        // normalize name to uppercase
+        param.name = param.name.toUpperCase();
         
         return param;
     }

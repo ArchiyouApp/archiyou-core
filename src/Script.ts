@@ -146,6 +146,43 @@ export class Script
         }
     }
 
+    //// PARAM CHECKS ////
+
+    /** Check parameter values against script definition params
+     *  Return Record with valid values only
+     *  If value was invalid, use default value
+     */
+    checkParamValues(paramValues:Record<string,any>):Record<string,any>
+    {
+        const checkedParamValues = Object.fromEntries(
+            Object.entries(this.params).map(([key, param]) => {
+                return [key, param.default];
+            })
+        );
+
+        for(const [key, value] of Object.entries(paramValues))
+        {
+            const keyUpper = key.toUpperCase();
+            const param = this.params[keyUpper];
+            
+            if(param && param.validateValue(value))
+            {
+                checkedParamValues[keyUpper] = value;
+            }
+            else {
+                if(!param){ 
+                    console.warn(`Script.checkParamValues(): Invalid param name "${key}", ignoring it.`);
+                }
+                else {
+                    console.warn(`Script.checkParamValues(): Invalid value for param "${key}": ${value}, using default: ${param.default}`);
+                }
+            }
+        }
+
+        return checkedParamValues;
+        
+    }
+
     //// PUBLISH ////
 
     validateParamValues(paramValues:Record<string,any>):boolean
@@ -174,19 +211,32 @@ export class Script
     async getVariantId(paramValues: Record<string,any>): Promise<string> 
     {
         const HASH_LENGTH_TRUNCATE = 11;
+        // TODO: remove dynamic import?
         const { createHash } = await import('crypto'); // NOTE: only for node right now!
 
         // generate string based on the param names and values
         // in format: {param1:value1,param2:value2,...}
-        const input = JSON.stringify(paramValues);
+        // NOTE: We use param definitions in script.params and default values if not set in paramValues
+        const paramValuesDefault = Object.fromEntries(Object.entries(this.params).map(([paramName, paramObj]) => [paramName.toUpperCase(), paramObj?.default]));
+        // Only accept param names that are also in definition 
+        const paramValuesUpper = Object.fromEntries(
+            Object.entries(paramValues)
+                .map(([k, v]) => [k.toUpperCase(), v])
+                .filter(([k, v]) => Object.keys(this.params).map(p => p.toUpperCase()).includes(k))
+        );
+        const input = JSON.stringify({...paramValuesDefault, ...paramValuesUpper}); // incoming overwrite default
         const hash = createHash('md5').update(input).digest();
 
         // Convert to base64 URL-safe format and truncate
-        return hash.toString('base64')
+        const id = hash.toString('base64')
             .replace(/\+/g, '-')
             .replace(/\//g, '_')
             .replace(/=/g, '')
             .substring(0, HASH_LENGTH_TRUNCATE);
+
+        console.log(`Script::getVariantId(): Generated variant id "${id}" for param values: ${input}`);
+
+        return id;
     }
 
     /** Get number of possible variants */
@@ -264,8 +314,13 @@ export class Script
 
     //// IO ////
 
-    fromData(data:ScriptData):this
+    fromData(data:Script|ScriptData):Script|this
     {
+        if (data instanceof Script)
+        {
+            return data as Script;
+        }
+
         this.id = data.id;
         this.name = data.name.toLowerCase();
         this.author = data.author.toLowerCase();

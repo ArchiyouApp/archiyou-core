@@ -1325,7 +1325,8 @@ export class Edge extends Shape
                     svgAttrs[t.attr] = svgValue
                 } 
                 else {
-                    console.warn(`Edge::_getSvgPathAttributes(): Skipped attribute ${t.geom}->${t.prop} because svg value was null!`);
+                    // TODO: avoid long console warnings
+                    //console.warn(`Edge::_getSvgPathAttributes(): Skipped attribute ${t.geom}->${t.prop} because svg value was null!`);
                 }
             })
         }
