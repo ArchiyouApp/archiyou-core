@@ -1344,10 +1344,10 @@ ${context}
             }
 
             // Gather results per pipeline and add to array
-            outputs.push(...await this._exportPipelineModels(scope, request, pipeline, meta)); 
-            outputs.push(...await this._exportPipelineMetrics(scope, request, pipeline, meta));
-            outputs.push(...await this._exportPipelineTables(scope, request, pipeline, meta));
-            outputs.push(...await this._exportPipelineDocs(scope, request, pipeline, meta));
+            outputs.push(...await this._exportPipelineModels(scope, request, pipeline, result));
+            outputs.push(...await this._exportPipelineMetrics(scope, request, pipeline, result));
+            outputs.push(...await this._exportPipelineTables(scope, request, pipeline, result));
+            outputs.push(...await this._exportPipelineDocs(scope, request, pipeline, result));
 
         };
 
@@ -1375,9 +1375,9 @@ ${context}
 
         
     /** Export models from given scope, pipeline and using output paths in request.outputs and place in ExecutionResult tree */
-    async _exportPipelineModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Promise<Array<ScriptOutputData>>
+    async _exportPipelineModels(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Promise<Array<ScriptOutputData>>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request, result);
         const outputPaths = outputManager.getOutputsByPipelineCategory(pipeline, 'model') as Array<ScriptOutputPath>;
 
         const outputs = [] as Array<ScriptOutputData>;
@@ -1445,9 +1445,9 @@ ${context}
     }
 
 
-    async _exportPipelineMetrics(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Promise<Array<ScriptOutputData>>
+    async _exportPipelineMetrics(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Promise<Array<ScriptOutputData>>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request, result);
         const outputPathsMetrics = outputManager.getOutputsByPipelineCategory(pipeline, 'metrics') as Array<ScriptOutputPath>;
 
         // real results
@@ -1481,11 +1481,11 @@ ${context}
         }
         return outputs;
     }
-    
-     
-    async _exportPipelineTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, meta:ScriptMeta): Promise<Array<ScriptOutputData>>
+
+
+    async _exportPipelineTables(scope: any, request: RunnerScriptExecutionRequest, pipeline: string, result:RunnerScriptExecutionResult): Promise<Array<ScriptOutputData>>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request, result);
         // All table output paths for this pipeline
         const outputPathsTables = outputManager.getOutputsByPipelineCategory(pipeline, 'tables') as Array<ScriptOutputPath>;
         
@@ -1528,10 +1528,10 @@ ${context}
         return outputs;
     }
 
-    
-    async _exportPipelineDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, meta: ScriptMeta): Promise<Array<ScriptOutputData>>
+
+    async _exportPipelineDocs(scope: any, request: RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult): Promise<Array<ScriptOutputData>>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request, result);
         // All table output paths for this pipeline
         const outputPathsDocs = outputManager.getOutputsByPipelineCategory(pipeline, 'docs') as Array<ScriptOutputPath>;
         // real doc outputs
@@ -1583,9 +1583,9 @@ ${context}
     /** Get internal outputs synchronously per pipeline
      *  Iterate from outputs and run pipelines where needed
     */
-    getLocalScopeResultOutputsInternal(scope:any, request:RunnerScriptExecutionRequest, meta:ScriptMeta):Array<ScriptOutputData>
+    getLocalScopeResultOutputsInternal(scope:any, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result);
         const pipelines = outputManager.getPipelines();
 
         console.info(`Runner::getLocalScopeResultOutputsInternal(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
@@ -1615,9 +1615,9 @@ ${context}
     }
 
     /** Get internal Obj/Shape model data from local execution scope */
-    _exportPipelineModelsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptOutputData>
+    _exportPipelineModelsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result);
         const outputPaths = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'model', ['internal']); // get the models to export for current pipeline
 
         const outputs = [] as Array<ScriptOutputData>;
@@ -1635,9 +1635,9 @@ ${context}
     }
 
     /** Get internal Metric data from local execution scope and set in result tree */
-    _exportPipelineMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptOutputData>
+    _exportPipelineMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result);
         const outputPathsForMetrics = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'metrics', ['internal']); // get the metrics to export for current pipeline
         
         const outputs = [] as Array<ScriptOutputData>;
@@ -1666,9 +1666,9 @@ ${context}
 
 
     /** Get internal Table data from local execution scope and set in result tree */
-    _exportPipelineTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptOutputData>
+    _exportPipelineTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result);
         // Get all table outputs for this pipeline in internal format
         const outputPathsForTables = outputManager.getOutputsByPipelineCategory(pipeline, 'tables') as Array<ScriptOutputPath>;
         
@@ -1701,9 +1701,9 @@ ${context}
 
  
     /** Get internal Doc data from local execution scope and set in result tree */
-    _exportPipelineDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, meta:ScriptMeta):Array<ScriptOutputData>
+    _exportPipelineDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,meta);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result);
         const outputPathsForDocs = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'docs', ['internal']); // get the docs to export for current pipeline
         const outputs = [] as Array<ScriptOutputData>;
 
