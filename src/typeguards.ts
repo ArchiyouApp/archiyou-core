@@ -17,7 +17,7 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           AnnotationAutoDimStrategy,
           RunnerScriptExecutionResult,
           RunnerScriptExecutionRequest,
-          ScriptOutputFormat, ScriptOutputDataWrapper
+          ScriptOutputCategory, ScriptOutputFormat, ScriptOutputDataWrapper
         } from './internal' // types
 
 import { ParamType, ScriptParam, ScriptParamData } from './internal'
@@ -575,12 +575,20 @@ export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutio
 
 //// EXECUTION RESULTS ////
 
-export function isScriptOutputFormat(o:any): o is ScriptOutputFormat
+export function isScriptOutputCategory(o:any):o is ScriptOutputCategory
 {
-    return SCRIPT_OUTPUT_MODEL_FORMATS.includes(o) 
-        || SCRIPT_OUTPUT_METRIC_FORMATS.includes(o)
-        || SCRIPT_OUTPUT_TABLE_FORMATS.includes(o)
-        || SCRIPT_OUTPUT_DOC_FORMATS.includes(o);
+    return typeof o === "string" && ['model','metrics','tables','docs'].includes(o);
+}
+
+/** Main typeguard for OutputFormat - Please update constants.ts when introducing a new format! */
+export function isScriptOutputFormat(o:any):o is ScriptOutputFormat
+{
+    const ALL_FORMATS = [...SCRIPT_OUTPUT_MODEL_FORMATS, ...SCRIPT_OUTPUT_METRIC_FORMATS, ...SCRIPT_OUTPUT_TABLE_FORMATS, ...SCRIPT_OUTPUT_DOC_FORMATS, 'internal']
+    const r = typeof o === "string" && ALL_FORMATS.includes(o);
+    if(!r){
+        console.error(`isScriptOutputFormat: Unknown output format "${o}". Valid formats: ${ALL_FORMATS.join(', ')}`);
+    }
+    return r;
 }
 
 export function isScriptOutputDataWrapper(o:any): o is ScriptOutputDataWrapper
@@ -589,3 +597,5 @@ export function isScriptOutputDataWrapper(o:any): o is ScriptOutputDataWrapper
         && o.data // can be string, object, Buffer
         && typeof o.type === 'string';
 }
+
+

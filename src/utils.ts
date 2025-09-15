@@ -577,3 +577,31 @@ export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffe
 
     return result;
 }
+
+/**
+ * Converts a record object to a URL parameter string.
+ * Example: { foo: 'bar', baz: 1 } => 'foo=bar&baz=1'
+ * @param params Record<string, any>
+ * @returns URL parameter string
+ */
+export function recordToUrlParams(params: Record<string, any>): string {
+    return Object.entries(params)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&');
+}
+
+/**
+ * Converts a URL parameter string to a record object.
+ * Example: 'foo=bar&baz=1' => { foo: 'bar', baz: '1' }
+ * @param paramString URL parameter string
+ * @returns Record<string, string>
+ */
+export function urlParamsToRecord(paramString: string): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (!paramString) return params;
+    paramString.split('&').forEach(pair => {
+        const [key, value] = pair.split('=');
+        if (key) params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+    });
+    return params;
+}

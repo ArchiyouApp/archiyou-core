@@ -148,12 +148,16 @@ export class Script
 
     //// PARAM CHECKS ////
 
-    /** Check parameter values against script definition params
-     *  Return Record with valid values only
-     *  If value was invalid, use default value
+    /** Check parameter values against script definition params and give back error messages
+     *  @return 
+     *      success flag
+     *      Record with valid values only
      */
-    checkParamValues(paramValues:Record<string,any>):Record<string,any>
+    checkParamValuesVerbose(paramValues:Record<string,any>):{ success: boolean, errors: Array<string>, checkedParamValues: Record<string,any> }
     {
+        let errors:Array<string> = [];
+        let success: boolean;
+
         const checkedParamValues = Object.fromEntries(
             Object.entries(this.params).map(([key, param]) => {
                 return [key, param.default];
@@ -164,24 +168,37 @@ export class Script
         {
             const keyUpper = key.toUpperCase();
             const param = this.params[keyUpper];
-            
-            if(param && param.validateValue(value))
+
+            const { success: validateSuccess, errors: validateErrors } = param.validateValueVerbose(value)
+            if(param && validateSuccess)
             {
                 checkedParamValues[keyUpper] = value;
+                success = validateSuccess;
             }
             else {
-                if(!param){ 
-                    console.warn(`Script.checkParamValues(): Invalid param name "${key}", ignoring it.`);
+                success = false;
+                if(!param)
+                { 
+                    errors.push(`Script.checkParamValues(): Invalid param name "${key}", ignoring it.`);
                 }
                 else {
-                    console.warn(`Script.checkParamValues(): Invalid value for param "${key}": ${value}, using default: ${param.default}`);
+                    errors = errors.concat(validateErrors);
                 }
             }
         }
 
-        return checkedParamValues;
-        
+        // Log all errors
+        errors.forEach( (e) => console.error(e) );
+
+        return { success, errors, checkedParamValues };   
     }
+
+    /** Simple flag version */
+    checkParamValues(paramValues:Record<string,any>):boolean
+    {
+        return this.checkParamValuesVerbose(paramValues).success;
+    }
+
 
     //// PUBLISH ////
 

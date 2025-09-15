@@ -277,6 +277,7 @@ export interface RunnerScriptExecutionResult
 
     statements?: Array<StatementResult>
     errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
+    warnings?: Array<string>, // warnings that occured related to request or execution
     messages?: Array<ConsoleMessage>, // based on settings in request you find the relevant messages
 
     meta?: ScriptMeta, // meta information on the script execution

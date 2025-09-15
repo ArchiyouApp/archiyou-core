@@ -1296,7 +1296,8 @@ ${context}
         // Outputs (needs to be after meta, because we need that info)
         if(request.outputs)
         {
-            result.outputs = await this.getLocalScopeResultOutputs(scope, request, result.meta);
+            // NOTE: we supply result instead of result.meta, because warnings can be added
+            result.outputs = await this.getLocalScopeResultOutputs(scope, request, result);
         }
         else {
             throw new Error(`Runner::getLocalScopeResults(): No outputs requested`);
@@ -1319,9 +1320,10 @@ ${context}
      *  @scope - execution scope to get results from
      *  @request - execution request with outputs
     */
-    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest, meta:ScriptMeta):Promise<Array<ScriptOutputData>>
+    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):Promise<Array<ScriptOutputData>>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request, meta);
+        const meta = result?.meta || {} as ScriptMeta;
+        const outputManager = new ScriptOutputManager().loadRequest(request, result);
 
         const pipelines = outputManager.getPipelines();
 

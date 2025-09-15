@@ -90,5 +90,6 @@ export * from './RunnerComponentImporter'
 export * from './Script'
 export * from './ScriptParam'
 export * from './LibraryConnector'
+export * from './ScriptOutputPath'
 export * from './ScriptOutputManager'
 

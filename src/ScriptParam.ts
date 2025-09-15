@@ -184,9 +184,17 @@ export class ScriptParam
         }
     }
 
-    /** Validate any value against current Param instance */
     validateValue(v:any):boolean
     {
+        return this.validateValueVerbose(v).success;
+    }
+
+    /** Validate any value against current Param instance */
+    validateValueVerbose(v:any):{ success:boolean, errors:Array<string> }
+    {
+        const errors:Array<string> = [];
+        let success: boolean;
+
         switch (this.type)
         {
             case 'number':
@@ -194,26 +202,36 @@ export class ScriptParam
                 const rmin = v >= this.min;
                 const rmax = v <= this.max;
                 const rstep = this.step ? (v - this.min) % this.step === 0 : true;
-                if(!rn) console.error(`ScriptParam::validateValue: Invalid number value: "${v}" for param "${this.name}"`);
-                if(!rmin) console.error(`ScriptParam::validateValue: Value "${v}" is below min "${this.min}" for param "${this.name}"`);
-                if(!rmax) console.error(`ScriptParam::validateValue: Value "${v}" is above max "${this.max}" for param "${this.name}"`);
-                if(!rstep) console.error(`ScriptParam::validateValue: Value "${v}" is not a multiple of step "${this.step}" for param "${this.name}"`);
+                if(!rn) errors.push(`ScriptParam::validateValue: Invalid number value: "${v}" for param "${this.name}"`);
+                if(!rmin) errors.push(`ScriptParam::validateValue: Value "${v}" is below min "${this.min}" for param "${this.name}"`);
+                if(!rmax) errors.push(`ScriptParam::validateValue: Value "${v}" is above max "${this.max}" for param "${this.name}"`);
+                if(!rstep) errors.push(`ScriptParam::validateValue: Value "${v}" is not a multiple of step "${this.step}" for param "${this.name}"`);
 
-                return rn && rmin && rmax && rstep;
+                success = rn && rmin && rmax && rstep;
+                break;
 
             case 'boolean':
-                return typeof v === 'boolean';
+                success = typeof v === 'boolean';
+                break;
             case 'text':
-                return typeof v === 'string' && v.length > 0 && v.length < (this.length || Infinity);
+                success = typeof v === 'string' && v.length > 0 && v.length < (this.length || Infinity);
+                break;
             case 'options':
-                return Array.isArray(v) && v.every((opt) => typeof opt === 'string');
+                success = Array.isArray(v) && v.every((opt) => typeof opt === 'string');
+                break;
             case 'list':
-                return Array.isArray(v) && v.every((item) => this.listElem?.validateValue(item));
+                success = Array.isArray(v) && v.every((item) => this.listElem?.validateValue(item));
+                break;
             case 'object':
-                return typeof v === 'object' // && this.schema?.validate(v); // TODO
+                success = typeof v === 'object' // && this.schema?.validate(v); // TODO
+                break;
             default:
-                return false;
+                success = false;
         }
+
+        // log errors to console
+        errors.forEach( (e) => console.error(e) );
+        return { success, errors };
     }
 
     //// PARAM ITERATION ////
