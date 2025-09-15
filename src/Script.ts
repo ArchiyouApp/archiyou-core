@@ -134,7 +134,7 @@ export class Script
     }
 
     /** Used by library to set public url of this script */
-    setPublishedUrl(rootUrl:string)
+    setPublishedUrl(rootUrl:string):this
     {
         if(this.published)
         {
@@ -144,6 +144,7 @@ export class Script
         else {
             console.warn("Script.setPublishedUrl(): Cannot set published URL, script is not published yet.");
         }
+        return this;
     }
 
     //// PARAM CHECKS ////
