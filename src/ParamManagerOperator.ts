@@ -8,13 +8,13 @@
  *  
  *  It provides a operator interface in scope of script
  * 
- *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).visibleIf(...)
- *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).enableIf(...)
- *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).enableIf(...)
+ *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).visibleIf(...)
+ *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).enableIf(...)
+ *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).enableIf(...)
  *  
  *  it also provides getters and setters of properties of Param
- *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).value
- *      $PARAMS(:ScriptParamManager).SOME_PARAM(:ScriptParamManagerOperator).type
+ *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).value
+ *      $PARAMS(:ParamManager).SOME_PARAM(:ParamManagerOperator).type
  *      ...etc
  *  
  *  
@@ -24,7 +24,7 @@
  * */
 
 import { ParamManager, ParamOperation } from "./internal";
-import { Param, ScriptParamData } from "./internal";
+import { ScriptParam } from "./internal";
 
 import deepEqual from 'deep-is'
 
@@ -47,13 +47,14 @@ export class ParamManagerOperator
     targetParam:ScriptParam
     value:any // reference to targetParam.value
     manager: ParamManager
-    operation:ScriptParamOperation // undefined (none), new, update, delete
+    operation:ParamOperation // undefined (none), new, update, delete
 
-    constructor(manager:ScriptParamManager, p?:ScriptParam)
+    constructor(manager:ParamManager, p?:ScriptParam)
     {
         if(!p){ throw new Error(`ParamManagerEntryController::constructor(): Please supply a Param obj for init`) }
         
-        this.originalParam = this._checkParam(p); 
+        //this.originalParam = this._checkParam(p); 
+        this.originalParam = p; // TODO: validation
         this.name = this.originalParam.name;
         this.targetParam = { ...this.originalParam, _behaviours: {}}; // start with copy, but reset behaviours 
         this.manager = manager;
@@ -63,7 +64,7 @@ export class ParamManagerOperator
 
     //// GETTERS/SETTERS ////
 
-    setOperation(op:ScriptParamOperation)
+    setOperation(op:ParamOperation)
     {
         this.operation = op;
     }
@@ -77,7 +78,7 @@ export class ParamManagerOperator
         {
             throw new Error(`ParamManager: Your are trying to set a value that does not fit a Param of type ${this.targetParam.type}! Check input type or range!`);
         }        
-        this.targetParam.value = v; // Set value of Param 
+        this.targetParam._value = v; // Set value of Param 
 
         return v;
     }
@@ -93,7 +94,7 @@ export class ParamManagerOperator
         }
         if(!this._checkIfListElemExistsLast(v))
         {
-            this.targetParam.value = this.targetParam.value.concat(v); // Insert new element into list
+            this.targetParam._value = this.targetParam._value.concat(v); // Insert new element into list
         }
 
         return v;
@@ -165,7 +166,7 @@ export class ParamManagerOperator
         }
         */
         // only place reference to value
-        this.value = this.targetParam.value;
+        this.value = this.targetParam._value;
     }
 
     //// COMPARE WITH ORIGINAL PARAM ////
@@ -218,7 +219,7 @@ export class ParamManagerOperator
     
     //// IO ////
 
-    paramToData(param:ScriptParam):ScriptParamData
+    paramToData(param:ScriptParam):ScriptParam
     {
         const behaviourData = {};
         for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
@@ -230,9 +231,9 @@ export class ParamManagerOperator
     }
 
     /** Export to raw Param data for output 
-     *  NOTE: We use ScriptParamData here that is used for IO, but in App it is transformed back to Param
+     *  NOTE: We use ScriptParam here that is used for IO, but in App it is transformed back to Param
     */
-    toData():ScriptParamData
+    toData():ScriptParam
     {
         return this.paramToData(this.targetParam);
     }
@@ -246,7 +247,7 @@ export class ParamManagerOperator
     */
     _checkIfListElemExistsLast(v:Record<string,any>):boolean
     {
-        const exists = deepEqual(this.targetParam.value[this.targetParam.value.length-1], v)
+        const exists = deepEqual(this.targetParam._value[this.targetParam._value.length-1], v)
         if (exists)
         {
             console.warn(`ParamManager::_checkIfListElemExistsLast(): We blocked an element that already exists in the list!`)
@@ -272,7 +273,7 @@ export class ParamManagerOperator
     {
         p = p ?? this.targetParam;
         
-        return (typeof v === 'number' && isFinite(v)) && v >= p.start && v <= p.end;
+        return (typeof v === 'number' && isFinite(v)) && v >= p.min && v <= p.max;
     }
 
     _checkBoolParamInput(v:any, p?:ScriptParam):boolean
@@ -350,12 +351,12 @@ export class ParamManagerOperator
 
         if(p.type === 'number')
         {
-            if(typeof p?.start !== 'number' || typeof p?.end !== 'number' )
+            if(typeof p?.min !== 'number' || typeof p?.max !== 'number' )
             {
-                throw new Error(`ParamManagerEntryController:_checkParam: Please supply a valid 'number' Param object: { start:number, end:number }`);
+                throw new Error(`ParamManagerEntryController:_checkParam: Please supply a valid 'number' Param object: { min:number, max:number }`);
             }
             // correct no default
-            p.default = p?.default || p.start;
+            p.default = p?.default || p.min;
         }
         else if(p.type === 'text')
         {

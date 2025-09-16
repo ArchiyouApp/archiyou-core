@@ -157,20 +157,46 @@ export class Doc
                             console.info(`Doc::executePipelines(): Executing pipeline of document "${docName}" ====`)
                             
                             /* IMPORTANT:
-                                Pipeline functions need to set variables using this.myVar = ... to the scope
-                                If using arrow functions this will not work, because we can't bind function to scope
-                                    In that case you provided scope argument: (scope) => scope.myVar = ...
+
+                                On variables and scopes defined inside the pipeline function:
+
+                                We call functions on the execution scope: ay.scope.call(fn)
+
+                                1. On functions defined with function(){ var1 = ..., let var2 = ... } 
+                                    - without let/var/const: will be placed on scope (non-script mode) 
+                                        ==> Old scripts use this and it works!
+                                    - with let/var/const: will be local to function and not available in scope
+                                
+                                2. On functions define with arrows: docPipeline = () => { var1 = ..., let var2 = ... }
+                                    - without let/var/const: will be placed on global scope (window in browser, global in node)
+                                    - with let/var/const: will be local to function and not available in scope
+
+                                There are ways to get this working, using the above. 
+                                
+                                But we introduce return values for clarity and to avoid confusion:
+                                Any variables that should be available in the scope after execution of the pipeline function
+                                are exported by using return { var1, var2, ...} using object shorthand notation
+
+                                
                             */
-                            if(!pipelineFn?.prototype)
+
+                            const startTime = Date.now();
+                            const outputs = pipelineFn.call(this._ay.scope,this._ay.scope);
+
+                            if(outputs && typeof outputs !== 'object')
                             {
-                                console.warn(`Doc:executePipelines(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)    
+                                console.warn(`Doc:executePipelines(): Your pipeline function did not return anything! Please use return { var1, var2, ... } to set variables on the scope!`);
                             }
                             else {
-                                console.warn('Doc:executePipelines(): To set variables in scope from pipeline function for later use: this.myVar = ...');
+                                console.info(`Doc:executePipelines(): Loading pipeline vars into execution scope: "${Object.keys(outputs).join(', ')}"`);
                             }
-                        
-                            const startTime = Date.now();
-                            pipelineFn.call(this._ay.scope,this._ay.scope);
+
+                            // get returned variables and set them on scope
+                            Object.entries(outputs).forEach(([key, value]) => 
+                            {
+                                if(this._ay.scope[key] !== undefined){ console.warn(`Doc:executePipelines(): Overwriting existing variable "${key}" on execution scope!`); }
+                                this._ay.scope[key] = value;
+                            });
 
                             console.info(`Doc:executePipelines(): Pipeline of document "${docName}" executed in ${Date.now() - startTime}ms`);
                             

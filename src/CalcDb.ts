@@ -15,9 +15,6 @@ export class Db
     shapes:Table; // all Shapes in the current model (see _geom)
     objects:Table; // all Obj containing Shapes in the Scene ( through _geom)
 
-    data:Object; // output data { tablename : [datarows] }
-
-
     constructor(geom:Geom)
     {
         this._geom = geom;

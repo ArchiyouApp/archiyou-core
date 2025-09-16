@@ -676,17 +676,21 @@ export class Runner
     {
         console.info(`Runner::_checkRequestAndAddDefaults(): Checking Execution Request with code "${request.script.code.slice(0, 150)}..."`);
         // check params defs and inputs
-        this._checkRequestParams(request);
+        // DONT VALIDATE
+        // this._checkRequestParams(request);
 
         return {
             ...request
         }
     }
 
-       /** Check params in RunnerScriptExecutionRequest
+    /** Check params in RunnerScriptExecutionRequest
      *  We need to make sure that param values are there and consistent with param definitions 
      *  - if param values (request.params) are not set, we use default values from script.params definitions
      *  - param values (request.params) are put in defs (request.script.params) 
+     *  
+     *  TODO: Use ScriptParam.validateValue() to validate incoming values
+     * 
      * */
     _checkRequestParams(request:RunnerScriptExecutionRequest):RunnerScriptExecutionRequest
     {
@@ -707,6 +711,7 @@ export class Runner
         // Params from script definition and values from request
         const params = (request.script.params && typeof request.script.params === 'object' && Object.keys(request.script.params).length > 0) 
             ? Object.values(request.script.params) : [];
+
         // Make sure we got name in param obj definition too
         params.forEach((pd,i) => 
         {
@@ -716,7 +721,7 @@ export class Runner
         });
 
         const paramValues = (request.params && typeof request.params === 'object' && Object.keys(request.params)) ? request.params : {};
-        params.forEach(pd => pd.value = paramValues[pd.name] || pd.default); // set values from request if available
+        params.forEach(pd => pd.value = paramValues[pd.name] && pd.default); // set values from request if available (beware of false, so && instead of ||)
         // NOTE: in paramManager incoming values are validated and set to default if not valid
         
         // Make sure we have param values too (default if not set)
@@ -765,6 +770,7 @@ export class Runner
     */
     async _executeLocal(request: RunnerScriptExecutionRequest, startRun:boolean=true, output:boolean=true):Promise<RunnerScriptExecutionResult|null>
     {
+        // First Check if OpenCascade is loaded
         if(!this.loaded())
         { 
             console.warn(`Runner::_executeLocal(): OpenCascade WASM module not loaded yet. The request is executed once it is!`);
@@ -783,7 +789,15 @@ export class Runner
                 checkLoaded();
             });
         }
-            
+
+        
+        // Create a fresh scope if this is a new execute run
+        if(startRun)
+        {
+            console.log('**** CREATING FRESH SCOPE STATE FOR NEW RUN ****');
+            this.createScope('default'); // resets all scope variables
+        }
+
         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
         console.info(`* With param values: ${JSON.stringify(request.params)} *`);
 
@@ -1023,13 +1037,14 @@ ${context}
     */
     _executionStartRunInScope(scope:any, request: RunnerScriptExecutionRequest):void
     {
-        // Setup ParamManager
-        // TODO: ParamManager takes array of Params. Make consistent with map of PublishScript.params
-        const params = (typeof request.script.params === 'object') ? Object.values(request.script.params) : []; // defs with values from request.params
-        console.info(`Runner::_executionStartRunInScope()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(params)}"`);
-        
-        scope.ay.paramManager = new ParamManager(params).setParent(scope); // sets globals in setParent()
+        // Setup ParamManager - it still uses Array of Param defintions with _value
+        const paramDefsWithValues = [...Object.values(request.script.params)]
+        paramDefsWithValues.forEach(p => p._value = request.params[p.name]);
+        console.info(`Runner::_executionStartRunInScope()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(paramDefsWithValues)}"`);
+        scope.ay.paramManager = new ParamManager(paramDefsWithValues)
+            .setParent(scope); // sets globals in method setParent()
         scope.$PARAMS = scope.ay.paramManager;
+        
 
         // Reset some modules
         scope.ay.geom.reset(); // reset before we begin
@@ -1368,7 +1383,7 @@ ${context}
         if(request.outputs)
         {
             console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
-            result.outputs = this.getLocalScopeResultOutputsInternal(scope, request, result.meta);
+            result.outputs = this.getLocalScopeResultOutputsInternal(scope, request, result);
         }
         return result;
     }
@@ -1605,10 +1620,10 @@ ${context}
             }
 
             // Gather raw results from pipeline
-            this._exportPipelineModelsInternal(scope, request, pipeline, meta);
-            this._exportPipelineMetricsInternal(scope, request, pipeline, meta);
-            this._exportPipelineTablesInternal(scope,request, pipeline, meta);
-            this._exportPipelineDocsInternal(scope, request, pipeline, meta);
+            this._exportPipelineModelsInternal(scope, request, pipeline, result);
+            this._exportPipelineMetricsInternal(scope, request, pipeline, result);
+            this._exportPipelineTablesInternal(scope,request, pipeline, result);
+            this._exportPipelineDocsInternal(scope, request, pipeline, result);
         };
 
         return outputs;

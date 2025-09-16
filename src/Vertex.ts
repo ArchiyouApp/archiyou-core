@@ -129,7 +129,7 @@ export class Vertex extends Shape
     {
         if (this._ocShape)
         {
-            let ocPoint = this._oc.BRep_Tool.prototype.constructor.Pnt(this._ocShape)
+            const ocPoint = this._oc.BRep_Tool.prototype.constructor.Pnt(this._ocShape)
             this._x = ocPoint.X();
             this._y = ocPoint.Y();
             this._z = ocPoint.Z();

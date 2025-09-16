@@ -149,15 +149,13 @@ export class ScriptParam
                 const rstep = isNumeric(param?.step);
                 if(!rmin) console.error(`ScriptParam::validateStructure(): Value min "${param?.min}" is invalid for param "${param?.name}"`);
                 if(!rmax) console.error(`ScriptParam::validateStructure(): Value max "${param?.max}" is invalid for param "${param?.name}"`);
-                if(!rstep) console.error(`ScriptParam::validateStructure(): Value step "${param?.step}" is invalid for param "${param?.name}"`);
+                if(!rstep) console.error(`ScriptvalidateParam::validateStructure(): Value step "${param?.step}" is invalid for param "${param?.name}"`);
                 // some other tests
                 if(param.default < param.min || param.default > param.max)
                 {
                     console.error('ScriptParam::validateStructure(): Default value is out of bounds');
                     param.default = param.min;
                 }
-
-
                 return rmin && rmax && rstep;
             case 'boolean':
                 param.default = param?.default ?? false // default is false
@@ -217,7 +215,11 @@ export class ScriptParam
                 success = typeof v === 'string' && v.length > 0 && v.length < (this.length || Infinity);
                 break;
             case 'options':
-                success = Array.isArray(v) && v.every((opt) => typeof opt === 'string');
+                const vf  = typeof v !== 'string' || v.length === 0;
+                const optInc = this.options?.includes(v);
+                if(vf) errors.push(`ScriptParam::validateValue: Invalid option value: "${v}" for param "${this.name}"`);
+                if(!optInc) errors.push(`ScriptParam::validateValue: Value "${v}" is not part of options [${this.options?.join(', ')}] for param "${this.name}"`);
+                success = !vf && optInc;
                 break;
             case 'list':
                 success = Array.isArray(v) && v.every((item) => this.listElem?.validateValue(item));

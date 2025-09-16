@@ -19,10 +19,13 @@
  *                      It is the responsibility of receiver to compare existing params with incoming ManagedParams. 
  *                      There is a helper method on ParamManager.updateParamsWithManaged()
  * 
+ * 
+ *  TODO: Refactor and test with new ScriptParam
+ * 
+ * 
  */
 
-import { Param, ScriptParamData, ParamOperation, ParamManagerOperator,  } from './internal'
-import { ScriptParamDataToParam, paramToScriptParamData } from './internal' // utils
+import { ScriptParam, ParamOperation, ParamManagerOperator } from './internal'
 
 import deepEqual from 'deep-is'
 
@@ -39,11 +42,13 @@ export class ParamManager
     paramOperators:Array<ParamManagerOperator> = [];
 
     /** Set up ParamManager with current params */
-    constructor(params?:Array<ScriptParamData|ScriptParam>)
+    constructor(params?:Array<ScriptParam>)
     {
         if(Array.isArray(params) && params.length > 0)
         {
-            this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(ScriptParamDataToParam(p)))); // always make sure we use Param internally
+            //this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(ScriptParamToParam(p)))); // always make sure we use Param internally
+            // Disable validation because its old
+            this.paramOperators = params.map(p => new ParamManagerOperator(this, p)); // always make sure we use Param internally
             this.paramOperators.forEach( p => this[p.name] = p) // set param access
         }
     }
@@ -61,7 +66,7 @@ export class ParamManager
      *  If needed forcing reactivity by creating copies
      *  returns new or changed params 
      */
-    static updateParamsWithManaged(currentParams:Array<Param|ScriptParamData>, managedParams:Record<ParamOperation, Array<ScriptParamData>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<ScriptParam>
+    static updateParamsWithManaged(currentParams:Array<ScriptParam>, managedParams:Record<ParamOperation, Array<ScriptParam>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<ScriptParam>
     {
         const allManagedParams = [...managedParams.new, ...managedParams.updated];
         const paramsToChange:Array<ScriptParam> = []
@@ -72,13 +77,13 @@ export class ParamManager
             if(!presentParam)
             {
                 // new param
-                paramsToChange.push(ScriptParamDataToParam(managedParam));
+                paramsToChange.push(managedParam);
             }
             else {
                 // existing param: check if changed
-                if(!deepEqual(paramToScriptParamData(ParamManager.validateParam(presentParam)), ParamManager.validateParam(managedParam)))
+                if(!deepEqual(presentParam, managedParam))
                 { 
-                    paramsToChange.push(ScriptParamDataToParam(ParamManager.validateParam(managedParam)))
+                    paramsToChange.push(managedParam)
                 }
             }
         })
@@ -103,7 +108,7 @@ export class ParamManager
     //// MANAGING PARAMS ////
 
     /** Add or update Param and return what was done (update, new, null)  */
-    addParam(p:ScriptParam):ScriptParamOperation|null
+    addParam(p:ScriptParam):ParamOperation|null
     {
         if(this._paramNameExists(p))
         { 
@@ -118,7 +123,7 @@ export class ParamManager
         }
         else {
             // create new
-            const newParamOperator = new ParamManagerOperator(this, this._validateParam(p));
+            const newParamOperator = new ParamManagerOperator(this, p);
             this.paramOperators.push(newParamOperator);
             newParamOperator.setOperation('new');
             return 'new'
@@ -177,7 +182,7 @@ export class ParamManager
         return map;
     }
 
-    getParamController(name:string):ScriptParamManagerOperator
+    getParamController(name:string):ParamManagerOperator
     {
         return this.paramOperators.find(pc => pc.name === name)
     }
@@ -200,7 +205,7 @@ export class ParamManager
         if(!p){ throw new Error(`ParamManager::define(p:ScriptParam): Please supply valid Param object! Got ${JSON.stringify(p)}`); }
         if(!p?.name){ throw new Error(`ParamManager::define(): Please supply at least a name for this Param!`); }
 
-        const checkedParam = this._validateParam(p);
+        const checkedParam = p;
         if(!checkedParam)
         { 
             return this; //  Error already thrown in checkParam if any
@@ -213,98 +218,10 @@ export class ParamManager
         return this;
     }
 
-    /** Check Param or ScriptParamData input and fill in defaults
-     *  We try to make anything work here, except if nothing is given
-     *  See also checkParam in ParamEntryController
-     */
-    static validateParam<TParam extends Param|ScriptParamData>(p:TParam):TParam
-    {
-        if(!p)
-        {
-            console.error(`ParamManager::validateParam(p:ScriptParam): Please supply valid Param object! Got null/undefined!`);
-            return null;
-        }
-
-        const paramType = p?.type || 'number'; // Default Param type is number
-
-        let checkedParam:TParam;
-
-        switch(paramType)
-        {
-            case 'number':
-                checkedParam = {
-                    ...p, // copy all for convenience 
-                    type: paramType,
-                    start: p?.start ?? 0,
-                    end: p?.end ?? 100,
-                    step: p?.step ?? 1,
-                } as TParam;
-                // if default not given choose start
-                checkedParam['default'] = p?.default ?? p.start;
-                break;
-            case 'boolean': 
-                checkedParam = {
-                    ...p, // copy all for convenience 
-                    type: paramType,
-                } as TParam;
-                break;
-            case 'text':
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    length: p.length ?? 100,
-                } as TParam;
-                break;
-            case 'options':
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    options: p.options ?? [],
-                } as TParam;
-                break;
-            case 'list': 
-                // NOTE: listElem is also a Param, which we need to check!
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    listElem: ParamManager.validateParam(p.listElem) ?? ParamManager.validateParam({ type: 'number' } as Param), // a Number is the default for a List
-                } as TParam;
-                break;
-            case 'object':
-                // Object schema is also a set of Params
-                const s = p.schema ?? {};
-                const schema = {};
-                
-                for (const [name, param] of Object.entries(s))
-                {
-                    schema[name.toUpperCase()] = ParamManager.validateParam(param); // param names are always uppercase!
-                }
-
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    schema: schema,
-                } as TParam;
-                break;
-        }
-
-        // basic checks and defaults
-        checkedParam.name = checkedParam?.name?.toUpperCase() ?? null; // make sure names are always uppercase
-        checkedParam.enabled = checkedParam?.enabled ?? true;
-        checkedParam.visible = checkedParam?.visible ?? true;
-        
-        return checkedParam;
-    }
-
-    _validateParam(p:ScriptParam):ScriptParam
-    {
-        return ParamManager.validateParam(p);
-    }
-
     //// EVALUATE ////
 
     /** Return Params that we operated upon */
-    getOperatedParamsByOperation():Record<ParamOperation, Array<ScriptParamData>>
+    getOperatedParamsByOperation():Record<ParamOperation, Array<ScriptParam>>
     {
         const changedParamsByOperation = this.paramOperators
                                     .filter((po) => po.paramOperated())
@@ -313,7 +230,7 @@ export class ParamManager
                                             acc[po.operation as ParamOperation].push(po.toData())
                                             return acc
                                         }, 
-                                        { new: [] as Array<ScriptParamData>, updated: [] as Array<ScriptParamData>, deleted: [] as Array<ScriptParamData> })
+                                        { new: [] as Array<ScriptParam>, updated: [] as Array<ScriptParam>, deleted: [] as Array<ScriptParam> })
 
         console.info('**** ParamManager::getOperatedParamsByOperation ****')
         console.info(changedParamsByOperation);
@@ -348,17 +265,17 @@ export class ParamManager
         // Set value of param reference ${PARAM_NAME} on scope
         curParams.forEach( p => 
         {
-            console.info(`ParamManager::setParamGlobalsInScope(): Setting global param "${this.PARAM_SIGNIFIER + p.name}" with value "${p.value ?? p.default}"`);
-            scope[this.PARAM_SIGNIFIER + p.name] = p.value ?? p.default;
+            console.info(`ParamManager::setParamGlobalsInScope(): Setting global param "${this.PARAM_SIGNIFIER + p.name}" with value "${p._value ?? p.default}"`);
+            scope[this.PARAM_SIGNIFIER + p.name] = p._value ?? p.default;
         })
     }
 
-    /** Compare two params (either Param or ScriptParamData) */
-    equalParams(param1:ScriptParam|ScriptParamData, param2:ScriptParam|ScriptParamData):boolean
+    /** Compare two params (either Param or ScriptParam) */
+    equalParams(param1:ScriptParam, param2:ScriptParam):boolean
     {
-        const ScriptParamData1 = JSON.parse(JSON.stringify(paramToScriptParamData(param1)));
-        const ScriptParamData2 = JSON.parse(JSON.stringify(paramToScriptParamData(param2)));
-        return deepEqual(ScriptParamData1,ScriptParamData2);
+        const ScriptParam1 = JSON.parse(JSON.stringify(param1));
+        const ScriptParam2 = JSON.parse(JSON.stringify(param2));
+        return deepEqual(ScriptParam1,ScriptParam2);
     }
 
     /** Set quick references from this instance to the values of params 
