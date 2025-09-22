@@ -166,7 +166,15 @@ export class ScriptParam
                 if (!rl){ console.error(`ScriptParam::validateStructure: Invalid text length for param "${param?.name}": ${param?.length}`);}
                 return rl;
             case 'options':
-                return (Array.isArray(param?.options) && param.options.length > 0);
+                const vs = (Array.isArray(param?.options) && param.options.length > 0);
+                if(!vs) { console.error(`ScriptParam::validateStructure: Invalid options for param "${param?.name}": ${param?.options}`); }
+                // check default
+                if(vs && (typeof param?.default !== 'string' || !param.options.includes(param.default)))
+                {
+                    console.warn(`ScriptParam::validateStructure: Default option "${param?.default}" is not part of options [${param?.options?.join(', ')}] for param "${param?.name}". Setting to first option.`);
+                    param.default = param.options[0];
+                }
+                return vs;
             case 'list':
                 return (
                         param?.listElem

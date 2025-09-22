@@ -882,7 +882,8 @@ export class Runner
 - error: "${e.message}" 
 - context: 
 ${context}
-**** END ERROR ****`;
+${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
+**** END ERROR ****`; 
 
         // Also add to local console
         console.error(errorMessage);
@@ -934,10 +935,13 @@ ${context}
             let context = contextLines.join('\n');
 
             // Try to highlight error
+            // Disabled because it's not very reliable
+            /*
             const stringOverlap = this._stringOverlap(context, e.message);
             if(stringOverlap){
                 context = context.replace(stringOverlap, `\x1b[31m >>>> ${stringOverlap} <<<<\x1b[0m`);
             }
+            */
 
             return context;
         }

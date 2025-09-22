@@ -415,6 +415,8 @@
       @checkInput('AnyShapeOrCollection', 'ShapeCollection')
       add(shapes?:AnyShapeOrSequence, ...args):this
       {
+         // TODO: Adding to ShapeCollection is by reference. This makes it not exclusively owned
+         // This sometimes leads to bugs, especially in map/forEach loops and global variables (not using let/const)
          this._addEntities([shapes, ...args])
          this._setFakeArrayKeys();
 
