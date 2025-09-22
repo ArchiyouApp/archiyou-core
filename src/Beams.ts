@@ -34,7 +34,7 @@
  *      
  */
 
-import { v4 as uuidv4 } from 'uuid'
+import { uuidv4 } from './internal' // utils
 import { ArchiyouApp, Point, Vector, Shape, AnyShape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
 import { Alignment, PointLike, isPointLike } from './internal'
 import { isNumeric, toRad }  from './internal'

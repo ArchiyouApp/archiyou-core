@@ -634,6 +634,7 @@ function _getHash(str:string):string
     return hash;
 }
 
+
 function _checkCache(cache:{(key:string):any} = null, hash:string):any
 {
     if (!cache)
@@ -648,7 +649,6 @@ function _setCache(cache:{(key:string):any}, hash:string, result:any)
 {
     cache[hash] = result;
 }
-
 
 /** TODO */
 export function ocCheck(target:Object, method:string,  descriptor: PropertyDescriptor)

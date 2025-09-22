@@ -5,7 +5,6 @@
  *      Able to run automatically or manually
  * 
  *      For now a pipeline is just a simple function that is run when needed.
- *      Later we can add structure to it (layout, annotate etc)
  */ 
 
 import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, isPipelineType } from './internal'

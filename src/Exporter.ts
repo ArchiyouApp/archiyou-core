@@ -1,4 +1,4 @@
-import { Shape, AnyShape, ShapeCollection} from './internal'
+import { Shape, AnyShape, ShapeCollection, ArchiyouApp} from './internal'
 
 import { ExportGLTFOptions, MeshingQualitySettings} from './internal'
 
@@ -54,11 +54,17 @@ export class Exporter
 
     //// END SETTINGS ////
 
-    _parent = null; 
+    _ay:ArchiyouApp; // New method, see set Archiyou
 
-    constructor(parent:any) 
+    constructor(ay?:ArchiyouApp) 
     {
-        this._parent = parent; // Either reference to WebWorker or Main.vue
+        this._ay = ay;
+    }
+
+    setArchiyou(ay:ArchiyouApp):this
+    {
+        this._ay = ay;
+        return this;
     }
 
     exportToStep():string
@@ -71,12 +77,12 @@ export class Exporter
         */
 
         const filename = this._getFileName() + '.step';
-        let sceneCompoundShape = new ShapeCollection(this._parent.geom.all()
+        let sceneCompoundShape = new ShapeCollection(this._ay.geom.all()
                                     .filter(s => s.visible())).toOcCompound(); // filter might return only one Shape
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
 
-        const oc = this._parent.geom._oc;
+        const oc = this._ay.geom._oc;
         
         let ocWriter = new oc.STEPControl_Writer_1();
         let ocTransferResult = ocWriter.Transfer(sceneCompoundShape, 0, true, new oc.Message_ProgressRange_1()); 
@@ -118,16 +124,16 @@ export class Exporter
 
     exportToStl():Uint8Array
     {
-        // !!!! TODO: is seperate triangulation needed? !!!!
-        /* See OC docs: 
-            - https://dev.opencascade.org/doc/refman/html/class_stl_a_p_i.html
-        */
-
-        const oc = this._parent.geom._oc;
+        const oc = this._ay.geom._oc;
         const filename = this._getFileName() + '.stl';
+
+        const visibleShapes = this._ay.geom.all().filter(s => s.visible());
         
-        let sceneCompoundShape = new ShapeCollection(
-                                        this._parent.geom.all().filter(s => s.visible())).toOcCompound();
+        // IMPORTANT: Make sure all shapes are triangulated before exporting to STL
+        // TODO: avoid doing this multiple times if already done before GLTF
+        this._triangulateShapes(visibleShapes);
+
+        const sceneCompoundShape = visibleShapes.toOcCompound();
 
         console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
         const ocStlWriter = new oc.StlAPI_Writer();
@@ -172,14 +178,14 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<Uint8Array|string>
+    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|null>
     {
         const startGLTFExport = performance.now();
 
-        const oc = this._parent.geom._oc;
+        const oc = this._ay.geom._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
         
-        const meshingQuality = options.quality || this._parent?.meshingQuality || this.DEFAULT_MESH_QUALITY;
+        const meshingQuality = options.quality || this.DEFAULT_MESH_QUALITY;
         const filename = `file.${(options.binary) ? 'glb' : 'gltf'}`
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
 
@@ -190,38 +196,46 @@ export class Exporter
             and export as much properties (id, color) as possible 
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
-        
-        new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type())))
-        .forEach(entity => {
-            if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
-            {
-                const shape = entity as AnyShape;
-                const ocShape = shape._ocShape;
-                const ocShapeLabel = ocShapeTool.AddShape(ocShape,false,false); // Shape, makeAssembly, makePrepare
 
-                const shapeName = `${shape.getId()}__${shape.getName()}`; // save obj_id and name into GLTF node
-                
-                oc.TDataStd_Name.Set_2(ocShapeLabel, 
-                                oc.TDataStd_Name.GetID(), 
-                                new oc.TCollection_ExtendedString_2(shapeName, false)); // Set_2 not according to docs (no Set_3)
+        const exportShapes = this._ay.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type()));
 
-                // Export basic material to GLTF
-                if (shape._getColorRGBA() !== null)
+        if(exportShapes.length === 0)
+        {
+            console.error(`Exporter::exportToGLTF: No visible shapes to export`);
+            return null;
+        }
+
+        new ShapeCollection(exportShapes)
+            .forEach(entity => {
+                if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
                 {
-                    const ocMaterialTool = oc.XCAFDoc_DocumentTool.prototype.constructor.VisMaterialTool(ocShapeLabel).get(); // returns Handle< XCAFDoc_VisMaterialTool >
-                    const ocMaterial = new oc.XCAFDoc_VisMaterial();
-                    const ocPBRMaterial = new oc.XCAFDoc_VisMaterialPBR(); // this is a struct
-                    ocPBRMaterial.BaseColor = new oc.Quantity_ColorRGBA_5(...shape._getColorRGBA()); // [ r,g,b,a]
-                    ocMaterial.SetPbrMaterial(ocPBRMaterial);
-                    const ocMaterialLabel = ocMaterialTool.AddMaterial_1( new oc.Handle_XCAFDoc_VisMaterial_2(ocMaterial), new oc.TCollection_AsciiString_2(shapeName)); // returns TDF_Label
-                    ocMaterialTool.SetShapeMaterial_1(ocShapeLabel, ocMaterialLabel);
+                    const shape = entity as AnyShape;
+                    const ocShape = shape._ocShape;
+                    const ocShapeLabel = ocShapeTool.AddShape(ocShape,false,false); // Shape, makeAssembly, makePrepare
 
-                    // NOTE: do we need to delete these OC classes (not here because we need them still). Save the references?
+                    const shapeName = `${shape.getId()}__${shape.getName()}`; // save obj_id and name into GLTF node
+                    
+                    oc.TDataStd_Name.Set_2(ocShapeLabel, 
+                                    oc.TDataStd_Name.GetID(), 
+                                    new oc.TCollection_ExtendedString_2(shapeName, false)); // Set_2 not according to docs (no Set_3)
+
+                    // Export basic material to GLTF
+                    if (shape._getColorRGBA() !== null)
+                    {
+                        const ocMaterialTool = oc.XCAFDoc_DocumentTool.prototype.constructor.VisMaterialTool(ocShapeLabel).get(); // returns Handle< XCAFDoc_VisMaterialTool >
+                        const ocMaterial = new oc.XCAFDoc_VisMaterial();
+                        const ocPBRMaterial = new oc.XCAFDoc_VisMaterialPBR(); // this is a struct
+                        ocPBRMaterial.BaseColor = new oc.Quantity_ColorRGBA_5(...shape._getColorRGBA()); // [ r,g,b,a]
+                        ocMaterial.SetPbrMaterial(ocPBRMaterial);
+                        const ocMaterialLabel = ocMaterialTool.AddMaterial_1( new oc.Handle_XCAFDoc_VisMaterial_2(ocMaterial), new oc.TCollection_AsciiString_2(shapeName)); // returns TDF_Label
+                        ocMaterialTool.SetShapeMaterial_1(ocShapeLabel, ocMaterialLabel);
+
+                        // NOTE: do we need to delete these OC classes (not here because we need them still). Save the references?
+                    }
+                    
+                    // triangulate BREP to mesh
+                    ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
                 }
-                
-                // triangulate BREP to mesh
-                ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
-            }
         })
 
         const ocGLFTWriter = new oc.RWGltf_CafWriter(new oc.TCollection_AsciiString_2(filename), meshingQuality);
@@ -232,19 +246,17 @@ export class Exporter
         ocGLFTWriter.SetForcedUVExport(true); // to output UV coords
         ocGLFTWriter.Perform_2(docHandle, new oc.TColStd_IndexedDataMapOfStringString_1(), new oc.Message_ProgressRange_1());
         
-        // TODO: We might need to pick up the seperate bin file for text-based GLTF
-        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: (options.binary) ? 'binary' : 'utf8' });
+        const gltfFile = oc.FS.readFile(`./${filename}`, { encoding: 'binary' }); // only binary for now
+        let gltfContent =  new Uint8Array(gltfFile.buffer) as Uint8Array; 
         oc.FS.unlink("./" + filename);
         
-        let gltfContent =  (options.binary) ? new Uint8Array(gltfFile.buffer) : gltfFile;
+        // clean up OC classes (if any shapes)
+        ocShapeTool?.delete();
+        ocIncMesh?.delete();
+        ocGLFTWriter?.delete();
+        ocCoordSystemConverter?.delete();
 
-        // clean up OC classes
-        ocShapeTool.delete();
-        ocIncMesh.delete();
-        ocGLFTWriter.delete();
-        ocCoordSystemConverter.delete();
-
-        console.info(`Exporter::exportToGLTF: Exported OC data in ${Math.round(performance.now() - startGLTFExport)}ms`);
+        console.info(`Exporter::exportToGLTF: Exported ${exportShapes.length} OC Shapes in ${Math.round(performance.now() - startGLTFExport)}ms`);
         const startGLTFExtra = performance.now();
 
         // Force inclusion of points and lines to export
@@ -252,7 +264,7 @@ export class Exporter
         {
             const startGLTFPointsAndLines = performance.now();
             const pointAndLineShapes:ShapeCollection = new ShapeCollection(
-                        this._parent.geom.all()
+                        this._ay.geom.all()
                         .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type()))));
             if (pointAndLineShapes.length > 0)
             {
@@ -264,24 +276,53 @@ export class Exporter
         // extra vertices and lines for specific visualization styles
         if (options?.extraShapesAsPointLines)
         {
+            console.info(`Exporter::exportToGLTF: Flag extraShapesAsPointLines: Exporting extra Shapes as Points and Lines. `);
             const startGLTFExtraShapes = performance.now();
-            const extraOutputShapes = new ShapeCollection(this._parent.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
-            gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
-            console.info(`Exporter::exportToGLTF: Exported extra ${extraOutputShapes.length} Shapes in ${Math.round(performance.now() - startGLTFExtraShapes)}ms`);
+            const extraOutputShapes = new ShapeCollection(this._ay.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
+            if( extraOutputShapes.length > 0)
+            {
+                gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
+            }
+            console.info(`Exporter::exportToGLTF: Exported extra ${extraOutputShapes.length} Shapes in ${Math.round(performance.now() - startGLTFExtraShapes)}ms`);            
         }
 
         // Add special archiyou data in GLTF asset.extras section
         if(options?.archiyouFormat)
         {
-            // add special Archiyou data to GLTF
+            console.info(`Exporter::exportToGLTF: Flag archiyouFormat: Exporting Archiyou data inside GLTF extras. Settings: ${JSON.stringify(options?.archiyouOutput)}`);
+            // We do some performance measurements here
             const startGLTFArchiyouData = performance.now();
-            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._parent.ay, options?.archiyouOutput || {}); 
+            gltfContent = await new GLTFBuilder().addArchiyouData(gltfContent, this._ay, options?.archiyouOutput || {}); 
             console.info(`Exporter::exportToGLTF: Exported archiyou data in ${Math.round(performance.now() - startGLTFArchiyouData)}ms`);	
+        }
+        else {
+            console.info(`Exporter::exportToGLTF: Skipped Archiyou data export. Set export flag data to true and set metrics, tables, docs flags for output`);
         }
 
         console.info(`Exporter::exportToGLTF: Exported extra data in ${Math.round(performance.now() - startGLTFExtra)}ms`);	
 
-        return gltfContent; // NOTE: text-based has no embedded buffers (so is empty)
+        return gltfContent.buffer as ArrayBuffer; // convert Uint8Array to ArrayBuffer
+    }
+
+    /** Needs to be called before before STL 
+     *  Also with GLTF but keep it seperate for now
+     *  Return OcIncMesh instance to be able to delete them
+     */
+    _triangulateShapes(shapes:ShapeCollection, meshingQuality?:MeshingQualitySettings):Array<any>
+    {
+        const oc = this._ay.geom._oc;
+        meshingQuality = meshingQuality || this.DEFAULT_MESH_QUALITY;
+        const ocIncMeshes = [] as Array<any>;
+        new ShapeCollection(shapes)
+        .forEach(entity => {
+            if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
+            {
+                const ocShape = entity._ocShape;
+                const ocIncMesh = new oc.BRepMesh_IncrementalMesh_2(ocShape, meshingQuality.linearDeflection, false, meshingQuality.angularDeflection, false);
+                ocIncMeshes.push(ocIncMesh);
+            }
+        });
+        return ocIncMeshes;
     }
 
     /** Export GLTF (binary or text) to the browser window */
@@ -319,12 +360,12 @@ export class Exporter
     {
         if(!only2D)
         {
-            const visibleShapes = this._parent.geom.all().filter(s => s.visible());
+            const visibleShapes = this._ay.geom.all().filter(s => s.visible());
             return visibleShapes._isometry().toSvg();
         }
         else {
             // Only export 2D edges on XY plane
-            const edges2DCollection = new ShapeCollection(this._parent.geom.all().filter(s => s.visible() && s.is2DXY()));
+            const edges2DCollection = new ShapeCollection(this._ay.geom.all().filter(s => s.visible() && s.is2DXY()));
             return edges2DCollection.toSvg();
         }
     }

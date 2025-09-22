@@ -16,11 +16,12 @@ import chroma from 'chroma-js' // direct import like in documentation does not w
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Geom, isObjStyle, isBaseStyle} from './internal'
 import { AnyShape, isAnyShape } from './internal' // types
 import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
-import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
+import { uuidv4 } from './internal' // utils
 import { MeshShape, MeshShapeBuffer } from './internal' // ExportModels.MeshShape
 import { SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle } from './internal' // InternalModels
 import { isNumeric, colorHexToInt } from './internal'
 import { PointLike, isPointLike, AnyShapeOrCollection, MeshingQualitySettings } from './internal';
+import type { RunnerScriptScopeState } from './internal' 
 
 
 export class Obj
@@ -82,6 +83,12 @@ export class Obj
     setParent(parent:Obj)
     {
         // TODO
+    }
+
+    /** Add Obj with its children to active layer */
+    addToScene()
+    {
+        this._geom.addToActiveLayer(this);
     }
 
     /** Get or set style
@@ -470,16 +477,18 @@ export class Obj
      * */
     _updateShapes(shapes:AnyShapeOrCollection)
     {
-        if ( new Shape().isShape(shapes) )
+        if (!Shape.isShape(shapes) && !ShapeCollection.isShapeCollection(shapes))
         {
-            // console.geom(`Obj::_updateShapes: from type "${this._shapes.type()}" to "${newShape.type()}"`);
-            this._shapes = new ShapeCollection(shapes);
-            this._shapes.setObj(this); // place reference of current Obj into new Shape
+            console.error(`Obj::_updateShapes: Got a unknown type of shape or ShapeCollection: ${typeof shapes}`);
         }
+        
+        this._shapes = new ShapeCollection(shapes);
+        this._shapes.setObj(this); // place reference of current Obj into new Shape
     }
 
-    // ==== Output all mesh data from Shape in this Obj and its children ====
+    //// EXPORTS ////
 
+    /** Output all mesh data from Shape in this Obj and its children */
     toMeshShapes(quality?:MeshingQualitySettings):Array<MeshShape>
     {
         let meshes = (this._visible && this._shapes != null) ? this._shapes.toMeshShapes(quality) : [];
@@ -585,5 +594,39 @@ export class Obj
         );
         return `<Obj id="${this.id}, name="${this._name}", shapes: ${shapeStrings}>`;
     }
+
+    /** 
+     *  Export Obj tree structure with raw shapes that will be recreated in other scope
+     * */
+    toComponentGraph(component:string, parentNode:Object=null):Object
+    {
+        const curNode = {
+            _entity : 'ObjData',
+            name : this._name,
+            shapes:  this.shapes(false) as ShapeCollection, // NOTE: geom is still current scope instance!
+            children : [],
+        }
+
+        // Recurse through children if any
+        this.children().forEach(childObj =>
+        {
+            childObj.toComponentGraph(component, curNode); // pass parent to child
+        });
+
+        // if child 
+        if(parentNode)
+        {
+            curNode.name = `${component}_${this.name()}`;
+            (parentNode as any).children.push(curNode); // add to to new parent Obj
+        }
+        // root
+        else {
+            curNode.name = component;
+        } 
+
+        return curNode;
+    }
+
+    
 
 }

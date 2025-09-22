@@ -1,0 +1,10 @@
+.git
+node_modules
+build/
+test/
+tests/
+docs/
+apidocs/
+*.ts
+src/
+wasm/

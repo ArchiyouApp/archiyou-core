@@ -11,6 +11,7 @@
  *  see https://github.com/CadQuery/cadquery/blob/master/cadquery/occ_impl/shapes.py:361 for inspiration
  */
 
+import { USE_GARBAGE_COLLECTION } from './internal';
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
             SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
@@ -148,20 +149,29 @@ export class Shape
     /** Update properties from current OC Shape */
     _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
     {
-        // Can be overriden by subclass
+        // Can be overriden by subclass (Vertex)
+        
         if(ocShape && !ocShape?.IsNull())
         {
-            this._clearOcShape(); // clear previous
-            this._ocShape = ocShape;
-            targetOcForGarbageCollection(this, ocShape); // set new target
-            this.clearMeshCache();
+            if(USE_GARBAGE_COLLECTION)
+            {
+                this._clearOcShape(); // clear previous
+                this._ocShape = ocShape;
+                targetOcForGarbageCollection(this, ocShape); // set new target
+                this.clearMeshCache();
+            }
+            else {
+                // just set new OcShape
+                this._ocShape = ocShape;
+                this.clearMeshCache();
+            }
         }
     }
 
     /** Manually clear existing OC Shape */
     _clearOcShape()
     {
-        if(this._ocShape)
+        if(USE_GARBAGE_COLLECTION && this._ocShape)
         {
             removeOcTargetForGarbageCollection(this._ocShape);
             this?._ocShape?.delete();
@@ -2667,7 +2677,8 @@ export class Shape
         const minLevel = bb.min()[axisNormal];
         const maxLevel = bb.max()[axisNormal];
 
-        if(level <= minLevel || level >= maxLevel){ 
+        if(level <= minLevel || level >= maxLevel)
+        { 
             console.error(`Shape::cutoff: Shape can not be cut off: level "${level}" not between "${minLevel}" and "${maxLevel}". Returned original`);
             return this
         }
@@ -2679,6 +2690,7 @@ export class Shape
 
         if(Shape.isShape(splittedShapes) || splittedShapes.length === 0){ console.warn(`Shape::cutoff: No splitted Shapes. Check level!`); return null; }
         if(splittedShapes.length === 1){ console.warn(`Shape::cutoff: Only one splitted Shapes. Returned original`); return this; }
+
 
         // Order by area() or length()
         (splittedShapes as ShapeCollection).sort((a,b) => (b.area() || b.length()) - (a.area() || a.length()))

@@ -3,10 +3,10 @@
 {
     "compilerOptions": 
     {
-      "target": "es2017", 
+      "target": "es2018", 
       "module": "esnext",
       "moduleResolution": "node", // Needed to import libs                   
-      "lib": ["es6","dom", "webworker"],        
+      "lib": ["esnext","dom", "webworker"],        
       "declaration" : true,
       "allowJs": true,
       "outDir": "dist",
@@ -15,11 +15,12 @@
       "noImplicitAny": false,
       "emitDecoratorMetadata": true,
       "experimentalDecorators" : true,
+      "forceConsistentCasingInFileNames": true,
       //"useDefineForClassFields": false,
       //"esModuleInterop": true,
       "allowSyntheticDefaultImports" : true, // fix: This module is declared with using 'export =', and can only be used with a default import when using the 'esModuleInterop' flag.
       "sourceMap": true,
-      "noEmit": true,
+      "noEmit": false,
       "baseUrl": ".",
       "paths": {
         "~/*": ["./*"],
@@ -27,7 +28,7 @@
       },
       "skipLibCheck": true
     },
-    "include" : ["src"], // not working
+    "include" : ["src", "src/wasm", "src/wasm"], 
     "exclude": [
       "node_modules",
       "**/archiyou-opencascade/*.ts", // not working when imported

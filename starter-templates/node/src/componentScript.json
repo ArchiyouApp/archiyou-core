@@ -1,0 +1,12 @@
+{
+    "id": "testcomponent:1.0",
+    "name" : "testcomponent",
+    "code" : "comp = sphere($SIZE);\ncalc.metric('componentmetric', 999);\ndoc.create('test').pipeline(() => { iso = all().iso(); }).page('test').text('A component page').view('iso').shapes('iso');calc.table('testtable', [{ col1: 'V1', col2: 'V2'}, { col1: 'V3', col2: 'V4'}]);",
+    "params" : {
+        "SIZE": {
+            "type": "number",
+            "default": 10,
+            "description": "Size of the sphere"   
+        }
+    }
+}

@@ -6,8 +6,24 @@ import JSONfn from 'json-fn';
 
 import { ConsoleMessage, ConsoleMessageType } from './types'
 
+
 export class Console
 {
+    //// SETTINGS ////
+    USE_COLORS = true; // use colors in console output
+    ENDING_COLOR = '\x1b[0m'; // reset color code
+    TYPE_TO_COLOR_CODE = { 
+        info: '\x1b[32m', // green
+        exec: '\x1b[34m', // blue
+        geom: '\x1b[36m', // cyan
+        warn: '\x1b[38;5;214m', // yellow
+        error: '\x1b[33m', // red
+        user: '\x1b[35m', // magenta
+        debug: '\x1b[90m', // gray
+    } as Record<ConsoleMessageType, string>;
+    
+    //// END SETTINGS ////
+
     output = null; // Vuex store, console, webworker instance or a local array [ null ]
     buffer:Array<ConsoleMessage> = []; // If we cannot output somewhere put in buffer
     _originalConsole = null // avoid circular references 
@@ -83,7 +99,7 @@ export class Console
             case 'console':
                 let origConsoleFunc = MESSAGE_TO_CONSOLE_TYPE[message.type] || 'log';
                 try {
-                    this._originalConsole[origConsoleFunc](message.message); // IMPORTANT: don't use output here, because it can lead to unending loops
+                    this._originalConsole[origConsoleFunc](this._wrapMessageStringWithColor(message)); // IMPORTANT: don't use output here, because it can lead to unending loops
                 }
                 catch(e) 
                 {
@@ -97,9 +113,16 @@ export class Console
 
             default: // put in buffer
                 this.buffer.push(message);
-                this._originalConsole[MESSAGE_TO_CONSOLE_TYPE[message.type] || 'log'](message.message); // also put into normal console for debug
+                this._originalConsole[MESSAGE_TO_CONSOLE_TYPE[message.type] || 'log'](this._wrapMessageStringWithColor(message)); // also put into normal console for debug
 
         }
+    }
+
+    _wrapMessageStringWithColor(message:ConsoleMessage):string
+    {
+        if (!this.USE_COLORS) return message.message; // no colors
+        const colorCode = this.TYPE_TO_COLOR_CODE[message.type] || '\x1b[0m'; // default color code
+        return `${colorCode}${message.message}${this.ENDING_COLOR}`; // wrap with color codes
     }
 
     newMessage(type:ConsoleMessageType, message:any)
@@ -191,7 +214,7 @@ export class Console
         return `${t.toLocaleTimeString()}.${t.getMilliseconds()}`;
     }
 
-    getBufferedMessages(types?:any|Array<ConsoleMessageType>)
+    getBufferedMessages(types:Array<ConsoleMessageType>=undefined):Array<ConsoleMessage>
     {
         types = (Array.isArray(types) ? 
                     (types.length > 0) ? types : undefined 
@@ -200,4 +223,8 @@ export class Console
                     : this.buffer.filter(m => types.includes(m.type))
     }
 
+    getErrors():Array<ConsoleMessage>
+    {
+        return this?.buffer?.filter(m => m.type === 'error') || [];
+    }
 }

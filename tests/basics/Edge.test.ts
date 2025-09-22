@@ -1,7 +1,6 @@
-import { Edge, Face, Solid, Geom, roundToTolerance } from '../../src/internal' // import only from internal, otherwise we get circular import problems
-import OcLoader from '../../src/OcLoader'
+import { Edge, Face, Solid, Geom, roundToTolerance, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
-// see Jest docs: https://jestjs.io/docs/expect
+import { test, beforeAll, expect } from 'vitest'
 
 let geom;
 console.geom = console.log;

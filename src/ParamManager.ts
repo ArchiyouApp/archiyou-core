@@ -13,16 +13,19 @@
  *      - [App scope] Script has params that go to ParamMenu
  *      - [Worker scope] ParamManager instance is created every run, new ParamManagerOperators are created based on current Params
  *      - [Worker scope] During script execution ParamManager is used to define or edit params
- *      - [Worker scope] At end of script execution, params that are managed are added to ComputeResult at managedParams and send to app. 
+ *      - [Worker scope] At end of script execution, params that are managed are added to RunnerScriptExecutionResult at managedParams and send to app. 
  *                       The managedParams are stateless, so every run, with same param values they emit the same managedParams
  *      - [App scope: editor or configurator] managedParams are put in store and picked up by ParamMenu to change menu params. 
  *                      It is the responsibility of receiver to compare existing params with incoming ManagedParams. 
  *                      There is a helper method on ParamManager.updateParamsWithManaged()
  * 
+ * 
+ *  TODO: Refactor and test with new ScriptParam
+ * 
+ * 
  */
 
-import { Param, PublishParam, ParamOperation, ParamManagerOperator,  } from './internal'
-import { publishParamToParam, paramToPublishParam } from './internal' // utils
+import { ScriptParam, ParamOperation, ParamManagerOperator } from './internal'
 
 import deepEqual from 'deep-is'
 
@@ -39,11 +42,13 @@ export class ParamManager
     paramOperators:Array<ParamManagerOperator> = [];
 
     /** Set up ParamManager with current params */
-    constructor(params?:Array<PublishParam|Param>)
+    constructor(params?:Array<ScriptParam>)
     {
         if(Array.isArray(params) && params.length > 0)
         {
-            this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(publishParamToParam(p)))); // always make sure we use Param internally
+            //this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(ScriptParamToParam(p)))); // always make sure we use Param internally
+            // Disable validation because its old
+            this.paramOperators = params.map(p => new ParamManagerOperator(this, p)); // always make sure we use Param internally
             this.paramOperators.forEach( p => this[p.name] = p) // set param access
         }
     }
@@ -51,7 +56,7 @@ export class ParamManager
     setParent(scope:any):this
     {
         this.parent = scope;
-        this.setParamGlobalsOnWorker();
+        this.setParamGlobalsInScope();
         return this
     }
 
@@ -61,10 +66,10 @@ export class ParamManager
      *  If needed forcing reactivity by creating copies
      *  returns new or changed params 
      */
-    static updateParamsWithManaged(currentParams:Array<Param|PublishParam>, managedParams:Record<ParamOperation, Array<PublishParam>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<Param>
+    static updateParamsWithManaged(currentParams:Array<ScriptParam>, managedParams:Record<ParamOperation, Array<ScriptParam>> = { new: [], updated: [], deleted: []}, forceReactivity:boolean=true):Array<ScriptParam>
     {
         const allManagedParams = [...managedParams.new, ...managedParams.updated];
-        const paramsToChange:Array<Param> = []
+        const paramsToChange:Array<ScriptParam> = []
 
         allManagedParams.forEach( managedParam => 
         {
@@ -72,13 +77,13 @@ export class ParamManager
             if(!presentParam)
             {
                 // new param
-                paramsToChange.push(publishParamToParam(managedParam));
+                paramsToChange.push(managedParam);
             }
             else {
                 // existing param: check if changed
-                if(!deepEqual(paramToPublishParam(ParamManager.validateParam(presentParam)), ParamManager.validateParam(managedParam)))
+                if(!deepEqual(presentParam, managedParam))
                 { 
-                    paramsToChange.push(publishParamToParam(ParamManager.validateParam(managedParam)))
+                    paramsToChange.push(managedParam)
                 }
             }
         })
@@ -103,7 +108,7 @@ export class ParamManager
     //// MANAGING PARAMS ////
 
     /** Add or update Param and return what was done (update, new, null)  */
-    addParam(p:Param):ParamOperation|null
+    addParam(p:ScriptParam):ParamOperation|null
     {
         if(this._paramNameExists(p))
         { 
@@ -118,7 +123,7 @@ export class ParamManager
         }
         else {
             // create new
-            const newParamOperator = new ParamManagerOperator(this, this._validateParam(p));
+            const newParamOperator = new ParamManagerOperator(this, p);
             this.paramOperators.push(newParamOperator);
             newParamOperator.setOperation('new');
             return 'new'
@@ -134,7 +139,7 @@ export class ParamManager
     }
 
     /** Update ParamEntryController if needed and return updated or not */
-    updateParam(p:Param):boolean
+    updateParam(p:ScriptParam):boolean
     {
         if(this._paramNameExists(p))
         {
@@ -158,19 +163,19 @@ export class ParamManager
         }
     }
 
-    _paramNameExists(p:Param):boolean
+    _paramNameExists(p:ScriptParam):boolean
     {
         return Object.keys(this.getParamsMap()).includes(p.name.toUpperCase()) 
     }
 
     /** Utility to easily get target Params */
-    getParams():Array<Param>
+    getParams():Array<ScriptParam>
     {
         return this.paramOperators.map(pc => pc.targetParam)
     }
 
     /** Utility to easily get target Params by name */
-    getParamsMap():Record<string, Param>
+    getParamsMap():Record<string,ScriptParam>
     {
         const map = {};
         this.paramOperators.forEach(pc => { map[pc.name] = pc.targetParam })
@@ -195,12 +200,12 @@ export class ParamManager
      *                h: { type: 'number', default: 200, start: 50, end: 300 } 
      *   }})
     */
-    define(p:Param)
+    define(p:ScriptParam)
     {
-        if(!p){ throw new Error(`ParamManager::define(p:Param): Please supply valid Param object! Got ${JSON.stringify(p)}`); }
+        if(!p){ throw new Error(`ParamManager::define(p:ScriptParam): Please supply valid Param object! Got ${JSON.stringify(p)}`); }
         if(!p?.name){ throw new Error(`ParamManager::define(): Please supply at least a name for this Param!`); }
 
-        const checkedParam = this._validateParam(p);
+        const checkedParam = p;
         if(!checkedParam)
         { 
             return this; //  Error already thrown in checkParam if any
@@ -213,98 +218,10 @@ export class ParamManager
         return this;
     }
 
-    /** Check Param or PublishParam input and fill in defaults
-     *  We try to make anything work here, except if nothing is given
-     *  See also checkParam in ParamEntryController
-     */
-    static validateParam<TParam extends Param|PublishParam>(p:TParam):TParam
-    {
-        if(!p)
-        {
-            console.error(`ParamManager::validateParam(p:Param): Please supply valid Param object! Got null/undefined!`);
-            return null;
-        }
-
-        const paramType = p?.type || 'number'; // Default Param type is number
-
-        let checkedParam:TParam;
-
-        switch(paramType)
-        {
-            case 'number':
-                checkedParam = {
-                    ...p, // copy all for convenience 
-                    type: paramType,
-                    start: p?.start ?? 0,
-                    end: p?.end ?? 100,
-                    step: p?.step ?? 1,
-                } as TParam;
-                // if default not given choose start
-                checkedParam['default'] = p?.default ?? p.start;
-                break;
-            case 'boolean': 
-                checkedParam = {
-                    ...p, // copy all for convenience 
-                    type: paramType,
-                } as TParam;
-                break;
-            case 'text':
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    length: p.length ?? 100,
-                } as TParam;
-                break;
-            case 'options':
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    options: p.options ?? [],
-                } as TParam;
-                break;
-            case 'list': 
-                // NOTE: listElem is also a Param, which we need to check!
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    listElem: ParamManager.validateParam(p.listElem) ?? ParamManager.validateParam({ type: 'number' } as Param), // a Number is the default for a List
-                } as TParam;
-                break;
-            case 'object':
-                // Object schema is also a set of Params
-                const s = p.schema ?? {};
-                const schema = {};
-                
-                for (const [name, param] of Object.entries(s))
-                {
-                    schema[name.toUpperCase()] = ParamManager.validateParam(param); // param names are always uppercase!
-                }
-
-                checkedParam = {
-                    ...p,
-                    type: paramType,
-                    schema: schema,
-                } as TParam;
-                break;
-        }
-
-        // basic checks and defaults
-        checkedParam.name = checkedParam?.name?.toUpperCase() ?? null; // make sure names are always uppercase
-        checkedParam.enabled = checkedParam?.enabled ?? true;
-        checkedParam.visible = checkedParam?.visible ?? true;
-        
-        return checkedParam;
-    }
-
-    _validateParam(p:Param):Param
-    {
-        return ParamManager.validateParam(p);
-    }
-
     //// EVALUATE ////
 
     /** Return Params that we operated upon */
-    getOperatedParamsByOperation():Record<ParamOperation, Array<PublishParam>>
+    getOperatedParamsByOperation():Record<ParamOperation, Array<ScriptParam>>
     {
         const changedParamsByOperation = this.paramOperators
                                     .filter((po) => po.paramOperated())
@@ -313,7 +230,7 @@ export class ParamManager
                                             acc[po.operation as ParamOperation].push(po.toData())
                                             return acc
                                         }, 
-                                        { new: [] as Array<PublishParam>, updated: [] as Array<PublishParam>, deleted: [] as Array<PublishParam> })
+                                        { new: [] as Array<ScriptParam>, updated: [] as Array<ScriptParam>, deleted: [] as Array<ScriptParam> })
 
         console.info('**** ParamManager::getOperatedParamsByOperation ****')
         console.info(changedParamsByOperation);
@@ -334,24 +251,31 @@ export class ParamManager
      *      on this scope that is not a Proxy. Proxies can only target Objects
             Use $PARAMS.$TEST.set() to set a value
     */
-    setParamGlobalsOnWorker():boolean
+    setParamGlobalsInScope(scope?:any):boolean
     {
         const curParams = this.getParams();
 
+        if(typeof scope !== 'object' || !scope)
+        { 
+            scope = this.parent; // set to parent scope (worker or app)
+        } 
+
         if (!Array.isArray(curParams)){ return false; }
 
-        // Make Params with getter and setter with Proxy
-        curParams.forEach( p => {
-            this.parent[this.PARAM_SIGNIFIER + p.name] = p.value ?? p.default;
+        // Set value of param reference ${PARAM_NAME} on scope
+        curParams.forEach( p => 
+        {
+            console.info(`ParamManager::setParamGlobalsInScope(): Setting global param "${this.PARAM_SIGNIFIER + p.name}" with value "${p._value ?? p.default}"`);
+            scope[this.PARAM_SIGNIFIER + p.name] = p._value ?? p.default;
         })
     }
 
-    /** Compare two params (either Param or PublishParam) */
-    equalParams(param1:Param|PublishParam, param2:Param|PublishParam):boolean
+    /** Compare two params (either Param or ScriptParam) */
+    equalParams(param1:ScriptParam, param2:ScriptParam):boolean
     {
-        const publishParam1 = JSON.parse(JSON.stringify(paramToPublishParam(param1)));
-        const publishParam2 = JSON.parse(JSON.stringify(paramToPublishParam(param2)));
-        return deepEqual(publishParam1,publishParam2);
+        const ScriptParam1 = JSON.parse(JSON.stringify(param1));
+        const ScriptParam2 = JSON.parse(JSON.stringify(param2));
+        return deepEqual(ScriptParam1,ScriptParam2);
     }
 
     /** Set quick references from this instance to the values of params 

@@ -32,6 +32,7 @@ declare global {
     interface Console {
         geom:any,
         user:any,
+        exec:any,
     }
 }
 

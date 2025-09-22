@@ -366,6 +366,12 @@ export class OBbox
                                 ? this.box() : null
     }
 
+    /** Alias for shape() */
+    toShape():Edge|Face|Solid|null
+    {
+        return this.shape();
+    }
+
     /** Make Line from 1D Bbox */
     line():Edge|null
     {

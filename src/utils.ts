@@ -4,21 +4,23 @@
  * 
  */
 
+import type { ScriptParamData } from './internal';
 
 import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, isDocUnitsWithPerc,
-        Param, PublishParam, isPublishParam, isParam, UnitsWithPerc} from './internal'
+        ScriptParam, isScriptParamData, isScriptParam, UnitsWithPerc, ScriptOutputDataWrapper,
+        } from './internal'
 
 //// PARAMS ////
 
-/** Turn data PublishParam into Param by recreating functions 
- *  NOTE: PublishParam is used as data - internally make sure to use Param
+/** Turn data ScriptParamData into Param by recreating functions 
+ *  NOTE: ScriptParamData is used as data - internally make sure to use Param
 */
-export function publishParamToParam(param:Param|PublishParam):Param
+export function ScriptParamDataToParam(param:ScriptParam|ScriptParamData):ScriptParam
 {
-    if(!isPublishParam(param))
+    if(!isScriptParamData(param))
     {
-        console.warn(`ParamManager::publishParamToParam: param "${param.name}" already a Param!`)
-        return { ...param };
+        console.warn(`ParamManager::ScriptParamDataToParam: param "${param.name}" already a Param!`)
+        return param; // return original
     }
 
     const funcBehaviours = {};
@@ -33,31 +35,31 @@ export function publishParamToParam(param:Param|PublishParam):Param
     const newParam = { 
         ...param, 
         _behaviours : funcBehaviours, 
-    } as Param
+    } as ScriptParam;
 
     return newParam;
 }
 
-/** Turn param into PublishParam */
-export function paramToPublishParam(param:Param|PublishParam):PublishParam
+/** Turn param into ScriptParamData */
+export function paramToScriptParamData(param:ScriptParam|ScriptParamData):ScriptParamData
 {
-    if(!isParam(param)){ console.error(`ParamManager:paramToPublishParam. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
-    if(isPublishParam(param)){ return param }; // already PublishParam
+    if(!isScriptParam(param)){ console.error(`ParamManager:ScriptParamToScriptParamData. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
+    if(isScriptParamData(param)){ return param }; // already ScriptParamData
 
     const behaviourData = {};
     for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
-    const publishParam = { ...param } as PublishParam; 
+    const ScriptParamData = { ...param } as ScriptParamData; 
     // remove all private fields (_{{prop}})
-    Object.keys(publishParam)
+    Object.keys(ScriptParamData)
         .filter(prop => prop[0] === '_')
-        .forEach((private_prop) => delete publishParam[private_prop]);
+        .forEach((private_prop) => delete ScriptParamData[private_prop]);
 
-    publishParam._behaviours = behaviourData; // TODO: remove _
+    ScriptParamData._behaviours = behaviourData; // TODO: remove _
     
-    return publishParam
+    return ScriptParamData
 }
 
-//// Working with types ////
+//// WORKING WITH TYPES ////
 
 export function flattenEntitiesToArray(entities:any):Array<any>
 {
@@ -98,8 +100,8 @@ export function flattenEntities(arr:Array<any>)
 }
 
 
- 
-//// Working with numbers ////
+
+//// WORKING WITH NUMBERS ////
 
 // see: https://github.com/sindresorhus/round-to
 export function roundTo(number:number, precision:number):number
@@ -344,6 +346,21 @@ export function mmToPoints(m:number):number
 
 //// DATA ENCODING ////
 
+ /**
+ * Convert a string value to its native type if possible.
+ * - "true"/"false" (case-insensitive) => boolean
+ * - Numeric strings => number
+ * - Otherwise, return as string
+ */
+export function convertStringValue(value: string): string | number | boolean {
+    if (typeof value !== 'string') return value;
+    const lower = value.toLowerCase();
+    if (lower === 'true') return true;
+    if (lower === 'false') return false;
+    if (!isNaN(Number(value)) && value.trim() !== '') return Number(value);
+    return value;
+}
+
 // taken from https://github.com/niklasvh/base64-arraybuffer/blob/master/src/index.ts
 export const arrayBufferToBase64 = (arraybuffer: ArrayBuffer): string => 
 {
@@ -381,3 +398,210 @@ export function isWorker():boolean
 {
     return (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
 } 
+
+/** A simple uuid4 method */
+export function uuidv4(): string 
+{
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const random = Math.random() * 16 | 0; // Generate a random number between 0 and 15
+        const value = char === 'x' ? random : (random & 0x3 | 0x8); // Use 4 for the version and 8-11 for the variant
+        return value.toString(16); // Convert to hexadecimal
+    });
+}
+
+//// ENCODING BINARY DATA ////
+
+/**
+ * Recursively transforms binary data in an object to base64 strings for JSON serialization
+ *  We use an instance of ScriptOutputDataWrapper to keep track of original type and length for easy decoding
+ * 
+ * @param obj - The object to transform
+ * @param maxDepth - Maximum recursion depth to prevent infinite loops (default: 10)
+ * @param currentDepth - Current recursion depth (internal use)
+ * @returns Transformed object with binary data as base64 strings
+ */
+export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentDepth: number = 0): number|string|Array<any>|Object|ScriptOutputDataWrapper
+{
+    // Prevent infinite recursion
+    if (currentDepth >= maxDepth) {
+        console.warn('convertBinaryToBase64: Maximum recursion depth reached');
+        return obj;
+    }
+
+    // Handle null or undefined
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+
+    // Handle ArrayBuffer
+    if (obj instanceof ArrayBuffer) 
+    {
+        return {
+            type: 'ArrayBuffer',
+            encoding: 'base64',
+            data: arrayBufferToBase64(obj),
+            length: obj.byteLength
+        } as ScriptOutputDataWrapper;
+    }
+
+    // Handle Uint8Array and other TypedArrays
+    if (obj instanceof Uint8Array || obj instanceof Int8Array || 
+        obj instanceof Uint16Array || obj instanceof Int16Array ||
+        obj instanceof Uint32Array || obj instanceof Int32Array ||
+        obj instanceof Float32Array || obj instanceof Float64Array) {
+        return {
+            type: obj.constructor.name,
+            encoding: 'base64',
+            data: arrayBufferToBase64(obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength) as ArrayBuffer),
+            length: obj.length
+        } as ScriptOutputDataWrapper;
+    }
+ 
+    // Handle Buffer (Node.js)
+    if (typeof Buffer !== 'undefined' && obj instanceof Buffer) {
+        return {
+            type: 'Buffer',
+            encoding: 'base64',
+            data: obj.toString('base64'),
+            length: obj.length
+        } as ScriptOutputDataWrapper;
+    }
+
+    // Don't do functions
+    if (typeof obj === 'function')
+    { 
+        console.warn('convertBinaryToBase64: Function serialization is not supported!');
+    }
+
+    // Handle original primitives
+    if (typeof obj !== 'object')
+    { 
+        return obj;
+    }
+
+    // Arrays - resurse
+    if (Array.isArray(obj))
+    {
+        return obj.map(item => convertBinaryToBase64(item, maxDepth, currentDepth + 1));
+    }
+
+
+    // Object
+    if(typeof obj === 'object')
+    {
+        // Avoid any instances of classes
+        if (Object.getPrototypeOf(obj) !== Object.prototype)
+        {
+            console.warn('convertBinaryToBase64: Class instances are not supported! Returned null');
+            return null;
+        }
+
+        const result: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+            // Skip non-enumerable properties and functions (unless explicitly handling them above)
+            if (typeof value === 'function') {
+                continue; // Skip functions in objects unless we want to serialize them
+            }
+            result[key] = convertBinaryToBase64(value, maxDepth, currentDepth + 1);
+        }
+        return result;
+    }
+
+
+    
+}
+
+
+
+/**
+ * Restores binary data from base64 strings after JSON parsing
+ * @param obj - The object to restore
+ * @returns Object with restored binary data
+ */
+export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffer: boolean=false): Buffer|ArrayBuffer|Uint8Array|null
+{
+    if (obj === null || obj === undefined) 
+    {
+        console.error('utils::restoreBinaryFromBase64(): Invalid input');
+        return null;
+    }
+    console.info(`utils::restoreBinaryFromBase64(): Restoring to binary "${obj?.type}" with length ${obj?.length}`);
+
+    // Handle primitives
+    if (typeof obj !== 'object') 
+    {
+        return obj;
+    }
+    // Check if this is a serialized binary object
+    if (obj.type && obj.data !== undefined)
+    {
+        switch (obj.type)
+        {
+            case 'ArrayBuffer':
+                const binaryString = atob(obj.data);
+                const buffer = new ArrayBuffer(binaryString.length);
+                const view = new Uint8Array(buffer);
+                for (let i = 0; i < binaryString.length; i++) {
+                    view[i] = binaryString.charCodeAt(i);
+                }
+                return (forceBuffer) 
+                        ? Buffer.from(buffer)
+                        : buffer as any;
+            case 'Uint8Array':
+                const b = restoreBinaryFromBase64({ type: 'ArrayBuffer', data: obj.data, length: obj.length }) as ArrayBuffer;
+                const u8 = new Uint8Array(b, 0, obj.length)
+                return (forceBuffer) 
+                        ? Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength)
+                        : u8;
+            case 'Buffer':
+                if (typeof Buffer !== 'undefined')
+                {
+                    return Buffer.from(obj.data, 'base64') as any;
+                }
+                break;
+
+            default:
+                console.warn(`restoreBinaryFromBase64: Unknown type ${obj.type}`);
+                return null;
+        }
+    }
+    // Handle Arrays
+    if (Array.isArray(obj)) {
+        return obj.map(item => restoreBinaryFromBase64(item)) as any;
+    }
+    // Handle plain objects
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+        result[key] = restoreBinaryFromBase64(value);
+    }
+
+    return result;
+}
+
+/**
+ * Converts a record object to a URL parameter string.
+ * Example: { foo: 'bar', baz: 1 } => 'foo=bar&baz=1'
+ * @param params Record<string, any>
+ * @returns URL parameter string
+ */
+export function recordToUrlParams(params: Record<string, any>): string {
+    return Object.entries(params)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&');
+}
+
+/**
+ * Converts a URL parameter string to a record object.
+ * Example: 'foo=bar&baz=1' => { foo: 'bar', baz: '1' }
+ * @param paramString URL parameter string
+ * @returns Record<string, string>
+ */
+export function urlParamsToRecord(paramString: string): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (!paramString) return params;
+    paramString.split('&').forEach(pair => {
+        const [key, value] = pair.split('=');
+        if (key) params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+    });
+    return params;
+}

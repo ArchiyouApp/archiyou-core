@@ -1,7 +1,6 @@
-import { Geom, Wire,Solid } from '../../src/internal' // import only from internal, otherwise we get circular import problems
-import OcLoader from '../../src/OcLoader'
+import { Geom, Wire,Solid, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
-// see Jest docs: https://jestjs.io/docs/expect
+import { test, beforeAll, expect } from 'vitest'
 
 let geom;
 console.geom = console.log;

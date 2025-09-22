@@ -20,7 +20,7 @@ import { AXIS_TO_VECS, MainAxis, PointLike, isPointLike, isCoord, Coord, PolarCo
     isAnyShapeOrCollection, AnyShapeOrCollection, isCursor, Plane } from './internal' // see types.ts
 import { isRelativeCartesianCoordString, parseRelativePolarCoordString, relativeCoordToNumber, roundToTolerance} from './internal' // utils
 import { addResultShapesToScene, checkInput } from './decorators' // decorators - using internal gives error
-import { gp_Pnt, gp_Vec } from '../libs/archiyou-opencascade/archiyou-opencascade'
+import { gp_Pnt, gp_Vec } from './wasm/archiyou-opencascade'
 
 export class Point
 {  

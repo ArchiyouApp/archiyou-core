@@ -31,7 +31,7 @@ export interface ScriptVersion
     prev_version_id? : string,
     created_at? : string,
     updated_at? : string,
-    params? : Array<Param>,
+    params? : Array<ScriptParam>,
     code : string,
     shared?: boolean,
     shared_version_tag?:string,
