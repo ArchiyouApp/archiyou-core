@@ -28,7 +28,7 @@ export class ScriptParam
     label: string // publically visible name
     
     default?: any // Default value: can be string or number
-    _value?: any|Array<any> // single or multiple values - private
+    _value?: any|Array<any> // single or multiple values - used internally
     
     min?: number // for ParamInputNumber
     max?: number // for ParamInputNumber
@@ -126,6 +126,12 @@ export class ScriptParam
         param.name = param.name.toUpperCase();
         
         return param;
+    }
+
+    /** Make a easy class method */
+    static validate(param:ScriptParamData):ScriptParamData
+    {
+        return new ScriptParam().validateInput(param);
     }
 
     /** Validate structure of ParamData by type 

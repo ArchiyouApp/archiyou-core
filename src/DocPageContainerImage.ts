@@ -110,30 +110,7 @@ export class Image extends Container
 
                 if(r.status !== 200) 
                 {
-<<<<<<< HEAD
-                    // FIX BUG IN NODE: TypeError: Failed to fetch - Most probably a DNS problem in Docker
-                    // Maybe try setting in Node: https://nodejs.org/docs/latest-v18.x/api/net.html#socketconnectoptions-connectlistener
-                    // TODO: Have some standards images - like the footer - locally for speed
-                    let r = await fetch(proxyUrl, 
-                        {
-                            method: 'POST',
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url : this._url }),
-                            // NOTE: responseType is not needed anymore
-                        }
-                    );
-                    if(r.status !== 200) 
-                    {
-                        console.error(`DocPageContainerImage::loadImageData(): Could not get image. Check if it exists or proxy address: "${proxyUrl}"`)
-                    }
-                    else {
-                        data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer());                     
-                        console.info(`DocPageContainerImage::loadImageData: Got data for image "${this._url}" with size ${data.length}`)
-                        cache[this._url] = data;
-                    }
-=======
                     console.error(`DocPageContainerImage::loadImageData(): Could not get image. Check if it exists or proxy address: "${proxyUrl}"`)
->>>>>>> scriptoutputmanager
                 }
                 else {
                     data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer());                     
