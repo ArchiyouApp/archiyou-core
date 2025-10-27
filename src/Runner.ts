@@ -1163,7 +1163,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     */
     async _prefetchComponentScripts(request:string|RunnerScriptExecutionRequest, noCache:boolean=false):Promise<Record<string,Script>>
     {
-        const IMPORT_COMPONENT_RE = /\$component\(\s*'(?<name>[^,]+)'[^\)]+/g;
+        const IMPORT_COMPONENT_RE = /\$component\(\s*["'](?<name>[^"']+)["']\s*,\s*(?<params>\{[^}]+\})\s*\)/g
 
         const scriptCode = (typeof request === 'string') 
             ? request : (request as RunnerScriptExecutionRequest).script.code;
@@ -1175,7 +1175,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             return this._componentScripts; // no components to fetch
         }
 
-        console.info(`Runner::_prefetchComponentScripts(): Found ${componentMatches.length} component scripts to prefetch in request script code`);
+        console.info(`Runner::_prefetchComponentScripts(): Found ${componentMatches.length} component scripts to prefetch: ${componentMatches.map(m => m.groups?.name).join(', ')}`);
 
         // Fetch all component scripts
         for(let i = 0; i < componentMatches.length; i++)
@@ -1199,35 +1199,36 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
     
     /** Fetch component script from url or local file path */
-    async _fetchComponentScript(name?:string):Promise<Script|null>
+    async _fetchComponentScript(path?:string):Promise<Script|null>
     {
-        if(!name){ throw new Error(`$component("${name}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
+        if(!path){ throw new Error(`$component("${path}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
 
         // Local file path (in node) for debug
-        if(name.includes('.js'))
+        if(path.includes('.js'))
         {
             if(!this.inNode())
             {
-                throw new Error(`$component("${name}")::_fetchComponentScript(): Cannot fetch component script from local file. Runner is not in Node.js context!`);    
+                throw new Error(`$component("${path}")::_fetchComponentScript(): Cannot fetch component script from local file. Runner is not in Node.js context!`);    
             }
 
-            console.info(`$component("${name}")::_fetchComponentScript(): Fetching local component script at "${name}"...`);
-            
+            console.info(`$component("${path}")::_fetchComponentScript(): Fetching local component script at "${path}"...`);
+
             // Load dynamically to avoid issues in browser
             const FS_PROMISES_LIB = 'fs/promises'; // avoid problems with older build systems preparsing import statement
             const fs = await import(FS_PROMISES_LIB); // use promises version of fs
-            const data = await fs.readFile(name, 'utf-8');
+            const data = await fs.readFile(path, 'utf-8');
 
             if(!data)
             { 
-                throw new Error(`$component("${name}")::_fetchComponentScript(): Cannot read component script from file "${name}". File not found or empty!`);
+                throw new Error(`$component("${path}")::_fetchComponentScript(): Cannot read component script from file "${path}". File not found or empty!`);
             }
             const componentScript = new Script().fromData(data);
             return componentScript;
         }
-        // Remote URL in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent'
+        // path in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent' (default library)
+        // or externally: 'pubv2.archiyou.com/archiyou/myscript:1.0'
         else {
-            return await this.getScriptFromUrl(name); // get library instance
+            return await this.getScriptFromUrl(path); // get library instance
         }
     }
 
@@ -1265,10 +1266,19 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         return r;
     }
 
+    getDefaultComponentLibraryUrl():string
+    {
+        return process.env.COMPONENT_LIBRARY_URL || 'http://localhost:4000';
+    }
+
     async getScriptFromUrl(url:string):Promise<Script>
     {
-        const library = new LibraryConnector();
-        return await library.getScriptFromUrl(url); // get script from library
+        const libUrl = this.getDefaultComponentLibraryUrl();
+        console.info(`Runner::getScriptFromUrl(): Fetching script from "${url}" at library "${libUrl}"`);
+
+        const library = new LibraryConnector(libUrl); // TODO: cache library instance
+        await library.connect();
+        return await library.getScriptFromUrl(`${libUrl}/${url}`); // get script from library
     }
 
     //// RESULTS ////
@@ -1326,7 +1336,6 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         else {
             throw new Error(`Runner::getLocalScopeResults(): No outputs requested`);
         }
-
 
         // Console messages
         if(request.messages && Array.isArray(result.messages))
@@ -1651,9 +1660,13 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
             outputs.push({
                 path: outputPath.toData(),
+                // Need to export Obj tree structure with Shapes in special way
+                // Because Obj is still tied to Scene graph of component scope
                 output: scope.geom.scene.toComponentGraph(request.component) // export the Obj/Shape graph for the component
             })
         }
+        console.info(`Runner::_exportPipelineModelsInternal(): Exported ${outputs.length} models of Pipeline "${pipeline}"`);
+
         return outputs;
     }
 

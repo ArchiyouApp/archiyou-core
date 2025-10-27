@@ -17,7 +17,7 @@ import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlan
           AnnotationAutoDimStrategy,
           RunnerScriptExecutionResult,
           RunnerScriptExecutionRequest,
-          ScriptOutputCategory, ScriptOutputFormat, ScriptOutputDataWrapper
+          ScriptOutputPathData, ScriptOutputCategory, ScriptOutputFormat, ScriptOutputDataWrapper
         } from './internal' // types
 
 import { ParamType, ScriptParam, ScriptParamData } from './internal'
@@ -598,4 +598,12 @@ export function isScriptOutputDataWrapper(o:any): o is ScriptOutputDataWrapper
         && typeof o.type === 'string';
 }
 
+export function isScriptOutputPathData(o:any): o is ScriptOutputPathData
+{
+    return o && typeof o === 'object'
+        && typeof o.requestedPath === 'string'
+        && typeof o.resolvedPath === 'string'
+        && typeof o.pipeline === 'string'
+        && typeof o.category === 'string'
+}
 

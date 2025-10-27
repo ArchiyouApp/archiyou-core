@@ -87,7 +87,7 @@ export class Script
             id: this.id && typeof this.id === "string",
             name : this.name && typeof this.name === "string" && this.name.length > 0,
             author: this.author && typeof this.author === "string" && this.author.length > 0,
-            description: typeof this.description === "string", // Allow empty description
+            description: (!this?.description) || typeof this.description === "string", // Allow nullish description
             tags: Array.isArray(this.tags),
             created: this.created instanceof Date,
             updated: this.updated instanceof Date,
@@ -113,8 +113,10 @@ export class Script
         if(typeof this.published !== "object"){ return false; }
 
         const VALIDATIONS = {
-            title: this.published.title && typeof this.published.title === "string" && this.published.title.length > 0,
-            version : typeof this.published?.version === "string" && semver.valid(this.published.version) !== null, // see docs semver - valid return null if invalid, string if valid
+            version : typeof this.published?.version === "string" 
+                // see docs semver - valid return null if invalid, string if valid. coerce allows things like "0.5" to be valid
+                && semver.valid(semver.coerce(this.published.version)) !== null, 
+            //title: this.published.title && typeof this.published.title === "string" && this.published.title.length > 0,
             // libraryUrl: this.published?.libraryUrl && typeof this.published.libraryUrl === "string" && this.published.libraryUrl.length > 0,
             // url: this.published?.url && typeof this.published.url === "string" && this.published.url.length > 0,
             // published : this.published.published instanceof Date,
@@ -165,12 +167,20 @@ export class Script
             })
         );
 
+        // empty/nullish input param values
+        if(paramValues === null || typeof paramValues !== 'object' 
+            || (typeof paramValues === 'object' && Object.keys(paramValues).length === 0))
+        {
+            return { success: true, errors: [], checkedParamValues };
+        }
+
         for(const [key, value] of Object.entries(paramValues))
         {
             const keyUpper = key.toUpperCase();
             const param = this.params[keyUpper];
 
             const { success: validateSuccess, errors: validateErrors } = param.validateValueVerbose(value)
+
             if(param && validateSuccess)
             {
                 checkedParamValues[keyUpper] = value;
@@ -344,7 +354,7 @@ export class Script
 
         this.id = data.id;
         this.name = data.name.toLowerCase();
-        this.author = data.author.toLowerCase();
+        this.author = data.author?.toLowerCase();
         this.description = data.description;
         this.tags = Array.isArray(data.tags) ? data.tags : [];
         this.created = data.created ? new Date(data.created) : new Date();
@@ -370,8 +380,14 @@ export class Script
         {
             this.published = {
                 title: anyData.name,
-                version: anyData.version
+                version: anyData.version,
             } as ScriptPublished
+        }
+
+        // Try to fix any semver issues
+        if(this.published)
+        {
+            this.published.version = this.fixSemver(this.published.version);
         }
 
         // Validate the script after loading
@@ -384,6 +400,11 @@ export class Script
         }
 
         return this;
+    }
+
+    fixSemver(v:string)
+    {
+        return semver.valid(semver.coerce(v));
     }
 
     /** To raw data */

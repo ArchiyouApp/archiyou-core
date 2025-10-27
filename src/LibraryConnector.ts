@@ -8,6 +8,8 @@
 
 import { PublishScript } from './types';
 import { Script, ScriptData } from './internal';
+
+
 import semver from 'semver';
 
 export class LibraryConnector
@@ -31,16 +33,17 @@ export class LibraryConnector
     {
         if(!domain || domain === '')
         {
-            console.warn(`LibraryConnector::constructor(): No domain supplied. Using default library URL: "${this.DEFAULT_LIBRARY_URL}"`);
+            console.error(`LibraryConnector::constructor(): No domain supplied. Using default library domain: "${this.DEFAULT_LIBRARY_URL}"`);
             this.domain = this.DEFAULT_LIBRARY_URL;
         }
-        if(!this._validateDomain(domain))
+        else if(!this._validateDomain(domain))
         {
             console.error(`LibraryConnector::constructor(): Please supply a valid domain of the library. Got: "${domain}". Default library URL will be used instead.`);
             this.domain = this.DEFAULT_LIBRARY_URL;
         }
         else {
             this.domain = this._validateDomain(domain) as string;
+            console.info(`LibraryConnector::constructor(): Using library domain: "${this.domain}"`);
         }
     }
 
@@ -124,12 +127,13 @@ export class LibraryConnector
                 }
                 return response.json();
             })
-            .then((data) => {
-                const scriptsRaw = data as Array<ScriptData>;
+            .then((res) => {
+                // either direct scripts or in data
+                const scriptsRaw = (this.version === 'v2') ? res.data : res;
                 return scriptsRaw.map(s => new Script().fromData(s)).filter(s => s !== null);
             })
             .catch((error) => {       
-                console.error('Error fetching scripts:', error);
+                console.error('LibraryConnector::getAllScripts():Error fetching scripts:', error);
                 throw error;
             });
     }
@@ -158,14 +162,21 @@ export class LibraryConnector
     async getScript(author:string, name:string, version?:string):Promise<Script|null>
     {
         const scripts = await this.getAllScripts();
-        const script = scripts.find(s => s.author === author && s.name === name && (!version || s.published.version === version));
+
+        const script = scripts.find(s => 
+                            s.author.toLowerCase() === author.toLowerCase() 
+                            && s.name.toLowerCase() === name.toLowerCase() 
+                            && (!version || s.published.version === version));
+
         return script || null;
     }
 
     async getLatestScript(author:string, name:string):Promise<Script|null>
     {
         const scripts = await this.getLatestScripts();
-        const script = scripts.find(s => s.author === author && s.name === name);
+        const script = scripts.find(s => 
+            s.author.toLowerCase() === author.toLowerCase() 
+            && s.name.toLowerCase() === name.toLowerCase());
         return script || null;
     }
 
@@ -173,7 +184,9 @@ export class LibraryConnector
     {
         const scripts = await this.getAllScripts();
         const versions = scripts
-                            .filter(s => s.author === author && s.name === name)
+                            .filter(s => 
+                                s.author.toLowerCase() === author.toLowerCase() 
+                                && s.name.toLowerCase() === name.toLowerCase())
                             .map(s => s.published.version);
         return versions;
     }
@@ -184,9 +197,9 @@ export class LibraryConnector
         const baseInfo = await this.connect();
         if(baseInfo)
         {
-            console.log('Library Overview:');
-            console.log(`URL: ${this.DEFAULT_LIBRARY_URL}`);
-            Object.keys(baseInfo).forEach((key) => { console.log(`- ${key}: ${baseInfo[key]}`);});
+            console.info('**** Library Overview ****');
+            console.info(`URL: ${this.DEFAULT_LIBRARY_URL}`);
+            Object.keys(baseInfo).forEach((key) => { console.info(`- ${key}: ${baseInfo[key]}`);});
 
             const scripts = await this.getAllScripts();
             const latestScripts = await this.getLatestScripts();
@@ -206,32 +219,35 @@ export class LibraryConnector
      *  If no https://domain is given, default library URL is used
      *  Otherwise a new instance of LibraryConnector is created for that domain
      * 
-     *  
      *  @param path - path to fetch the script from 
      *     
      *     examples: 
      *         - https://pub.archiyou.com/archiyou/simplestep
      *         - https://pubv2.archiyou.com/archiyou/simplestep/0.9.1 or https://pub.archiyou.com/archiyou/simplestep:0.9.1
+     *         - archiyou/simplestep (default library)
      * 
      
      *  @returns Promise<Script> - The script object with code and params
      */
     async getScriptFromUrl(url:string):Promise<Script>
     {
-        const m = url.match(/^(?:https:\/\/)?(?:(?<domain>[^/]+)\/)?(?<library>[^/]+)\/(?<scriptname>[^/:]+)(?:[:/](?<version>[^/]+))?\/?$/);
+        const m = url.match(/^(?:(?<domain>https?:\/\/[^/]+)\/)?(?<author>[^/]+)\/(?<scriptname>[^/:]+)(?:[:/](?<version>[^/]+))?\/?$/);
 
         if(!m)
         {
-            throw new Error(`LibraryConnector::getScriptFromUrl(): Invalid URL format: ${url}`);
+            throw new Error(`LibraryConnector::getScriptFromUrl(): Invalid URL format: "${url}"`);
         }
         else
         {
-            let { domain, library, scriptname, version } = m.groups;
+            let { domain, author, scriptname, version } = m.groups;
 
             // First check if path has domain that is different than current library
             let currentLibraryConnector;
-            if(domain !== this.domain)
+
+            if(domain.toLowerCase() !== this.domain.toLowerCase())
             {
+                console.info(`LibraryConnector::getScriptFromUrl(): Different domain detected in URL. Creating new LibraryConnector for domain: "${domain}"`);
+
                 currentLibraryConnector = new LibraryConnector(domain);
                 const r = await currentLibraryConnector.connect(); // connect to new library
                 if(!r)
@@ -261,14 +277,15 @@ export class LibraryConnector
                 }
             }
 
-            const script = await currentLibraryConnector.getScript(library, scriptname, version);
-            if(script)
+            const script = await (currentLibraryConnector as LibraryConnector).getScript(author, scriptname, version);
+            if(!script)
             {
-                return new Script(script);
+                throw new Error(`LibraryConnector::getScriptFromUrl(): Script not found at URL: ${url}`);
             }
             else {
-                throw new Error(`LibraryConnector::getScriptFromUrl(): Script not found at URL: ${url}`);
-            }            
+                console.info(`LibraryConnector::getScriptFromUrl(): Successfully fetched script "${scriptname}" (v${version}) from URL: ${url}`);
+            }
+            return script            
         }
         
     }

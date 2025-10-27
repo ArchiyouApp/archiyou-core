@@ -2674,7 +2674,7 @@
 
       toString():string
       {
-         return `ShapeCollection<${this.shapes.map(s => s.toString())}>`;
+         return `ShapeCollection<${(this.shapes.length > 0 ? this.shapes.map(s => s.toString()) : 'empty')}>`;
       }
 
       /** Get all edges of 2D XY Shapes in this collection 

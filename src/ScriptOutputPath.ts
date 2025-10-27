@@ -17,7 +17,7 @@
             from './internal' // constants
  import type { ScriptMeta, ScriptOutputCategory, ScriptOutputFormat, 
             ScriptOutputFormatMetric, ScriptOutputFormatModel, ScriptOutputFormatTable, 
-            ScriptOutputFormatDoc, ScriptOutputPathData } 
+            ScriptOutputFormatDoc, ScriptOutputPathData, ScriptOutputDataWrapper } 
         from './internal';
 
 import { isScriptOutputFormat, isScriptOutputCategory } from './internal'; // ScripOutputManager typeguards
@@ -35,6 +35,8 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
     public format: null|'*'|ScriptOutputFormat|null;
     public formatOptions: Record<string, any>; // TODO: TS typing
 
+    public _output:any|ScriptOutputDataWrapper // if we load output path from result, we can keep track of data here
+
     constructor(outputPath?:string)
     {
         if(!outputPath)
@@ -42,7 +44,6 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
             console.warn(`ScriptOutputPath::constructor(): Empty ScriptOutputPath instance created. Use fromData() to set!`);
             return;
         }
-
         // parse a string like 'default/model/glb?data=true'
         this.requestedPath = outputPath;
         const PATH_REGEX = /^(?<pipeline>[^\/]+)\/(?<category>[^\/]+)(?:\/(?<entity>[^\/]+))?\/(?<format>[^\/\?]+)(?:\?(?<options>.*))?$/;
@@ -50,7 +51,7 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
 
         if (!match || !match?.groups)
         {
-            console.error(`ScriptOutput::constructor(): Invalid output path: "${outputPath}"`);
+            console.error(`ScriptOutputPath::constructor(): Invalid output path: "${outputPath}"`);
         }
         else 
         {
@@ -136,6 +137,12 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
         this.resolved = true;
         this.resolvedPath = `${this.pipeline}/${this.category}/internal`;
         this._validate();
+        return this;
+    }
+
+    setOutputData(data:any):this
+    {
+        this._output = data;
         return this;
     }
 

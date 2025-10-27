@@ -1188,7 +1188,7 @@ export interface ScriptOutputPathData
 export interface ScriptOutputData
 {
     path:ScriptOutputPathData
-    output: any|ScriptOutputDataWrapper // raw data or wrapped data with metadata
+    output: string|ArrayBuffer|Record<string,any>|ScriptOutputDataWrapper // raw data or wrapped data with metadata
 }
 
 

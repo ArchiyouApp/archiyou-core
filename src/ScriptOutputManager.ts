@@ -49,15 +49,13 @@
  *
  */
 
- import { ScriptOutputPath } from './internal'
+ import { ScriptOutputPath, isScriptOutputPathData } from './internal'
  import type { ScriptOutputCategory, ScriptOutputFormatModel, ScriptOutputFormatMetric,
             ScriptOutputFormatTable, ScriptOutputFormatDoc, ScriptMeta,
             RunnerScriptExecutionRequest,
             RunnerScriptExecutionResult, 
   } from './internal'
 
-import { SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_METRIC_FORMATS,
-         SCRIPT_OUTPUT_TABLE_FORMATS, SCRIPT_OUTPUT_DOC_FORMATS } from './constants';
 
  export class ScriptOutputManager
  {
@@ -113,6 +111,37 @@ import { SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_METRIC_FORMATS,
         return this;
     }
 
+    /** If we want to manage outputs of a execution result without resolving paths 
+     * This also ties outputs to the path objects for easy access
+    */
+    public fromResult(result:RunnerScriptExecutionResult):this
+    {
+        this.requestedOutputPaths = [];
+        this.resolvedOutputsPaths = [];
+
+        if(!result && typeof result !== 'object'){ throw new Error(`ScriptOutputManager::fromResult(): Invalid result object!`)};
+
+        if(result?.outputs && Array.isArray(result.outputs))
+        {
+            result.outputs.forEach(
+                (out) => 
+                {
+                    if(isScriptOutputPathData(out.path))
+                    {
+                        const outputPathObj = new ScriptOutputPath().fromData(out.path);
+                        if(outputPathObj)
+                        {
+                            outputPathObj.setOutputData(out.output); // tie output data to path object
+                            this.resolvedOutputsPaths.push(outputPathObj);
+                        }
+                    }
+                });
+            console.info(`ScriptOutputManager::fromResult: Loaded ${this.resolvedOutputsPaths.length} output paths from result: "${this.resolvedOutputsPaths.map(o => o.resolvedPath).join(', ')}"`);
+        }
+
+        return this;
+    }
+        
     //// GET RESULTS FROM PARSED OUTPUTS ////
 
     public getPipelines():Array<string>

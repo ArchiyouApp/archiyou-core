@@ -1,8 +1,8 @@
-import { Runner, Script, ScriptOutputPath } from './internal';
+import { Runner, Script, ScriptOutputManager, ScriptOutputPath, } from './internal';
 
 import type { RunnerScriptExecutionRequest, 
             RunnerScriptScopeState, Obj, PublishScript, 
-            ImportComponentResult } from './internal';
+            ImportComponentResult, ImportComponentResultPipelines } from './internal';
 
 
 /**
@@ -32,7 +32,7 @@ import type { RunnerScriptExecutionRequest,
 export class RunnerComponentImporter
 {
     //// SETTINGS ////
-    DEFAULT_OUTPUTS = ['models/internal']; 
+    DEFAULT_OUTPUTS = ['default/model/internal']; 
 
     ////
     
@@ -144,68 +144,70 @@ export class RunnerComponentImporter
         
         const r = this._runner._executeComponentScript(request);
         
-        // We get a normal ExecutionResult here: flatten all data
+        // Check for errors
         if(r.status === 'error')
         {
             throw new Error(`$component("${this.name}")::_executeComponentScript(): Error executing component script: ${r.errors.join('; ')}`);
         }
 
-        // Basic structure for result from Component 
-        const result:ImportComponentResult = {
-                status: r.status,
-                errors: r.errors,
-                component: this.name,
-                outputs: {},
-                model: undefined,
-                metrics: {},
-                tables: {},
-                docs: {}
-            };
+        // Continue gathering results
+        /* Check how we can flatten the result:
+            - check how many pipelines
+            - if single output
+            - if multiple outputs
+        */
+        const outputManager = new ScriptOutputManager().fromResult(r); // tie outputs to path objects too 
 
-        const singlePipeline = (Object.keys(r.outputs.pipelines).length === 1)  
-                                    ? Object.keys(r.outputs.pipelines)[0] 
-                                    : Object.keys(r.outputs.pipelines).find((k) => k === 'default') 
-                                        ? 'default' : null;
-                                    
-        const allPipelines = Object.keys(r.outputs.pipelines);
-
-        console.info(`$component("${this.name}")::get(): Got result with pipelines:"${allPipelines.join(',')}. The main pipeline is "${singlePipeline}". Access results of default pipeline with .model, .tables, .docs, .metrics. Or use .{pipelinename}.model for specific pipeline`);
-
-        allPipelines.forEach((pipelineName) => 
-        {
-            let resultTarget = result[pipelineName]; 
-            if(resultTarget === undefined){  resultTarget = result[pipelineName] = {} as ImportComponentResult;}
+        // First make total tree, then apply shortcuts (if any)
+        let result = {} as ImportComponentResult; 
         
-            // We need to recreate the component scene hierarchy and shapes in main scope
-            // TODO: check results
-            resultTarget.model = this._recreateComponentObjTree(r.outputs.pipelines[pipelineName].model.internal.data);
-            // Other outputs by name of document, metric, table etc
-            resultTarget.metrics = r.outputs.pipelines[pipelineName]?.metrics || {}; 
-
-            resultTarget.tables = Object.keys(r.outputs.pipelines[pipelineName]?.tables || {}).reduce((agg,v) => { agg[v] = r.outputs.pipelines[pipelineName].tables[v].internal.data; return agg }, {});
-            resultTarget.docs = Object.keys(r.outputs.pipelines[pipelineName]?.docs || {}).reduce((agg,v) => { agg[v] = r.outputs.pipelines[pipelineName].docs[v].internal.data; return agg}, {});
-            
-            // default on main level result object
-            if(pipelineName === 'default' || pipelineName === singlePipeline)
+        outputManager.getPipelines().forEach(pl => 
+        {
+            outputManager.getOutputsByPipeline(pl)
+            .forEach( outPathObj =>
             {
-                result.model = resultTarget.model;
-                result.metrics = resultTarget.metrics;
-                result.tables = resultTarget.tables;
-                result.docs = resultTarget.docs;
-            }
+                if(!result[pl]){ result[pl] = {} as ImportComponentResultPipelines };
+                const pipelineResult = result[pl]; // reference
+                // All outputs are internal format and all together (no specific entities like 'docs/report')
+                pipelineResult[outPathObj.category] = outPathObj._output;
 
+                // Special import for model category - recreate Obj tree in main scope
+                if(outPathObj.category === 'model' && outPathObj._output)
+                {
+                    console.info(`$component("${this.name}")::_executeComponentScript(): Recreating component Obj tree in main scope for pipeline "${pl}"...`);
+                    const recreatedObj = this._recreateComponentObjTree(outPathObj._output as Object);
+                    pipelineResult['model'] = recreatedObj.shapes(true); // result is ShapeCollection of all shapes in the Obj tree
+                    console.info(`$component("${this.name}")::_executeComponentScript(): Recreated component Obj tree in main scope for pipeline "${pl}".`);
+                }
+            });
         });
 
+        // Flatten result if possible
+        if(outputManager.getPipelines().length === 1)
+        {
+            const singlePipeline = outputManager.getPipelines()[0];
+            result = result[singlePipeline];   
+            // only one result
+            if(outputManager.getOutputsByPipeline(singlePipeline).length === 1)
+            {
+                const singleOutput = outputManager.getOutputsByPipeline(singlePipeline)[0];
+                result = result[singleOutput.category];
+                const resultType = result?.constructor?.name || typeof result;
+                console.info(`$component("${this.name}")::_executeComponentScript(): Returning single output of category "${singleOutput.category}" with result of type "${resultType}".`);
+            }
+        }
+        
         return result;
 
     }
 
      /** Get component script from Runners cache (in Runner.componentScripts) */
-    _getComponentScript():PublishScript|null
+    _getComponentScript():Script|null
     {
         return this._runner.getComponentScript(this.name)
     }
 
+    /** We need to recreate the component object tree into the current scope */
     _recreateComponentObjTree(tree:Object, parentObj?:Obj):Obj
     {
         console.info(`$component("${this.name}")::_recreateComponentObjTree(): Recreating component object tree...`);

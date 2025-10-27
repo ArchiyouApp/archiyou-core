@@ -597,12 +597,14 @@ export class Obj
 
     /** 
      *  Export Obj tree structure with raw shapes that will be recreated in other scope
+     *  NOTE: is this needed?
      * */
     toComponentGraph(component:string, parentNode:Object=null):Object
     {
         const curNode = {
             _entity : 'ObjData',
             name : this._name,
+            // Note: shapes(true) for all shapes including children Objs
             shapes:  this.shapes(false) as ShapeCollection, // NOTE: geom is still current scope instance!
             children : [],
         }
