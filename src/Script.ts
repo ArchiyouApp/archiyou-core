@@ -119,7 +119,7 @@ export class Script
             // url: this.published?.url && typeof this.published.url === "string" && this.published.url.length > 0,
             // published : this.published.published instanceof Date,
             // description: this.published.description && typeof this.published.description === "string",
-            params: typeof this.published.params === "object",
+            // params: typeof this.published.params === "object",
         }
 
         const isValidPublished = Object.values(VALIDATIONS).every((v) => v === true);
@@ -332,7 +332,10 @@ export class Script
 
     //// IO ////
 
-    fromData(data:Script|ScriptData):Script|this
+    /** Load from raw data
+     *  Some backwards compatibility
+     */
+    fromData(data:Script|ScriptData|Record<string, any>):Script|this
     {
         if (data instanceof Script)
         {
@@ -360,9 +363,26 @@ export class Script
         this.presets = data.presets || {};
 
         this.published = data.published || null; // will be validated in validate()     
+        
+        // Some backwards compatibility for v1 scripts
+        const anyData = (data as any);
+        if(!this.published && anyData?.version)
+        {
+            this.published = {
+                title: anyData.name,
+                version: anyData.version
+            } as ScriptPublished
+        }
 
         // Validate the script after loading
-        this.validate();
+        try { 
+            this.validate();
+        }
+        catch(e)
+        {
+            return null;
+        }
+
         return this;
     }
 

@@ -3,7 +3,7 @@ import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell,
         ParamManager, Obj, Script, ScriptParam, ScriptData  } from './internal'
 
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, 
-            Exporter, Make, Calc, View, Table } from './internal'
+            Exporter, Make, Calc, Db as CalcDb, View, } from './internal'
 
 import type { ScriptOutputPath, ScriptParamData } from './internal'
 
@@ -128,13 +128,13 @@ export interface ScriptPublished
 {
     title:string // nice title of the script
     version:string // valid semver
-    libraryUrl:string // url to the library where the script is published
-    url:string // url to the published script - without library url - this anticipates different publication urls
-    published:Date // Date of publication
-    description:string // public description of script
-    public:boolean // if the script is public or not
-    params: Record<string, any>; // the parameters that are public with override configuration, others are default
-    presets: Array<string>; // presets that are public
+    libraryUrl?:string // url to the library where the script is published
+    url?:string // url to the published script - without library url - this anticipates different publication urls
+    published?:Date // Date of publication
+    description?:string // public description of script
+    public?:boolean // if the script is public or not
+    params?: Record<string, any>; // the parameters that are public with override configuration, others are default
+    presets?: Array<string>; // presets that are public
 }
 
 /** A group of all modules of Archiyou for easy access  */
@@ -286,30 +286,26 @@ export interface RunnerScriptExecutionResult
     outputs?: Array<ScriptOutputData>
 }
 
-/** Results of component execution */
-export interface ImportComponentResult
-{
-    status?:'success'|'error'; // status of the execution
-    errors?:Array<any>; // errors if any
-    component?:string // name of component
-    outputs:Record<string, ImportComponentPipelineOutputs> // outputs per pipeline name in internal format
-    // for ease of use we also place the results model, metrics, tables and docs on main level
-    model?:Obj, // model of default pipeline
-    metrics?:Record<string, Metric>,
-    tables?:Record<string, Table>,
-    docs?:Record<string, Doc>,
+/** Results of component execution 
+ *  This is a flattened version of RunnerScriptExecutionResult for direct use in execution scope
+ *  Any output is in internal format
+ *   - models -> Obj (which contains Shapes)
+ *   - metrics -> Record<string,Metric>
+ *   - tables -> CalcTable (or CalcDb?)
+ *   - docs -> Doc
+ *   
+*/
+export type ImportComponentOutput = Obj|Record<string,Metric>|Calc|Doc|null
+export interface ImportComponentResultPipeline {
+    model?: Obj|null,
+    metrics?: Record<string,Metric>|null,
+    tables?:CalcDb|null,
+    docs?: Doc|null
 }
-
-/** Outputs of component execution
- *  All internal instances for internal use
- */
-export interface ImportComponentPipelineOutputs
-{
-    model: Obj, 
-    metrics: Record<string, Metric>, // metrics of the model
-    tables: Record<string, Table>
-    docs: Record<string, Doc>,
-}
+/** Result with multiple pipelines */
+export type ImportComponentResultPipelines = Record<string, ImportComponentResultPipeline>
+/** Combined type: direct output, per pipeline or multiple pipelines */
+export type ImportComponentResult = ImportComponentOutput|ImportComponentResultPipeline|ImportComponentResultPipelines
 
 
 //// PARAMS ////
@@ -1194,8 +1190,6 @@ export interface ScriptOutputData
     path:ScriptOutputPathData
     output: any|ScriptOutputDataWrapper // raw data or wrapped data with metadata
 }
-
-
 
 
 /** Wraps different output data with information 

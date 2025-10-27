@@ -20,7 +20,7 @@ import type { ArchiyouApp, ExportGLTFOptions, Statement,
 
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, Db, 
-            RunnerScriptExecutionResult, CodeParser, LibraryConnector, 
+            RunnerScriptExecutionResult, Script, CodeParser, LibraryConnector, 
             ScriptOutputManager} from "./internal"
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
@@ -52,8 +52,8 @@ export class Runner
     _activeScope: RunnerActiveScope; // scope in given context (local or worker) and name
     _activeExecRequest: RunnerScriptExecutionRequest;
 
-    _componentScripts: Record<string, PublishScript> = {}; // prefetched component scripts by name=url=path
-    
+    _componentScripts: Record<string, Script> = {}; // prefetched component scripts by name=url=path
+
     _manageWorker:Worker|null; // the worker that this runner manages (if role is manager)
     _onWorkerMessageFunc:(m:RunnerWorkerMessage) => any; // function to call when we get a message from the Worker
 
@@ -1065,9 +1065,10 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
      *  This is always done in local context 
      *   because executing components comes from within execution scope and context
      *   IMPORTANT: 
-     *      We want to avoid writing in a script: await $component('name').get(..) - which will be ugly and prone to errors
-     *      So a sync function is used to execute component scripts
-     *      This also means that we need to pre-fetch all component scripts before executing them
+     *      - We want to avoid writing in a script: await $component('name').get(..)
+     *          which will be ugly and prone to errors
+     *      - So a sync function is used to execute component scripts
+     *      - This also means that we need to pre-fetch all component scripts before executing them
      */
     _executeComponentScript(request:RunnerScriptExecutionRequest): RunnerScriptExecutionResult
     {
@@ -1081,7 +1082,8 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
      /** For executing component scripts we need to have synchronous execution function
      *  Because we don't want to write await $component('name').get() in the code
      *  This is possible only if we use sync methods in the code
-     *  In this case that's no problem because we need the internal instances from Component scope for model, metrics, docs, tables
+     *  In this case that's no problem because we need the existing internal instances 
+     *      from Component scope for model, metrics, docs, tables
      *  
      *  NOTE: This is run in the local scope, so 'this' is the execution scope
      */
@@ -1159,7 +1161,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     /* Prefetch component scripts from request script code
         IMPORTANT: How to deal with recursive component imports?
     */
-    async _prefetchComponentScripts(request:string|RunnerScriptExecutionRequest, noCache:boolean=false):Promise<Record<string,PublishScript>>
+    async _prefetchComponentScripts(request:string|RunnerScriptExecutionRequest, noCache:boolean=false):Promise<Record<string,Script>>
     {
         const IMPORT_COMPONENT_RE = /\$component\(\s*'(?<name>[^,]+)'[^\)]+/g;
 
@@ -1197,12 +1199,12 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
     
     /** Fetch component script from url or local file path */
-    async _fetchComponentScript(name?:string):Promise<PublishScript>
+    async _fetchComponentScript(name?:string):Promise<Script|null>
     {
         if(!name){ throw new Error(`$component("${name}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
 
-        // Local file path (in node)
-        if(name.includes('.json'))
+        // Local file path (in node) for debug
+        if(name.includes('.js'))
         {
             if(!this.inNode())
             {
@@ -1220,7 +1222,8 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             { 
                 throw new Error(`$component("${name}")::_fetchComponentScript(): Cannot read component script from file "${name}". File not found or empty!`);
             }
-            return JSON.parse(data) as PublishScript; // parse JSON script
+            const componentScript = new Script().fromData(data);
+            return componentScript;
         }
         // Remote URL in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent'
         else {
@@ -1228,8 +1231,10 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         }
     }
 
-    /** Get component from cache in componentScripts */
-    getComponentScript(name:string):PublishScript|null
+    /** Get component from cache in componentScripts 
+     *  Cache needs to be filled by this._prefetchComponentScripts()
+    */
+    getComponentScript(name:string):Script|null
     {
         if(!this._componentScripts[name])
         {
@@ -1260,7 +1265,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         return r;
     }
 
-    async getScriptFromUrl(url:string):Promise<PublishScript>
+    async getScriptFromUrl(url:string):Promise<Script>
     {
         const library = new LibraryConnector();
         return await library.getScriptFromUrl(url); // get script from library
@@ -1380,7 +1385,6 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     {
         const result = {} as RunnerScriptExecutionResult;
 
-        // Meta
         this._addMetaToResult(scope, request, result);
 
         // Outputs
@@ -1624,10 +1628,10 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             }
 
             // Gather raw results from pipeline
-            this._exportPipelineModelsInternal(scope, request, pipeline, result);
-            this._exportPipelineMetricsInternal(scope, request, pipeline, result);
-            this._exportPipelineTablesInternal(scope,request, pipeline, result);
-            this._exportPipelineDocsInternal(scope, request, pipeline, result);
+            outputs.push(...this._exportPipelineModelsInternal(scope, request, pipeline, result));
+            outputs.push(...this._exportPipelineMetricsInternal(scope, request, pipeline, result));
+            outputs.push(...this._exportPipelineTablesInternal(scope,request, pipeline, result));
+            outputs.push(...this._exportPipelineDocsInternal(scope, request, pipeline, result));
         };
 
         return outputs;
@@ -1647,7 +1651,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
             outputs.push({
                 path: outputPath.toData(),
-                output: scope.geom.scene.toComponentGraph(request.component)
+                output: scope.geom.scene.toComponentGraph(request.component) // export the Obj/Shape graph for the component
             })
         }
         return outputs;
@@ -1661,20 +1665,13 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         
         const outputs = [] as Array<ScriptOutputData>;
 
-        const metricsToExport = Array.from(new Set(outputPathsForMetrics.map(o => o.entityName))); // get unique metric names
-        const metrics = (scope.calc as Calc).getMetrics(metricsToExport);
-
-        metrics.forEach((metric) => 
+        // We result all metrics per pipeline (no per-metric export here)
+        // TODO: tie Metrics to component?
+        outputPathsForMetrics.forEach((outputPath) => 
         {
-            // To keep track that this Metric instance came from the component
-            metric._component = request?.component;
-
-            const outputPath = outputPathsForMetrics.find(p => p.entityName === metric.name);
-
-            // TODO: test
             outputs.push({
                 path: outputPath.toData(),
-                output: metric,
+                output: scope.calc.getMetrics(),
             });
         });
 
@@ -1683,32 +1680,21 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         return outputs;
     }
 
-
     /** Get internal Table data from local execution scope and set in result tree */
     _exportPipelineTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
         const outputManager = new ScriptOutputManager().loadRequest(request,result);
         // Get all table outputs for this pipeline in internal format
         const outputPathsForTables = outputManager.getOutputsByPipelineCategory(pipeline, 'tables') as Array<ScriptOutputPath>;
-        
-        if(outputPathsForTables.length === 0)
-        {
-            console.info(`Runner::_exportPipelineTablesInternal(): No tables to export`);
-            return []; // no tables to export
-        }
 
         // Filter out doubles
         const outputs = [] as Array<ScriptOutputData>;
         
         outputPathsForTables.forEach((path) => 
-        {
-            const table = scope.calc.getTable(path.entityName);
-            // To keep track that this Table instance came from a component
-            table._component = request?.component; // set component name on table instance
-            
+        {   
             outputs.push({
                 path: path.toData(),
-                output: table // get table by name    
+                output: scope.calc.db // get Db internal instance
             });
 
         });
@@ -1724,20 +1710,16 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     {
         const outputManager = new ScriptOutputManager().loadRequest(request,result);
         const outputPathsForDocs = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'docs', ['internal']); // get the docs to export for current pipeline
+        
         const outputs = [] as Array<ScriptOutputData>;
-
-        // what documents to output
-        // NOTE: toData() is raw data, we need to export internal data
         
         outputPathsForDocs.forEach((outputPath) => 
         {
-            const doc = scope.doc.getDoc(outputPath.entityName)
-            // To keep track that this DocDocument instance came from a component
-            doc._component = request?.component;
-            // Set internal doc data in result in path pipelines/docname/internal
+            // TODO: keep track of Component in docs
+            
             outputs.push({
                 path: outputPath.toData(),
-                output: doc
+                output: scope.doc._docs, // internal docs (DocDocument) by name
             });
             
         });

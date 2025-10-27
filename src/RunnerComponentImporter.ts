@@ -1,4 +1,5 @@
-import { Runner } from './internal';
+import { Runner, Script, ScriptOutputPath } from './internal';
+
 import type { RunnerScriptExecutionRequest, 
             RunnerScriptScopeState, Obj, PublishScript, 
             ImportComponentResult } from './internal';
@@ -18,13 +19,20 @@ import type { RunnerScriptExecutionRequest,
  *      We can get away with introducing a sync execution method
  *      RunnerComponentImporter.get() => Runner._executeComponentScript => Runner._executeLocalSync
  *      
- *      
+ *  Some usage examples based on get and shortcuts methods model() and all():
+ * 
+ *    - leftWall = $component("test/wall", { LENGTH: 300, HEIGHT: 250 }).model() // default pipeline model Obj  
+ *    ==> same as: $component("test/wall", { LENGTH: 300, HEIGHT: 250 }).get('default/model')
+ *    - cutShapes = $component("test/box", { WIDTH: 100, DEPTH: 100 }).get('cnc/model')  
+ *    - { model: wallShape, docs: wallDocs, tables: wallTables } = $component("test/wall", { }).all()
+ *    ==> same as: $component("test/wall", { }).get('default/model','default/tables', 'default/docs', 'default/metrics')
+ * 
  * 
  */
 export class RunnerComponentImporter
 {
     //// SETTINGS ////
-    DEFAULT_OUTPUTS = ['models/raw']; 
+    DEFAULT_OUTPUTS = ['models/internal']; 
 
     ////
     
@@ -45,50 +53,63 @@ export class RunnerComponentImporter
         this.params = params || {}; // parameters for the component
     }
 
-    /** This trigger actual script execution
-     *  based on data in this instance of RunnerComponentImporter
-     *  @param p - path or array of paths to requested outputs (like 'model', 'cnc/model')  
+    /** 
+     *  Get outputs from component script execution
+     *   This will enable the user to get specific outputs from the component:
+     *      - any pipeline
+     *      - any category: model, docss, tables, metrics 
+     *  
+     *  @param p - path or array of paths to requested outputs (like 'default/model', 'cnc/model')  
      * 
      *  Components only work with internal data, so we always get 'internal' format
+     *  Some simplications: 
+     *      - no other formats than 'internal'
+     *      - we export internal categories like 'model', 'docs', 'tables', 'metrics' directly as module instances
+     *          : no specific entities like 'docs/report'
+     *      - if only one output path given (for example 'default/model') return that directly
+     * 
+     *  See RunnerComponentImporter.model() for easy way of getting model
      *  
      * */
-    get(p:string|Array<string>)
+    get(p:string|Array<string>): ImportComponentResult
     {
         if (typeof p === 'string') p = [p]; // convert to array if string
 
-        // what to get 
-        // 'model' => 'default/models/internal'
-        // 'docs' => 'default/docs/*/internal'
-        // or default/docs/spec/internal
         const outputPaths = p.map((path) =>
         {
-            console.log(path.split('/'));
-            // For get we have some simpler paths - like 'model', 'docs', 'tables', 'metrics'
-            // TODO: Manage output paths in a more generic way
-            if(path.split('/').length === 1 && ['model', 'docs', 'tables', 'metrics'].includes(path))
+            const outputPathObj = new ScriptOutputPath(path).internalize();
+            if(!outputPathObj.checkValid())
             {
-                if(path === 'model') return `default/${path}/internal`;
-                else return `default/${path}/*/internal`; // 'docs/*' or 'tables/*' or 'metrics/*'
+                console.warn(`$component("${this.name}")::get(): Invalid output path requested: "${path}". Skipping this output.`);
+                return undefined;
             }
-            // Append format'internal' with paths like 'docs/spec' or 'tables/*' or 'models/cnc'
-            else if(path.split('/').length === 2)
-            {
-                return `default/${path}/internal`; // 'docs/spec/internal' or 'tables/*/internal'
-            }
-            // TODO: correct wrong formats like 'cnc/model/dxf' or 'cnc/tables/*/xlsx'
-
+            return outputPathObj.resolvedPath;
 
         }).filter(path => path !== undefined); // remove undefined paths
 
-        
-        this._requestedOutputs = this._requestedOutputs.concat(outputPaths);
+        this._requestedOutputs = outputPaths;
 
-        console.log(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
+        console.info(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
 
         return this._getAndExecute();
     }
+
+    /** Shortcut method for getting model */
+    model(): ImportComponentResult 
+    {
+        // TODO: add pipeline arg
+        return this.get('default/model');
+    }
+
+    /** Shortcut method for getting everything of default pipeline */
+    all(): ImportComponentResult
+    {
+        // TODO: add pipeline arg
+        return this.get(['default/model', 'default/tables', 'default/docs', 'default/metrics']);
+    }
+
    
-    /** Really get the script and execute in seperate scope */
+    /** Really get the script and execute in seperate component scope */
     _getAndExecute():ImportComponentResult
     {
         if(!this._runner){ throw new Error('ImportComponentController::_execute(): Runner not set!');}
@@ -103,18 +124,12 @@ export class RunnerComponentImporter
         return this._executeComponentScript(script); // execute script in seperate component scope
     }
 
-    /** Get component script from Runners cache (in Runner.componentScripts) */
-    _getComponentScript():PublishScript|null
-    {
-        return this._runner.getComponentScript(this.name)
-    }
-
     /** Execute component script with params and requested outputs
      *  @param script - PublishScript to execute
      *  @param params - parameters to pass to the script
      *  @returns Promise<ImportComponentResult> - result of the execution
      */
-    _executeComponentScript(script:PublishScript):ImportComponentResult
+    _executeComponentScript(script:Script):ImportComponentResult
     {
         const request:RunnerScriptExecutionRequest = {
             script: script,
@@ -129,11 +144,10 @@ export class RunnerComponentImporter
         
         const r = this._runner._executeComponentScript(request);
         
-        // We get a normal ExecutionResult here, convert to a more simpler ImportComponentResult
-        // With only raw data per pipeline name
+        // We get a normal ExecutionResult here: flatten all data
         if(r.status === 'error')
         {
-            return { status: 'error', errors: r.errors, component: this.name, outputs: {}};
+            throw new Error(`$component("${this.name}")::_executeComponentScript(): Error executing component script: ${r.errors.join('; ')}`);
         }
 
         // Basic structure for result from Component 
@@ -186,6 +200,11 @@ export class RunnerComponentImporter
 
     }
 
+     /** Get component script from Runners cache (in Runner.componentScripts) */
+    _getComponentScript():PublishScript|null
+    {
+        return this._runner.getComponentScript(this.name)
+    }
 
     _recreateComponentObjTree(tree:Object, parentObj?:Obj):Obj
     {

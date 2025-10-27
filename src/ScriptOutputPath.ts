@@ -125,6 +125,20 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
         return this;
     }
 
+    /** Alter path for internal use
+     *  This removes/sets some parsed properties like entity, format, formatOptions
+     */
+    internalize()
+    {
+        this.entityName = null;
+        this.format = 'internal';
+        this.formatOptions = {};
+        this.resolved = true;
+        this.resolvedPath = `${this.pipeline}/${this.category}/internal`;
+        this._validate();
+        return this;
+    }
+
     //// CACHE FILE PATHS ////
     
     /** Load output path data from a cache file path */
@@ -202,7 +216,7 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
         return true;
     }
 
-    private checkValid():boolean
+    public checkValid():boolean
     {
         if(!this.valid)
         { 
