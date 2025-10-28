@@ -512,10 +512,11 @@ export class Bbox
     }   
 
     /** Get Shape from this Bounding Box */
-    shape():Edge|Face|Solid|null
+    shape():Vertex|Edge|Face|Solid|null
     {
-        // TODO: point or line?
-        return (this.is1D()) ? this.line() :
+        return (this.isPoint()) 
+                    ? this.center()._toVertex() 
+                    : (this.is1D()) ? this.line() :
                             (this.is2D()) ? this.rect() : (this.is3D()) 
                                 ? this.box() : null
     }

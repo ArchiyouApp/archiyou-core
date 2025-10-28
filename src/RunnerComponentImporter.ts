@@ -98,14 +98,14 @@ export class RunnerComponentImporter
     model(): ImportComponentResult 
     {
         // TODO: add pipeline arg
-        return this.get('default/model');
+        return this.get('default/model/internal');
     }
 
     /** Shortcut method for getting everything of default pipeline */
     all(): ImportComponentResult
     {
         // TODO: add pipeline arg
-        return this.get(['default/model', 'default/tables', 'default/docs', 'default/metrics']);
+        return this.get(['default/model/internal', 'default/metrics/*/internal', 'default/tables/*/internal', 'default/docs/*/internal']);
     }
 
    
@@ -168,7 +168,8 @@ export class RunnerComponentImporter
             {
                 if(!result[pl]){ result[pl] = {} as ImportComponentResultPipelines };
                 const pipelineResult = result[pl]; // reference
-                // All outputs are internal format and all together (no specific entities like 'docs/report')
+                // All outputs are grouped together (no specific entities like 'docs/report')
+                // Make data directly available (flatten path and _output structure)
                 pipelineResult[outPathObj.category] = outPathObj._output;
 
                 // Special import for model category - recreate Obj tree in main scope

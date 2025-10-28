@@ -5,11 +5,11 @@
  *     Define DocDocuments by code
  * 
  *      Important entities:
- *        - Doc - set of pages
- *        - Page
- *        - Containers - blocks on the page with content
- *        - Templates - set of containers with variable slots
- *        - View - container that shows CAD shapes
+ *        - DocDocument - set of pages
+ *        - DocPage
+ *        - DocPageContainer - blocks on the page with content
+ *        - DocPageView - container that shows CAD shapes
+  *       - DocPageImage - container that shows an image
  *      
  *      Example:
  *          doc
@@ -20,11 +20,12 @@
  *          .padding('10mm')
  *          .orientation('landscape')
  *          .view('isometric view')
- *            .shapes(leftfrontback) 
- *            .scale('auto')
- *            .width('100%')
- *            .height('100%')
- *            .position('topleft')         
+ *          .shapes(leftfrontback) 
+ *          .scale('auto')
+ *          .width('100%')
+ *          .height('100%')
+ *          .position('topleft')         
+ * 
  */
 
 import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
@@ -183,26 +184,28 @@ export class Doc
                             const startTime = Date.now();
                             const outputs = pipelineFn.call(this._ay.scope,this._ay.scope);
 
-                            if(outputs && typeof outputs !== 'object')
+                            if(!outputs || typeof outputs !== 'object')
                             {
-                                console.warn(`Doc:executePipelines(): Your pipeline function did not return anything! Please use return { var1, var2, ... } to set variables on the scope!`);
+                                console.warn(`Doc:executePipelines(): Your pipeline function did not return anything! This can work in some cases (for example with function(){ var1 = ...} ). But advised to return { var1, var2 } `);
                             }
                             else {
                                 console.info(`Doc:executePipelines(): Loading pipeline vars into execution scope: "${Object.keys(outputs).join(', ')}"`);
+
+                                // get returned variables and set them on scope
+                                Object.entries(outputs).forEach(([key, value]) => 
+                                {
+                                    if(this._ay.scope[key] !== undefined){ console.warn(`Doc:executePipelines(): Overwriting existing variable "${key}" on execution scope!`); }
+                                    // TODO: protect against overwriting important variables!
+                                    console.info(`Doc:executePipelines(): Setting variable "${key}" on execution scope from pipeline of doc "${docName}"`);
+                                    this._ay.scope[key] = value;
+                                });
                             }
-
-                            // get returned variables and set them on scope
-                            Object.entries(outputs).forEach(([key, value]) => 
-                            {
-                                if(this._ay.scope[key] !== undefined){ console.warn(`Doc:executePipelines(): Overwriting existing variable "${key}" on execution scope!`); }
-                                this._ay.scope[key] = value;
-                            });
-
                             console.info(`Doc:executePipelines(): Pipeline of document "${docName}" executed in ${Date.now() - startTime}ms`);
                             
                             pipeline.done = true; // set done
                         }
-                        catch(e){
+                        catch(e)
+                        {
                             console.error(`Doc:executePipelines(): Cannot execute a pipeline in worker scope: Error: "${e}"`);
                         }
                     }
@@ -300,49 +303,12 @@ export class Doc
 
         if(!fn.hasOwnProperty('prototype'))
         {
-            console.warn(`Doc::pipeline(): You supplied a function defined with arrows. In that case you need to use the argument scope to set variables: pipeline( (scope) => scope.myShape = box(); )`)
+            console.warn(`Doc::pipeline(): You supplied a function defined with arrows. Use return { var1, var2 } to export variables to execution scope!`);
         }
 
         this._activeDoc.addPipeline({ fn: fn, done: false } as DocPipeline);
 
         return this;
-    }
-
-    //// DOCUMENT AGGREGATION OPERATIONS ////
-
-    /** Merge incoming DocDocument instances with current document 
-     *  @d single or collection of DocDocument instance 
-    */
-    merge(d:DocDocument|Array<DocDocument>|Record<string, DocDocument>)
-    {
-        const docsArray = (Array.isArray(d)) ? d 
-                            : d instanceof DocDocument 
-                                ? [d]
-                                : Object.values(d);
-
-        if(docsArray.length === 0){ throw new Error(`Doc::merge: Please supply at least one DocDocument to merge!`); }
-
-        docsArray.forEach((doc, i) => 
-        {
-            if(!(doc instanceof DocDocument)){ console.error(`Doc::merge: Encountered a object of type ${typeof doc} which is not a DocDocument at index ${i}. Skipping it!`)};
-            const mergedDocName= `${doc?._component || ''}:${doc.name}`; // use component name if available
-            // Now just add the pages of incoming document to current one
-            doc._pages.forEach((page) =>
-            {
-                const mergedPageName = `${doc?._component || ''}${page.name}`; 
-                if(!this._activeDoc.pageExists(mergedPageName))
-                {
-                    page.name = mergedPageName;
-                    this._activeDoc._pages.push(page); // add page to current document
-                    console.info(`Doc::merge: Merged page "${page.name}" from DocDocument "${mergedDocName}" into active DocDocument "${this._activeDoc.name}"`);
-                }
-                else {
-                    // NOTE: this should not happen! 
-                    console.warn(`Doc::merge: Page "${page.name}" already exists in active DocDocument "${this._activeDoc.name}". Skipping it!`);
-                }
-            });
-
-        })
     }
 
     //// PAGE API ////
@@ -1122,6 +1088,15 @@ export class Doc
         }
     }
 
+    /** For moving Doc internally around from component scopes */
+    toInternalData():Array<DocDocument>
+    {
+        if(typeof this._docs !== 'object' || this._docs.length === 0) return [];
+
+        return Object.values(this._docs).map( curDoc => curDoc.resolveScopeReferences());
+            
+    }
+
     /** Export pure data */
     async toData(onlyDocs:string|Array<string>, noCache:boolean=false):Promise<{[key:string]:DocData} | undefined>
     {
@@ -1373,6 +1348,60 @@ export class Doc
         return convertValueFromToUnit(num, inUnit, unit)
             
      }
+
+     //// DOC AGGREGATION ////
+     /* 
+        When dealing with components it is essential to be able to combine docs of these components
+        into a single doc at a higher level. This is done by exporting the internal data of the doc module
+        and importing it into another doc module instance.
+
+        Some considerations:
+         - naming clarity conflicts
+         - append pages to existing document or append as new document
+         - extra additions based on new aggregation: page numbers, references etc
+     */
+
+    //// DOCUMENT AGGREGATION OPERATIONS ////
+
+    /** Merge incoming DocDocument instances with current document 
+     *  @d single or collection of DocDocument instance 
+    */
+    merge(d:DocDocument|Array<DocDocument>|Record<string, DocDocument>, namePrefix:string=''):this
+    {
+        const docsArray = (Array.isArray(d)) ? d 
+                            : d instanceof DocDocument 
+                                ? [d]
+                                : Object.values(d);
+
+        if(docsArray.length === 0){ throw new Error(`Doc::merge: Please supply at least one DocDocument to merge!`); }
+
+        docsArray.forEach((doc, i) => 
+        {
+            if(!(doc instanceof DocDocument)){ console.error(`Doc::merge: Encountered a object of type ${typeof doc} which is not a DocDocument at index ${i}. Skipping it!`)};
+            const mergedDocName= `${doc?._component || ''}:${doc.name}`; // use component name if available
+            // Now just add the pages of incoming document to current one
+            doc._pages.forEach((page) =>
+            {
+                // Page name in format {{prefix}}[{{component}}]-{{pagename}} like: leftWall[WallComponent]-workdrawings
+                const mergedPageName = `${namePrefix}${(doc?._component) ? '[' + doc?._component + ']' : ''}-${page.name}`; 
+                if(!this._activeDoc.pageExists(mergedPageName))
+                {
+                    page.name = mergedPageName;
+                    this._activeDoc._pages.push(page); // add page to current document
+                    console.info(`Doc::merge: Merged page "${page.name}" from DocDocument "${mergedDocName}" into active DocDocument "${this._activeDoc.name}"`);
+                }
+                else {
+                    // NOTE: this should not happen! 
+                    console.warn(`Doc::merge: Page "${page.name}" already exists in active DocDocument "${this._activeDoc.name}". Skipping it!`);
+                }
+            });
+
+        })
+        
+        return this;
+    }
+
+    
 }
 
 

@@ -71,7 +71,7 @@
      *  Any warnings will be places inside result.warnings
      *  @returns number of valid (resolved) output paths generated 
     */
-    public loadRequest(request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):this
+    public loadRequest(request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult, resolve:boolean=true):this
     {
         const requestedOutputPaths = Array.isArray(request.outputs) ? request.outputs : [];
         if(requestedOutputPaths.length === 0)
@@ -94,19 +94,31 @@
                 result.warnings.push(warningMsg);
             }
         });
-        // Resolve wildcards in the requested outputs
-        this.resolvedOutputsPaths = []; // reset
-        const meta = result?.meta || {} as ScriptMeta;
-        this.requestedOutputPaths.forEach( (output) => 
+
+        if(!resolve)
         {
-            const { resolved, warnings } = output.resolveVerbose(meta);
-            this.resolvedOutputsPaths.push(...resolved); // resolving can return multiple paths
-            
-            // Any warnings (like invalid entity names) are placed in result.warnings
-            if(!result.warnings) result.warnings = [];
-            result.warnings.push(...warnings);
-            
-        });
+            // Don't resolve, just copy requested to resolved
+            // This is used to get outputs from components, where wildcards for entities are not needed
+            // Because everything is exported
+            this.resolvedOutputsPaths = this.requestedOutputPaths.map(p => p.internalize());
+            return this;
+        }
+        else {
+            // Resolve wildcards in the requested outputs
+            this.resolvedOutputsPaths = []; // reset
+            const meta = result?.meta || {} as ScriptMeta;
+            this.requestedOutputPaths.forEach( (output) => 
+            {
+                const { resolved, warnings } = output.resolveVerbose(meta);
+                this.resolvedOutputsPaths.push(...resolved); // resolving can return multiple paths
+                
+                // Any warnings (like invalid entity names) are placed in result.warnings
+                if(!result.warnings) result.warnings = [];
+                result.warnings.push(...warnings);
+                
+            });
+        }
+       
 
         return this;
     }

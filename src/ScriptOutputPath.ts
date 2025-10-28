@@ -31,7 +31,7 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
     public resolved:boolean; // doesn't contain any wildcards anymore
     public pipeline:null|string;
     public category:null|'*'|ScriptOutputCategory;
-    public entityName:null|'*'  |string; // name of metric, table or doc
+    public entityName:null|'*'|string; // name of metric, table or doc
     public format: null|'*'|ScriptOutputFormat|null;
     public formatOptions: Record<string, any>; // TODO: TS typing
 
@@ -126,16 +126,16 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
         return this;
     }
 
-    /** Alter path for internal use
-     *  This removes/sets some parsed properties like entity, format, formatOptions
-     */
+    /** Alter path for internal use in context of components
+     *  We try to keep it the same as normal use */
     internalize()
     {
-        this.entityName = null;
+        this.entityName = (this.category !== 'model' ) ? '*' : null; // all entities for internal outputs in tables, docs, metrics
         this.format = 'internal';
         this.formatOptions = {};
+        // Make resolved path, keeping wildcard in for metrics, tables, docs
+        this.resolvedPath = `${this.pipeline}/${this.category}/${ (this.entityName) ? this.entityName + '/' : ''}internal`;
         this.resolved = true;
-        this.resolvedPath = `${this.pipeline}/${this.category}/internal`;
         this._validate();
         return this;
     }

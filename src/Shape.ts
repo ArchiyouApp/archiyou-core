@@ -2771,6 +2771,13 @@ export class Shape
         return this;
     }
 
+    /** Alias for align */
+    @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
+    alignTo(other:AnyShape, pivot?:Pivot, alignment?:Alignment):this
+    {
+        return this.align(other, pivot, alignment);
+    }
+
     /** Copy and then align */
     @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
     aligned(other:AnyShape, pivot?:Pivot, alignment?:Alignment):this

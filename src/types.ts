@@ -659,7 +659,7 @@ export interface ContainerContent
 {
     source?:string, // source url (used for quick access if possible)
     format?:'jpg'|'svg'|'png';
-    data:any; // main data
+    data:any; // main data - can be base64
     settings:{[key:string]:any}
 }
 

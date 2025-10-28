@@ -5,6 +5,7 @@ import { checkInput  } from './internal';
 export class View extends Container
 {
     _shapes:ShapeCollection|string; // either a real reference to a ShapeCollection or the name of it that is suppose to be available after running the Doc pipeline
+    _resolvedShapesSVG:string; // cached resolved SVG string
     _style:any; // general style (TODO)
     _styles:{[key:string]:any}; // style overrides (TODO)
     _dimension:any; // TODO
@@ -23,12 +24,28 @@ export class View extends Container
         return {
             ...this._toContainerData(),
             content: { 
-                data: (ShapeCollection.isShapeCollection(this._shapes)) ? 
-                                (this._shapes as ShapeCollection)?.toSvg({ all: this._forceAll, annotations: true }) : 
-                                this.resolveShapeNameToSVG(this._shapes as string), 
+                data: this.resolveShapesToSVG(), 
                 settings: {} 
             } as ContainerContent,
         }
+    }
+
+    /** For components we need to remove all references to Shapes */
+    resolveShapesToSVG():string
+    {
+        if(this._resolvedShapesSVG)
+        { 
+            console.info(`DocPageContainerView::resolveShapesToSVG(): Got svg from cache!`);
+            return this._resolvedShapesSVG
+        }
+
+        const svg = (ShapeCollection.isShapeCollection(this._shapes)) 
+                        ? (this._shapes as ShapeCollection)?.toSvg({ all: this._forceAll, annotations: true }) 
+                        :  this.resolveShapeNameToSVG(this._shapes as string)
+
+        this._resolvedShapesSVG = svg; // set to avoid double use
+        
+        return this._resolvedShapesSVG;
     }
 
     resolveShapeNameToSVG(shapesRef:string):string
@@ -76,5 +93,18 @@ export class View extends Container
             throw new Error('DocPageContainer:shapes(): Please supply either a reference to ShapeCollection or the name of one that will be available after running the pipeline!');
         }
     }
+
+    //// UTIL ////
+
+    /** Used to remove DocDocument instances from execution scope
+     *  Used in components
+     */
+    resolveScopeReferences():this
+    {
+        this.resolveShapesToSVG();
+        this.shapes = null; // remove to be sure
+        return this;
+    }
+
 
 }

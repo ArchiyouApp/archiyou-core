@@ -1399,7 +1399,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         // Outputs
         if(request.outputs)
         {
-            console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: ${request.outputs.join(', ')}`);
+            console.info(`Runner::getLocalScopeResultsComponent(): Getting results from execution scope. Requested outputs: "${request.outputs.join('", "')}"`);
             result.outputs = this.getLocalScopeResultOutputsInternal(scope, request, result);
         }
         return result;
@@ -1617,7 +1617,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     */
     getLocalScopeResultOutputsInternal(scope:any, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,result);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result,false); // IMPORTANT: don't resolve because we don't have entity names
         const pipelines = outputManager.getPipelines();
 
         console.info(`Runner::getLocalScopeResultOutputsInternal(): Getting results from execution scope. Running pipelines: ${pipelines.join(',')}`);
@@ -1641,6 +1641,11 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             outputs.push(...this._exportPipelineMetricsInternal(scope, request, pipeline, result));
             outputs.push(...this._exportPipelineTablesInternal(scope,request, pipeline, result));
             outputs.push(...this._exportPipelineDocsInternal(scope, request, pipeline, result));
+
+            console.info(`**** Runner::getLocalScopeResultOutputsInternal(): Finished exporting "${outputs.length}" internal outputs for pipeline "${pipeline}" ****`);
+            outputs.forEach(o => {
+                console.info(`  - ${o.path.resolvedPath} : ${(typeof o.output)}`);
+            });
         };
 
         return outputs;
@@ -1649,7 +1654,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     /** Get internal Obj/Shape model data from local execution scope */
     _exportPipelineModelsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,result);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result, false);
         const outputPaths = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'model', ['internal']); // get the models to export for current pipeline
 
         const outputs = [] as Array<ScriptOutputData>;
@@ -1662,6 +1667,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                 path: outputPath.toData(),
                 // Need to export Obj tree structure with Shapes in special way
                 // Because Obj is still tied to Scene graph of component scope
+                // TODO: Can we fix this? 
                 output: scope.geom.scene.toComponentGraph(request.component) // export the Obj/Shape graph for the component
             })
         }
@@ -1673,22 +1679,28 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     /** Get internal Metric data from local execution scope and set in result tree */
     _exportPipelineMetricsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,result);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result, false);
         const outputPathsForMetrics = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'metrics', ['internal']); // get the metrics to export for current pipeline
         
         const outputs = [] as Array<ScriptOutputData>;
 
         // We result all metrics per pipeline (no per-metric export here)
-        // TODO: tie Metrics to component?
-        outputPathsForMetrics.forEach((outputPath) => 
+        
+        const metrics = scope.calc.getMetrics();
+        if(typeof metrics === 'object' && Object.keys(metrics).length > 0 )
         {
-            outputs.push({
-                path: outputPath.toData(),
-                output: scope.calc.getMetrics(),
+            outputPathsForMetrics.forEach((outputPath) => 
+            {
+                outputs.push({
+                    path: outputPath.toData(),
+                    output: scope.calc.getMetrics(),
+                });
             });
-        });
-
-        console.info(`Runner::_exportPipelineMetricsInternal(): Exported metrics ${JSON.stringify(outputs)} of Pipeline "${pipeline}"`);
+            console.info(`Runner::_exportPipelineMetricsInternal(): Exported ${Object.keys(metrics).length} metrics of Pipeline "${pipeline}" for output paths "${outputPathsForMetrics.map(m => m.entityName).join('", "')}"`);
+        }
+        else {
+            console.info(`Runner::_exportPipelineMetricsInternal(): No metrics to export for Pipeline "${pipeline}"`);
+        }
 
         return outputs;
     }
@@ -1696,7 +1708,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     /** Get internal Table data from local execution scope and set in result tree */
     _exportPipelineTablesInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,result);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result, false);
         // Get all table outputs for this pipeline in internal format
         const outputPathsForTables = outputManager.getOutputsByPipelineCategory(pipeline, 'tables') as Array<ScriptOutputPath>;
 
@@ -1707,7 +1719,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         {   
             outputs.push({
                 path: path.toData(),
-                output: scope.calc.db // get Db internal instance
+                output: null // TODO
             });
 
         });
@@ -1718,26 +1730,41 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     }
 
  
-    /** Get internal Doc data from local execution scope and set in result tree */
+    /** Get internal Doc data from local execution scope and set in result tree 
+     *  Because of the Doc module is tied to the execution scope, we export raw data here (Doc.toData())
+    */
     _exportPipelineDocsInternal(scope:any, request:RunnerScriptExecutionRequest, pipeline:string, result:RunnerScriptExecutionResult):Array<ScriptOutputData>
     {
-        const outputManager = new ScriptOutputManager().loadRequest(request,result);
+        const outputManager = new ScriptOutputManager().loadRequest(request,result, false);
         const outputPathsForDocs = outputManager.getOutputsByPipelineEntityFormats(pipeline, 'docs', ['internal']); // get the docs to export for current pipeline
         
         const outputs = [] as Array<ScriptOutputData>;
-        
-        outputPathsForDocs.forEach((outputPath) => 
-        {
-            // TODO: keep track of Component in docs
-            
-            outputs.push({
-                path: outputPath.toData(),
-                output: scope.doc._docs, // internal docs (DocDocument) by name
-            });
-            
-        });
 
-        console.info(`Runner::_exportPipelineDocsInternal(): Exported ${outputs.length} docs of Pipeline "${pipeline}" with output request: ${outputPathsForDocs.map(d => d.entityName).join(', ')}`);
+        const docNames = scope.doc.docs();
+
+        if(docNames.length > 0)
+        {
+            outputPathsForDocs.forEach((outputPath) => 
+            {
+                // TODO: keep track of Component in docs
+                
+                outputs.push({
+                    path: outputPath.toData(),
+                    /* Before we can export internal doc data, 
+                        We need to make sure all references from execution scope are removed
+                        This applies to shapes mostly, which are turned into SVG's
+                        NOTE: doc.toData() is not possible because it's async
+                    */
+                    output: (scope.doc as Doc).toInternalData(), 
+                });     
+            });
+
+            console.info(`Runner::_exportPipelineDocsInternal(): Exported ${docNames.length} docs of Pipeline "${pipeline}" with output requests: "${outputPathsForDocs.map(d => d.entityName).join('", "')}"`);   
+        }
+        else {
+            console.info(`Runner::_exportPipelineDocsInternal(): No docs in scope to export for Pipeline "${pipeline}"`);
+        }
+
         return outputs;
     }
 

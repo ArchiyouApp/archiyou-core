@@ -187,6 +187,20 @@ export class Page
         } as PageData;
     }
 
+    //// COMPONENTS ////
+
+    resolveScopeReferences():this
+    {
+        this._containers.forEach( c => 
+        {
+            if((c as any)?.resolveScopeReferences) // check if method exists
+            {
+                (c as View).resolveScopeReferences(); // make sure all shapes are resolved to SVG
+            }
+        });
+        return this;
+    }
+
     //// UTILS
 
     _containerExists(name:string):boolean

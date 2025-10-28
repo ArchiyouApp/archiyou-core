@@ -720,15 +720,15 @@
          const others = (otherCollection.count() === 1) ? otherCollection.first() : otherCollection;
 
          // pivot using bbox() of ShapeCollection
-         const pivotAlignPerc:Array<number> = (this.bbox().box() || this.bbox().rect())._alignPerc(pivot)
-         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(others)) ? 
-                                             (others.bbox().box() || others.bbox().rect())._alignPerc(alignment) :
-                                             (other as Shape)._alignPerc(alignment)
+         const pivotAlignPerc:Array<number> = (this.bbox().shape())._alignPerc(pivot)
+         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(others)) 
+                                                ? (others.bbox().shape())._alignPerc(alignment) 
+                                                : (others as Shape)._alignPerc(alignment)
          
          const fromPosition = this.bbox().getPositionAtPerc(pivotAlignPerc).toVector();
          const toPosition = others.bbox().getPositionAtPerc(alignmentPerc).toVector();
 
-         this.move(toPosition.subtracted(fromPosition)); //.move(pivotOffsetVec);
+         this.move(toPosition.subtracted(fromPosition));
 
          return this;
       }

@@ -86,4 +86,17 @@ export class DocDocument
         }
         
     }
+
+    //// COMPONENTS ////
+
+    /** Remove all references that tie this DocDocument instance to the execution scope */
+    resolveScopeReferences():this
+    {
+        this._doc.executePipelines(); // make sure pipelines are executed before moving around
+        this._pages.forEach( p => 
+        {
+            p?.resolveScopeReferences();
+        });
+        return this;
+    }
 }
