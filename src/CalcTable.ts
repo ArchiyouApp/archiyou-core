@@ -4,6 +4,8 @@
  * 
 */
 
+import type { JSONSchema7 } from 'json-schema';
+
 import { Db, DataRowsColumnValue, DataRowColumnValue, DataRows } from './internal';
 import { isDataRowsValues, isDataRowsColumnValue } from './internal';
 
@@ -18,6 +20,7 @@ export class Table
     _name:string;
     _db:Db; // reference to database parent
     _dataRows: DataRowsColumnValue; // raw data fallback: [{ col1: v1, col2: v2}, { col1: v3, col2: v4 }]}
+    _schema:JSONSchema7; // optional JSON schema for this table
     _component:string; // component name if this table came from a component
 
     /** Make Table from rows with Objects or values */
@@ -63,6 +66,19 @@ export class Table
         
         this._db.renameTable(this, newName);
         return this;
+    }
+
+    /** Set JSON schema for defining the structure of this table */
+    schema(schema?:JSONSchema7):this
+    {
+        this._schema = schema;
+        return this;
+    }
+
+    /** Validate this Table against its schema */
+    validate()
+    {
+        // TODO validate this._dataRows against this._schema
     }
 
     /** Save this Table in the database*/

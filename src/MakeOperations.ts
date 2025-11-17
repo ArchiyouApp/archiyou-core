@@ -142,8 +142,9 @@ export class MakeOperations
             const xDir = obbox[`${largeSide.axis}Dir`](), // local x axis in world coords is along largest side (~length of piece)
             const yDir = obbox[`${midSide.axis}Dir`]().reversed(), // local y axis is along middle side (~width of piece) parallel to global x, but reversed
             const zDir = obbox[`${smallSide.axis}Dir`]()  // local z axis is along smallest side (~height of piece, or depth of operation)
+            // the face of the reference plane
             const face = new Face().makePlaneBetween(origin, origin.moved(xDir.scaled(largeSide.size, yDir.scaled(midSide.size))))
-            
+            // TODO: bounds?
 
             return { 
                 type: shapeType, 
