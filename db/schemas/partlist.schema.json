@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Part List",
+  "description": "A list of products required to manufacture parts, including calculated quantities and pricing information",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Part group or category"
+    },
+    "specs" : {
+      "type": "string",
+      "description": "Summary of specs to identify this part list entry. Like SLS 33x195x6000 or OSB3-12-1220x2440"
+    },
+    "part": {
+      "$ref": "./part.schema.json",
+      "description": "Reference to part properties"
+    },
+    "part_names" : {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of part names included in this part list entry"
+    },
+    "pieces": {
+      "type": "integer",
+      "description": "Number of pieces (aggregated by part/product id with special algorithm)",
+      "minimum": 1
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Total quantity required",
+      "minimum": 0
+    },
+    "price_per_quantity": {
+      "type": "number",
+      "description": "Price per quantity unit (e.g. product, pieces, total_quantity)",
+      "minimum": 0
+    },
+    "price_per": {
+      "type": "string",
+      "enum": ["m1", "m2", "m3", "pcs", "kg"],
+      "description": "Unit for price calculation"
+    },
+    "price_currency": {
+      "type": "string",
+      "enum": ["€", "$"],
+      "description": "Currency for price values"
+    },
+    "price": {
+      "type": "number",
+      "description": "Total price for the required quantity",
+      "minimum": 0
+    },
+    "waste": {
+      "type": "number",
+      "description": "Waste quantity (difference between ordered and part quantity)",
+      "minimum": 0
+    }
+  },
+  "required": ["name", "specs", "part", "pieces"],
+  "additionalProperties": false
+}

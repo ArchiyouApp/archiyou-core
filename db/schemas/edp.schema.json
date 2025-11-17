@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "",
+  "description": "",
+  "type": "object",
+   "$defs": 
+   {
+    "technical_specification": 
+    {
+      "type": "object",
+      "properties": {
+        "value": { "type": "number" },
+        "unit": { "type": "string" }
+      }
+    },
+    "epd_effect_category" : {
+       "enum" : [
+          "GWP",
+          "AD",
+          "ODP",
+          "POCP",
+          "AP",
+          "EP",
+          "HT",
+          "FAETP",
+          "MAETP",
+          "TETP",
+          "Climate Change",
+          "Climate Change - Fossil",
+          "Climate Change - Biogenic",
+          "Climate Change - Land Use and Land Use Change",
+          "Ozone Depletion",
+          "Acidification",
+          "Eutrophication, freshwater",
+          "Eutrophication, marine",
+          "Eutrophication, terrestrial",
+          "Photochemical Ozone Formation",
+          "Resource use, minerals and metals",
+          "Resource use, fossils",
+          "Water use",
+          "Particulate matter",
+          "Ionising radiation",
+          "Excotoxicity, freshwater",
+          "Human toxicity, cancer",
+          "Human toxicity, non-cancer",
+          "Land use",
+          "Energy, primary, renewable, excluding",
+          "Energy, primary, renewable, materials",
+          "Energy, primary, renewable",
+          "Energy, primary, non-renewable, exc",
+          "Energy, primary, non-renewable, mat",
+          "Energy, primary, non-renewable",
+          "Secondary material",
+          "Secondary Fuel, renewable",
+          "Secondary Fuel, non-renewable",
+          "Water, Fresh Water use",
+          "Waste, hazardous",
+          "Waste, non hazardous",
+          "Waste, radioactive",
+          "Components for re-use",
+          "Materials for recycling",
+          "Materials for Energy Recovery",
+          "Exported Energy, Electric",
+          "Exported Energy, Thermal"
+       ]
+    },
+    "epd_impact": 
+    {
+      "type": "object",
+      "properties": {
+        "effect_categorie": { "$ref": "#/$defs/epd_effect_category" },
+        "effect_name" : { "type": "string" },
+        "unit": { "type": "string" },
+        "total": { "type": "number" },
+        "A1_A3": { "type": "number" },
+        "A4": { "type": "number" },
+        "A5": { "type": "number" },
+        "B1_B5": { "type": "number" },
+        "C1": { "type": "number" },
+        "C2": { "type": "number" },
+        "C3": { "type": "number" },
+        "C4": { "type": "number" },
+        "D": { "type": "number" }
+      }
+    }
+  },
+  "properties": 
+  {
+    "name": { "type": "string", "description": "The name of the product."},
+    "functional_unit": { "type": "string", "description": "The functional unit for the EPD." },
+    "service_life": { "type": "string", "description": "The service life of the product in years."},
+    "composition": { "type": "string", "description": "The composition of the product." },
+    "thickness": { "$ref": "#/$defs/technical_specification" },
+    "fire_rating": {
+          "description": "Fire classification according to EN 13501-1.",
+          "$ref": "#/$defs/technical_specification"
+        },
+    "epd": 
+    {
+      "description": "Environmental Product Declaration (EPD) information.",
+      "type": "object",
+      "properties": 
+      {
+        "impacts": 
+        {
+          "description": "Impact categories for EPD performance metrics.",
+          "type": "array",
+          "items": 
+          {
+            "$ref": "#/$defs/epd_impact"
+          }
+        }
+      }
+    }
+  }
+}

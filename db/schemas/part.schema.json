@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Part",
+  "description": "Descibes the exact part, how it is produced from a stock product and how it is placed identifyable inside the assembly ",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the part"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the part. No need to be unique."
+    },
+    "size": {
+      "type": "number",
+      "description": "Primary size specification",
+      "minimum": 0
+    },
+    "width": {
+      "type": "number",
+      "description": "Section width in mm",
+      "minimum": 0
+    },
+    "height": {
+      "type": "number",
+      "description": "Section height in mm (must be > width)",
+      "minimum": 0
+    },
+    "product": {
+      "$ref": "./product.schema.json",
+      "description": "Reference to product properties"
+    },
+    "material": {
+      "$ref": "./material.schema.json",
+      "description": "Reference to material properties"
+    },
+    "group": {
+      "type": "string",
+      "description": "Part group or category"
+    },
+    "description": {
+      "type": "string",
+      "description": "Part description"
+    },
+    "component": {
+      "$ref": "./material.schema.json",
+      "description": "Belongs to this component"
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Operation type"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Operation parameters"
+          }
+        }
+      },
+      "description": "Array of operations to be performed on the part"
+    },
+    "area" : {
+      "type": "number",
+      "description": "Surface area of the part in square millimeters",
+      "minimum": 0
+    },
+    "volume" : {
+      "type": "number",
+      "description": "Volume of the part in cubic millimeters",
+      "minimum": 0
+    },
+    "mass" : {
+      "type": "number",
+      "description": "Mass of the part in kg",
+      "minimum": 0
+    },
+    "cost" : {
+        "type": "number",
+        "description": "Material cost of the part in Euro",
+        "minimum": 0
+    },
+    "labor_cost" : {
+        "type": "number",
+        "description": "Labor cost of the part in Euro",
+        "minimum": 0
+    },
+    "price" : {
+        "type": "number",
+        "description": "Price of the part in Euro. This includes material cost plus labor cost.",
+        "minimum": 0
+    },
+    "time" : {
+        "type": "number",
+        "description": "Processing time of the part in minutes",
+        "minimum": 0
+    },
+    "waste" : {
+        "type": "number",
+        "description": "Material waste of the part in percentage (%). This is material that is cut from product size and is not used for the part.",
+        "minimum": 0,
+        "maximum": 100
+    }
+  },
+  "required": ["id", "size", "product"],
+  "additionalProperties": false
+  
+}
