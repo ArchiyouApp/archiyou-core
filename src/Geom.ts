@@ -49,7 +49,6 @@ export class Geom
   activeSketch:Sketch; // if we are in Sketch mode
   _captureShapesStart:ShapeCollection = null;
   _activeLayerGroup:Obj = null; // active group of layers - used to combine layer into one
-  _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
   // NOTE: meshingQuality is either in Main or Webworker scope
   _Arr2D:any; // holds class Reference to Arrangements2D module
 
@@ -64,7 +63,6 @@ export class Geom
     Shape.prototype._oc = this._oc; // set for all Shapes: this is inherited to Vertex, Edge etc
     ShapeCollection.prototype._oc = this._oc;
     Sketch.prototype._oc = this._oc;
-    Pipeline.prototype._oc = this._oc;
     
     // tie all Classes to this Geom instance ( handles for example registering of copied shapes )
     //Vector.prototype._geom = this;
@@ -74,7 +72,6 @@ export class Geom
     Shape.prototype._geom = this;
     ShapeCollection.prototype._geom = this;
     Sketch.prototype._geom = this;
-    Pipeline.prototype._geom = this;
 
     Annotator.prototype._geom = this;
     this._annotator = new Annotator();
@@ -802,7 +799,6 @@ export class Geom
     this.scene.empty(); // remove all Shapes from scene obj
     this.scene = new Obj().name("scene") as Obj; // create empty Obj to be sure
     this.resetLayers();
-    this._pipelines = [];
   }
 
   /** Get a name for a layer based on existing ones and a pattern */
@@ -895,22 +891,6 @@ export class Geom
     let tmpLayerGroup = this._activeLayerGroup;
     this._activeLayerGroup = null;
     return tmpLayerGroup;
-  }
-
-  //// PIPELINES ////
-
-  /** Make a new pipeline. Use .execute(fn) to set function later */
-  pipeline(name?:string, fn?:() => ShapeCollection):Pipeline
-  {
-    const p = new Pipeline(name);
-    if (fn){ p.does(fn); }
-    if(!this._pipelines.includes(p)) this._pipelines.push(p);
-    return p;
-  }
-
-  getPipelineNames():Array<string>
-  {
-      return Array.from( new Set(this._pipelines.map( p => p.name)))
   }
 
   //// CAPTURE SHAPES STATE ////

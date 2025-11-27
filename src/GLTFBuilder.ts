@@ -126,7 +126,7 @@ export class GLTFBuilder
                     messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
                     // Document data by document name in special format for AY doc viewers (PDF and web)
                     docs: (settings?.docs !== false) ? (await ay?.doc?.toData(settings?.docs) || {}) : {},
-                    pipelines: ay.geom.getPipelineNames(), // TODO: Make this definitions not only names
+                    pipelines: ay.runner.getPipelineNames(), // TODO: Make this definitions not only names
                     metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
                     tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
                     /* TODO: pipeline

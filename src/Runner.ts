@@ -21,7 +21,7 @@ import type { ArchiyouApp, ExportGLTFOptions, Statement,
 
 import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, Db, 
             RunnerScriptExecutionResult, Script, CodeParser, LibraryConnector, 
-            ScriptOutputManager} from "./internal"
+            ScriptOutputManager, Pipeline } from "./internal"
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
@@ -53,6 +53,7 @@ export class Runner
     _activeExecRequest: RunnerScriptExecutionRequest;
 
     _componentScripts: Record<string, Script> = {}; // prefetched component scripts by name=url=path
+    _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
 
     _manageWorker:Worker|null; // the worker that this runner manages (if role is manager)
     _onWorkerMessageFunc:(m:RunnerWorkerMessage) => any; // function to call when we get a message from the Worker
@@ -385,6 +386,7 @@ export class Runner
 
         const state = this.buildLocalExecScopeState();
         state._scope = name; // set name of the scope inside scope
+        state._main = (name === 'default'); // is this the main scope
 
         if(this.role === 'worker' || this.role === 'single')
         {
@@ -453,7 +455,8 @@ export class Runner
             calc: new Calc(),
             exporter: new Exporter(),
             make: new Make(),
-            worker: this, // reference to worker instance
+            worker: this, // reference to runner instance
+            runner: this, // worker=runner - NOTE: this is keps for clarity for now 
             scope: null, // reference to the scope - is set when scope is created
         } as ArchiyouApp
 
@@ -544,7 +547,7 @@ export class Runner
         .forEach(methodName => 
         {
             const method = state.geom[methodName];
-            if (!method){ console.warn(`Runners::_addModelingMethodsToScopeState: Could not find ${methodName} in Geom class. Check config: GEOM_METHODS_INTO_GLOBAL`);}
+            if (!method){ console.warn(`Runner::_addModelingMethodsToScopeState: Could not find ${methodName} in Geom class. Check config: GEOM_METHODS_INTO_GLOBAL`);}
             else {
                 // avoid overwriting
                 if (!state[methodName])
@@ -570,6 +573,35 @@ export class Runner
             // Don't execute yet, wait for componentImporter.get()
             return componentImporter;
         }
+
+        state.$pipeline = (name:string, func: () => Promise<any>|any) => 
+        {
+            console.info(`$pipeline: Registering pipeline: "${name}"`);
+            // Pipelines are registered on the Runner instance
+            this.pipeline(name, func);
+        }
+    }
+
+    //// PIPELINES ////
+
+    /** Make a new pipeline. Use .do(fn) to set function later */
+    pipeline(name?:string, fn?:() => any):Pipeline
+    {
+        const p = new Pipeline(name);
+        if (fn){ p.do(fn); } // attach function if given
+        if(!this._pipelines.includes(p)) this._pipelines.push(p);
+        console.info(`Geom::pipeline: Created new pipeline "${p.name}"`);
+        return p;
+    }
+
+    getPipelineNames():Array<string>
+    {
+        return Array.from( new Set(this._pipelines.map( p => p.name)))
+    }
+
+    getPipelineByName(name:string):Pipeline
+    {
+        return this._pipelines.find(p => p.name === name);
     }
 
     //// MANAGING EXECUTION SCOPES 
@@ -1215,7 +1247,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
             // Load dynamically to avoid issues in browser
             const FS_PROMISES_LIB = 'fs/promises'; // avoid problems with older build systems preparsing import statement
-            const fs = await import(FS_PROMISES_LIB); // use promises version of fs
+            const fs = await impoRunnerScriptExecutionResultrt(FS_PROMISES_LIB); // use promises version of fs
             const data = await fs.readFile(path, 'utf-8');
 
             if(!data)
@@ -1243,6 +1275,80 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             return null;
         }
         return this._componentScripts[name];
+    }
+
+    //// PIPELINE ////
+
+    async executePipeline(pipeline:Pipeline, request:RunnerScriptExecutionRequest): Promise<RunnerScriptExecutionResult|null>
+    {
+        if(!pipeline){ console.error(`Runner::_executePipeline(): No pipeline object given!`); return null; }
+
+        const result = await this._executePipelineIsolated(pipeline, request); // start run and output
+        this.deleteLocalScope(`pipeline:${pipeline.name}`); // delete scope after execution
+        console.info(`******* Runner::executePipeline(): Finished executing pipeline "${pipeline.name}" *****`);
+        return result;
+    }
+
+    /** Execute a Pipeline in a isolated scope and extract requested outputs
+     *  NOTE: Based on _executeLocal() but simplified for ease of use
+     */
+    private async _executePipelineIsolated(pipeline:Pipeline, request:RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult|null>
+    {
+        console.info(`Runner::_executePipelineIsolated(): Executing pipeline "${pipeline.name}" in seperate scope!`);
+
+        const mainScope = this.getLocalActiveScope();
+
+        const executeStartTime = performance.now()
+
+        const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+
+        const scopeName = `pipeline:${pipeline.name}`;
+
+        this.createScope(scopeName); // isolated pipeline scope, automatically becomes current scope
+        const pipelineScope = this.getLocalActiveScope();
+
+        const outputFunc = (scope:RunnerScriptScopeState) => this.getLocalScopeResults(scope, request);
+
+        const exec = async () =>
+        {
+            try 
+            {
+                return await (new AsyncFunction(  
+                        'mainScope',
+                        'pipelineScope',
+                        'pipeline',
+                        'outputFunc',
+                            // function body
+                            `
+                            console.log('***** EXECUTING PIPELINE "${pipeline.name}" IN ISOLATED SCOPE *****');
+                            // run pipeline function in own scope, and supplying mainScope as argument
+                            pipeline._function.call(pipelineScope, mainScope); 
+                            
+                            // export results
+                            asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
+                            
+                            return (asyncOutput) 
+                                        ? Promise.resolve(outputFunc(pipelineScope)) // avoid await keyword - again for Webpack 4
+                                        : outputFunc(pipelineScope);
+            
+                            `
+                    ))(mainScope, pipelineScope, pipeline, outputFunc) as Promise<RunnerScriptExecutionResult>|RunnerScriptExecutionResult;    
+            }
+            catch(e)
+            {
+               return this._handleExecutionError(pipelineScope, request, outputFunc.toString(), e);
+            }
+        }
+
+        const result = await exec();
+        
+        // Set duration if result is RunnerScriptExecutionResult
+        if(isRunnerScriptExecutionResult(result))
+        {
+            result.duration = Math.round(performance.now() - executeStartTime);
+        }
+
+        return result;
     }
 
     //// EXECUTION UTILS ////
@@ -1283,7 +1389,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
     //// RESULTS ////
 
-    _addMetaToResult(scope, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):RunnerScriptExecutionResult
+    _addMetaToResult(scope:RunnerScriptScopeState, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):RunnerScriptExecutionResult
     {
         const shapes = scope.geom.all();
         const bbox = shapes.length ? shapes.bbox() : undefined;
@@ -1293,7 +1399,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         result.meta = {
             units: scope.geom._units,
             docs : scope.doc.docs(), // available doc names
-            pipelines : scope.geom.getPipelineNames(),  // names of defined pipelines
+            pipelines : this.getPipelineNames(),  // names of defined pipelines
             tables:scope.calc.getTableNames(), // names of available tables
             metrics : scope.calc.getMetricNames(),
             bbox : bboxArr, 
@@ -1307,11 +1413,11 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
      *  This function is bound to the scope - so 'this' is the execution scope
      *  If this method is run only if there were no errors during execution
     */
-    async getLocalScopeResults(scope:any, request:RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
+    async getLocalScopeResults(scope:RunnerScriptScopeState, request:RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
-        console.info('****Runner::getLocalScopeResults(): Getting results from execution scope ****');
+        console.info(`****Runner::getLocalScopeResults(): Getting results from execution scope "${scope._scope}" ****`);
         console.info(`Request outputs:`)
-        request.outputs?.forEach(o => console.info(` * ${o}`));
+            request.outputs?.forEach(o => console.info(` * ${o}`));
    
         const result = {} as RunnerScriptExecutionResult;
 
@@ -1350,41 +1456,66 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     /** Get results from local execution scope based on 
      *  request.outputs paths
      *  We gather result by pipeline, because we can have multiple pipelines in the request that need to be run
+     * 
      *  @scope - execution scope to get results from
      *  @request - execution request with outputs
+     * 
+     *  @returns - Array of ScriptOutputData with path and output data { path: ScriptOutputPath, output: any }
+     * 
+     *  NOTE: There is a recursive aspect here, because in the default pipeline (main scope) we run pipelines first 
+     *      in a seperate scope and get its results. Here this function is used too.
     */
-    async getLocalScopeResultOutputs(scope:any, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):Promise<Array<ScriptOutputData>>
+    async getLocalScopeResultOutputs(scope:RunnerScriptScopeState, 
+            request:RunnerScriptExecutionRequest, 
+            result:RunnerScriptExecutionResult):Promise<Array<ScriptOutputData>>
     {
-        const meta = result?.meta || {} as ScriptMeta;
-        const outputManager = new ScriptOutputManager().loadRequest(request, result);
-
-        const pipelines = outputManager.getPipelines();
-
-        console.info(`**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope. Requested pipelines: ${pipelines.length ? pipelines.join(',') : 'none'} ****`);
-
         const outputs = [] as Array<ScriptOutputData>;
+        const outputManager = new ScriptOutputManager().loadRequest(request, result);
+        const requestedPipelineNames = outputManager.getPipelines(); 
 
-        for(let i = 0; i < pipelines.length; i++)
+        // If we are in main scope, we need to run other pipelines first and get their results
+        console.info(`**** Runner::getLocalScopeResultOutputs(): Getting results from execution scope "${scope._scope}". Requested pipelines: "${requestedPipelineNames.length ? requestedPipelineNames.join('","') : 'none'}" ****`);
+
+        for(let i = 0; i < requestedPipelineNames.length; i++)
         {
-            const pipeline = pipelines[i];
-            
-            // Default pipeline is already run, only run others
-            if(pipeline !== 'default')
+            const pipelineName = requestedPipelineNames[i];
+
+            // Execute this pipeline if needed (when it is not the default)
+            if(pipelineName !== 'default' && scope._main === true) // IMPORTANT: Only pipelines from main/default scope - otherwise loops happen
             {
-                // TODO: run specific pipeline
-                console.info(`'Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelines[i]}"`);                
-                console.warn(`Runner::getLocalScopeResultOutputs(): Running pipeline "${pipeline}" not implemented yet`);
+                // Default pipeline is already run, only run others    
+                const curPipeline = this.getPipelineByName(pipelineName);
+
+                if(!curPipeline) // TODO: check valid
+                {
+                    console.warn(`Runner::getLocalScopeResultOutputs: Can't get pipeline "${pipelineName}"`);
+                }
+                else 
+                {
+
+                    console.info(`'Runner::getLocalScopeResultOutputs(): Running extra pipeline: "${pipelineName}"`);
+                    /* NOTE: executePipeline actually uses this same function (so there is recursion here)
+                        It's important that we create a specific request with only the outputs of current pipeline
+                        Otherwise we would end up in infinite loops
+                    */
+                    const pipelineOutputs = outputManager.getOutputsByPipeline(pipelineName).map(p => p.resolvedPath);
+                    const pipelineResults = await this.executePipeline(curPipeline, { ...request, outputs: pipelineOutputs });
+                    // Add the results to outputs of main scope
+                    outputs.push(...pipelineResults.outputs);
+                }
             }
-
-            // Gather results per pipeline and add to array
-            outputs.push(...await this._exportPipelineModels(scope, request, pipeline, result));
-            outputs.push(...await this._exportPipelineMetrics(scope, request, pipeline, result));
-            outputs.push(...await this._exportPipelineTables(scope, request, pipeline, result));
-            outputs.push(...await this._exportPipelineDocs(scope, request, pipeline, result));
-
-        };
-
-        return outputs;
+            else {
+                // Gather results per pipeline and add to array
+                console.info(`**** Runner::getLocalScopeResultOutputs(): Exporting outputs for pipeline "${pipelineName}" ****`);
+                outputs.push(...await this._exportPipelineModels(scope, request, pipelineName, result));
+                outputs.push(...await this._exportPipelineMetrics(scope, request, pipelineName, result));
+                outputs.push(...await this._exportPipelineTables(scope, request, pipelineName, result));
+                outputs.push(...await this._exportPipelineDocs(scope, request, pipelineName, result));
+            }
+        }
+        
+        return outputs;        
+        
     }    
 
     /**
@@ -1552,6 +1683,45 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         output: (typeof xlsxBuffer === 'object') ? Object.values(xlsxBuffer)[0] : null
                     } as ScriptOutputData);
                     break;
+                case 'gsheets':
+                    
+                    /* 
+                        Exports to Google Sheets work a bit differently
+                        We can have template exports (where no internal Table is involved) or Table exports to Google Sheet
+                        The first case is implemented here
+                    */
+
+                    /* Exporting data through a Google Sheet template document is done by the user
+                        mostly in a pipeline like this:
+                        
+                        pipeline('gsheettemplate', 
+                            async()
+                            { 
+                                await calc.gsheets.connect('<<DRIVE_ID>>'); // TODO: auth - now archiyou by default
+                                await calc.gsheets.fromTemplate(
+                                    './db/TEMPLATE_SHEET', 
+                                    './ex                ports/OUTPUT_SHEET',
+                                    { ... }) 
+                            })
+
+                        This saves exports in calc.gsheets.exports by output sheet path 
+                        calc.gsheet.outputs: 
+                           { './exports/OUTPUT_SHEET' : 'https://docs.google.com/spreadsheets/d/{{SHEET_ID}}'
+                             ...
+                           }
+                        
+                        Below we simply return all these outputs 
+
+                    */
+                    
+                    outputs.push({
+                        path: outputPathTable.toData(),
+                        output: scope.calc?.gsheets?.exports || {}
+                    });
+
+                    // TODO: straight export from tables to Google Sheets! 
+                    break;
+
                 default:
                     throw new Error(`Runner::_getScopeRunnerScriptExecutionResult(): Unknown table export format "${outputPathTable.format}"`);
             }

@@ -3,7 +3,7 @@ import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell,
         ParamManager, Obj, Script, ScriptParam, ScriptData  } from './internal'
 
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, 
-            Exporter, Make, Calc, Db as CalcDb, View, } from './internal'
+            Exporter, Make, Calc, Db as CalcDb, View, Runner} from './internal'
 
 import type { ScriptOutputPath, ScriptParamData } from './internal'
 
@@ -141,7 +141,8 @@ export interface ScriptPublished
 export interface ArchiyouApp
 {
     worker?: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
-    scope?:any // Scope where th escript is run in
+    runner?:Runner, // The instance of the Runner where the script is run
+    scope?:any // Scope where the script is run in
     geom: Geom,
     doc?: Doc,
     console?: Console,
@@ -1113,6 +1114,7 @@ export interface RunnerActiveScope
 export interface RunnerScriptScopeState extends ProxyConstructor
 {
     _scope:string // name of scope
+    _main:boolean // is this the main scope
     ay: ArchiyouApp
     // global references
     console: Console
@@ -1168,7 +1170,7 @@ export type ScriptOutputFormatInternal = 'internal'; // basics
 
 export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'; // TODO:brep,dxf
 export type ScriptOutputFormatMetric = 'json'|'xlsx';
-export type ScriptOutputFormatTable = 'json'|'xlsx';
+export type ScriptOutputFormatTable = 'json'|'xlsx'|'gsheets';
 export type ScriptOutputFormatDoc = 'json'|'pdf';
 export type ScriptOutputFormat = ScriptOutputFormatInternal|ScriptOutputFormatModel|ScriptOutputFormatMetric|ScriptOutputFormatTable|ScriptOutputFormatDoc
 

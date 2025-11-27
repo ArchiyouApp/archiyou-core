@@ -30,7 +30,10 @@ type GoogleSheetNamedRange = sheets_v4.Schema$NamedRange;
 export class TableIO
 {
     //// SETTINGS ////
+    GOOGLE_KEYFILE_PATH = './secrets/archiyoudb-f474df5307aa.json' // defaults path to google API credentials - relative to main script
+    // NOTE: Set root Google Drive folder ID in env GOOGLE_DRIVE_ROOT_ID
     FORMULA_IMPORTRANGE = /IMPORTRANGE\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/i;
+    GOOGLE_SHEETS_BASE_URL = 'https://docs.google.com/spreadsheets/d/';
 
     //// END SETTINGS ////
 
@@ -41,7 +44,7 @@ export class TableIO
     _googleAuth:any; // Google auth module
     _googleDriveId:string; // Google Drive folder ID to create files in
 
-    constructor(table:Table)
+    constructor(table?:Table)
     {
         this._table = table;
     }
@@ -66,10 +69,15 @@ export class TableIO
     //// GENERAL GOOGLE DRIVER OPERATIONS ////
 
     /** Load Google module and authenticate  */
-    async initGoogle(keyfilePath:string, driveId:string):Promise<this>
+    async initGoogle(keyfilePath?:string, driveId?:string):Promise<this>
     {
-        if(!keyfilePath || typeof keyfilePath !== 'string'){ throw new Error('Google Sheets key file path is required for authentication.'); }
-        if(!driveId || typeof driveId !== 'string'){ throw new Error('Google Drive ID is required to create Sheets in.'); }
+        keyfilePath = keyfilePath || this.GOOGLE_KEYFILE_PATH; // defaults
+        driveId = driveId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+        console.info(`TableIO::initGoogle(): Initializing Google Sheets API and connecting with keyfile (${keyfilePath}) and driveId=${driveId}...`);
+
+        if(!keyfilePath || typeof keyfilePath !== 'string'){ throw new Error('Google Sheets key file path is required for authentication. Normally this is a keyfile in accessable from main script directory!'); }
+        if(!driveId || typeof driveId !== 'string'){ throw new Error('Google Drive ID is required to create Sheets in. Set env var GOOGLE_DRIVE_ROOT_ID'); }
 
         this._googleDriveId = driveId;
 
@@ -90,24 +98,40 @@ export class TableIO
         const auth = new this._googleModule.auth.GoogleAuth(
         {
             // NOTE: API keys don't work here, need to use service account with email and private key
+            // TODO: lose the keyfile for users to set their own credentials
             keyFile: keyfilePath,
             scopes: [
                 'https://www.googleapis.com/auth/drive', // To create new files - this needs to be above spreadsheets scope
+                'https://www.googleapis.com/auth/drive.file',
+                'https://www.googleapis.com/auth/drive.readonly',
                 'https://www.googleapis.com/auth/spreadsheets',
             ],
         });
         this._googleAuth = await auth.getClient(); // JWT info
 
 
-        console.info(`CalcTableIO::initGoogle(): Google Sheets authentication successful`);
+        console.info(`TableIO::initGoogle(): Google Sheets authentication successful`);
 
         return this;
+    }
+
+    checkGoogleInitialized()
+    {
+        if(!this._googleModule)
+        {
+            throw new Error(`TableIO::_googleModule not initialized. Call initGoogle() first.`);
+        }
+        if(!this._googleAuth)
+        {
+            throw new Error(`TableIO::_googleAuth not initialized. Call initGoogle() first with keyfile and shared drive id`);
+        }
     }
 
     /** Create new Google Sheet document and return its id */
     async createGoogleSheet(title:string, folderPath:string):Promise<string>
     {
-        console.info(`CalcTableIO: Creating new Google Sheet document: ${title}...`);
+        this.checkGoogleInitialized();
+        console.info(`TableIO: Creating new Google Sheet document: ${title}...`);
 
         // NOTE: We use Drive API to create new file in specific folder
         // IMPORTANT: Set up a shared drive and create a folder in it and set in config
@@ -193,7 +217,7 @@ export class TableIO
             for (const folderName of pathParts)
             {
                 
-                console.info(`CalcTableIO::_googleListPath() 📂 Navigating to folder: ${folderName} in parent: ${currentFolderId}`);
+                console.info(`TableIO::_googleListPath() 📂 Navigating to folder: ${folderName} in parent: ${currentFolderId}`);
                 
                 const folderItems = await this._googleListFolder(currentFolderId);
                 const folders = folderItems
@@ -202,11 +226,11 @@ export class TableIO
 
                 if (!folders || folders.length === 0)
                 {
-                    throw new Error(`CalcTableIO::_googleListPath():⛔ Folder '${folderName}' not found in path '${path}'`);
+                    throw new Error(`TableIO::_googleListPath():⛔ Folder '${folderName}' not found in path '${path}'`);
                 }
                 if (folders.length > 1)
                 {
-                    console.warn(`CalcTableIO::_googleListPath(): 📂 Multiple folders named '${folderName}' found, using the first one`);
+                    console.warn(`TableIO::_googleListPath(): 📂 Multiple folders named '${folderName}' found, using the first one`);
                 }
                 currentFolderId = folders[0].id;
             }
@@ -245,6 +269,7 @@ export class TableIO
      */
     async copyGoogleItem(item: GoogleDriveItem, itemNewPath: string):Promise<GoogleDriveItem>
     {
+        this.checkGoogleInitialized();
         if (typeof itemNewPath !== 'string'){ throw new Error('CalcTableIO::copyGoogleItem(): Invalid path specified');}    
         if(itemNewPath.endsWith('/')){ throw new Error('CalcTableIO::copyGoogleItem(): Target path must include the new file name, not end with a slash.');}
 
@@ -254,7 +279,7 @@ export class TableIO
 
         if (!targetFolderItem || targetFolderItem.type !== 'folder')
         {
-            throw new Error(`CalcTableIO::copyGoogleItem(): Target folder not found: ${targetFolderName}`);
+            throw new Error(`TableIO::copyGoogleItem(): Target folder not found: ${targetFolderName}`);
         }
 
         // Create a copy in the target folder
@@ -268,7 +293,7 @@ export class TableIO
                 parents: [targetFolderItem.id],
             }
         });
-        console.info(`CalcTableIO::copyGoogleItem(): Copied "${item.name}" to "${itemNewPath}"`);
+        console.info(`TableIO::copyGoogleItem(): Copied "${item.name}" to "${itemNewPath}"`);
 
         return copy.data;
     }
@@ -277,7 +302,7 @@ export class TableIO
      *  If path is file get file contents
      *  If path is folder get list of items in folder
      */
-    async _googleGetContentPath(path: string): Promise<string|ArrayBuffer|Array<GoogleDriveItem>|undefined>
+    private async _googleGetContentPath(path: string): Promise<string|ArrayBuffer|Array<GoogleDriveItem>|undefined>
     {
         const item = await this._googleGetPathItem(path);
         if (!item)
@@ -289,7 +314,7 @@ export class TableIO
     }
 
     /** Get content of a file or folder */
-    async _googleGetItemContent(item: GoogleDriveItem): Promise<string|ArrayBuffer|Array<GoogleDriveItem>>
+    private async _googleGetItemContent(item: GoogleDriveItem): Promise<string|ArrayBuffer|Array<GoogleDriveItem>>
     {
         console.info(`Getting content of item with id "${item.id}" and type "${item.type}"`);
 
@@ -305,7 +330,7 @@ export class TableIO
     }
 
     /** Get content of a file based on its mimeType */
-    async _googleGetItemFileContent(item: GoogleDriveItem, format?: GoogleWorkspaceExportFormat): Promise<ArrayBuffer | string>
+    private async _googleGetItemFileContent(item: GoogleDriveItem, format?: GoogleWorkspaceExportFormat): Promise<ArrayBuffer | string>
     {
         console.info(`Getting file content of item "${item.name}" (${item.mimeType})`);
 
@@ -322,13 +347,13 @@ export class TableIO
         return this._downloadRegularFile(item);
     }
 
-    _isGoogleWorkspaceFile(item: GoogleDriveItem): boolean 
+    private _isGoogleWorkspaceFile(item: GoogleDriveItem): boolean 
     {
         return item.mimeType.startsWith('application/vnd.google-apps.');
     }
 
     /** Export Google Workspace files to downloadable formats */
-    async _exportGoogleWorkspaceFile(item: GoogleDriveItem, format: GoogleWorkspaceExportFormat): Promise<ArrayBuffer>
+    private async _exportGoogleWorkspaceFile(item: GoogleDriveItem, format: GoogleWorkspaceExportFormat): Promise<ArrayBuffer>
     {
         console.info(`Exporting Google Workspace file: ${item.name}`);
 
@@ -337,7 +362,7 @@ export class TableIO
             'application/vnd.google-apps.document': 
             { 
                 text: 'text/plain',
-                pdf: 'application/pdf',
+                pdf: 'application/pdfthis.checkGoogleInitialized();',
                 docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 odt: 'application/vnd.oasis.opendocument.text',
                 html: 'text/html',
@@ -431,10 +456,8 @@ export class TableIO
     */
     async openGoogleSheet(sheetId:string):Promise<GoogleSpreadsheet>
     { 
-        if(!this._googleAuth)
-        { 
-            throw new Error('Google Sheets not initialized. Call initGoogle() first.');
-        }
+        this.checkGoogleInitialized();
+        
         if(!sheetId || typeof sheetId !== 'string')
         {
             throw new Error('Invalid sheet ID. Please provide a valid string.');
@@ -454,17 +477,25 @@ export class TableIO
         }
         catch (error)
         {
-            throw new Error(`CalcTableIO::openGoogleSheet(): Can't open Google Sheet with ID "${sheetId}": "${error.message}"`);
+            throw new Error(`TableIO::openGoogleSheet(): Can't open Google Sheet with ID "${sheetId}": "${error.message}"`);
         }   
     }
 
     /** Powertool that creates a copy of a template sheet
      *  then fills in the inputs, resolve any IMPORTRANGE formulas, and returns the id of a new sheet
      */
-    async googleSheetFromTemplate(templateSheetPath:string, newSheetPath:string, inputs: Record<string, any>):Promise<string>
+    async googleSheetFromTemplate(templateSheetPath:string, newSheetPath:string, inputs: Record<string, any>, makePublic:boolean=true, returnUrl:boolean=false):Promise<string>
     {
+        // Init google module(s) if not there
+        if(!this._googleModule && !this._googleAuth)
+        {
+            await this.initGoogle();
+        }
+        
+        this.checkGoogleInitialized();
+
         const templateSheetItem = await this._googleGetPathItem(templateSheetPath);
-        if(!templateSheetItem) throw new Error(`CalcTableIO::googleSheetFromTemplate(): Template sheet not found at path: ${templateSheetPath}`);
+        if(!templateSheetItem) throw new Error(`TableIO::googleSheetFromTemplate(): Template sheet not found at path: ${templateSheetPath}`);
 
         const newSheetItem = await this.copyGoogleItem(templateSheetItem, newSheetPath);
 
@@ -475,7 +506,13 @@ export class TableIO
         // Resolve any IMPORTRANGE formulas
         await this.googleSheetResolveImportRangeFormulas(newSheet);
 
-        return newSheetItem.id;
+        // Also make it public (with link)
+        if(makePublic)
+        {
+            this.googleDriveSetPermissions(newSheet, 'writer', 'anyone');
+        }
+
+        return (returnUrl ? this.GOOGLE_SHEETS_BASE_URL : '') + newSheetItem.id;
     }
 
     /** Load module google-spreadsheet dynamically */
@@ -563,7 +600,7 @@ export class TableIO
         {
             if (!validInputNames.includes(inputName))
             {
-                console.warn(`CalcTableIO::_googleWorkSheetSetInputs(): Input "${inputName}" is not a valid input name, skipping.`);
+                console.warn(`TableIO::_googleWorkSheetSetInputs(): Input "${inputName}" is not a valid input name, skipping.`);
                 continue;
             }
             // Now get cell and set value
@@ -571,7 +608,7 @@ export class TableIO
             
             if (!inputNamedRange) // just to make sure
             {
-                console.warn(`CalcTableIO::_googleWorkSheetSetInputs(): Named range for input "${inputName}" not found, skipping.`);
+                console.warn(`TableIO::_googleWorkSheetSetInputs(): Named range for input "${inputName}" not found, skipping.`);
                 continue;
             }
             
@@ -587,14 +624,14 @@ export class TableIO
             const startCol = inputNamedRange.range.startColumnIndex || 0;
             
             const cell = await worksheet.getCell(startRow, startCol);
-            console.info(`CalcTableIO::_googleWorkSheetSetInputs(): Setting input "${inputName}" at cell [${startRow}, ${startCol}] to value: ${inputValue}`);
+            console.info(`TableIO::_googleWorkSheetSetInputs(): Setting input "${inputName}" at cell [${startRow}, ${startCol}] to value: ${inputValue}`);
             cell.value = inputValue;
 
         }
         // Save all changes
         for (let id of worksheetIds)
         {
-            console.info(`CalcTableIO::_googleWorkSheetSetInputs(): Saving changes for worksheet id: "${id}"`);
+            console.info(`TableIO::_googleWorkSheetSetInputs(): Saving changes for worksheet id: "${id}"`);
             await sheet.sheetsById[id].saveUpdatedCells();
         }
     }
@@ -609,7 +646,7 @@ export class TableIO
      */
     async googleSheetResolveImportRangeFormulas(sheet:GoogleSpreadsheet, worksheets: Array<string>=[])
     {
-        console.info(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Resolving IMPORTRANGE formulas...`);
+        console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Resolving IMPORTRANGE formulas...`);
         // Determine which worksheets to process
         if(!Array.isArray(worksheets)) worksheets = [];
         worksheets = worksheets.map(name => name.trim().toLowerCase()).filter(name => name.length > 0);
@@ -639,14 +676,14 @@ export class TableIO
                 {
                     if (cell.formula && cell.formula.includes('IMPORTRANGE'))
                     {
-                        console.info(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Found IMPORTRANGE in cell ${cell.a1Address}: ${cell.formula}`);
+                        console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Found IMPORTRANGE in cell ${cell.a1Address}: ${cell.formula}`);
                         
                         const { sheetId: lookupSheetId, range } = this._googleWorksheetImportRangeArgs(cell.formula) || {};
                         console.log(lookupSheetId, range);
 
                         if (lookupSheetId && range)
                         {
-                            console.info(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Resolving IMPORTRANGE in cell ${cell.a1Address}: targetSheetId="${lookupSheetId}", range="${range}"`);
+                            console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Resolving IMPORTRANGE in cell ${cell.a1Address}: targetSheetId="${lookupSheetId}", range="${range}"`);
 
                             const externalSheet = externalSheetCache[lookupSheetId] || (await this.openGoogleSheet(lookupSheetId));
                             externalSheetCache[lookupSheetId] = externalSheet; // cache it
@@ -657,7 +694,7 @@ export class TableIO
                             const lookupNamedRange = namedRanges.find(nr => nr.name === range);
                             if (!lookupNamedRange)
                             {
-                                console.warn(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Named range "${range}" not found in external sheet "${externalSheet.title}" (${lookupSheetId}), skipping.`);
+                                console.warn(`TableIO::googleSheetResolveImportRangeFormulas(): Named range "${range}" not found in external sheet "${externalSheet.title}" (${lookupSheetId}), skipping.`);
                                 return;
                             }
                             else 
@@ -667,7 +704,7 @@ export class TableIO
                                 const targetWorksheet = externalSheet.sheetsById[targetSheetId];
                                 if (!targetWorksheet)
                                 {
-                                    console.warn(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Worksheet with id "${targetSheetId}" not found in external sheet "${externalSheet.title}". Skipping.`);
+                                    console.warn(`TableIO::googleSheetResolveImportRangeFormulas(): Worksheet with id "${targetSheetId}" not found in external sheet "${externalSheet.title}". Skipping.`);
                                     return;
                                 }
                                 // check cache if we need to load cells
@@ -683,7 +720,7 @@ export class TableIO
                                 // Replace the IMPORTRANGE(...) entry of the formula with the actual value
                                 cell.formula = cell.formula.replace(this.FORMULA_IMPORTRANGE, targetCell.value as string);
 
-                                console.info(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Replaced IMPORTRANGE in cell ${cell.a1Address} with value from external named range "${range}": ${targetCell.value}`);
+                                console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Replaced IMPORTRANGE in cell ${cell.a1Address} with value from external named range "${range}": ${targetCell.value}`);
 
                             }
                         }
@@ -720,5 +757,73 @@ export class TableIO
             }
         }
     }
+
+    //// MANAGE RIGHTS ////
+
+    /** Set permissions on a Google Drive file using Drive API directly */
+    async googleDriveSetPermissions(sheet: GoogleSpreadsheet, role: 'reader'|'writer'|'commenter', type: 'user'|'group'|'domain'|'anyone', emailAddress?: string): Promise<void>
+    {
+        this.checkGoogleInitialized();
+        
+        const drive = this._googleModule.drive({ version: 'v3', auth: this._googleAuth });
+        
+        const permission = {
+            role: role,
+            type: type,
+            ...(emailAddress && { emailAddress }) // Add email if provided for user/group types
+        };
+        
+        try {
+            const response = await drive.permissions.create({
+                fileId: sheet.spreadsheetId,
+                supportsAllDrives: true, // Essential for shared drives
+                sendNotificationEmail: false, // Optional: don't send email notifications
+                resource: permission
+            });
+
+            console.info(`✅ TableIO::googleDriveSetPermissions(): set: ${type} Role "${role}" applied to file ${sheet.spreadsheetId}`);
+            return response.data;
+        }
+        catch (error: any) {
+            console.error(`TableIO::googleDriveSetPermissions(): Error setting permissions on file ${sheet.spreadsheetId}:`, error.message);
+            throw error;
+        }
+    }
+
+    /** Remove public access from a Google Drive file */
+    async googleDriveRemovePublicAccess(sheet: GoogleSpreadsheet): Promise<void>
+    {
+        this.checkGoogleInitialized();
+        
+        const drive = this._googleModule.drive({ version: 'v3', auth: this._googleAuth });
+        
+        try {
+            // First, list all permissions to find the public one
+            const permissionsResponse = await drive.permissions.list({
+                fileId: sheet.spreadsheetId,
+                supportsAllDrives: true
+            });
+            
+            const publicPermission = permissionsResponse.data.permissions?.find(p => p.type === 'anyone');
+            
+            if (publicPermission && publicPermission.id) {
+                await drive.permissions.delete({
+                    fileId: sheet.spreadsheetId,
+                    permissionId: publicPermission.id,
+                    supportsAllDrives: true
+                });
+
+                console.info(`✅ Removed public access from file ${sheet.spreadsheetId}`);
+            } else {
+                console.info(`ℹ️ File ${sheet.spreadsheetId} is not publicly accessible`);
+            }
+        }
+        catch (error: any) {
+            console.error(`❌ Error removing public access from file ${sheet.spreadsheetId}:`, error.message);
+            throw error;
+        }
+    }
+
+    
 
 }

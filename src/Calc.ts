@@ -3,7 +3,7 @@
  *      Generate data tables and do basic data analytics 
  */
  
- import { Db, Table, Geom,  } from './internal'; 
+ import { Geom, Db, Table, TableIO } from './internal'; 
  import { Metric, MetricName, MetricOptions, TableLocation, DataRows, isDataRows, isMetricName } from './internal' // types and typeguards
  import { METRICS } from './internal' // constants
 
@@ -19,6 +19,8 @@
     dbData:Object // raw outputted data 
     _metrics:{[key:string]:Metric} = {};
 
+    gsheets:Record<string, any>; // utils bundled in gsheet object
+
     constructor(geom:Geom = null)
     {
         this._geom = geom; // needed to get data from the model
@@ -29,6 +31,7 @@
     init()
     {
         this.db = new Db(this._geom);
+        this.setupGSheetUtils();
     }
 
     reset()
@@ -165,6 +168,26 @@
     {
         return Object.keys(this._metrics);
     }
+
+    //// GOOGLE SHEETS OPS ////
+    /* We bundle some CalcTableIO utils here for easy access */
+    
+    setupGSheetUtils()
+    {
+        const io = new TableIO();
+    
+        this.gsheets = {
+            exports: [], // keep track of exported sheets. Add base url to ID 
+            connect: async (googleDriveRootId:string) => await io.initGoogle(null, googleDriveRootId),
+            fromTemplate: 
+                async (templateSheetPath:string, newSheetPath:string, inputs:Record<string, any>) => 
+                    this.gsheets.exports.push(
+                        await io.googleSheetFromTemplate(templateSheetPath, newSheetPath, inputs, true, true)
+                    ),
+        };
+    }
+
+
 
     //// UTILS ////
 

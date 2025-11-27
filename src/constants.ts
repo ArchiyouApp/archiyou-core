@@ -171,7 +171,6 @@ export const GEOM_METHODS_INTO_GLOBAL = [
     'rectTo', 'rect', 'circleTo', 'circle', 'mirror', 'offset', 'offsetted', 'fillet', 'chamfer', 'thicken', 'thickened','combine',
     'close', 'importSketch',
     'units',
-    'pipeline',
     ];
 
 

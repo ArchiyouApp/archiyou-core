@@ -73,6 +73,7 @@ export * from './DocPDFExporter'
 export * from './CalcTable'
 export * from './CalcDb'
 export * from './Calc'
+export * from './CalcTableIO'
 
 
 export * from './ParamManager'
@@ -92,4 +93,5 @@ export * from './ScriptParam'
 export * from './LibraryConnector'
 export * from './ScriptOutputPath'
 export * from './ScriptOutputManager'
+
 

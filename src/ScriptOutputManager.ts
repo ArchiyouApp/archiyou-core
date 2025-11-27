@@ -71,7 +71,7 @@
      *  Any warnings will be places inside result.warnings
      *  @returns number of valid (resolved) output paths generated 
     */
-    public loadRequest(request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult, resolve:boolean=true):this
+    public loadRequest(request:RunnerScriptExecutionRequest, result?:RunnerScriptExecutionResult, resolve:boolean=true):this
     {
         const requestedOutputPaths = Array.isArray(request.outputs) ? request.outputs : [];
         if(requestedOutputPaths.length === 0)
@@ -90,8 +90,12 @@
             {
                 const warningMsg = `ScriptOutputManager::loadRequest(): Ignoring invalid output path: "${path}"`;
                 console.warn(warningMsg);
-                if(!result.warnings) result.warnings = [];
-                result.warnings.push(warningMsg);
+                // Only add warning on result object if given
+                if(result)
+                {
+                    if(!result.warnings) result.warnings = [];
+                    result.warnings.push(warningMsg);
+                }
             }
         });
 
@@ -113,9 +117,11 @@
                 this.resolvedOutputsPaths.push(...resolved); // resolving can return multiple paths
                 
                 // Any warnings (like invalid entity names) are placed in result.warnings
-                if(!result.warnings) result.warnings = [];
-                result.warnings.push(...warnings);
-                
+                if(result)
+                {
+                    if(!result.warnings) result.warnings = [];
+                    result.warnings.push(...warnings);
+                }
             });
         }
        
