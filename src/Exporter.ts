@@ -46,7 +46,7 @@ export class Exporter
     DEFAULT_GLTF_OPTIONS = {
         binary: true,
         archiyouFormat: true,
-        archiyouOutput: { metrics: true, tables: true, docs: true, pipelines:true, formats: true, messages: true },
+        archiyouOutput: { metrics: true, tables: true, docs: false, pipelines:true, formats: true, messages: true },
         includePointsAndLines: true,
         extraShapesAsPointLines: true,
         messages: [],

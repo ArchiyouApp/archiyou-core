@@ -1621,7 +1621,12 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     }
                     else 
                     {
-                        const glb = await (scope.exporter as Exporter).exportToGLTF(); // without archiyou data
+                        const glb = await (scope.exporter as Exporter)
+                            .exportToGLTF({ 
+                                archiyouFormat: false,  // without archiyou data
+                                includePointsAndLines: false, // IMPORTANT: services/assimp might trip
+                                extraShapesAsPointLines: false
+                            }); 
                         const conversion = await scope.ay.services.convert(glb, 'glb', outputPath.format);
                         if(!conversion.success)
                         { 
