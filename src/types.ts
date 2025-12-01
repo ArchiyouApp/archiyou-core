@@ -3,7 +3,7 @@ import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell,
         ParamManager, Obj, Script, ScriptParam, ScriptData  } from './internal'
 
 import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, 
-            Exporter, Make, Calc, Db as CalcDb, View, Runner} from './internal'
+            Exporter, Make, Calc, Db as CalcDb, View, Runner, Services } from './internal'
 
 import type { ScriptOutputPath, ScriptParamData } from './internal'
 
@@ -150,6 +150,7 @@ export interface ArchiyouApp
     exporter?: Exporter,
     calc?: Calc,
     make?: Make,
+    services?: Services,
     // TODO: importer?
     gizmos?: Array<Gizmo>, // TODO: move this to Geom?
     beams?: Beams,
@@ -1168,7 +1169,7 @@ export interface RunnerScriptExecutionRequest
 export type ScriptOutputCategory = 'model'|'metrics'|'tables'|'docs'
 export type ScriptOutputFormatInternal = 'internal'; // basics
 
-export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'; // TODO:brep,dxf
+export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'|'dae'|'obj'; // TODO:brep,dxf
 export type ScriptOutputFormatMetric = 'json'|'xlsx';
 export type ScriptOutputFormatTable = 'json'|'xlsx'|'gsheets';
 export type ScriptOutputFormatDoc = 'json'|'pdf';

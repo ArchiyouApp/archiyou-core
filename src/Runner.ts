@@ -19,7 +19,7 @@ import type { ArchiyouApp, ExportGLTFOptions, Statement,
  } from "./internal"
 
 
-import { OcLoader, Console, Geom, Doc, Calc, Exporter, Make, Db, 
+import { OcLoader, Console, Geom, Doc, Calc, Exporter, Services, Make, Db, 
             RunnerScriptExecutionResult, Script, CodeParser, LibraryConnector, 
             ScriptOutputManager, Pipeline } from "./internal"
 
@@ -448,12 +448,13 @@ export class Runner
     initLocalArchiyou():ArchiyouApp
     {
         // create all Archiyou modules
-        const ay  = {
+        const ay = {
             console: new Console((this.LOGGING_DEBUG) ? console : this), // put Archiyou console in debug mode if needed
             geom: new Geom(),
             doc: new Doc(), // TODO: settings with proxy
             calc: new Calc(),
             exporter: new Exporter(),
+            services: new Services(this.getServicesUrl()), // external services API
             make: new Make(),
             worker: this, // reference to runner instance
             runner: this, // worker=runner - NOTE: this is keps for clarity for now 
@@ -1377,6 +1378,11 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         return process.env.COMPONENT_LIBRARY_URL || 'http://localhost:4000';
     }
 
+    getServicesUrl():string
+    {
+        return process.env.SERVICES_API_URL || 'http://localhost:8090';
+    }
+
     async getScriptFromUrl(url:string):Promise<Script>
     {
         const libUrl = this.getDefaultComponentLibraryUrl();
@@ -1597,6 +1603,31 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         path: outputPath.toData(),
                         output: await (scope.exporter as Exporter).exportToStl()
                     });
+                    break;
+
+                // Using external services
+                case 'dae':
+                case 'obj':
+                    if(!(await scope.ay.services.isUp()))
+                    {
+                        console.error(`Runner::_getScopeRunnerScriptExecutionResult(): Cannot export to ${outputPath.format} because Archiyou Services are not available at: "${this.getServicesUrl()}"!`);
+                    }
+                    else 
+                    {
+                        const glb = await (scope.exporter as Exporter).exportToGLTF(); // without archiyou data
+                        const conversion = await scope.ay.services.convert(glb, 'glb', outputPath.format);
+                        if(!conversion.success)
+                        { 
+                            console.error(`Runner::_getScopeRunnerScriptExecutionResult(): ${outputPath.format} conversion failed: ${conversion.error}`); 
+                        }
+                        else 
+                        {
+                            outputs.push({
+                                path: outputPath.toData(),
+                                output: conversion.data
+                            });
+                        }
+                    }
                     break;
 
                 default:
