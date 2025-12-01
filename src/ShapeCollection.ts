@@ -10,20 +10,21 @@
  import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
          ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
-         isMainAxis} from './internal' // see types
+         isMainAxis, ModelUnits } from './internal' // see types
  import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, MainAxis, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
+ import type { Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
  import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
  import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, AnnotationAutoDimStrategy } from './internal'
 
  import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
  import { MeshingQualitySettings } from './types';
 
- // special libraries
- import chroma from 'chroma-js';
- import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+// special libraries
+import chroma from 'chroma-js';
+import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+import { DxfWriter, Units } from '@tarikjabiri/dxf';
  
  interface PackerItem {
    name:string
@@ -2765,6 +2766,44 @@
          return svgText;
       }
       
+      toDxf(options:toDXFOptions = {}):string|null
+      {
+         const UNITS_TO_DXF_UNITS = {
+            mm: Units.Millimeters,
+            cm: Units.Centimeters,
+            dm: Units.Decimeters,
+            m: Units.Meters,
+            in: Units.Inches,
+            ft: Units.Feet,
+            yd: Units.Yards,
+            mi: Units.Miles,
+         } as Record<ModelUnits, any>;
+
+         const DEFAULT_OPTIONS = { all: false, annotations: true };
+         options = { ...DEFAULT_OPTIONS, ...(options ?? {}) };
+         const shapeEdges = this._get2DXYShapeEdges(options?.all);
+         if (shapeEdges.length == 0){ return null;}
+
+         const writer = new DxfWriter();
+         writer.setUnits(UNITS_TO_DXF_UNITS[this._geom._units as ModelUnits] || Units.Unitless);
+         const modelSpace = writer.document.modelSpace;
+
+         shapeEdges.forEach( edge => {
+               edge.toDxf(modelSpace); // add Edge as line to DXF modelspace
+         });
+
+         if(options?.annotations)
+         {
+            this.getAnnotations().forEach( a => {
+               if(a._type === 'dimensionLine')
+               {
+                   (a as DimensionLine).toDxf(modelSpace);
+               }
+            });
+         }
+
+         return writer.stringify();
+      }
  }
 
 

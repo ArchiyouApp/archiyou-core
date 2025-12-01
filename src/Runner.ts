@@ -1584,10 +1584,17 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         output: await (scope.exporter as Exporter).exportToGLTF(options)
                     });
                     break;
-                case 'svg':
+                case 'svg': // 2D SVG export
                     outputs.push({
                         path: outputPath.toData(),
-                        output: scope.exporter.exportToSvg(false)
+                        output: scope.exporter.exportToSvg(true) // force 2D
+                    } as ScriptOutputData);
+                    break;
+
+                case 'dxf': // 2D DXF export
+                    outputs.push({
+                        path: outputPath.toData(),
+                        output: (scope.exporter as Exporter).exportToDxf()
                     } as ScriptOutputData);
                     break;
 

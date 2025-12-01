@@ -9,6 +9,8 @@
  * 
 */
 
+import { DxfBlock, AlignedDimension, point3d } from '@tarikjabiri/dxf'
+
 import { Point, Vector, Shape, Edge, AnyShape, ShapeCollection, AnyShapeOrCollection, isAnyShapeOrCollection, isPointLike } from './internal'
 import {  Coord, MainAxis, PointLike, ModelUnits, DimensionLineData, DimensionOptions, AnnotationType} from './internal' // types
 
@@ -558,4 +560,15 @@ export class DimensionLine extends BaseAnnotation
                     </text>`; // NOTE: data in JSON format with "'"! TODO: Make this more elegant!
     }
     // NOTE: do very little styling here to be able to easily style with CSS. Only stroke-width is good to set (default is 1, 0.5 sets it apart from Shapes)
+
+    /** Export Annotation to DXF aligned dimension line */
+    toDxf(dxf:DxfBlock):this
+    {
+        dxf.addAlignedDim(
+            point3d(this.targetStart.x, this.targetStart.y, 0), 
+            point3d(this.targetEnd.x, this.targetEnd.y, 0),
+            { offset: this.offsetLength as number }
+        );
+        return this;
+    }
 }

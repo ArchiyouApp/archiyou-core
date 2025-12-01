@@ -37,7 +37,7 @@ export const ALIGNMENTS_ADD_TO_SIDES = ['center','start','end'];
 
 //// UNION TYPES ////
 
-export type ModelUnits = 'mm'|'cm'|'dm'|'m'|'km'|'inch'|'feet'|'yd'|'mi'; // For now they are for administration only
+export type ModelUnits = 'mm'|'cm'|'dm'|'m'|'km'|'in'|'ft'|'yd'|'mi'; // For now they are for administration only
 export type Units = DocUnits | ModelUnits
 export type UnitsWithPerc = Units | '%'
 export type Coord = number|string
@@ -785,6 +785,13 @@ export interface SVGtoPDFtransform
     
 }
 
+export interface toDXFOptions 
+{
+    all?:boolean // also invisible
+    annotations?:boolean // add annotations
+    // TODO: more
+}
+
 //// DOCS:PAGE:CONTAINER:TEXTAREA ////
 
 export interface TextAreaOptions
@@ -1169,7 +1176,7 @@ export interface RunnerScriptExecutionRequest
 export type ScriptOutputCategory = 'model'|'metrics'|'tables'|'docs'
 export type ScriptOutputFormatInternal = 'internal'; // basics
 
-export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'|'dae'|'obj'; // TODO:brep,dxf
+export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'|'dae'|'obj'|'dxf'; // TODO:brep,dxf
 export type ScriptOutputFormatMetric = 'json'|'xlsx';
 export type ScriptOutputFormatTable = 'json'|'xlsx'|'gsheets';
 export type ScriptOutputFormatDoc = 'json'|'pdf';

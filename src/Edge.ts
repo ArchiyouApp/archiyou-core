@@ -11,6 +11,7 @@
  */
 
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
+import { DxfBlock, point3d } from '@tarikjabiri/dxf'
 
 import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_DEFAULT_OFFSET, EDGE_DEFAULT_THICKEN,
     EDGE_DEFAULT_POPULATE_NUM, EDGE_DEFAULT_EXTEND_AMOUNT, EDGE_DEFAULT_EXTEND_DIRECTION, EDGE_DEFAULT_ALIGNTO_FROM,
@@ -1375,6 +1376,28 @@ export class Edge extends Shape
         })
         return classes.join(' ');
     }
+
+    /** Export Edge to DXF writer instance 
+     *  Now only lines are supported
+     *  TODO: Introduce arcs and splines
+    */
+    toDxf(dxf:DxfBlock):this
+    {
+        const segmPoints = this._segmentizeToPoints(EDGE_DEFAULT_SEGMENTS_ANGLE_SVG);
+
+        segmPoints.forEach((point,i,arr) =>
+        {
+            if(i < arr.length -1 ) // skip last point
+            {
+                dxf.addLine(
+                    point3d(point.x, point.y, 0), 
+                    point3d(arr[i+1].x, arr[i+1].y, 0));
+            }
+        });
+
+        return this; 
+    }
+
     
     //// UTILS ////
 

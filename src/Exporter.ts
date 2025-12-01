@@ -355,7 +355,9 @@ export class Exporter
         });
     }
 
-    /** Export entire (visual) model by creating a isometric 2D view  */
+    /** Export entire (visual) model by creating a isometric 2D view  
+     * TODO: seperate these functions into export3DtoSvg and export2DtoSvg
+    */
     exportToSvg(only2D:boolean=false):string
     {
         if(!only2D)
@@ -426,6 +428,12 @@ export class Exporter
         {
           console.info("Saved SVG Animation to " + fileHandle.name);
         });
+    }
+
+    exportToDxf():string
+    {
+        const visibleShapes = this._ay.geom.all().filter(s => s.visible());
+        return visibleShapes.toDxf();
     }
 
     _getFileName():string
