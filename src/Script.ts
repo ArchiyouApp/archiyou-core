@@ -176,8 +176,15 @@ export class Script
 
         for(const [key, value] of Object.entries(paramValues))
         {
+            console.info(`Script.checkParamValues(): Checking param "${key}" with value:`, value);
+
             const keyUpper = key.toUpperCase();
             const param = this.params[keyUpper];
+
+            if(!param)
+            {  
+                throw new Error(`Script.checkParamValuesVerbose(): Parameter "${key}" is not defined in script parameters. Check script params and published.params!`); 
+            }
 
             const { success: validateSuccess, errors: validateErrors } = param.validateValueVerbose(value)
 

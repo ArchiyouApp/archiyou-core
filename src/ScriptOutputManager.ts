@@ -89,6 +89,7 @@
             else 
             {
                 const warningMsg = `ScriptOutputManager::loadRequest(): Ignoring invalid output path: "${path}"`;
+                
                 console.warn(warningMsg);
                 // Only add warning on result object if given
                 if(result)

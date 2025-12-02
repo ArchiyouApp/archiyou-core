@@ -16,7 +16,8 @@ export class Services
     private _nodeFormDataModule: any;
     private _nodeFormFetchModule: any;
 
-    constructor(baseUrl: string = 'http://localhost:3000/', timeout: number = 30000) {
+    constructor(baseUrl: string, timeout: number = 30000) {
+        if(!baseUrl){ throw new Error(`Services(): baseUrl is required`); }
         this._baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
         this._timeout = timeout;
         this._headers = {

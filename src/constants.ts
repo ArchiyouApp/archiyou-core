@@ -14,7 +14,7 @@ export const SHAPE_CACHE_ENABLED = false;
 export const SCRIPT_OUTPUT_CATEGORIES = ['model','metrics','tables','docs'] // see types: ScriptOutputCategory
 export const SCRIPT_OUTPUT_MODEL_FORMATS = ['glb','step','stl','svg', 'dae', 'obj', 'dxf'] // see types: ScriptOutputModelFormat
 export const SCRIPT_OUTPUT_METRIC_FORMATS = ['json','xlsx'] // see types: ScriptOutputMetricFormat
-export const SCRIPT_OUTPUT_TABLE_FORMATS = ['json','xlsx'] // see types: ScriptOutputTableFormat
+export const SCRIPT_OUTPUT_TABLE_FORMATS = ['json','xlsx', 'gsheets'] // see types: ScriptOutputTableFormat
 export const SCRIPT_OUTPUT_DOC_FORMATS = ['json','pdf'] // see types: ScriptOutputDocFormat
 
 //// MESH SETTINGS

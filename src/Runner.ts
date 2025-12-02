@@ -54,6 +54,7 @@ export class Runner
 
     _componentScripts: Record<string, Script> = {}; // prefetched component scripts by name=url=path
     _pipelines:Array<Pipeline> = []; // keep track of defined pipelines
+    _pipelineExports:Array<any> = []; // HACK: if we want to dump some outputs - for example in pipelines (see calc.gsheets pipeline)
 
     _manageWorker:Worker|null; // the worker that this runner manages (if role is manager)
     _onWorkerMessageFunc:(m:RunnerWorkerMessage) => any; // function to call when we get a message from the Worker
@@ -466,6 +467,7 @@ export class Runner
         ay?.exporter?.setArchiyou(ay);
         ay?.make?.setArchiyou(ay);
         ay?.beams?.setArchiyou(ay); // Not there currently
+        ay?.calc?.setArchiyou(ay);
 
         return ay;
     }
@@ -1089,6 +1091,8 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         scope.ay.calc.reset();
         scope.ay.beams?.reset();
         scope.ay.gizmos = [];
+
+        this._pipelineExports = []; // reset pipelineExports (to avoid from previous runs)
     }
 
      //// EXECUTION COMPONENT SCRIPTS ////
@@ -1308,7 +1312,8 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         this.createScope(scopeName); // isolated pipeline scope, automatically becomes current scope
         const pipelineScope = this.getLocalActiveScope();
 
-        const outputFunc = (scope:RunnerScriptScopeState) => this.getLocalScopeResults(scope, request);
+        // IMPORTANT: Needs to be async !!!
+        const outputFunc = async (scope:RunnerScriptScopeState) => { return await this.getLocalScopeResults(scope, request); };
 
         const exec = async () =>
         {
@@ -1321,16 +1326,19 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         'outputFunc',
                             // function body
                             `
-                            console.log('***** EXECUTING PIPELINE "${pipeline.name}" IN ISOLATED SCOPE *****');
+                            console.log('***** EXECUTING PIPELINE "${pipeline.name}" IN ISOLATED SCOPE (ASYNC) *****');
                             // run pipeline function in own scope, and supplying mainScope as argument
-                            pipeline._function.call(pipelineScope, mainScope); 
+                            await pipeline._function.call(pipelineScope, mainScope); 
                             
                             // export results
+                            /*
                             asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
                             
                             return (asyncOutput) 
                                         ? Promise.resolve(outputFunc(pipelineScope)) // avoid await keyword - again for Webpack 4
                                         : outputFunc(pipelineScope);
+                            */
+                            return await outputFunc(pipelineScope);
             
                             `
                     ))(mainScope, pipelineScope, pipeline, outputFunc) as Promise<RunnerScriptExecutionResult>|RunnerScriptExecutionResult;    
@@ -1342,6 +1350,9 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         }
 
         const result = await exec();
+
+        console.log('***** FINISHED EXECUTING PIPELINE "${pipeline.name}" *****');
+        console.log(JSON.stringify(result));
         
         // Set duration if result is RunnerScriptExecutionResult
         if(isRunnerScriptExecutionResult(result))
@@ -1380,7 +1391,11 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
     getServicesUrl():string
     {
-        return process.env.SERVICES_API_URL || 'http://localhost:8090';
+        if(process.env.SERVICES_API_URL)
+        {
+            return process.env.SERVICES_API_URL;
+        }
+        throw new Error(`Runner::getServicesUrl(): SERVICES_API_URL is not defined: Please set in ENV!`);
     }
 
     async getScriptFromUrl(url:string):Promise<Script>
@@ -1506,8 +1521,12 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     */
                     const pipelineOutputs = outputManager.getOutputsByPipeline(pipelineName).map(p => p.resolvedPath);
                     const pipelineResults = await this.executePipeline(curPipeline, { ...request, outputs: pipelineOutputs });
-                    // Add the results to outputs of main scope
-                    outputs.push(...pipelineResults.outputs);
+                    if(!pipelineResults){ console.error(`Runner::getLocalScopeResultOutputs: No results from pipeline "${pipelineName}"`); }
+                    else { // Add the results to outputs of main scope
+                        outputs.push(...pipelineResults.outputs);
+                        // Make sure it is empty (TODO-better)
+                        this._pipelineExports = [];
+                    }
                 }
             }
             else {
@@ -1737,8 +1756,8 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     /* Exporting data through a Google Sheet template document is done by the user
                         mostly in a pipeline like this:
                         
-                        pipeline('gsheettemplate', 
-                            async()
+                        $pipeline('gsheettemplate', 
+                            async () =>
                             { 
                                 await calc.gsheets.connect('<<DRIVE_ID>>'); // TODO: auth - now archiyou by default
                                 await calc.gsheets.fromTemplate(
@@ -1747,19 +1766,27 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                                     { ... }) 
                             })
 
-                        This saves exports in calc.gsheets.exports by output sheet path 
-                        calc.gsheet.outputs: 
-                           { './exports/OUTPUT_SHEET' : 'https://docs.google.com/spreadsheets/d/{{SHEET_ID}}'
+                        WARNING: We can't access scope.calc.gsheets.exports from here directly - Don't know why
+                        HACK: So we store them in Runner instance variable _pipelineExports
+                        TODO: Figure out why this happens
+
+                        This saves exports in runner._pipelineExports by output sheet path 
+                        runner._pipelineExports = [ 
+                            'https://docs.google.com/spreadsheets/d/{{SHEET_ID}}',
                              ...
-                           }
+                        ]
                         
                         Below we simply return all these outputs 
 
                     */
+
+                    console.info(`Runner::_exportPipelineTables(): Exporting to Google Sheets from template(s)...`);
+                    console.info(JSON.stringify(scope.calc.gsheets.exports));
+                    console.info(scope.ay.runner._pipelineExports);
                     
                     outputs.push({
                         path: outputPathTable.toData(),
-                        output: scope.calc?.gsheets?.exports || {}
+                        output: scope.ay.runner._pipelineExports
                     });
 
                     // TODO: straight export from tables to Google Sheets! 

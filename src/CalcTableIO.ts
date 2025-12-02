@@ -509,7 +509,7 @@ export class TableIO
         // Also make it public (with link)
         if(makePublic)
         {
-            this.googleDriveSetPermissions(newSheet, 'writer', 'anyone');
+            await this.googleDriveSetPermissions(newSheet, 'writer', 'anyone');
         }
 
         return (returnUrl ? this.GOOGLE_SHEETS_BASE_URL : '') + newSheetItem.id;

@@ -240,7 +240,16 @@ import { convertStringValue, recordToUrlParams } from './internal'; // utils
      * */
     public resolveVerbose(meta: ScriptMeta):{ resolved: Array<ScriptOutputPath>, warnings: Array<string> }
     {
+        // Somewhat of a hack for output paths that don't need resolving
+        const SKIP_IF_FORMATS = ['gsheets']
+        if(SKIP_IF_FORMATS.includes(this.format as string))
+        {
+            console.info(`ScriptOutputPath::resolve(): Skipping resolution for output path: "${this.requestedPath}"`);
+            return { resolved: [this.copy().setResolved()], warnings: [] };
+        }
+
         const warnings:Array<string> = []
+
 
         if(this.checkValid())
         {
