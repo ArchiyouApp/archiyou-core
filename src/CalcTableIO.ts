@@ -26,13 +26,13 @@ type GoogleDriveFile = drive_v3.Schema$File;
 type GoogleDriveItem = GoogleDriveFile & { type: 'folder' | 'file' };
 type GoogleWorkspaceExportFormat = 'text'|'csv'|'html'|'xlsx'|'pdf'|'docx'|'pptx'|'odt'|'ods'|'odp'|'rtf';
 type GoogleSheetNamedRange = sheets_v4.Schema$NamedRange;
+//type GoogleSheetNamedFunction = sheets_v4.Schema$;
 
 export class TableIO
 {
     //// SETTINGS ////
     GOOGLE_KEYFILE_PATH = './secrets/archiyoudb-f474df5307aa.json' // defaults path to google API credentials - relative to main script
     // NOTE: Set root Google Drive folder ID in env GOOGLE_DRIVE_ROOT_ID
-    FORMULA_IMPORTRANGE = /IMPORTRANGE\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/i;
     GOOGLE_SHEETS_BASE_URL = 'https://docs.google.com/spreadsheets/d/';
 
     //// END SETTINGS ////
@@ -646,7 +646,21 @@ export class TableIO
      */
     async googleSheetResolveImportRangeFormulas(sheet:GoogleSpreadsheet, worksheets: Array<string>=[])
     {
-        console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Resolving IMPORTRANGE formulas...`);
+        // settings for various function, mainly IMPORTRANGE, but also some custom ones for archiyou
+        const REPLACE_FUNCTION_SETUP = 
+        {
+            'IMPORTRANGE' : (formula) => 
+            {
+                const m = formula.match(/IMPORTRANGE\s*\(\s*"(?:https:\/\/docs\.google\.com\/spreadsheets\/d\/)?([^"\/]+)"\s*,\s*"([^"]+)"\s*\)/i);
+                return (!m) ? null : { sheetId: m[1], range: m[2] }
+            },
+            'GET_NAMED_RANGE_FROM_OTHER_SHEET' : (formula) => 
+            {
+                const m = formula.match(/GET_NAMED_RANGE_FROM_OTHER_SHEET\s*\(\s*"(?:https:\/\/docs\.google\.com\/spreadsheets\/d\/)?([^"\/]+)"\s*,\s*"([^"]+)"\s*\)/i);
+                return (!m) ? null : { sheetId: m[1], range: m[2] }
+            }
+        }
+
         // Determine which worksheets to process
         if(!Array.isArray(worksheets)) worksheets = [];
         worksheets = worksheets.map(name => name.trim().toLowerCase()).filter(name => name.length > 0);
@@ -674,17 +688,17 @@ export class TableIO
                 worksheet, 
                 async (cell, row, col) => 
                 {
-                    if (cell.formula && cell.formula.includes('IMPORTRANGE'))
+                    // First we test with a simple include regex based on presence of function names
+                    const containsFuncRegex = new RegExp(Object.keys(REPLACE_FUNCTION_SETUP).join('|'), 'gi');
+                    const matchedFunc = containsFuncRegex.exec(cell.formula)?.[0].toUpperCase();
+                    if (cell.formula && matchedFunc)
                     {
-                        console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Found IMPORTRANGE in cell ${cell.a1Address}: ${cell.formula}`);
-                        
-                        const { sheetId: lookupSheetId, range } = this._googleWorksheetImportRangeArgs(cell.formula) || {};
-                        console.log(lookupSheetId, range);
+                        //console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Found IMPORT function "${matchedFunc}" in cell ${cell.a1Address}: ${cell.formula}`);
+                        const parseFunc = REPLACE_FUNCTION_SETUP[matchedFunc];
+                        const { sheetId: lookupSheetId, range } = parseFunc(cell.formula) || {};
 
                         if (lookupSheetId && range)
                         {
-                            console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Resolving IMPORTRANGE in cell ${cell.a1Address}: targetSheetId="${lookupSheetId}", range="${range}"`);
-
                             const externalSheet = externalSheetCache[lookupSheetId] || (await this.openGoogleSheet(lookupSheetId));
                             externalSheetCache[lookupSheetId] = externalSheet; // cache it
                             const namedRanges = externalNameRangeCache[lookupSheetId] || (await this._googleSheetGetNamedRanges(externalSheet));
@@ -711,17 +725,31 @@ export class TableIO
                                 const worksheetCacheKey = `${lookupSheetId}_${targetSheetId}`;
                                 if (!externalWorksheetLoaded[worksheetCacheKey])
                                 {
+                                    console.log(`CalcTableIO::googleSheetResolveImportRangeFormulas(): Loading cells for external worksheet: ${targetWorksheet.title}`);
                                     await targetWorksheet.loadCells(); // load cells, only once
                                     externalWorksheetLoaded[worksheetCacheKey] = true;
                                 }
 
                                 const targetCell = targetWorksheet.getCell(lookupNamedRange.range?.startRowIndex, lookupNamedRange.range?.startColumnIndex);
                                 
-                                // Replace the IMPORTRANGE(...) entry of the formula with the actual value
-                                cell.formula = cell.formula.replace(this.FORMULA_IMPORTRANGE, targetCell.value as string);
+                                if(!targetCell)
+                                {
+                                    console.warn(`TableIO::googleSheetResolveImportRangeFormulas(): Target cell not found in named range "${range}" in external sheet "${externalSheet.title}". Skipping.`);
+                                }
+                                else {
+                                    // Replace the IMPORTRANGE(...) entry of the formula with the actual value
+                                    let replaceValue = targetCell.value;
+                                    if(!targetCell.value)
+                                    {
+                                        console.warn(`TableIO::googleSheetResolveImportRangeFormulas(): Target cell is empty in named range "${range}" in external sheet "${externalSheet.title}". Defaulted to "0"`);
+                                        replaceValue = 0;
+                                    }
 
-                                console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Replaced IMPORTRANGE in cell ${cell.a1Address} with value from external named range "${range}": ${targetCell.value}`);
+                                    const replaceRegex = new RegExp(`${matchedFunc}\\s*\\([^)]+\\)`, 'i');
+                                    cell.formula = cell.formula.replace(replaceRegex, replaceValue as string);
 
+                                    console.info(`TableIO::googleSheetResolveImportRangeFormulas(): Replaced ${matchedFunc}(...) in cell ${cell.a1Address} with value from external named range "${range}": ${replaceValue}`);
+                                }
                             }
                         }
                     }
@@ -733,20 +761,6 @@ export class TableIO
 
     }
 
-    _googleWorksheetImportRangeArgs(formula:string):{ sheetId: string; range: string }|null
-    {
-        const importrangeRegex = this.FORMULA_IMPORTRANGE;
-        const match = formula.match(importrangeRegex);
-        if (match && match.length === 3)
-        {
-            return {
-                sheetId: match[1].replace('https://docs.google.com/spreadsheets/d/', ''), // remove url parts
-                range: match[2],
-            };
-        }
-        return null;
-    }
-
     async _googleWorksheetIterateCells(worksheet, callback: (cell:GoogleSpreadsheetCell, row:number, col:number) => void)
     {
         for (let row = 0; row < worksheet.rowCount; row++) {
@@ -756,6 +770,51 @@ export class TableIO
                 await callback(cell, row, col);
             }
         }
+    }
+
+    //// PROGRAMMATIC ADMIN UTILS ////
+
+    /** Iterate over cells in a sheet, or specific worksheet
+     *  If callback returns GoogleSpreadsheetCell instance, update the cells content
+     */
+    async _googleSheetIterEditCells(sheet: GoogleSpreadsheet, 
+            worksheets:Array<string>, callback: (cell: GoogleSpreadsheetCell, row, col:number) => Promise<GoogleSpreadsheetCell|void>): Promise<void>
+    {
+        if(!Array.isArray(worksheets)) worksheets = [];
+        worksheets = worksheets.map(name => name.trim().toLowerCase()).filter(name => name.length > 0);
+
+        const worksheetsToProcess = Object.entries(sheet.sheetsByTitle)
+                                .map(([name, ws]) => 
+                                    {
+                                        if(worksheets.length === 0 || worksheets.includes(name.toLowerCase()))
+                                        {
+                                            return ws; // either no worksheet is given by user, or it's in the list
+                                        }
+                                        return null;
+                                    }).filter(ws => ws); 
+
+        let updateCells = false;
+        for (const worksheet of worksheetsToProcess)
+        {
+            await worksheet.loadCells(); // Do this first to load all cells
+
+            await this._googleWorksheetIterateCells(
+                worksheet, 
+                async (cell, row, col) => 
+                {
+                    const r = await callback(cell, row, col);
+                    if (r) 
+                    {
+                        updateCells = true;
+                    }
+                }
+            );
+
+            // update all cells
+            if(updateCells){
+                await worksheet.saveUpdatedCells();
+            }
+        }  
     }
 
     //// MANAGE RIGHTS ////
