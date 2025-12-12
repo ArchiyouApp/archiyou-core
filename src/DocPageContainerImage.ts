@@ -76,8 +76,6 @@ export class Image extends Container
     /** We want to load the raw data of the image in the ContainerContent for easy access later (in HTML and PDF exporter) */
     async loadImageData(cache?:Record<string,any>|undefined):Promise<any>
     {
-        console.log('==== LOAD IMAGE DATA CALL ===');
-
         let data;
         if(cache && cache[this._url]) // get from cache
         {

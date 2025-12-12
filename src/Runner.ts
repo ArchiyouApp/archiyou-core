@@ -390,17 +390,46 @@ export class Runner
         state._main = (name === 'default'); // is this the main scope
 
         if(this.role === 'worker' || this.role === 'single')
-        {
+        {   
+            /*
+                Proxy is used to isolate scope changes
+                and allow settings variables without var/let/const
+
+                Some important notes about the Proxy handler:
+                 - Inline functions can behave counter intuitive 
+                     when using (parent) variables earlier in the script
+                    The values of these variables are 'locked in' at the time of function creation.
+                    This is called lexical closure. This results in pipelines that have 
+                    "previous" parameters/results
+                    
+                    ==> WARN THE USER to avoid inline functions 
+                    that use variables from outside the function scope! So for pipelines and re-usable functions, 
+                    always use explicit arguments instead.
+
+                    pipelineFunc = (mainScope) => { mainScope.someShapeVar.move() ... }
+                    otherFunc = (arg1, arg2) => { arg1.doSomething() ... }
+
+                    Arrow functions are preferred to normal functions, because they keep the "this" reference
+                        to the Proxy scope object
+
+            */
             const scope = new Proxy({ ...BASIC_SCOPE, ...state }, 
             {
-                has: () => true, // Allows access to any variable (avoids ReferenceError)
+                has: () => true, // Allows access to any variable (avoids ReferenceError) - this enabled users to omit var/let/const
                 get: (target, key) => target[key], // Retrieves values from scope
-                set: (target, key, value) => {
-                    if (typeof target[key] === 'object' && target[key] !== null) {
-                        // If the property is an object, update its properties
+                set: (target, key, value) => 
+                {
+                    // Give warning about using functions (see above)
+                    if(typeof value === 'function')
+                    {
+                        console.warn(`Runner: Detected a function definition in scope "${name}" with name "${String(key)}". \nPlease make sure you don't use variables from outside the function scope, \nbecause they will be locked in at the time of function creation (lexical closure). \nUse explicit arguments instead!`);
+                    }
+
+                    if (typeof target[key] === 'object' && target[key] !== null)
+                    {
                         Object.assign(target[key], value);
-                    } else {
-                        // Otherwise, directly set the value
+                    } 
+                    else {
                         target[key] = value;
                     }
                     return true;
@@ -580,6 +609,9 @@ export class Runner
         state.$pipeline = (name:string, func: () => Promise<any>|any) => 
         {
             console.info(`$pipeline: Registering pipeline: "${name}"`);
+            
+            // Detect if given function has no arguments
+
             // Pipelines are registered on the Runner instance
             this.pipeline(name, func);
         }
@@ -659,11 +691,20 @@ export class Runner
     private async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<RunnerScriptExecutionResult>
     {
         console.info(`**** Runner::_execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****`);
+        console.info(` params: ${JSON.stringify((request as any)?.params)} --- outputs: ${JSON.stringify((request as any)?.outputs)}`);
+        console.info(`***************************************`);
 
         // Convert code to request if needed
         if(typeof request === 'string')
         {
             request = { script: { code: request } } as RunnerScriptExecutionRequest;    
+        }
+
+        // If no params are defined, use default params
+        if(!request.params)
+        {
+            console.warn(`Runner::_execute(): No params defined in request, using default param values from script`);
+            request.params = new Script().fromData(request.script).getDefaultParamValues();
         }
 
         // If no outputs are defined, use default outputs
@@ -857,39 +898,41 @@ export class Runner
         {
             try 
             {
-                return await (new AsyncFunction(  
-                        'request',
-                        'scope', 
-                        'startRunFunc',
-                        'outputFunc',
-                            // function body
-                            `
-                            startRunFunc.call(scope, scope, request); // first is this, the rest args
-                            // To deal with replaced async functions in old JS enviroments
-
-                            // run code in scope
-                            with (scope)
-                            {
-                                "use strict"; 
-                                ${code};
-                            }
-                            // export results
-                            
-                            // detect if everything is OK and this is indeed a AsyncFunction - otherwise it is Function
-                            asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
-                            // We run the output function in scope of Runner and pass the scope as argument
-                            return (asyncOutput) 
-                                        ? Promise.resolve(outputFunc(scope, request)) // avoid await keyword - again for Webpack 4
-                                        : outputFunc(scope, request);
-            
-                            `
-                    ))(this._activeExecRequest, scope, startRunFunc, outputFunc) as Promise<RunnerScriptExecutionResult>|RunnerScriptExecutionResult;    
+                const asyncFunc = new AsyncFunction(  
+                'request',
+                'scope', 
+                'startRunFunc',
+                'outputFunc',
+                    // function body
+                    `
+                    startRunFunc.call(scope, scope, request);
+                    
+                    // run code in scope with 'this' bound to scope
+                    with (scope)
+                    {
+                        "use strict"; 
+                        ${code};
+                    }
+                    
+                    // detect if everything is OK and this is indeed a AsyncFunction
+                    asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
+                    return (asyncOutput) 
+                                ? Promise.resolve(outputFunc(scope, request))
+                                : outputFunc(scope, request);
+                    `
+                );
+                // IMPORTANT: Use .call() to bind 'this' to scope
+                return await asyncFunc.call(scope, this._activeExecRequest, scope, startRunFunc, outputFunc);
             }
             catch(e)
             {
                return this._handleExecutionError(scope, this._activeExecRequest, code, e);
             }
         }
+
+        console.warn('**** AFTER EXECUTION - DEBUG  ****');
+        console.warn('GLOBALS')
+        console.warn(Object.keys(globalThis));
 
         const result = await exec();
         
@@ -1252,7 +1295,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
             // Load dynamically to avoid issues in browser
             const FS_PROMISES_LIB = 'fs/promises'; // avoid problems with older build systems preparsing import statement
-            const fs = await impoRunnerScriptExecutionResultrt(FS_PROMISES_LIB); // use promises version of fs
+            const fs = await import(FS_PROMISES_LIB); // use promises version of fs
             const data = await fs.readFile(path, 'utf-8');
 
             if(!data)
@@ -1350,9 +1393,6 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         }
 
         const result = await exec();
-
-        console.log('***** FINISHED EXECUTING PIPELINE "${pipeline.name}" *****');
-        console.log(JSON.stringify(result));
         
         // Set duration if result is RunnerScriptExecutionResult
         if(isRunnerScriptExecutionResult(result))
@@ -1568,20 +1608,34 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         const outputManager = new ScriptOutputManager().loadRequest(request, result);
         const outputPaths = outputManager.getOutputsByPipelineCategory(pipeline, 'model') as Array<ScriptOutputPath>;
 
+        if (outputPaths.length === 0)
+        {
+            console.warn(`Runner::_exportPipelineModels(): No output paths found for pipeline "${pipeline}"`);
+            return [];
+        }
+
         const outputs = [] as Array<ScriptOutputData>;
 
         for(let m = 0; m < outputPaths.length; m++)
         {
             const outputPath = outputPaths[m] as ScriptOutputPath;
+            const startNumOutputs = outputs.length;
+
+            const outputPathData = outputPath.toData();
+            let outp:any;
         
             switch(outputPath.format as ScriptOutputFormatModel)
             {
                 // NOTE: No internal here, use _exportPipelineModelsInternal()
                 case 'buffer':
-                    outputs.push({ 
-                            path: outputPath.toData(),
-                            output: scope.geom.scene.toMeshShapeBuffer(),
+                    outp = scope.geom.scene.toMeshShapeBuffer();
+                    if(outp)
+                    {
+                        outputs.push({ 
+                            path: outputPathData,
+                            output: outp,
                         } as ScriptOutputData);
+                    }
                     break;
                 case 'glb':
                     // convert the flat ExecutionRequestOutputFormatGLTFOptions to ExportGLTFOptions (TODO: use one and the same type)
@@ -1598,37 +1652,58 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         includePointsAndLines: inOptions?.pointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.pointAndLines, // export points and lines
                         extraShapesAsPointLines: inOptions?.shapesAsPointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.shapesAsPointAndLines, // export extra shapes as points and lines
                     } as ExportGLTFOptions
-                    outputs.push({
-                        path: outputPath.toData(),
-                        output: await (scope.exporter as Exporter).exportToGLTF(options)
-                    });
+
+                    outp = await (scope.exporter as Exporter).exportToGLTF(options);
+                    if(outp)
+                    {
+                        outputs.push({
+                            path: outputPathData,
+                            output: outp
+                        });
+                    }
                     break;
                 case 'svg': // 2D SVG export
-                    outputs.push({
-                        path: outputPath.toData(),
-                        output: scope.exporter.exportToSvg(true) // force 2D
-                    } as ScriptOutputData);
+                    outp = (scope.exporter as Exporter).exportToSvg(true);
+                    if(outp)
+                    {
+                        outputs.push({
+                            path: outputPathData,
+                            output: outp // force 2D
+                        } as ScriptOutputData);
+                    }
                     break;
 
                 case 'dxf': // 2D DXF export
-                    outputs.push({
-                        path: outputPath.toData(),
-                        output: (scope.exporter as Exporter).exportToDxf()
-                    } as ScriptOutputData);
+                    outp = (scope.exporter as Exporter).exportToDxf();
+                    if(outp)
+                    {
+                        outputs.push({
+                            path: outputPathData,
+                            output: outp
+                        } as ScriptOutputData);
+                    }
                     break;
 
                 case 'step':
-                    outputs.push({
-                        path: outputPath.toData(),
-                        output: await (scope.exporter as Exporter).exportToStep()
-                    });
+                    outp = await (scope.exporter as Exporter).exportToStep();
+                    if(outp)
+                    {
+                        outputs.push({
+                            path: outputPathData,
+                            output: outp
+                        });
+                    }
                     break;
 
                 case 'stl':
-                    outputs.push({
-                        path: outputPath.toData(),
-                        output: await (scope.exporter as Exporter).exportToStl()
-                    });
+                    outp = await (scope.exporter as Exporter).exportToStl();
+                    if(outp)
+                    {
+                        outputs.push({
+                            path: outputPathData,
+                            output: outp
+                        });
+                    }
                     break;
 
                 // Using external services
@@ -1663,7 +1738,16 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
                 default:
                     console.error(`Runner::_getScopeRunnerScriptExecutionResult(): Skipped unknown model format "${outputPath.format}" in requested output "${outputPath.resolvedPath}"`); 
-            }   
+            }
+
+            // Check if any output was added
+            if(startNumOutputs + 1 === outputs.length)
+            {
+                console.info(`Runner::_exportPipelineModels(): Exported model at "${outputPath.resolvedPath}" to format "${outputPath.format}" with size ${(outputs[outputs.length -1].output?.length ?? (outputs[outputs.length -1].output as ArrayBuffer)?.byteLength) ?? '<unknown>'} bytes`);
+            }
+            else {
+                console.warn(`Runner::_exportPipelineModels(): No output generated for model at "${outputPath.resolvedPath}" to format "${outputPath.format}"`);
+            }
         }
 
         return outputs;

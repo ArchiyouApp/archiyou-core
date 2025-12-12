@@ -571,7 +571,8 @@ export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffe
     }
     // Handle plain objects
     const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of Object.entries(obj))
+    {
         result[key] = restoreBinaryFromBase64(value);
     }
 
@@ -604,4 +605,88 @@ export function urlParamsToRecord(paramString: string): Record<string, string> {
         if (key) params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
     });
     return params;
+}
+
+ /**
+ * Converts a data object to a JS module string with export default,
+ * each key on a separate line for readability.
+ * @param data The data object to export
+ * @returns JS module string
+ * 
+*  This is used to write script.js files in the Library
+ */
+export function dataToModuleString(data: Record<string, any>): string {
+    function serialize(val: any, indent: string = '  '): string {
+        if (typeof val === 'string')
+        {
+            if (val.includes('${')) val = val.replace(/\$\{/g, '\\${'); // Escape ${...} to prevent evaluation when imported
+            // Use backticks for multiline strings or strings with backticks
+            if (val.includes('\n')) return '`' + val.replace(/`/g, '\\`') + '`';
+            // Otherwise just use JSON.stringify which results in double quotes
+            return JSON.stringify(val);
+        }
+        if (typeof val === 'number' || typeof val === 'boolean' || val === null)
+        {
+            return String(val);
+        }
+        if (Array.isArray(val))
+        {
+            if (val.length === 0) return '[]';
+            return '[\n' + val.map(v => indent + serialize(v, indent + '  ')).join(',\n') + '\n' + indent.slice(2) + ']';
+        }
+        if (typeof val === 'object' && val !== null)
+        {
+            const entries = Object.entries(val);
+            if (entries.length === 0) return '{}';
+            // Don't stringify keys, assume they are valid identifiers
+            return '{\n' + entries.map(([k, v]) => `${indent}${k}: ${serialize(v, indent + '  ')}`).join(',\n') + '\n' + indent.slice(2) + '}';
+        }
+        return undefined;
+    }
+
+    return `export default ${serialize(data)};\n`;
+}
+
+//// FUNCTIONS ////
+
+export function _getArgNames(func:any):Array<string>
+{
+     // taken from: https://stackoverflow.com/questions/1007981/how-to-get-function-parameter-names-values-dynamically?page=1&tab=votes#tab-top
+     var STRIP_COMMENTS = /(\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s*=[^,\)]*(('(?:\\'|[^'\r\n])*')|("(?:\\"|[^"\r\n])*"))|(\s*=[^,\)]*))/mg;
+     const ARGUMENT_NAMES = /([^\s,]+)/g;
+     
+     let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+     let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+     if(result === null)
+         result = [];
+     return result;
+}
+
+export function analyzeFunc(func:(any) => any)
+    : { argCount: number, argNames: string[], isAsync: boolean, 
+        hasMainScopeParam: boolean, returnsPromise: boolean }
+{
+    const funcStr = func.toString();
+    
+    // Get argument names (reuse your existing logic)
+    const argNames = _getArgNames(func);
+    
+    // Check if async
+    const isAsync = funcStr.startsWith('async ') || funcStr.includes('async function');
+    
+    // Check if first parameter looks like mainScope
+    const hasMainScopeParam = argNames.length > 0 && 
+        (argNames[0].toLowerCase().includes('scope') || argNames[0] === 'mainScope');
+    
+    // Detect return statements and promises
+    const returnMatches = funcStr.match(/return\s+([^;}\n]+)/g) || [];
+    const returnsPromise = isAsync || returnMatches.some(r => r.includes('Promise'));
+    
+    return {
+        argCount: argNames.length,
+        argNames,
+        isAsync,
+        hasMainScopeParam, // this is indicative
+        returnsPromise
+    };
 }

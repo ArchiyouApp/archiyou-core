@@ -144,7 +144,7 @@ export class TableIO
         };
 
         try {
-            console.info(`📄 Creating spreadsheet "${title}" in folder: ${this._googleDriveFolderId}...`);
+            console.info(`📄 Creating spreadsheet "${title}" in folder: ${this._googleDriveId}...`);
 
             const response = await drive.files.create({
                 resource: fileMetadata,

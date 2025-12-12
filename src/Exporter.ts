@@ -430,16 +430,22 @@ export class Exporter
         });
     }
 
-    exportToDxf():string
+    exportToDxf():string|null
     {
         const visibleShapes = this._ay.geom.all().filter(s => s.visible());
+        if(visibleShapes.length === 0)
+        {
+            console.warn(`Exporter::exportToDxf(): No visible shapes to export to DXF`);
+            return null;
+        }
         return visibleShapes.toDxf();
     }
 
     _getFileName():string
     {
         // Try to get script name from parent (Webworker (likely!), or Main))
-        return this._parent?.lastExecutionRequest?.script?.file_name || this?._parent?.script?.file_name || 'exportmodel';
+        // TODO: Fix with new Runner structure
+        return this._ay?.worker?.lastExecutionRequest?.script?.file_name || 'exportmodel';
     }
 
     // Taken from Cascade Studio

@@ -13,8 +13,10 @@
  *          
  *          await calc.gsheets.fromTemplate(...); // IMPORTANT: use await is essential here!
  * 
- *          // ==> after pipeline is done, results are taken from pipeline scope
- * 
+ *          // RETURN: after pipeline is done, results are taken from pipeline scope
+            // If no return value is given the current state within the pipeline scope is outputted
+            // (which is the scene root Obj)
+            // When one Shape or ShapeCollection is returned this is used as state (TODO)
  *      })
  * 
  *      
@@ -33,7 +35,8 @@
  *
  */ 
 
-import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom, isPipelineType } from './internal'
+import { ShapeCollection, Geom } from './internal'
+import { analyzeFunc } from './internal'
 import { PIPELINE_VALID_NAMES } from './internal' // from typeguards.ts
 
 //// SETTINGS ////
@@ -60,13 +63,40 @@ export class Pipeline
 
     /** Things for the pipeline to do
      *   NOTE: the given function is executed in the WebWorker global scope, 
-     *   this means previous variables are available
+     *   IMPORTANT: While previously defined variables from the main script scope are accessible,
+     *              it is STRONGLY ADVISED to only use variables defined within the pipeline function itself,
+     *              or passed as arguments to it. This avoids unexpected behavior due to variable scope issues.
+     *   
      */
     do(fn:() => ShapeCollection):this
     {
         if (typeof fn === 'function')
         {
             this._function = fn;
+            
+            // Some IMPORTANT warnings about how pipelines work based on the function analysis
+            const funcInfo = analyzeFunc(fn);
+            if(funcInfo.argCount === 0)
+            {
+                console.warn(`Pipeline::do(): Pipeline "${this.name}": The pipeline function has no arguments. 
+                It is strongly advised to define at least one argument (mainScope) 
+                to ensure proper access to the script's main scope.
+                Relying on external variables can lead to unexpected behavior.`);
+            }
+            if(!funcInfo.hasMainScopeParam)
+            {
+                console.warn(`Pipeline::do(): Pipeline "${this.name}": You don't seem to use a mainScope reference.
+                    Please only access variables from main scope using this mainScope argument to avoid issues!
+                    Use: function(mainScope) { ... } and access shapes via mainScope.someShape ...`);
+            }
+            if(funcInfo.argCount > 1)
+            {
+                console.warn(`Pipeline::do(): Pipeline "${this.name}": You have defined multiple arguments in your pipeline function.
+                    It is strongly advised to only use one argument (mainScope) to ensure proper access to the script's main scope.
+                    Relying on external variables can lead to unexpected behavior.`);
+            }
+            
+
             return this;
         }
         else {

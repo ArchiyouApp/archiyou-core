@@ -2782,7 +2782,11 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          const DEFAULT_OPTIONS = { all: false, annotations: true };
          options = { ...DEFAULT_OPTIONS, ...(options ?? {}) };
          const shapeEdges = this._get2DXYShapeEdges(options?.all);
-         if (shapeEdges.length == 0){ return null;}
+         if (shapeEdges.length == 0)
+         { 
+            console.warn(`ShapeCollection::toDxf(): No 2D Shapes on XY plane found in collection!`);
+            return null;
+         }
 
          const writer = new DxfWriter();
          writer.setUnits(UNITS_TO_DXF_UNITS[this._geom._units as ModelUnits] || Units.Unitless);

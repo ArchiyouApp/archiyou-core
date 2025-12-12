@@ -126,7 +126,7 @@ export interface ScriptMeta
 */
 export interface ScriptPublished
 {
-    title:string // nice title of the script
+    title?:string // nice title of the script
     version:string // valid semver
     libraryUrl?:string // url to the library where the script is published
     url?:string // url to the published script - without library url - this anticipates different publication urls

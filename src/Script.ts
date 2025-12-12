@@ -5,11 +5,11 @@
  *    Adds programmatic layer for validation 
  */
 
-import { uuidv4 } from './internal' // utils
 import semver from 'semver'; // for version validation
 
 import type { ScriptParamData, ScriptPublished, ScriptMeta } from './internal';
 import { ScriptParam } from './internal'
+import { uuidv4, dataToModuleString } from './internal' // utils
 
 export class Script 
 {
@@ -35,8 +35,6 @@ export class Script
 
     _valid = false; // internal validation flag
 
-
-
     constructor(author?:string, name?:string, code?:string, params?:Record<string,ScriptParam>, presets?:Record<string, Record<string, ScriptParamData>>)
     {
         if (!name || !author)
@@ -60,6 +58,11 @@ export class Script
     isValid():boolean
     {
         return this._valid;
+    }
+
+    namespace():string
+    {
+        return `${this.author}/${this.name}`;
     }
 
     //// VALIDATION AND DEFAULTS ////
@@ -150,6 +153,14 @@ export class Script
     }
 
     //// PARAM CHECKS ////
+
+    getDefaultParamValues():Record<string,any>
+    {
+        if(!this.params || typeof this.params !== 'object') { return {}; }
+        return Object.fromEntries(
+            Object.entries(this.params).map(([key, param]) => [key, param.default])
+        );
+    }
 
     /** Check parameter values against script definition params and give back error messages
      *  @return 
@@ -434,6 +445,12 @@ export class Script
             presets: this.presets,
             published: this.published,
         };
+    }
+
+    /** Export to module string - in this format the Script is saved in the library */
+    toModuleString():string
+    {
+        return dataToModuleString(this.toData());
     }
 
 }
