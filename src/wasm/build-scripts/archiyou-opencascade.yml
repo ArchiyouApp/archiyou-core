@@ -308,6 +308,9 @@ mainBuild:
   - symbol: TopTools_HSequenceOfShape2
   - symbol: OCJS
   emccFlags:
+    - -lembind
+    - -sMODULARIZE=1
+    - -sENVIRONMENT='web'
     - -sEXPORT_ES6=1
     - -sUSE_ES6_IMPORT_META=0
     - -sINITIAL_MEMORY=100MB
