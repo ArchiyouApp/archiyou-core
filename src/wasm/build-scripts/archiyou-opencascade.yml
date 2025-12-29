@@ -310,7 +310,7 @@ mainBuild:
   emccFlags:
     - -lembind
     - -sMODULARIZE=1
-    - -sENVIRONMENT='web'
+    - -sENVIRONMENT='web,node'
     - -sEXPORT_ES6=1
     - -sUSE_ES6_IMPORT_META=0
     - -sINITIAL_MEMORY=100MB
