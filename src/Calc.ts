@@ -30,14 +30,14 @@
     setArchiyou(ay:ArchiyouApp)
     {
         this._ay = ay;
-        this._geom = ay?.geom;
+        this._brep = ay?.brep;
         this.init();
     }
 
     /** We need to know when we can load the Shapes */
     init()
     {
-        this.db = new Db(this._geom);
+        this.db = new Db(this._brep);
         this.setupGSheetUtils();
     }
 

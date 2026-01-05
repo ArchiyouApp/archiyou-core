@@ -7,6 +7,8 @@ Use our editor and community platform for free at [Archiyou.com](https://archiyo
 
 ## Example
 
+This is a script on our platform:
+
 <img width=350 align="right" src="assets/codecad_table.gif">
 
 ```js
@@ -65,39 +67,48 @@ Now run this script in the browser or node:
 
 ```js
 
-import { initSimple as init, brep, doc } from 'archiyou'
+import { initSimple as init, Brep, Doc } from 'archiyou'
 
 await init();
 
+const brep = new Brep();
+
 // model a box 
-const myModel = brep.box(100)
+const myModel = brep.Box(100)
     .subtract(
-        brep.box(50,50,100)
+        brep.Box(50,50,100)
         .move(25,25,50)
     )
 
-myModel.saveToGLB() // in browser: save as window - in node save as file
+myModel.save('mybox.glb') // in browser: save as window - in node save as file
 
 // make a 2D isometry projection
 const myIso = myModel.iso()
-myIso.saveToSvg(); 
+myIso.save('myboxiso.svg'); 
 
 // put it on document
-const myDoc = doc.create('spec')
+const myDoc = new Doc().create('spec')
                 .text('My design')
                 .view(myIso);
 
-myDoc.saveAsPDF();
+myDoc.save('myboxdoc.pdf');
 
 
 ```
 
+## Starter templates for your framework
+
 For starter-templates for some popular frameworks see /examples/templates
+
+## Notes on the wasm file
+
+Archiyou is a TS/JS layer on top of a WASM build of [OpenCascade](https://github.com/Open-Cascade-SAS/OCCT). 
+You application needs to be able to find the WASM file for it to work. If you experience errors during import or execution this is most probably the cause.  
 
 
 ## More advanced applications
 
-If you want to execute scripts (either locally or on a server like Archiyou)  and get certain outputs use the Runner. You can also use the Runner to execute scripts in a Webworker. 
+If you want to execute scripts (either locally or on a server like Archiyou) and get certain outputs use the Runner. You can also use the Runner to execute scripts in a Webworker. 
 
 
 ```ts 
@@ -110,7 +121,7 @@ If you want to execute scripts (either locally or on a server like Archiyou)  an
     {
          // Then you execute a script in the default scope
          const r = await runner.execute({ 
-                     code: `b = new Box($SIZE)`, 
+                     code: `b = box($SIZE)`, 
                      params: { SIZE: 100 } }, 
                      { formats: ['glb'] }
                   ); 
@@ -123,4 +134,4 @@ If you want to execute scripts (either locally or on a server like Archiyou)  an
 ## Examples and use cases
 
 TODO
-(links to examples/scripts)
+(links to examples/scripts and editor links)

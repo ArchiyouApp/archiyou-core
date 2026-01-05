@@ -1,15 +1,15 @@
-import { Solid, Geom, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
+import { Solid, Brep, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 
-let geom;
+let brep:Brep;
 console.geom = console.log;
 
 beforeAll(async () => 
 {
     let ocLoader = new OcLoader();
     await ocLoader.loadAsync(); // Jest waits for the promise to be resolved
-    geom = new Geom(); // needed to set oc on all other Shapes
+    brep = new Brep(); // needed to set oc on all other Shapes
 });
 
 test("Obj", () => 

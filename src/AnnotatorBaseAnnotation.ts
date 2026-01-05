@@ -46,7 +46,7 @@ export class BaseAnnotation
 
     //// EXPORTS ////
 
-    toSvg():string|null
+    toSVG():string|null
     {
         return null; // override by child class
     }

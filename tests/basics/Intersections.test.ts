@@ -1,26 +1,26 @@
-import { Vector, Geom, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
+import { Vector, Brep, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 
-let geom;
+let brep:Brep;
 console.geom = console.log;
 
 beforeAll(async () => 
 {
     let ocLoader = new OcLoader();
     await ocLoader.loadAsync(); // Jest waits for the promise to be resolved
-    geom = new Geom(); // needed to set oc on all other Shapes
+    brep = new Brep(); // needed to set oc on all other Shapes
 });
 
 test("Intersection Basics", () => 
 {
-    const v1 = geom.Vertex(100,0,0);
-    const v2 = geom.Vertex(100,100,100);
-    const v3 = geom.Vertex(100,100,100);
-    const lv = geom.Line([0,-50],[0,50])
-    const lh = geom.Line([-100,0],[200,0])
-    const b = geom.Box();
-    const s = geom.Sphere(200);
+    const v1 = brep.Vertex(100,0,0);
+    const v2 = brep.Vertex(100,100,100);
+    const v3 = brep.Vertex(100,100,100);
+    const lv = brep.Line([0,-50],[0,50])
+    const lh = brep.Line([-100,0],[200,0])
+    const b = brep.Box();
+    const s = brep.Sphere(200);
 
     // vertex - vertex
     expect(v1.intersection(v2)).toEqual(null); // null

@@ -5,6 +5,7 @@
   "description": "Execute Archiyou scripts in different contexts",
   "scripts": {
     "dev": "nodemon --trace-warnings ./src/index.ts",
+    "dev:basic" : "nodemon --trace-warnings ./src/basic.ts",
     "dev:pdf": "nodemon --trace-warnings ./src/pdf.ts",
     "dev:component": "nodemon --trace-warnings ./src/component.ts",
     "dev:library": "nodemon --trace-warnings ./src/library.ts",

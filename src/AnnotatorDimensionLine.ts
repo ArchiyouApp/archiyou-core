@@ -455,7 +455,7 @@ export class DimensionLine extends BaseAnnotation
      *     if 3D the Dimension Line is projected to XY plane
      *     NOTE: we need to transform from Archiyou coordinate system to the SVG one (flip y)
      */
-    toSvg():string
+    toSVG():string
     {   
         const lineStart = this._calculatePoint('start');
         const lineEnd = this._calculatePoint('end');
@@ -562,7 +562,7 @@ export class DimensionLine extends BaseAnnotation
     // NOTE: do very little styling here to be able to easily style with CSS. Only stroke-width is good to set (default is 1, 0.5 sets it apart from Shapes)
 
     /** Export Annotation to DXF aligned dimension line */
-    toDxf(dxf:DxfBlock):this
+    toDXF(dxf:DxfBlock):this
     {
         dxf.addAlignedDim(
             point3d(this.targetStart.x, this.targetStart.y, 0), 

@@ -1,4 +1,4 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
 //// IN CM ////
 let BASE_BOARD_WIDTH = $BASE_BOARD_WIDTH || 15; // variable: 10-24?
@@ -30,26 +30,26 @@ seatBackVec.rotate(90, [1,0,0]);
 let CHAIR_DEPTH = seatVec.x  + seatGapVec.x + seatBackVec.scaled(0.5).x;
 
 ///// DIAGRAM ////
-geom.layer('lines').color('red');
+brep.layer('lines').color('red');
 
-let seatLine = geom.Line([0,0,0], seatVec);
-let backLine = geom.Line( seatVec.added(seatGapVec), seatVec.added(seatGapVec).added(seatBackVec) );
+let seatLine = brep.Line([0,0,0], seatVec);
+let backLine = brep.Line( seatVec.added(seatGapVec), seatVec.added(seatGapVec).added(seatBackVec) );
 
 let seatFace = seatLine.extruded(50,[0,1,0]).addToScene();
 let backFace = backLine.extruded(50,[0,1,0]).addToScene();
 
-geom.layer('sideRight').color('blue');
+brep.layer('sideRight').color('blue');
 
 //// SIDE RIGHT ////
 const HANDRAIL_WIDTH = 6.5;
 /*
-let sideRightHorizontal = geom.Box(CHAIR_DEPTH, BASE_BOARD_THICKNESS, BASE_BOARD_WIDTH)
+let sideRightHorizontal = brep.Box(CHAIR_DEPTH, BASE_BOARD_THICKNESS, BASE_BOARD_WIDTH)
                     .move([CHAIR_DEPTH/2, -2*BASE_BOARD_THICKNESS + (BASE_BOARD_THICKNESS/2),0]);
-let sideRightLegFront = geom.Box(BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS, TRIPLE_BOARD)
+let sideRightLegFront = brep.Box(BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS, TRIPLE_BOARD)
                 .move([BASE_BOARD_WIDTH/2, -3*BASE_BOARD_THICKNESS + (BASE_BOARD_THICKNESS/2),0]);
-let sideRightLegBack = geom.Box(BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS, TRIPLE_BOARD)
+let sideRightLegBack = brep.Box(BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS, TRIPLE_BOARD)
                         .move([CHAIR_DEPTH-BASE_BOARD_WIDTH/2,-BASE_BOARD_THICKNESS/2,0]);
-let sideRightHandrail = geom.Box(CHAIR_DEPTH, HANDRAIL_WIDTH,  BASE_BOARD_THICKNESS)
+let sideRightHandrail = brep.Box(CHAIR_DEPTH, HANDRAIL_WIDTH,  BASE_BOARD_THICKNESS)
         .move([CHAIR_DEPTH/2, -2*BASE_BOARD_THICKNESS + (BASE_BOARD_THICKNESS/2), TRIPLE_BOARD/2+BASE_BOARD_THICKNESS/2]);
 
 let sideRight = new ShapeCollection([sideRightHorizontal,sideRightLegFront,sideRightLegBack,sideRightHandrail]);
@@ -58,9 +58,9 @@ let sideRight = new ShapeCollection([sideRightHorizontal,sideRightLegFront,sideR
 // start at the XY plane
 const BACK_BOARD_SPACING = 3;
 
-geom.layer('back').color('green');
+brep.layer('back').color('green');
 
-let backBoard = geom.Box(backLine.length(),BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS).move([100,0,0]);
+let backBoard = brep.Box(backLine.length(),BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS).move([100,0,0]);
 
 backBoard.alignByPoints(['leftfrontbottom', 'rightfrontbottom', 'rightbackbottom'], 
    [backLine.start(),backLine.end(), backFace.vertices()[1]]); // TODO: side selector
@@ -69,7 +69,7 @@ backBoard.alignByPoints(['leftfrontbottom', 'rightfrontbottom', 'rightbackbottom
 let backBoardCollection = backBoard.hide()._array1D(CHAIR_WIDTH_NUM_BOARDS, [0,BASE_BOARD_WIDTH+BACK_BOARD_SPACING,0]).addToScene();
 
 const CHAIR_WIDTH_BACK = CHAIR_WIDTH_NUM_BOARDS*(BASE_BOARD_WIDTH+BACK_BOARD_SPACING) - BACK_BOARD_SPACING;
-let backBoardHorizontal = geom.Box(HANDRAIL_WIDTH, 
+let backBoardHorizontal = brep.Box(HANDRAIL_WIDTH, 
                         CHAIR_WIDTH_BACK, 
                         BASE_BOARD_THICKNESS);
 
@@ -80,12 +80,12 @@ backBoardHorizontal.alignByPoints(
 // TODO: Access tight Bbox so that we can get width of Box 
 let backBoardHorizontalBottom = backBoardHorizontal.copy().move(seatBackVec.reversed().added(seatBackVec.normalized().scale(HANDRAIL_WIDTH))).addToScene();
 
-let back = geom.group([backBoardCollection,backBoardHorizontal, backBoardHorizontalBottom]);
+let back = brep.group([backBoardCollection,backBoardHorizontal, backBoardHorizontalBottom]);
 
 //// SEATING ////
-geom.layer('seat').color('purple');
+brep.layer('seat').color('purple');
 
-let seatingBoard = geom.Box(seatLine.length(), BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS);
+let seatingBoard = brep.Box(seatLine.length(), BASE_BOARD_WIDTH, BASE_BOARD_THICKNESS);
 // AlignByPoint and selectors don't work very well for Faces
 
 seatingBoard.rotateY(SEAT_ANGLE).align(seatFace, 'leftfrontbottom', 'leftfrontbottom'); 
@@ -95,7 +95,7 @@ let seatingBoards = seatingBoard.hide()
     ._array1D(CHAIR_WIDTH_NUM_BOARDS, [0,BASE_BOARD_WIDTH+BACK_BOARD_SPACING,0]).addToScene();
 
 const CHAIR_WIDTH_SEATING = CHAIR_WIDTH_NUM_BOARDS*(BASE_BOARD_WIDTH+BACK_BOARD_SPACING) - BACK_BOARD_SPACING + BASE_BOARD_THICKNESS*2;
-seatingHorizontalFront = geom.Box(HANDRAIL_WIDTH, 
+seatingHorizontalFront = brep.Box(HANDRAIL_WIDTH, 
                         CHAIR_WIDTH_SEATING, 
                         BASE_BOARD_THICKNESS);
 
@@ -107,13 +107,13 @@ seatingHorizontalFront.alignByPoints(
 seatingHorizontalFront.move([0,-BASE_BOARD_THICKNESS,0]); // attach to side - this is different than original design
 seatingHorizontalBack = seatingHorizontalFront.moved(seatVec.subtracted(seatVec.normalized().scaled(HANDRAIL_WIDTH))).addToScene();
 
-let seating = geom.group([seatingBoards,seatingHorizontalFront,seatingHorizontalBack]);
+let seating = brep.group([seatingBoards,seatingHorizontalFront,seatingHorizontalBack]);
 
 //// LEFT - JUST MIRROR RIGHT ////
-geom.layer('left').color('blue');
+brep.layer('left').color('blue');
 let sideLeft = sideRight.mirrored('x', [0,CHAIR_WIDTH_SEATING/2-BASE_BOARD_THICKNESS,0]).addToScene();
 
-let chair = geom.group([sideRight, sideLeft, seating, back]);
+let chair = brep.group([sideRight, sideLeft, seating, back]);
 chair.move([0,-(CHAIR_WIDTH_SEATING/2-BASE_BOARD_THICKNESS),TRIPLE_BOARD/2]);
 
 seatLine.hide();

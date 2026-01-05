@@ -5,7 +5,7 @@
  */
 
 import { Statement } from './internal'
-import { GEOM_METHODS_INTO_GLOBAL } from './internal'
+import { BREP_METHODS_INTO_GLOBAL } from './internal'
 import { Parser, Options, Node } from 'acorn'
 import findGlobals from 'acorn-globals'
 import { ScriptVersion, ImportStatement } from './models'
@@ -122,7 +122,7 @@ export class CodeParser
         const SKIP_GLOBALS = ['Array', 'Math']
         const ARCHIYOU_MODULES = ['doc', 'geom', 'calc', 'make', 'beams']
 
-        const globalFuncsLowerCase = GEOM_METHODS_INTO_GLOBAL.map(f => f.toLowerCase())
+        const globalFuncsLowerCase = BREP_METHODS_INTO_GLOBAL.map(f => f.toLowerCase())
 
         return findGlobals(this.code).map(r => r.name)
                     .filter(g => !globalFuncsLowerCase.includes(g.toLowerCase()))

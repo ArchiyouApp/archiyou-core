@@ -1,4 +1,4 @@
-import { Shape, AnyShape, ShapeCollection, ArchiyouApp} from './internal'
+import { Shape, AnyShape, ShapeCollection, ArchiyouApp, isBrowser} from './internal'
 
 import { ExportGLTFOptions, MeshingQualitySettings} from './internal'
 
@@ -67,22 +67,31 @@ export class Exporter
         return this;
     }
 
-    exportToStep():string
+    /** Export given shapes or all shapes in Brep instance to STEP 
+     *  Optionally supply a filename
+    */
+    exportToSTEP(shapes?:AnyShape|ShapeCollection, filename?:string):string
     {
         // Taken from: https://github.com/zalo/CascadeStudio/blob/1a0f44b4d7617cc9dfc1dd6833945e04e2dfc1c9/js/CADWorker/CascadeStudioFileUtils.js
 
-        /* OC docs:
+        /* 
+            OC docs:
             - https://dev.opencascade.org/doc/refman/html/class_s_t_e_p_control___writer.html
             - Output modes: https://dev.opencascade.org/doc/refman/html/_s_t_e_p_control___step_model_type_8hxx.html#a032affe8dae498d429a83225f8c5da4e
         */
 
-        const filename = this._getFileName() + '.step';
-        let sceneCompoundShape = new ShapeCollection(this._ay.geom.all()
-                                    .filter(s => s.visible())).toOcCompound(); // filter might return only one Shape
+        const shapesToExport = new ShapeCollection(shapes as AnyShape);
 
-        console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
+        filename = filename || this._getFileName() + '.step';
+        // Export given shape(s) or all in Brep instance
+        const sceneShapes = (shapesToExport.length) 
+                                ? shapesToExport 
+                                : this._ay.brep.all().filter(s => s.visible());
+        const sceneCompoundShape = new ShapeCollection(sceneShapes).toOcCompound(); // filter might return only one Shape
 
-        const oc = this._ay.geom._oc;
+        console.info(`Exporter::exportToSTEP: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
+
+        const oc = this._ay.brep._oc;
         
         let ocWriter = new oc.STEPControl_Writer_1();
         let ocTransferResult = ocWriter.Transfer(sceneCompoundShape, 0, true, new oc.Message_ProgressRange_1()); 
@@ -103,46 +112,52 @@ export class Exporter
             }
             else
             {
-                console.error("Exporter::exportToStep: File Export Transfer to STEP failed");
+                console.error("Exporter::exportToSTEP: File Export Transfer to STEP failed");
             }
         }
         else 
         {
-            console.error("Exporter::exportToStep: File Export to STEP failed");
+            console.error("Exporter::exportToSTEP: File Export to STEP failed");
         }
     }
 
-    async exportToStepWindow(content:string)
+    /** Open a window to save the file in browser */
+    async exportToSTEPWindow(content?:string)
     {
-        let stepContent = content || this.exportToStep();
-        const fileHandle = await this.getNewFileHandle("STEP files", "text/plain", "step");
-        this.writeFile(fileHandle, stepContent).then(() => 
-        {
-          console.info("Saved STEP to " + fileHandle.name);
-        });
+        const stepContent = content || this.exportToSTEP();
+        await this._exportToFileWindow(stepContent, 'text/plain', 'step', 'STEP file');
     }
 
-    exportToStl():Uint8Array
+    /** Export given shapes or all shapes in Brep instance to STL
+     *  Optionally supply a filename
+    */
+    exportToSTL(shapes?:AnyShape|ShapeCollection, filename?:string):Uint8Array
     {
-        const oc = this._ay.geom._oc;
-        const filename = this._getFileName() + '.stl';
-
-        const visibleShapes = this._ay.geom.all().filter(s => s.visible());
+        const oc = this._ay.brep._oc;
         
+        filename = (filename || this._getFileName());
+        if(!filename.includes(".stl")) filename += '.stl';
+
+        const shapesToExport = new ShapeCollection(shapes);
+
+        const visibleShapes = (shapesToExport.length) 
+                                    ? shapesToExport 
+                                    : this._ay.brep.all().filter(s => s.visible());
+
         // IMPORTANT: Make sure all shapes are triangulated before exporting to STL
         // TODO: avoid doing this multiple times if already done before GLTF
         this._triangulateShapes(visibleShapes);
 
         const sceneCompoundShape = visibleShapes.toOcCompound();
 
-        console.info(`Exporter::exportToStep: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
+        console.info(`Exporter::exportToSTEP: Output of ${sceneCompoundShape.NbChildren()} Shapes`);
         const ocStlWriter = new oc.StlAPI_Writer();
         ocStlWriter.ASCIIMode = false; // binary
         const result = ocStlWriter.Write(sceneCompoundShape, filename, new oc.Message_ProgressRange_1()); // Shape, stream content, ASCI or not
 
         if (!result)
         {
-            console.error(`Exporter::exportToStl: Error exporting to STL. Try again, or another format!`);
+            console.error(`Exporter::exportToSTL: Error exporting to STL. Try again, or another format!`);
             return null;
         }
         else {
@@ -153,14 +168,11 @@ export class Exporter
         
     }
 
-    async exportToStlWindow(content:ArrayBuffer)
+    /** Open a window to save the STL file in browser */
+    async exportToSTLWindow(content?:ArrayBuffer)
     {
-        // TODO: check with new binary
-        const fileHandle = await this.getNewFileHandle("STL files", "application/octet-stream", "stl");
-        this.writeFile(fileHandle, content).then(() => 
-        {
-          console.info("Saved STL to " + fileHandle.name);
-        });
+        const stlContent = content || this.exportToSTL();
+        await this._exportToFileWindow(stlContent, 'application/octet-stream', 'stl', 'STL file');
     }
 
     /** Export Scene to GLTF 
@@ -178,15 +190,16 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions):Promise<ArrayBuffer|null>
+    async exportToGLTF(options?:ExportGLTFOptions, shapes?:Array<AnyShape>, filename?:string):Promise<ArrayBuffer|null>
     {
         const startGLTFExport = performance.now();
 
-        const oc = this._ay.geom._oc;
+        const oc = this._ay.brep._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
         
         const meshingQuality = options.quality || this.DEFAULT_MESH_QUALITY;
-        const filename = `file.${(options.binary) ? 'glb' : 'gltf'}`
+        filename = (typeof filename === 'string') ? filename : `file.${(options.binary) ? 'glb' : 'gltf'}`;
+
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
 
         const ocShapeTool = oc.XCAFDoc_DocumentTool.prototype.constructor.ShapeTool(docHandle.get().Main()).get(); // autonaming is on by default
@@ -197,7 +210,10 @@ export class Exporter
             NOTE: OC only exports Solids to GLTF - use custom method to export Vertices/Edges/Wires
         */
 
-        const exportShapes = this._ay.geom.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type()));
+        const shapesToExport = new ShapeCollection(shapes);
+        const exportShapes = shapesToExport.length
+                                ? shapesToExport 
+                                : this._ay.brep.all().filter(s => s.visible() && !['Vertex','Edge','Wire'].includes(s.type()));
 
         if(exportShapes.length === 0)
         {
@@ -264,7 +280,7 @@ export class Exporter
         {
             const startGLTFPointsAndLines = performance.now();
             const pointAndLineShapes:ShapeCollection = new ShapeCollection(
-                        this._ay.geom.all()
+                        this._ay.brep.all()
                         .filter(s => (s.visible() && ['Vertex','Edge','Wire'].includes(s.type()))));
             if (pointAndLineShapes.length > 0)
             {
@@ -278,7 +294,7 @@ export class Exporter
         {
             console.info(`Exporter::exportToGLTF: Flag extraShapesAsPointLines: Exporting extra Shapes as Points and Lines. `);
             const startGLTFExtraShapes = performance.now();
-            const extraOutputShapes = new ShapeCollection(this._ay.geom.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
+            const extraOutputShapes = new ShapeCollection(this._ay.brep.all().filter(s => (s.visible() && !['Vertex','Edge','Wire'].includes(s.type()))));
             if( extraOutputShapes.length > 0)
             {
                 gltfContent = await new GLTFBuilder().addSeperatePointsAndLinesForShapes(gltfContent, extraOutputShapes, meshingQuality); 
@@ -310,7 +326,7 @@ export class Exporter
      */
     _triangulateShapes(shapes:ShapeCollection, meshingQuality?:MeshingQualitySettings):Array<any>
     {
-        const oc = this._ay.geom._oc;
+        const oc = this._ay.brep._oc;
         meshingQuality = meshingQuality || this.DEFAULT_MESH_QUALITY;
         const ocIncMeshes = [] as Array<any>;
         new ShapeCollection(shapes)
@@ -326,49 +342,43 @@ export class Exporter
     }
 
     /** Export GLTF (binary or text) to the browser window */
-    async exportToGLTFWindow(content:Uint8Array|string)
+    async exportToGLTFWindow(content?:Uint8Array|string)
     {
-        const fileHandle = (typeof content === 'string') ? 
-                    await this.getNewFileHandle("GLTF files", "text/plain", "gltf") :
-                    await this.getNewFileHandle("GLTF files", "application/octet-stream", "glb");
+        const mime = (typeof content === 'string') 
+                    ? 'text/plain'
+                    : 'application/octet-stream';
 
-        this.writeFile(fileHandle, content).then(() => 
-        {
-          console.info("Saved GLTF to " + fileHandle.name);
-        });
+        const ext = (typeof content === 'string') ? 'gltf' : 'glb';
+        const gltfContent = content || await this.exportToGLTF();
+        this._exportToFileWindow(gltfContent, mime, ext, 'GLTF file');
     }
 
     async exportToGLTFAnimation(frameGLBs:Array<Uint8Array>):Promise<Uint8Array>
     {
-        let gltfExporter = new GLTFBuilder();
+        const gltfExporter = new GLTFBuilder();
         await gltfExporter.createAnimation(frameGLBs);
-        let buffer = gltfExporter.toGLTFBuffer();
-        return buffer;
+        return gltfExporter.toGLTFBuffer();
     }
 
     async exportToGLTFAnimationWindow(content:Uint8Array)
     {
-        const fileHandle = await this.getNewFileHandle("GLTF files", "application/octet-stream", "glb");
-        this.writeFile(fileHandle, content).then(() => 
-        {
-            console.info("Saved GLTF Animation to " + fileHandle.name);
-        });
+        this._exportToFileWindow(content, 'application/octet-stream', 'glb', 'GLTF file');
     }
 
     /** Export entire (visual) model by creating a isometric 2D view  
-     * TODO: seperate these functions into export3DtoSvg and export2DtoSvg
+     * TODO: seperate these functions into export3DtoSVG and export2DtoSVG
     */
-    exportToSvg(only2D:boolean=false):string
+    exportToSVG(only2D:boolean=false):string
     {
         if(!only2D)
         {
-            const visibleShapes = this._ay.geom.all().filter(s => s.visible());
-            return visibleShapes._isometry().toSvg();
+            const visibleShapes = this._ay.brep.all().filter(s => s.visible());
+            return visibleShapes._isometry().toSVG();
         }
         else {
             // Only export 2D edges on XY plane
-            const edges2DCollection = new ShapeCollection(this._ay.geom.all().filter(s => s.visible() && s.is2DXY()));
-            return edges2DCollection.toSvg();
+            const edges2DCollection = new ShapeCollection(this._ay.brep.all().filter(s => s.visible() && s.is2DXY()));
+            return edges2DCollection.toSVG();
         }
     }
 
@@ -377,7 +387,7 @@ export class Exporter
      *  At the same time apply special SLIM SVG keyframe animation tags 
      *  so the SVG animation can be viewed inside ordinary browsers
      */
-    exportToSvgAnimation(svgs:Array<string>):string
+    exportToSVGAnimation(svgs:Array<string>):string
     {
         const SVG_FPS = 2; // 2 frames per second
         const SVG_FRAME_DURATION = 1 / SVG_FPS;
@@ -421,24 +431,63 @@ export class Exporter
         return (bbox) ? bbox[2] * bbox[3] : 0;
     }
 
-    async exportToSvgWindow(content:string)
+    /** Open browser file window to save svg */
+    async exportToSVGWindow(content:string)
     {
-        const fileHandle = await this.getNewFileHandle("SVG files", "text/plain", "svg");
-        this.writeFile(fileHandle, content).then(() => 
-        {
-          console.info("Saved SVG Animation to " + fileHandle.name);
-        });
+       await this._exportToFileWindow(content, 'text/svg', 'svg', 'SVG file');
     }
 
-    exportToDxf():string|null
+    exportToDXF(shapes:AnyShape|ShapeCollection):string|null
     {
-        const visibleShapes = this._ay.geom.all().filter(s => s.visible());
-        if(visibleShapes.length === 0)
+        const shapesToExport = new ShapeCollection(shapes);
+        const exportShapes = (shapesToExport.length) 
+                            ? shapesToExport 
+                            : this._ay.brep.all().filter(s => s.visible());
+
+        if(exportShapes.length === 0)
         {
-            console.warn(`Exporter::exportToDxf(): No visible shapes to export to DXF`);
+            console.warn(`Exporter::exportToDXF(): No visible shapes to export to DXF`);
             return null;
         }
-        return visibleShapes.toDxf();
+        return exportShapes.toDXF();
+    }
+
+
+    /** Convenience method for saving files in browser and node */
+    save(shapes:AnyShape|ShapeCollection, filename:string, options:any={})
+    {
+        const EXTENTIONS_EXPORT_METHODS = {
+            'glb' : 'exportToGLTF',
+            'svg': 'exportToSVG',
+            'step': 'exportToSTEP',
+            'stl': 'exportToSTL',
+            'dxf' : 'exportToDXF',
+        }
+
+        const ext = filename.split('.').pop();
+        if(!Object.keys(EXTENTIONS_EXPORT_METHODS).includes(ext))
+        {
+            console.error(`Shape::save: Unsupported file extension to save file "${filename}". Please use any of these extensions: ${ALLOWED_EXTENSIONS.join(', ')}`);
+            return;
+        }
+
+        const data = this[EXTENTIONS_EXPORT_METHODS[ext]](shapes, filename, options);
+
+        if (isBrowser())
+        {
+            
+        }
+        
+    }
+
+
+    //// UTILS ////
+
+    async _exportToFileWindow(data:any, mime:string, ext:string, desc:string)
+    {
+        const fileHandle = await this.getNewFileHandle(desc, mime, ext);
+        await this.writeFile(fileHandle, data)
+        console.info(`Exporter::exportToWindow(): Saved file "${fileHandle.name}"`);
     }
 
     _getFileName():string

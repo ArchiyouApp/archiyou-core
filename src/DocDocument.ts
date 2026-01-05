@@ -82,7 +82,7 @@ export class DocDocument
             name: this.name,
             units: this.units,
             pages: docPagesData,
-            modelUnits: this._doc._geom._units, // set model units to calculate scale later
+            modelUnits: this._doc._brep._units, // set model units to calculate scale later
         }
         
     }

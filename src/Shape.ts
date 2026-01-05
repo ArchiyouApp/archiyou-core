@@ -435,7 +435,7 @@ export class Shape
     {
         if(this._obj)
         {
-            this._geom.removeObj(this._obj);
+            this._brep.removeObj(this._obj);
         }
     }
 
@@ -3054,7 +3054,7 @@ export class Shape
     @checkInput('AnyShape', 'auto')
     intersecting():AnyShapeCollection
     {
-        let sceneShapes:AnyShapeCollection = this._geom.all(); // get all Shapes in scene
+        let sceneShapes:AnyShapeCollection = this._brep.all(); // get all Shapes in scene
         let intersectingShapeCollection = sceneShapes.filter(shape => (shape as AnyShape)._intersections(this) != null );
 
         return intersectingShapeCollection;
@@ -4273,7 +4273,7 @@ export class Shape
     @checkInput([['DimensionOptions', null]], ['auto'] )
     autoDim(options?:DimensionOptions)
     {
-        this._geom._annotator.autoDim(this, options);
+        this._brep._annotator.autoDim(this, options);
     }
 
     //// API to forward to _Obj ////
@@ -4282,7 +4282,7 @@ export class Shape
     addToScene(force:boolean=false):Shape
     {
         // TODO: avoid double adding to scene?
-        this._geom.addToActiveLayer(this.object());
+        this._brep.addToActiveLayer(this.object());
 
         return this;
     }
@@ -4407,14 +4407,14 @@ export class Shape
 
         if(visibleOutlines)
         {  
-            visibleOutlines.attribute('outline', true); // for later reference (toSvg())
+            visibleOutlines.attribute('outline', true); // for later reference (toSVG())
             groupedProjectedEdges.addGroup('outlines', visibleOutlines);
         };
         
         // main two groups (hidden and visible)
         const visibleEdges = new ShapeCollection(visibleSharpEdges,visibleSmoothEdges,visibleOutlines);        
         groupedProjectedEdges._defineGroup('visible', visibleEdges);
-        visibleEdges.attribute('visible', true); // for later reference (toSvg())
+        visibleEdges.attribute('visible', true); // for later reference (toSVG())
         
         // add invisible too
         if(all)
@@ -4941,7 +4941,16 @@ export class Shape
 
     }
 
-    //// Export ////
+    //// EXPORT ////
+
+    /** Convenience method to save the shape to a file
+     *   the extension determines the file format
+     *   Supported formats: glb, svg, step, stl, dxf
+    */
+    save(filename:string, options:any={})
+    {
+        new ShapeCollection(this).save(filename, options);        
+    }
 
     toData():Object
     {
@@ -4981,11 +4990,13 @@ export class Shape
     }
 
     /** Export 2D Shape to SVG */
-    toSvg(options:toSVGOptions = { all: false, annotations: true}):string
+    toSVG(options:toSVGOptions = { all: false, annotations: true}):string
     {
-        // for now use ShapeCollection.toSvg()
+        // for now use ShapeCollection.toSVG()
         // NOTE: this method will be overwriten in Edge
-        return new ShapeCollection(this).toSvg(options);
+        return new ShapeCollection(this).toSVG(options);
     }
+
+    
 
 }

@@ -3,7 +3,7 @@
  * 
  */
 
-import { Geom } from "./Geom";
+import { Geom } from "./Brep";
 import { AnyShape, ShapeCollection, Sketch } from "./internal";
 
 import parseSVG from "svg-path-parser"; // https://github.com/hughsk/svg-path-parser
@@ -52,8 +52,8 @@ export class IO
 
     constructor(geom:Geom)
     {
-        this._geom = geom;
-        this._oc = this?._geom?._oc;
+        this._brep = geom;
+        this._oc = this?._brep?._oc;
     }
 
     async load(source:string, forceFetch:boolean=false, onlyCache:boolean=false)
@@ -253,7 +253,7 @@ export class IO
             {
                 case 'path':
                     shapeOrShapes = this._importSVGPath(node.attributes.d, transform);
-                    shapeOrShapes.setName(this._geom.getNextObjName('ImportedSVGPath'));
+                    shapeOrShapes.setName(this._brep.getNextObjName('ImportedSVGPath'));
                     break;
             }
             svgShapeCollection.add(shapeOrShapes)
@@ -343,7 +343,7 @@ export class IO
         
         let shapeOrShapes = sketch.getShapes(); // return Shape of this SVG Path
         sketch._removeSketchLayer(); // remove original sketch layer
-        this._geom.resetLayers(); 
+        this._brep.resetLayers(); 
 
         return shapeOrShapes;
     }

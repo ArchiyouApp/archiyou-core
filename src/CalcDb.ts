@@ -17,7 +17,7 @@ export class Db
 
     constructor(geom:Geom)
     {
-        this._geom = geom;
+        this._brep = geom;
 
         this.init(); // try to init immediately. Maybe there are not Shapes in Geom instance. When there are use init()
     }
@@ -93,23 +93,23 @@ export class Db
 
     generateShapesData():Array<Object> // TODO: make output Object an Interface?
     {
-        if(!this._geom)
+        if(!this._brep)
         {
             console.error(`Db::generateShapesData: Cannot get Shapes without an instance of Geom. Please supply it in constructor!`);
             return [];
         }
-        let shapesData = this._geom.all().toArray().map(shape => shape.toTableData());
+        let shapesData = this._brep.all().toArray().map(shape => shape.toTableData());
         return shapesData;
     }
 
     generateObjsData():Array<Object> // TODO: make output Object an Interface?
     {
-        if(!this._geom)
+        if(!this._brep)
         {
             console.error(`Db::generateObjsData: Cannot get Objs without an instance of Geom. Please supply it in constructor!`);
             return [];
         }
-        return this._geom.allObjs().map(obj => obj.toData());
+        return this._brep.allObjs().map(obj => obj.toData());
     }
 
     //// OUTPUTS ////

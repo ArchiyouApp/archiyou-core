@@ -11,7 +11,7 @@
          ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
          isMainAxis, ModelUnits } from './internal' // see types
- import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
+ import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep } from './internal'
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
  import type { Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
@@ -46,7 +46,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
  {
       /*  ShapeCollection cannot contain other ShapeCollections. Hierarchies are managed by Obj container class */
       _oc:any; // Don't set to null!
-      _geom:any; // Set on init of Geom
+      _brep:Brep;
       _obj:Obj = null; // Obj container
       _parent:AnyShapeOrCollection;
       shapes:Array<AnyShape> = []; // No ShapeCollection here
@@ -964,7 +964,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
             const copiedShapes = groupShapes.map(shape => shape._copy())
             newShapeCollection.addGroup(groupName, copiedShapes); 
          })
-         newShapeCollection.setName( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
+         newShapeCollection.setName( this._brep.getNextLayerName( 'CopyOf' + this.getName() ));
          newShapeCollection._setFakeArrayKeys();
 
          return newShapeCollection;
@@ -1074,7 +1074,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
             
             // Extra: enlarge bbox with possible Annotations within or nearby
             /*
-            this._geom._annotator.getAnnotationsInBbox(combinedBbox)
+            this._brep._annotator.getAnnotationsInBbox(combinedBbox)
                   .forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
             */
          }
@@ -2161,9 +2161,9 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       {
          // For now, flatten collection into existing layer
          // TODO: We could start a new layer to keep collection together
-         // this._geom.layer( this._geom.getNextLayerName(this.getName()));
+         // this._brep.layer( this._brep.getNextLayerName(this.getName()));
          this.all().forEach(shape => shape.addToScene());
-         //this._geom.resetLayers(); // return active layer to scene
+         //this._brep.resetLayers(); // return active layer to scene
          return this;
       }
 
@@ -2510,7 +2510,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       autoDim(settings?:DimensionLevelSettings, strategy?:AnnotationAutoDimStrategy):ShapeCollection
       {
          // TODO: How to tie annotations to ShapeCollection?
-         this._geom._annotator.autoDim(this, settings, strategy);
+         this._brep._annotator.autoDim(this, settings, strategy);
 
          return this;
       }
@@ -2678,6 +2678,10 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          return `ShapeCollection<${(this.shapes.length > 0 ? this.shapes.map(s => s.toString()) : 'empty')}>`;
       }
 
+
+
+      //// UTILS ////
+
       /** Get all edges of 2D XY Shapes in this collection 
        *    Supply true to force all Shapes, even invisible ones!
       */
@@ -2691,8 +2695,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
             {
                shapeEdges.add(shape.edges()); // NOTE: this._parent refers to main Shape of subshapes
             }
-         })
-
+         });
          return shapeEdges;
       }
 
@@ -2715,7 +2718,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
        *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
        *    TODO: run these algorithms apart from OC
       */
-      toSvg(options?:toSVGOptions):string
+      toSVG(options?:toSVGOptions):string
       {
          const DEFAULT_OPTIONS = { all: false, annotations: true };
 
@@ -2732,7 +2735,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          let svgPaths:Array<string> = [];
          shapeEdges.forEach( edge => 
          {
-            svgPaths.push(edge.toSvg());
+            svgPaths.push(edge.toSVG());
          })
          
          const withAnnotations = options?.annotations ?? true; // true is default
@@ -2748,25 +2751,24 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
                         viewBox="${svgViewBbox}"
                         _bbox="${svgWorldBbox}" 
-                        _worldUnits="${this._geom._units}" stroke="black">
+                        _worldUnits="${this._brep._units}" stroke="black">
                         ${svgPaths.join('\n\t')}
                         ${ (withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
-
          return svg;
       }
 
 
       _getDimensionLinesSvgElems():string
       {
-         const svgElems = this.getAnnotations().map(a => a.toSvg())
+         const svgElems = this.getAnnotations().map(a => a.toSVG())
          const svgText = svgElems.join('\n')
 
          return svgText;
       }
       
-      toDxf(options:toDXFOptions = {}):string|null
+      toDXF(options:toDXFOptions = {}):string|null
       {
          const UNITS_TO_DXF_UNITS = {
             mm: Units.Millimeters,
@@ -2784,16 +2786,16 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          const shapeEdges = this._get2DXYShapeEdges(options?.all);
          if (shapeEdges.length == 0)
          { 
-            console.warn(`ShapeCollection::toDxf(): No 2D Shapes on XY plane found in collection!`);
+            console.warn(`ShapeCollection::toDXF(): No 2D Shapes on XY plane found in collection!`);
             return null;
          }
 
          const writer = new DxfWriter();
-         writer.setUnits(UNITS_TO_DXF_UNITS[this._geom._units as ModelUnits] || Units.Unitless);
+         writer.setUnits(UNITS_TO_DXF_UNITS[this._brep._units as ModelUnits] || Units.Unitless);
          const modelSpace = writer.document.modelSpace;
 
          shapeEdges.forEach( edge => {
-               edge.toDxf(modelSpace); // add Edge as line to DXF modelspace
+               edge.toDXF(modelSpace); // add Edge as line to DXF modelspace
          });
 
          if(options?.annotations)
@@ -2801,7 +2803,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
             this.getAnnotations().forEach( a => {
                if(a._type === 'dimensionLine')
                {
-                   (a as DimensionLine).toDxf(modelSpace);
+                   (a as DimensionLine).toDXF(modelSpace);
                }
             });
          }

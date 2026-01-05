@@ -2,10 +2,10 @@ import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell,
         Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, 
         ParamManager, Obj, Script, ScriptParam, ScriptData  } from './internal'
 
-import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, 
+import { Brep, Doc, Beams, Container, DimensionLine, CodeParser, 
             Exporter, Make, Calc, Db as CalcDb, View, Runner, Services } from './internal'
 
-import type { ScriptOutputPath, ScriptParamData } from './internal'
+import type { ScriptParamData } from './internal'
 
 import { Console } from './Console'
 
@@ -143,7 +143,7 @@ export interface ArchiyouApp
     worker?: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
     runner?:Runner, // The instance of the Runner where the script is run
     scope?:any // Scope where the script is run in
-    geom: Geom,
+    brep: Brep,
     doc?: Doc,
     console?: Console,
     executor?: CodeParser,
@@ -1126,7 +1126,7 @@ export interface RunnerScriptScopeState extends ProxyConstructor
     ay: ArchiyouApp
     // global references
     console: Console
-    geom: Geom
+    brep: Brep
     doc: Doc
     calc: Calc
     exporter: Exporter

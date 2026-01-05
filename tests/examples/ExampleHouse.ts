@@ -1,4 +1,4 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
 const WALL_HEIGHT = 520;
 const DEPTH = 1000;
@@ -13,7 +13,7 @@ const APPARTMENT_BALCONY = 100
 // Barn volume
 let top = [0,DEPTH/2,WALL_HEIGHT+ROOF_HEIGHT];
  
-let profile = geom.Face().fromVertices([
+let profile = brep.Face().fromVertices([
     [0,0,0],
     [0,0,WALL_HEIGHT],
     top,
@@ -36,7 +36,7 @@ let topLightSolid = new Face().makeRect(
 let shell.cut(topLightSolid);
 
 // windows
-geom.layer("openings").color('blue');
+brep.layer("openings").color('blue');
 const OPENING_WIDTH = 90;
 const OPENING_TYPE_FRONT_HEIGHT = 100;
 const OPENING_TYPE_BACK_HEIGHT = 50;
@@ -44,21 +44,21 @@ const OPENING_FROM_LEFT = 220;
 const OPENING_START_HEIGHT = 150;
 
 // front
-let openingFrontLeft = geom.Box(OPENING_WIDTH,OPENING_WIDTH*2,OPENING_TYPE_FRONT_HEIGHT)
+let openingFrontLeft = brep.Box(OPENING_WIDTH,OPENING_WIDTH*2,OPENING_TYPE_FRONT_HEIGHT)
 .move([OPENING_FROM_LEFT,0,OPENING_START_HEIGHT+OPENING_TYPE_FRONT_HEIGHT/2]);
 let openingFrontRight = openingFrontLeft.moved([350,0,0]).addToScene();
-let openingFrontRightTop = geom.Box(OPENING_WIDTH,OPENING_WIDTH*2,OPENING_TYPE_FRONT_HEIGHT*1.5)
+let openingFrontRightTop = brep.Box(OPENING_WIDTH,OPENING_WIDTH*2,OPENING_TYPE_FRONT_HEIGHT*1.5)
 .move([OPENING_FROM_LEFT+350,0,OPENING_START_HEIGHT+OPENING_TYPE_FRONT_HEIGHT/2+200]);
 
 // back
-let openingBackLeft = geom.Box(OPENING_WIDTH,OPENING_WIDTH*2,OPENING_TYPE_BACK_HEIGHT)
+let openingBackLeft = brep.Box(OPENING_WIDTH,OPENING_WIDTH*2,OPENING_TYPE_BACK_HEIGHT)
 .move([OPENING_FROM_LEFT,DEPTH,OPENING_START_HEIGHT+OPENING_TYPE_BACK_HEIGHT/2]);
 let openingBackRight = openingBackLeft.moved([450,0,0]).addToScene();
 
 // doors left
 const DOOR_HEIGHT = 220;
 // note: because of shelling there is a floor plate of WALL_THICKNESS thickness
-let doorOpening= geom.Box(100,200,DOOR_HEIGHT).move([0,DEPTH/2,DOOR_HEIGHT/2]);
+let doorOpening= brep.Box(100,200,DOOR_HEIGHT).move([0,DEPTH/2,DOOR_HEIGHT/2]);
 
 // subtract all openings from shell
 let openings = new ShapeCollection([openingFrontLeft,openingFrontRight,openingFrontRightTop,openingBackLeft,openingBackRight,doorOpening]);
@@ -69,7 +69,7 @@ openings.forEach(o => o.hide());
 
 // appartment
 const APP_WALL_THICKNESS = 15;
-geom.layer("appartment").color('green');
+brep.layer("appartment").color('green');
 
 let arc = new Edge().makeArc(
         [0,0,APPARTMENT_WALL_HEIGHT],
@@ -95,8 +95,8 @@ appSolid.move([WALL_THICKNESS,-APPARTMENT_BALCONY,APPARTMENT_HEIGHT]);
 shell.cut(appSolid, false);
 appSolid.hide();
 
-geom.layer("vide").color('purple');
-let videBase = geom.Rect(
+brep.layer("vide").color('purple');
+let videBase = brep.Rect(
     purlinPointBack.moved([WALL_THICKNESS,0,0]), // BUG in Z-axis
     [APPARTMENT_WIDTH+APP_WALL_THICKNESS*2+20, distancePurlins, 0])
     .move([0,0,-315]).hide(); // make parametric
@@ -122,17 +122,17 @@ let smallArcCut = new Edge().makeArc(
 appSpace.cut(smallArcCut, true);
 
 // appartment windows and openings
-let bathOpening = geom.Box(40,100,180).move([WALL_THICKNESS+APPARTMENT_WIDTH, DEPTH/2, APPARTMENT_HEIGHT+90+15]).hide();
-let officeOpening = geom.Box(40,200,120).move([WALL_THICKNESS+APPARTMENT_WIDTH, 180, APPARTMENT_HEIGHT+60+15+75]).hide();
-let stairsOpening = geom.BoxBetween([WALL_THICKNESS+15, DEPTH-WALL_THICKNESS-20,0],[WALL_THICKNESS+100, DEPTH-WALL_THICKNESS-200,400] ).hide();
-let archOpening = geom.BoxBetween([300,125,0],[350,175,APPARTMENT_HEIGHT+500] ).move([0,0,300]).hide();
+let bathOpening = brep.Box(40,100,180).move([WALL_THICKNESS+APPARTMENT_WIDTH, DEPTH/2, APPARTMENT_HEIGHT+90+15]).hide();
+let officeOpening = brep.Box(40,200,120).move([WALL_THICKNESS+APPARTMENT_WIDTH, 180, APPARTMENT_HEIGHT+60+15+75]).hide();
+let stairsOpening = brep.BoxBetween([WALL_THICKNESS+15, DEPTH-WALL_THICKNESS-20,0],[WALL_THICKNESS+100, DEPTH-WALL_THICKNESS-200,400] ).hide();
+let archOpening = brep.BoxBetween([300,125,0],[350,175,APPARTMENT_HEIGHT+500] ).move([0,0,300]).hide();
 let archOpening2 = archOpening.moved([-225,-100,0]).addToScene().hide();
 appSpace.cut([bathOpening,officeOpening,archOpening, archOpening2, stairsOpening], true);
 
 
 // layout for print
 /*
-let cutBoxRight = geom.BasePlane('X').move([DEPTH-WALL_THICKNESS*2.0-10,0,0]).extrude(1000).hide();
+let cutBoxRight = brep.BasePlane('X').move([DEPTH-WALL_THICKNESS*2.0-10,0,0]).extrude(1000).hide();
 shell.cut(cutBoxRight);
 appSpace.align( new Vertex(-700,200,-50), 'bottomleft', 'bottom'); // BUG IN VERTEX ALIGNMENT
 videSpace.align( new Vertex(0,-500,30), 'bottom', 'bottom'); // BUG IN VERTEX ALIGNMENT

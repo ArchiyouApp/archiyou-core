@@ -88,7 +88,7 @@ export class Obj
     /** Add Obj with its children to active layer */
     addToScene()
     {
-        this._geom.addToActiveLayer(this);
+        this._brep.addToActiveLayer(this);
     }
 
     /** Get or set style

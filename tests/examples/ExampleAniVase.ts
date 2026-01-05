@@ -1,4 +1,4 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
 //// PARAMS ////
 // in mm
@@ -14,10 +14,10 @@ const VASE_BASE_RADIUS = 80;
 //// PARAM CHECKS ////
 VASE_NUM_POINTS = (VASE_NUM_POINTS %2 == 0) ? VASE_NUM_POINTS+1 : VASE_NUM_POINTS;
  
-let topCircle = geom.Circle(VASE_TOP_RADIUS).move([0,0,VASE_HEIGHT]).hide().toWire();
-let middleCircle = geom.Circle(VASE_MIDDLE_RADIUS).move([0,0,VASE_HEIGHT*VASE_MIDDLE_PERC]).hide().toWire();
-let bottomCircle = geom.Circle(VASE_BOTTOM_RADIUS).move([0,0,VASE_HEIGHT*VASE_BOTTOM_PERC]).hide().toWire();
-let baseCircle = geom.Circle(VASE_BASE_RADIUS).move([0,0,0]).toWire();
+let topCircle = brep.Circle(VASE_TOP_RADIUS).move([0,0,VASE_HEIGHT]).hide().toWire();
+let middleCircle = brep.Circle(VASE_MIDDLE_RADIUS).move([0,0,VASE_HEIGHT*VASE_MIDDLE_PERC]).hide().toWire();
+let bottomCircle = brep.Circle(VASE_BOTTOM_RADIUS).move([0,0,VASE_HEIGHT*VASE_BOTTOM_PERC]).hide().toWire();
+let baseCircle = brep.Circle(VASE_BASE_RADIUS).move([0,0,0]).toWire();
 
 let topCircleBasePoints = topCircle.populated(VASE_NUM_POINTS).addToScene();
 

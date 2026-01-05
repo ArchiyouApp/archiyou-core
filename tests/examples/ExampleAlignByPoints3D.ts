@@ -1,18 +1,18 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
-geom.layer("original").color('blue');
-let box = geom.Box(30,20,10);
-let rect = geom.Rect([0,0,0],[30,10,0]);
+brep.layer("original").color('blue');
+let box = brep.Box(30,20,10);
+let rect = brep.Rect([0,0,0],[30,10,0]);
 
-geom.layer("align geometry").color('orange');
+brep.layer("align geometry").color('orange');
 
-let face = geom.Face().fromVertices(
+let face = brep.Face().fromVertices(
     [[0,0,0],[100,0,100],[100,100,200]])
     .rotateZ($ANGLE, [0,0,0]);
 
-let line = geom.Line([0,0,0],[100,100,0]).rotateZ($ANGLE, [0,0,0]);
+let line = brep.Line([0,0,0],[100,100,0]).rotateZ($ANGLE, [0,0,0]);
 
-geom.layer("aligned").color('red');
+brep.layer("aligned").color('red');
 
 box.copy().color('red').addToScene().alignByPoints(
     ['leftbottomfront', 'rightbottomfront', 'rightbottomback'],

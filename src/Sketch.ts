@@ -123,7 +123,7 @@ export class Sketch
         }
 
         this._createSketchLayer();
-        this._geom.activeSketch = this;
+        this._brep.activeSketch = this;
     }
 
     /** Set autoOps on or off */
@@ -135,13 +135,13 @@ export class Sketch
 
     _createSketchLayer()
     {
-        this._geom.layer('sketch').color('blue');
+        this._brep.layer('sketch').color('blue');
     }
 
     _removeSketchLayer()
     {
-        this._geom.deleteLayer('sketch');
-        this._geom.activeSketch = null;
+        this._brep.deleteLayer('sketch');
+        this._brep.activeSketch = null;
     }
 
     /** Set workplane from x and y coordinate */
@@ -584,7 +584,7 @@ export class Sketch
         upgradedCollection.replace(oldWires, newFaces);
         this.shapes = upgradedCollection;
 
-        this._geom.activeSketch = null; 
+        this._brep.activeSketch = null; 
 
         return this;
     }
@@ -1101,7 +1101,7 @@ export class Sketch
         let isCollection = ShapeCollection.isShapeCollection(sketchShapes);
         
         // combine incoming Shapes into layer or single Shape
-        let sketchName = this._geom.getNextLayerName('Sketch');
+        let sketchName = this._brep.getNextLayerName('Sketch');
         
         this._removeSketchLayer(); // remove original sketch layer
         
@@ -1116,7 +1116,7 @@ export class Sketch
         }
 
 
-        console.geom(`Sketch::import(): Imported ${ isCollection ? importedShapeOrCollection.length : 1 } Shapes on layer "${this._geom.getLayer().name()}"`);
+        console.geom(`Sketch::import(): Imported ${ isCollection ? importedShapeOrCollection.length : 1 } Shapes on layer "${this._brep.getLayer().name()}"`);
         
         return importedShapeOrCollection;
 

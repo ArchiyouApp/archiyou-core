@@ -28,13 +28,14 @@
  * 
  */
 
-import { Geom, ModelUnits, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
+import { Brep, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
             ArchiyouApp, DocPathStyle, 
             ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
             ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs, 
             isContainerPositionCoordAbs,
             DocPDFExporter, ScriptParam} from './internal' // classes
-import { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
+
+import type { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
             ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
 
 import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
@@ -64,7 +65,7 @@ export class Doc
     //// END SETTINGS ////
     _ay:ArchiyouApp; // all archiyou modules together
     _settings:DocSettings; // some essential settings like _settings.proxy
-    _geom:Geom;
+    _brep:Brep;
     _calc:any; // Cannot use reference to Calc here, because we don't allow references outside core
     _pdfExporter:DocPDFExporter;
     
@@ -111,7 +112,7 @@ export class Doc
         if(ay)
         {
             this._ay = ay;
-            this._geom = ay?.geom;
+            this._brep = ay?.brep;
             this._calc = ay?.calc;
         }
     }

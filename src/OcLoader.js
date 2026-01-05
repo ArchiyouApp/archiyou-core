@@ -15,12 +15,12 @@
  *      - Node v18lts
  *     
  *    TESTED BUILD TOOLS:
- *      - Vite / Vitest (Nuxt3)
- *      - Webpack 4 (Nuxt 2)
+ *      - Vite / Vitest (Nuxt3+)
+ *      - Webpack 4 (Nuxt2)
  *   
 */
 
-import { Geom } from './Geom'
+import { Brep } from './Brep'
 
 // For browser we refer to the module 
 // For node we just add /src/wasm folder
@@ -32,7 +32,6 @@ import ocFullJS from "./wasm/archiyou-opencascade.js";
 export class OcLoader
 {
   //// SETTINGS ////
-  USE_FAST = false; // Fast is not really a big difference!
   SHAPE_TOLERANCE = 0.001;
   RUN_TEST = false;
 
@@ -41,9 +40,9 @@ export class OcLoader
      Relative paths remain to same
   */
 
-  ocJsModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.js`;
+  ocJsModulePath = `./wasm/archiyou-opencascade.js`;
   ocJsNodeModulePath = `./wasm/node.js`;
-  ocWasmModulePath = `./wasm/archiyou-opencascade${(this.USE_FAST) ? '-fast' : ''}.wasm`; // ?url let vite load a wasm without affecting other contexts (TODO TEST!)
+  ocWasmModulePath = `./wasm/archiyou-opencascade.wasm`;
 
   //// PROPERTIES ////
 
@@ -107,15 +106,6 @@ export class OcLoader
   */
   _loadOcBrowser(onLoaded)
   {
-    /*
-    this._loadOcBrowserAsync()
-      .then(oc => {
-        if(typeof onLoaded === 'function'){ onLoaded(oc) }
-        else { console.warn('**** OcLoader.load() - No onLoaded function provided! Beware that load takes a while, so you have to wait for it!') };
-    });
-    */
-
-   
     /** Taken from OC.js with some small changes
      *  This uses a static import for the JS module - which still seems to be the most robust
      *  Use this method is everything else fails
@@ -161,6 +151,7 @@ export class OcLoader
 
   /** Load OpenCascade module async 
    *  Uses static import for maximum compatibility
+   *  This can work in Webpack 4 and above, Vite and Node environments
   */
   async _loadOcBrowserAsync()
   {
@@ -171,7 +162,6 @@ export class OcLoader
     const ocWasm = (await import(/* webpackIgnore: true */ wasmPath)).default;
     const ocJs = ocFullJS; // static import - This works!
     //const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default; // Problem in Webpack 4
-    //const ocJs = (await import(await this._getAbsPath('./wasm/archiyou-opencascade.js'))).default; // And does this work?
 
     // https://emscripten.org/docs/api_reference/module.html#Module.locateFile
     const oc = await ocJs({ 
@@ -184,13 +174,11 @@ export class OcLoader
     });
     return this._onOcLoaded(oc);
   }
-  //*/
 
 
   /** Load OpenCascade in Node context */
   async _loadOcNodeAsync()
   {
-      // TODO: Add fast mode to node loading process
       const modulePath = await this._getAbsPath(this.ocJsNodeModulePath);
       
       console.info(`OcLoader::_loadOcNodeAsync(): Loading OpenCascade module at: ${modulePath}}`);
@@ -212,7 +200,7 @@ export class OcLoader
 
     this._oc = oc;
     this._oc.SHAPE_TOLERANCE = this.SHAPE_TOLERANCE; // set tolerance
-    Geom.prototype._oc = this._oc; // Geom sets it for all other OC based Classes!
+    Brep.prototype._oc = this._oc; // Brep sets it for all other OC based Classes!
 
     if (this.RUN_TEST){ this.runTest();}
 

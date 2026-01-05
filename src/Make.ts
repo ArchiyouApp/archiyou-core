@@ -799,7 +799,7 @@ export class Make
         primaryStuds.remove(removedStuds.hide())
 
         let wall = new ShapeCollection()
-                    .setName(this._ay.geom.getNextObjName('Wall'))
+                    .setName(this._ay.brep.getNextObjName('Wall'))
         
         // TODO: with addGroup organize scene tree too!
         return wall

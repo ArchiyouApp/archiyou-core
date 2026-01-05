@@ -4,10 +4,13 @@
  *          Is used also for selecting and aligning 
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, AnyShape, Shell, Solid, ShapeCollection, AnyShapeOrCollection } from './internal'
+import { Brep, Point, Vector, Shape, Vertex, Edge, 
+        Face, Solid, AnyShapeOrCollection } from './internal'
 import { targetOcForGarbageCollection } from './internal' 
-import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
-import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
+
+import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
+
+import { PointLike, MainAxis, Side } from './internal' // types
 import { roundToTolerance } from './utils'
 
 import { SIDES, SIDE_TO_AXIS } from './internal'
@@ -19,7 +22,7 @@ export class Bbox
     //// PROPERTIES
 
     _oc:any;
-    _geom:any;
+    _brep:Brep;
     _ocBbox:any = null;
     _parent:AnyShapeOrCollection;
 

@@ -1,21 +1,21 @@
-import { Geom, Wire,Solid, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
+import { Brep, Wire,Solid, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 
-let geom;
+let brep:Brep;
 console.geom = console.log;
 
 beforeAll(async () => 
 {
     let ocLoader = new OcLoader();
     await ocLoader.loadAsync(); // Jest waits for the promise to be resolved
-    geom = new Geom(); // needed to set oc on all other Shapes
+    brep = new Brep(); // needed to set oc on all other Shapes
 });
 
 test("ExampleTinyHouse", () => 
 {
     
-    const geom = new Geom(); // get the Geometry tool out
+    const brep = new Brep(); // get the Brepetry tool out
 
     const LENGTH = 600; 
     const WIDTH = 240;
@@ -37,8 +37,8 @@ test("ExampleTinyHouse", () =>
     let WALL_RIGHT_HEIGHT = WALL_BASE_HEIGHT + ROOF_RIGHT_HEIGHT;
 
     //// VOLUME ////
-    geom.layer("volume").color('blue');
-    let outline = geom.Wire(
+    brep.layer("volume").color('blue');
+    let outline = brep.Wire(
         [0, 0, 0],
         [0, 0, WALL_LEFT_HEIGHT],
         [ROOF_MID_PERC/100*LENGTH, 0, WALL_BASE_HEIGHT],
@@ -55,7 +55,7 @@ test("ExampleTinyHouse", () =>
     const MARGIN_BETWEEN_ENTRANCE_AND_CORNER = 30;
     const MAX_ENTRANCE_WIDTH = (100-BIGGEST_PERC)/100*LENGTH*2-MARGIN_BETWEEN_ENTRANCE_AND_CORNER*2;
 
-    geom.layer('entrance').color('orange');
+    brep.layer('entrance').color('orange');
 
     let entranceWidth = (ENTRANCE_WIDTH > MAX_ENTRANCE_WIDTH) ? MAX_ENTRANCE_WIDTH : ENTRANCE_WIDTH;
     let midPoint = [ROOF_MID_PERC/100*LENGTH-LENGTH/2, 0, WALL_BASE_HEIGHT ];
@@ -69,7 +69,7 @@ test("ExampleTinyHouse", () =>
 
     //// WINDOWS ////
 
-    geom.layer('windows').color([100,0,0]);
+    brep.layer('windows').color([100,0,0]);
 
     // left window
     const WINDOW_WIDTH = 100;
@@ -92,27 +92,27 @@ test("ExampleTinyHouse", () =>
     //// ROOF LIGHTS ////
     const ROOF_LIGHT_WIDTH = entranceWidth/2;
     const ROOF_LIGHT_DEPTH = 100;
-    let roofLight = geom.Box(ROOF_LIGHT_WIDTH,100,800).move(midPoint[0],WIDTH/2, 0);
+    let roofLight = brep.Box(ROOF_LIGHT_WIDTH,100,800).move(midPoint[0],WIDTH/2, 0);
     walls.subtract(roofLight.hide());
 
     //// FLOOR ////
-    geom.layer('floor').color([20,5,5])
+    brep.layer('floor').color([20,5,5])
     const FLOOR_HEIGHT = 30;
-    let floor = geom.Box(LENGTH, WIDTH, FLOOR_HEIGHT).move([0,WIDTH/2,-FLOOR_HEIGHT/2]);
+    let floor = brep.Box(LENGTH, WIDTH, FLOOR_HEIGHT).move([0,WIDTH/2,-FLOOR_HEIGHT/2]);
     (floor as Solid).chamfer(20, floor.select('F||bottom').select('E|Y'));
 
     let WHEEL_RADIUS = 20;
     let WHEEL_SPACING = 25;
 
-    geom.all().move([0,0,FLOOR_HEIGHT+WHEEL_RADIUS]); 
+    brep.all().move([0,0,FLOOR_HEIGHT+WHEEL_RADIUS]); 
 
     //// WHEELS ////
-    geom.layer('wheel').color([5,5,20]);
+    brep.layer('wheel').color([5,5,20]);
 
-    let wheelFrontLeft = geom.Circle(20).extrude(20).move(0,0,-10).rotateX(-90) as Solid;
+    let wheelFrontLeft = brep.Circle(20).extrude(20).move(0,0,-10).rotateX(-90) as Solid;
     wheelFrontLeft.fillet(5); // all edges
     let wheelFrontRight = wheelFrontLeft.copy().move(WHEEL_RADIUS+WHEEL_SPACING);
-    let wheelsFront = geom.Collection(wheelFrontLeft, wheelFrontRight).move(0,0,WHEEL_RADIUS);
+    let wheelsFront = brep.Collection(wheelFrontLeft, wheelFrontRight).move(0,0,WHEEL_RADIUS);
     wheelsFront.mirrored([0,WIDTH/2,0],[0,1,0]);
 
 });

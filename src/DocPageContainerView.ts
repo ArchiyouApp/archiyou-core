@@ -40,7 +40,7 @@ export class View extends Container
         }
 
         const svg = (ShapeCollection.isShapeCollection(this._shapes)) 
-                        ? (this._shapes as ShapeCollection)?.toSvg({ all: this._forceAll, annotations: true }) 
+                        ? (this._shapes as ShapeCollection)?.toSVG({ all: this._forceAll, annotations: true }) 
                         :  this.resolveShapeNameToSVG(this._shapes as string)
 
         this._resolvedShapesSVG = svg; // set to avoid double use
@@ -68,7 +68,7 @@ export class View extends Container
             } 
             
             const s = ShapeCollection.isShapeCollection(realShapes) ? realShapes : new ShapeCollection(realShapes); // make sure we got a ShapeCollection
-            return s.toSvg({ all: this._forceAll, annotations: true });
+            return s.toSVG({ all: this._forceAll, annotations: true });
         }
         else {
             console.warn('DocPageContainerView:resolveShapenameToSVG(): Could not determine worker scope: Could not resolve shapes variable. No shapes were outputted!');

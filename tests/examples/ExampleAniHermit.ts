@@ -1,4 +1,4 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
 const WIDTH = $WIDTH || 300;
 const DEPTH = $DEPTH || 500;
@@ -8,7 +8,7 @@ const SEGMENT_SIZE = $SEGMENT_SIZE || 60;
 
 //// DIAGRAM ////
 
-geom.layer("diagram").color('red');
+brep.layer("diagram").color('red');
 
 let segmentVec = new Vector(1,1,0).normalize().scale(SEGMENT_SIZE);
 let closeVec = segmentVec.normalized().scale(WIDTH/2*Math.sqrt(2));
@@ -31,7 +31,7 @@ for(let s = 0; s < numSegmentsInDepth; s++)
     points.push(curPoint);  
     prevPoint = curPoint;
 }
-let leftZigZag = geom.Wire().fromVertices(points);
+let leftZigZag = brep.Wire().fromVertices(points);
 let rightZigZag = leftZigZag.mirrored('y', [WIDTH/2,0,0]).addToScene();
 let back = new Wire().fromVertices([leftZigZag.end(), [WIDTH/2,leftZigZag.end().toVector().y + closeVec.y,0], rightZigZag.end()]).addToScene();
 
@@ -54,7 +54,7 @@ let frontContour = new Wire().fromEdges(frontEdges).addToScene();  // TODO: chec
 
 //// SOLIDS ////
 
-geom.layer("solids").color('red');
+brep.layer("solids").color('red');
 let floor = floorContour.toFace().extrude(20);
 
 let wallFaceLeft = contourLeftSide.thickened(10, [WIDTH/2,0,0]).addToScene().color('yellow');
@@ -68,13 +68,13 @@ frontContourLeftExt = new Wire().fromVertices(frontContourLeft.vertices().slice(
     frontContourLeft.end().toVector().add(roofLineVec.scale(20)).toVertex())).addToScene().color('purple').hide();
 
 let wallsSolidsLeft = wallFaceLeft.outerWire().sweeped(frontContourLeftExt, true, true, null).addToScene(); 
-let subBox = geom.BoxBetween([WIDTH/2,-100,0],[WIDTH,DEPTH,WALL_HEIGHT+ROOF_HEIGHT+100]);
+let subBox = brep.BoxBetween([WIDTH/2,-100,0],[WIDTH,DEPTH,WALL_HEIGHT+ROOF_HEIGHT+100]);
 wallsSolidsLeft.subtract(subBox.hide());
 let wallsSolidsRight = wallsSolidsLeft.mirrored('y', [WIDTH/2,0,0]).addToScene();
 
 //// OPENINGS/WINDOWS
 
-geom.layer('openings').color('blue');
+brep.layer('openings').color('blue');
 
 // use Bbox selector to select this line
 let entranceLineLeft = wallsSolidsLeft.select(`E@B[${segmentVec.x+5},0,0][${WIDTH/2+5},100,2000]`);
@@ -83,12 +83,12 @@ let entranceLineRight = entranceLineLeft.mirrored('y', [WIDTH/2,0,0]);
 let entranceLine = new Wire().fromEdges(entranceLineLeft).combined(new Wire().fromEdges(entranceLineRight));
 entranceLine.addToScene().color('black');
 
-let entranceProfile = geom.Rect(10,10).hide();
+let entranceProfile = brep.Rect(10,10).hide();
 
 let entranceFrame = entranceProfile.sweeped(entranceLine, true, true, 'right').addToScene();
 
 let wallInsideHeight = entranceLineLeft.select(`E@B[${segmentVec.x+5},0,0][${WIDTH/2-20},100,2000]`).first().end();
-let entranceFrameH = geom.BoxBetween(
+let entranceFrameH = brep.BoxBetween(
     wallInsideHeight.toVector().add([0,10/2,0]),  // NOT WORKING WITH Vertex.move
     wallInsideHeight.toVector().add([entranceLine.bbox().width(), -10/2, -10])).color('blue');
 let entranceFrameH2 = entranceFrameH.moved([0,0,-wallInsideHeight.z+10]).addToScene().color('blue');
@@ -97,7 +97,7 @@ entranceFrame.union(entranceFrameH).union(entranceFrameH2);
 function window(w,h)
 {
     const FRAME_SIZE = 10;
-    let frame = geom.Box(w,FRAME_SIZE, h).subtract(geom.Box(w-2*FRAME_SIZE, FRAME_SIZE, h-2*FRAME_SIZE).hide());
+    let frame = brep.Box(w,FRAME_SIZE, h).subtract(brep.Box(w-2*FRAME_SIZE, FRAME_SIZE, h-2*FRAME_SIZE).hide());
     return frame;
 }
 
@@ -105,7 +105,7 @@ let segmentIndex = (rightZigZag.edges().length > 3) ? 3 : 1;
 let segment = rightZigZag.edges()[segmentIndex];
 let w1 = window(SEGMENT_SIZE-20,WALL_HEIGHT-70).move(segment.center())
 .rotateZ(45).move([0,0,WALL_HEIGHT/2]);
-let sbox = geom.Box(SEGMENT_SIZE-20, 30, WALL_HEIGHT-70)
+let sbox = brep.Box(SEGMENT_SIZE-20, 30, WALL_HEIGHT-70)
     .move([segment.center().x, segment.center().y, WALL_HEIGHT/2]).rotateZ(45).hide();
 wallsSolidsRight.subtract(sbox);
 

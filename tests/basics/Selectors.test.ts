@@ -1,15 +1,15 @@
-import { Geom, Vertex, Edge, Face, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
+import { Brep, Vertex, Edge, Face, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
 import { test, beforeAll, expect } from 'vitest'
 
-let geom;
+let brep:Brep;
 console.geom = console.log;
 
 beforeAll(async () => 
 {
     let ocLoader = new OcLoader();
     await ocLoader.loadAsync(); // Jest waits for the promise to be resolved
-    geom = new Geom(); // needed to set oc on all other Shapes
+    brep = new Brep(); // needed to set oc on all other Shapes
 });
 
 test("Selectors Basics", () => 
@@ -17,7 +17,7 @@ test("Selectors Basics", () =>
     const W = 10;
     const H = 20;
     const D = 30;
-    const b = geom.Box(W,D,H);
+    const b = brep.Box(W,D,H);
     // Parallel
     expect(b.select('E|X').length).toEqual(4);
     expect(b.select('E|Z').length).toEqual(4);

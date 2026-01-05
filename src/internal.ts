@@ -33,8 +33,7 @@ export * from './Exporter'
 export * from './OBbox'
 
 
-
-export * from './Geom'
+export * from './Brep'
 export * from './workerUtils'
 export * from './AnnotatorBaseAnnotation'
 export * from './AnnotatorDimensionLine'
@@ -46,14 +45,11 @@ export * from './GLTFBuilder'
 export * from './typeguards'
 export * from './decorators'
 
-
-
 export * from './utils'
 export * from './Selector'
 
 export * from './Console'
 export * from './CodeParser'
-
 
 export * from './Doc'
 export * from './DocDocument'
@@ -83,6 +79,7 @@ export * from './ParamManagerOperator'
 export * from './Make'
 export * from './Beams'
 
+export * from './init' // exposes init function by using OcLoader
 export * from './OcLoader'
 export * from './Runner'
 export * from './RunnerOps'

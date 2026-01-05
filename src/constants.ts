@@ -159,7 +159,7 @@ export const METRICS = [
 //// WORKER UTILS ////
 
 //// Methods from geom that are imported into global under samen name and lowercase ////
-export const GEOM_METHODS_INTO_GLOBAL = [
+export const BREP_METHODS_INTO_GLOBAL = [
     'Point', 'Vector', 
     'Vertex', 'Edge', 'Line', 'Arc', 'Spline', 
     'Wire', 'Polyline', 'Spiral', 'Helix',

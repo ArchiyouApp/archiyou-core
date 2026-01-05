@@ -19,7 +19,7 @@ import type { ArchiyouApp, ExportGLTFOptions, Statement,
  } from "./internal"
 
 
-import { OcLoader, Console, Geom, Doc, Calc, Exporter, Services, Make, Db, 
+import { OcLoader, Console, Brep, Doc, Calc, Exporter, Services, Make, Db, 
             RunnerScriptExecutionResult, Script, CodeParser, LibraryConnector, 
             ScriptOutputManager, Pipeline } from "./internal"
 
@@ -27,7 +27,7 @@ import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeColle
 
 import { RunnerComponentImporter, DocDocument, Table } from "./internal"
 
-import { GEOM_METHODS_INTO_GLOBAL, SCRIPT_OUTPUT_MODEL_FORMATS
+import { BREP_METHODS_INTO_GLOBAL, SCRIPT_OUTPUT_MODEL_FORMATS
  } from "./internal" // from constants
 
 
@@ -199,12 +199,12 @@ export class Runner
 
             case 'save-step':
                 const stepContent = message.payload.content;
-                //this.exporter.exportToStepWindow(stepContent);
+                //this.exporter.exportToSTEPWindow(stepContent);
                 break;
             
                 case 'save-stl':
                 const stlContent = message.payload.payload.content;
-                //this.exporter.exportToStlWindow(stlContent);
+                //this.exporter.exportToSTLWindow(stlContent);
                 break;
 
             // Got a GLTF file back
@@ -216,13 +216,14 @@ export class Runner
             // Got a SVG file back
             case 'save-svg':
                 const svgContent = message.payload.payload.content; // string
+                // TODO
                 /*
                 if (svgContent === null)
                 {
                 this.showMessage('No SVG content found to export to SVG. If you choose 2D, make sure there are 2D Shapes on the XY plane!');
                 }
                 else {
-                this.exporter.exportToSvgWindow(svgContent);
+                this.exporter.exportToSVGWindow(svgContent);
                 }*/
                 break;
             
@@ -309,12 +310,12 @@ export class Runner
             
             /*
             case 'export-to-step':
-                let stepContent = exporter.exportToStep();
+                let stepContent = exporter.exportToSTEP();
                 ctx.postMessage({ type : 'save-step', payload : { content : stepContent }});
                 break;
             
             case 'export-to-stl':
-                let stlContent = exporter.exportToStl();
+                let stlContent = exporter.exportToSTL();
                 ctx.postMessage({ type : 'save-stl', payload : { content : stlContent }});
                 break;
 
@@ -326,12 +327,12 @@ export class Runner
                 break;
             
             case 'export-to-svg':
-                const svgContent = exporter.exportToSvg(false);
+                const svgContent = exporter.exportToSVG(false);
                 ctx.postMessage({ type : 'save-svg', payload : { content : svgContent }});
                 break;
 
             case 'export-to-svg-2d':
-                const svgContent2D = exporter.exportToSvg(true); // 2D only
+                const svgContent2D = exporter.exportToSVG(true); // 2D only
                 ctx.postMessage({ type : 'save-svg', payload : { content : svgContent2D }});
                 break;
 
@@ -455,7 +456,7 @@ export class Runner
     {
         const scopeState = { ay: null } as RunnerScriptScopeState; 
 
-        // Archiyou base modules like geom, doc, calc, make etc
+        // Archiyou base modules like brep, doc, calc, make etc
         Object.assign(scopeState, { ay: this.initLocalArchiyou()});
 
         // Add basic globals (like Math)
@@ -480,7 +481,7 @@ export class Runner
         // create all Archiyou modules
         const ay = {
             console: new Console((this.LOGGING_DEBUG) ? console : this), // put Archiyou console in debug mode if needed
-            geom: new Geom(),
+            brep: new Brep(),
             doc: new Doc(), // TODO: settings with proxy
             calc: new Calc(),
             exporter: new Exporter(),
@@ -527,7 +528,7 @@ export class Runner
         
         Object.assign(state, { 
             console: state.ay.console,
-            geom: state.ay.geom,
+            geom: state.ay.brep,
             doc: state.ay.doc,
             calc: state.ay.calc,
             exporter: state.ay.exporter,
@@ -568,25 +569,25 @@ export class Runner
         state.ShapeCollection = ShapeCollection;
         state.Obj = Obj;
 
-        if(!state.geom)
+        if(!state.brep)
         {
-            // Make sure the geom global is present
+            // Make sure the brep global is present
             this._addModulesToScopeState(state);
         }
 
-        // Some shortcuts to important methods on Geom
-        GEOM_METHODS_INTO_GLOBAL
+        // Some shortcuts to important methods on Brep
+        BREP_METHODS_INTO_GLOBAL
         .forEach(methodName => 
         {
-            const method = state.geom[methodName];
-            if (!method){ console.warn(`Runner::_addModelingMethodsToScopeState: Could not find ${methodName} in Geom class. Check config: GEOM_METHODS_INTO_GLOBAL`);}
+            const method = state.brep[methodName];
+            if (!method){ console.warn(`Runner::_addModelingMethodsToScopeState: Could not find ${methodName} in Brep class. Check config: BREP_METHODS_INTO_GLOBAL`);}
             else {
                 // avoid overwriting
                 if (!state[methodName])
                 {
-                    state[methodName] = method.bind(state.geom);
+                    state[methodName] = method.bind(state.brep);
                 }
-                state[methodName.toLowerCase()] = method.bind(state.geom);
+                state[methodName.toLowerCase()] = method.bind(state.brep);
             }
         })
 
@@ -625,7 +626,7 @@ export class Runner
         const p = new Pipeline(name);
         if (fn){ p.do(fn); } // attach function if given
         if(!this._pipelines.includes(p)) this._pipelines.push(p);
-        console.info(`Geom::pipeline: Created new pipeline "${p.name}"`);
+        console.info(`Brep::pipeline: Created new pipeline "${p.name}"`);
         return p;
     }
 
@@ -1129,7 +1130,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         
 
         // Reset some modules
-        scope.ay.geom.reset(); // reset before we begin
+        scope.ay.brep.reset(); // reset before we begin
         scope.ay.doc.reset();
         scope.ay.calc.reset();
         scope.ay.beams?.reset();
@@ -1452,13 +1453,13 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
     _addMetaToResult(scope:RunnerScriptScopeState, request:RunnerScriptExecutionRequest, result:RunnerScriptExecutionResult):RunnerScriptExecutionResult
     {
-        const shapes = scope.geom.all();
+        const shapes = scope.brep.all();
         const bbox = shapes.length ? shapes.bbox() : undefined;
         const bboxArr = bbox ? bbox.min().toArray().concat(bbox.max().toArray()) : undefined;
 
         // Add meta info to result
         result.meta = {
-            units: scope.geom._units,
+            units: scope.brep._units,
             docs : scope.doc.docs(), // available doc names
             pipelines : this.getPipelineNames(),  // names of defined pipelines
             tables:scope.calc.getTableNames(), // names of available tables
@@ -1486,10 +1487,10 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         result.status = 'success'; // if this method is run, this means no errors were thrown
         result.request = request; // Keep the original request
         result.errors = []; // no errors by definition
-        result.duration = scope.geom._duration; // duration of the last operation
+        result.duration = scope.brep._duration; // duration of the last operation
 
         // Basic Archiyou data
-        result.scenegraph = scope.geom.scene.toGraph();
+        result.scenegraph = scope.brep.scene.toGraph();
 
         // Meta
         this._addMetaToResult(scope, request, result);
@@ -1628,7 +1629,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             {
                 // NOTE: No internal here, use _exportPipelineModelsInternal()
                 case 'buffer':
-                    outp = scope.geom.scene.toMeshShapeBuffer();
+                    outp = scope.brep.scene.toMeshShapeBuffer();
                     if(outp)
                     {
                         outputs.push({ 
@@ -1663,7 +1664,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     }
                     break;
                 case 'svg': // 2D SVG export
-                    outp = (scope.exporter as Exporter).exportToSvg(true);
+                    outp = (scope.exporter as Exporter).exportToSVG(true);
                     if(outp)
                     {
                         outputs.push({
@@ -1674,7 +1675,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     break;
 
                 case 'dxf': // 2D DXF export
-                    outp = (scope.exporter as Exporter).exportToDxf();
+                    outp = (scope.exporter as Exporter).exportToDXF();
                     if(outp)
                     {
                         outputs.push({
@@ -1685,7 +1686,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     break;
 
                 case 'step':
-                    outp = await (scope.exporter as Exporter).exportToStep();
+                    outp = await (scope.exporter as Exporter).exportToSTEP();
                     if(outp)
                     {
                         outputs.push({
@@ -1696,7 +1697,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     break;
 
                 case 'stl':
-                    outp = await (scope.exporter as Exporter).exportToStl();
+                    outp = await (scope.exporter as Exporter).exportToSTL();
                     if(outp)
                     {
                         outputs.push({
@@ -1992,7 +1993,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                 // Need to export Obj tree structure with Shapes in special way
                 // Because Obj is still tied to Scene graph of component scope
                 // TODO: Can we fix this? 
-                output: scope.geom.scene.toComponentGraph(request.component) // export the Obj/Shape graph for the component
+                output: scope.brep.scene.toComponentGraph(request.component) // export the Obj/Shape graph for the component
             })
         }
         console.info(`Runner::_exportPipelineModelsInternal(): Exported ${outputs.length} models of Pipeline "${pipeline}"`);

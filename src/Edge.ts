@@ -1212,9 +1212,9 @@ export class Edge extends Shape
         // For Edges it is always unclear where to offset dimension to
         // For now we set offset away from origin. See Annotator
         if(!options){ options = { units: null }}
-        options.units = options?.units || this._geom.units(); // make sure we have units
+        options.units = options?.units || this._brep.units(); // make sure we have units
 
-        const dimLine = this._geom._annotator.dimensionLine().fromEdge(this, options);
+        const dimLine = this._brep._annotator.dimensionLine().fromEdge(this, options);
         dimLine.link(this._parent); // set parent
 
         return dimLine
@@ -1253,7 +1253,7 @@ export class Edge extends Shape
      *  IMPORTANT: official SVG path (without comma!)
      *  code inspired from CadQuery: https://github.com/CadQuery/cadquery/blob/917d918e34690c101a50a233a11026974b87574b/cadquery/occ_impl/exporters/svg.py#L84
     */
-    toSvg():string
+    toSVG():string
     {
         /* OC docs: 
             - GCPnts_QuasiUniformDeflection: https://dev.opencascade.org/doc/refman/html/class_g_c_pnts___quasi_uniform_deflection.html
@@ -1278,7 +1278,7 @@ export class Edge extends Shape
         // Based on attributes we assign some classes for later styling
         const svgNodeStr = `<path d="${svgPathD}" ${this._getSvgPathAttributes()} fill="none" class="${this._getSvgClasses()}"/>`; 
 
-        // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSvg() method
+        // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSVG() method
         return svgNodeStr; // return as string for now
     }
 
@@ -1292,7 +1292,7 @@ export class Edge extends Shape
             - we set all attributes here, either set by user or default. So the renderers have consistent styling to work with
         */
 
-        const modelUnits = this._geom._units;
+        const modelUnits = this._brep._units;
 
         const STYLE_TO_ATTR = [
             { geom: 'line', prop: 'color', attr: 'stroke', transform : (val) => (val) ? chroma(val).hex() : this.TO_SVG_LINE_COLOR_DEFAULT },
@@ -1381,7 +1381,7 @@ export class Edge extends Shape
      *  Now only lines are supported
      *  TODO: Introduce arcs and splines
     */
-    toDxf(dxf:DxfBlock):this
+    toDXF(dxf:DxfBlock):this
     {
         const segmPoints = this._segmentizeToPoints(EDGE_DEFAULT_SEGMENTS_ANGLE_SVG);
 

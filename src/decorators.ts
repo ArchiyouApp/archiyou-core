@@ -598,7 +598,7 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         {
             return wrappedMethod.apply(this, args); // this is the direct output 
         }
-        const cache = this._geom._cache;
+        const cache = this._brep._cache;
         const hash = _hashOp(wrappedMethodName, args)
         const cacheResult = _checkCache(cache, hash);
 

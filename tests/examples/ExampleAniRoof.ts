@@ -1,4 +1,4 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
 //// PARAMS ////
 
@@ -16,26 +16,26 @@ const WALL_THICKNESS = 40;
 
 //// DIAGRAM ////
 
-geom.layer("diagram").color('blue');
+brep.layer("diagram").color('blue');
 
-let roofLine = geom.Line([0,0,0],[ROOF_WIDTH/2,ROOF_HEIGHT, 0]).hide();
-let wallLine = geom.Line([0,0,0],[0,-WALL_HEIGHT,0]).hide();
+let roofLine = brep.Line([0,0,0],[ROOF_WIDTH/2,ROOF_HEIGHT, 0]).hide();
+let wallLine = brep.Line([0,0,0],[0,-WALL_HEIGHT,0]).hide();
 let diagonalV1 = wallLine.pointAt(DIAGONAL_ON_WALL_PERC).toVertex().hide();
 let diagonalV2 = roofLine.pointAt(DIAGONAL_ON_ROOF_PERC).toVertex().hide();
-let diagonal = geom.Line(diagonalV1,diagonalV2).hide();
+let diagonal = brep.Line(diagonalV1,diagonalV2).hide();
 let lateralV = roofLine.pointAt(LATERAL_BEAM_PERC_OF_ROOF);
-let lateral = geom.Line(lateralV,[ROOF_WIDTH/2, lateralV.y, 0]).hide();
+let lateral = brep.Line(lateralV,[ROOF_WIDTH/2, lateralV.y, 0]).hide();
 
 let roofVec90 = roofLine.direction().normalize().rotated(90);
-let gording = geom.Rect(20,20).alignByPoints([[0,0,0],[10,0,0]],[[0,0,0],[ROOF_WIDTH/2,ROOF_HEIGHT, 0]])
+let gording = brep.Rect(20,20).alignByPoints([[0,0,0],[10,0,0]],[[0,0,0],[ROOF_WIDTH/2,ROOF_HEIGHT, 0]])
     .move(roofLine.pointAt(GORDING_ON_ROOF_PERC)).move(roofVec90.scaled(ROOF_BEAM_THICKNESS)).hide();
 
-let lateralWallV = diagonal.intersection( geom.Line([0,0,0],[ROOF_WIDTH/2,0,0]).hide()).moved([20,0,0]); // extend a little
-let laterialWall = geom.Line([0,0,0], lateralWallV).hide();
+let lateralWallV = diagonal.intersection( brep.Line([0,0,0],[ROOF_WIDTH/2,0,0]).hide()).moved([20,0,0]); // extend a little
+let laterialWall = brep.Line([0,0,0], lateralWallV).hide();
 
 //// 2D ////
 
-geom.layer("beams").color('red');
+brep.layer("beams").color('red');
 
 let centerPoint = [ROOF_WIDTH/2,0,0];
 
@@ -47,8 +47,8 @@ let lateralWallBeam = laterialWall.thickened(15); //.addToScene();
 let gordingBeam = gording.extruded(ROOF_DEPTH); //.addToScene();
 let gordingBeam2 = gordingBeam.moved(roofLine.direction().scaled(GORDING_ON_ROOF_PERC)); //.addToScene();
 
-let topBeam = geom.Box(20,20,ROOF_DEPTH).move([ROOF_WIDTH/2, ROOF_HEIGHT,ROOF_DEPTH/2]);
-let verticalBeam = geom.Box(10,ROOF_HEIGHT-lateralV.y-20,10).move([ROOF_WIDTH/2, lateralV.y+(ROOF_HEIGHT-lateralV.y-20)/2,7.5 ]);
+let topBeam = brep.Box(20,20,ROOF_DEPTH).move([ROOF_WIDTH/2, ROOF_HEIGHT,ROOF_DEPTH/2]);
+let verticalBeam = brep.Box(10,ROOF_HEIGHT-lateralV.y-20,10).move([ROOF_WIDTH/2, lateralV.y+(ROOF_HEIGHT-lateralV.y-20)/2,7.5 ]);
 
 //roofBeam.unioned(wall).unioned(diagonalBeam).unioned(lateralBeam).unioned(lateralWallBeam); //.addToScene().move([0,0,100]).extrude(100);
 // EXTRUDE DOES NOT CHANGE THE OLD REFERENCE ---?

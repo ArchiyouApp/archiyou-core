@@ -1,6 +1,6 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
-geom.layer("lines").color('red');
+brep.layer("lines").color('red');
 
 let lastPosition = new Vector(0,0,0);
 let totalLength = 0;
@@ -14,11 +14,11 @@ for ( let l = 0; l < 20; l++)
     
     // now make the line
     let newLine = (isHorizonalRandom > 0.5) 
-        ? geom.Line(lastPosition, 
+        ? brep.Line(lastPosition, 
             lastPosition.added([randomLineLength,0,0])
             ).color('blue') 
         : 
-        newLine = geom.Line(lastPosition, 
+        newLine = brep.Line(lastPosition, 
             lastPosition.added([0,randomLineLength,0])
         );
 

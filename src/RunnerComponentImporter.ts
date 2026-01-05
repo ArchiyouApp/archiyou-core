@@ -218,14 +218,14 @@ export class RunnerComponentImporter
         const newObj = new mainScope.Obj(); // create Geom Obj container 
         newObj.name((curNode as any).name);
         // IMPORTANT: Shapes are still tied to Geom of component scope - change that
-        newObj._updateShapes(curNode.shapes.map(s => { s._geom = mainScope.geom; return s; })); 
+        newObj._updateShapes(curNode.shapes.map(s => { s._brep = mainScope.brep; return s; })); 
 
         console.info(`$component("${this.name}")::_recreateComponentObjTree(): Recreated object "${newObj.name()}" with ${newObj.shapes(false).length} shapes`);
         
         // is root
         if(!parentObj)
         {
-            mainScope.geom.scene.add(newObj);
+            mainScope.brep.scene.add(newObj);
         }
         else {
             parentObj.add(newObj); // add to parent

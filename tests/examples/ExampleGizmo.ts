@@ -1,4 +1,4 @@
-const geom = new Geom(); // get the Geometry tool out
+const brep = new Brep(); // get the Brepetry tool out
 
 
 Gizmo({ name: 'size', 
@@ -16,4 +16,4 @@ domains: [0,100],
 toParams: 'height' });
 
 
-geom.RectBetween([0,0,0], [1+$width,1+$depth,0]).extrude($height+1);
+brep.RectBetween([0,0,0], [1+$width,1+$depth,0]).extrude($height+1);
