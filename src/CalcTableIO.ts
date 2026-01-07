@@ -18,15 +18,41 @@
 
 import { Table } from "./internal";
 
-import type { drive_v3, sheets_v4 } from "googleapis";
-import type { GoogleSpreadsheet, GoogleSpreadsheetCell } from "google-spreadsheet";  // Docs: https://theoephraim.github.io/node-google-spreadsheet/
+// import type { drive_v3, sheets_v4 } from "googleapis"; // Don't add, because as library this is not needed
+//import type { GoogleSpreadsheet, GoogleSpreadsheetCell } from "google-spreadsheet";  // Docs: https://theoephraim.github.io/node-google-spreadsheet/
 
 //// LOCAL TYPES ////
-type GoogleDriveFile = drive_v3.Schema$File;
+interface GoogleDriveFile {
+    id: string;
+    name: string;
+    mimeType: string;
+    parents: string[];
+    createdTime: string;
+    modifiedTime: string;
+} // simplified from drive_v3.Schema$File
 type GoogleDriveItem = GoogleDriveFile & { type: 'folder' | 'file' };
 type GoogleWorkspaceExportFormat = 'text'|'csv'|'html'|'xlsx'|'pdf'|'docx'|'pptx'|'odt'|'ods'|'odp'|'rtf';
-type GoogleSheetNamedRange = sheets_v4.Schema$NamedRange;
-//type GoogleSheetNamedFunction = sheets_v4.Schema$;
+interface GoogleSheetNamedRange {
+    name: string;
+    range: GoogleSheetRange
+} // simplified from sheets_v4.Schema$NamedRange
+interface GoogleSheetRange { 
+    sheetId: string;
+    startRowIndex: number;
+    startColumnIndex: number;
+    endRowIndex: number;
+    endColumnIndex: number;
+}
+type GoogleSpreadsheet = any; // TODO
+type GoogleSpreadsheetCell = any; // TODO
+type GoogleSpreadsheetWorksheet = {
+    sheetId: string;
+    title: string;
+    index: number;
+    loadCells: () => Promise<void>;
+    getCell: (row: number, col: number) => GoogleSpreadsheetCell | null;
+    saveUpdatedCells: () => Promise<void>;
+} // simplified
 
 export class TableIO
 {
@@ -86,7 +112,7 @@ export class TableIO
         
         try {
             const googleModule = await import(GOOGLE_LIB);
-            this._googleModule = googleModule.google as typeof import('googleapis').google;
+            this._googleModule = googleModule.google; // googleModule.google as typeof import('googleapis').google;
             console.info('CalcTableIO::initGoogle(): Google APIs module loaded successfully.');
         } catch (error) 
         {
@@ -522,7 +548,7 @@ export class TableIO
 
         try {
             const gsModule = await import(GOOGLE_SPREADSHEET_LIB);
-            this._googleSpreadsheetModule= gsModule as typeof import('google-spreadsheet');
+            this._googleSpreadsheetModule= gsModule; // as typeof import('google-spreadsheet');
             console.info('CalcTableIO: Google Spreadsheet module loaded successfully.');
         } catch (error) 
         {
@@ -590,7 +616,7 @@ export class TableIO
         for (let id of worksheetIds)
         {
             console.info(`CalcCalcTableIO::_googleSheetSetInputs(): Loading cells for worksheet id: "${id}"`);
-            await sheet.sheetsById[id].loadCells(); // load cells into cache
+            await sheet.sheetsById[id]?.loadCells(); // load cells into cache
             // TODO: filters?
         }
 
@@ -613,7 +639,7 @@ export class TableIO
             }
             
             const sheetId = inputNamedRange.range?.sheetId ?? 0; // API leaves out sheetId when 0
-            const worksheet = sheet.sheetsById[sheetId];
+            const worksheet = sheet.sheetsById[sheetId] as GoogleSpreadsheetWorksheet;
             if (!worksheet)
             {
                 console.warn(`Worksheet with id "${sheetId}" not found for input "${inputName}", skipping.`);
@@ -663,7 +689,8 @@ export class TableIO
 
         // Determine which worksheets to process
         if(!Array.isArray(worksheets)) worksheets = [];
-        worksheets = worksheets.map(name => name.trim().toLowerCase()).filter(name => name.length > 0);
+        worksheets = worksheets.map(
+                name => name.trim().toLowerCase()).filter(name => name.length > 0);
 
         const worksheetsToProcess = Object.entries(sheet.sheetsByTitle)
                                 .map(([name, ws]) => 
@@ -673,7 +700,7 @@ export class TableIO
                                             return ws; // either no worksheet is given by user, or it's in the list
                                         }
                                         return null;
-                                    }).filter(ws => ws); 
+                                    }).filter(ws => ws) as GoogleSpreadsheetWorksheet[];
 
         
         const externalSheetCache: Record<string, GoogleSpreadsheet> = {}; // Cache of opened external sheets by sheetId
@@ -682,7 +709,7 @@ export class TableIO
 
         for (const worksheet of worksheetsToProcess)
         {
-            await worksheet.loadCells(); // Do this first to load all cells
+            await worksheet?.loadCells(); // Do this first to load all cells
 
             await this._googleWorksheetIterateCells(
                 worksheet, 
@@ -756,7 +783,7 @@ export class TableIO
                 });
 
             // update all cells
-            await worksheet.saveUpdatedCells();
+            await worksheet?.saveUpdatedCells();
         }
 
     }
@@ -791,7 +818,7 @@ export class TableIO
                                             return ws; // either no worksheet is given by user, or it's in the list
                                         }
                                         return null;
-                                    }).filter(ws => ws); 
+                                    }).filter(ws => ws) as Array<GoogleSpreadsheetWorksheet>; 
 
         let updateCells = false;
         for (const worksheet of worksheetsToProcess)
@@ -811,8 +838,9 @@ export class TableIO
             );
 
             // update all cells
-            if(updateCells){
-                await worksheet.saveUpdatedCells();
+            if(updateCells)
+            {
+                await worksheet?.saveUpdatedCells();
             }
         }  
     }

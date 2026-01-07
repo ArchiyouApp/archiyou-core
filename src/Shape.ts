@@ -18,7 +18,7 @@ import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POIN
 
 import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
 import { PointLike,PointLikeOrAnyShape,AnyShape,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
-import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection,  } from './internal'
+import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Brep } from './internal'
 
 import { ShapeClone } from './internal'
 
@@ -48,7 +48,7 @@ type IDimensionLine = DimensionLine
 export class Shape
 {
     _oc:any; // avoids TS errors in filling CLASSNAME_TO_SHAPE_ENUM
-    _geom:any;
+    _brep:Brep;
     _obj:Obj; // Obj container this Shape belongs to
     _parent:AnyShapeOrCollection; // With selecting subshapes we keep the reference to parent    
     _ocShape:any = null; // instance of OC Shape subclass: Vertex, Edge, Wire etc. - NOTE: we have to set a value here: otherwise it will not be set 
@@ -4273,7 +4273,7 @@ export class Shape
     @checkInput([['DimensionOptions', null]], ['auto'] )
     autoDim(options?:DimensionOptions)
     {
-        this._brep._annotator.autoDim(this, options);
+        this._brep._annotator.autoDim(new ShapeCollection(this), options);
     }
 
     //// API to forward to _Obj ////
@@ -4949,7 +4949,9 @@ export class Shape
     */
     save(filename:string, options:any={})
     {
-        new ShapeCollection(this).save(filename, options);        
+        new ShapeCollection(this).save(
+            new ShapeCollection(this), 
+            filename, options);
     }
 
     toData():Object

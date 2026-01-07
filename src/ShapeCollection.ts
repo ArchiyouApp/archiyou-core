@@ -7,11 +7,17 @@
  *
  */
 
- import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
-         ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
+ 
+import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep, Exporter } from './internal'
+
+import type { ArchiyouApp, PointLike, PointLikeOrAnyShapeOrCollection,
+         ShapeType, AnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, MakeShapeCollectionInput,
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
-         isMainAxis, ModelUnits } from './internal' // see types
- import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep } from './internal'
+         ModelUnits } from './internal' // see types
+
+import { isCoordArray, isPointLike, isPointLikeSequence, 
+      isAnyShape, isAnyShapeCollection, isMainAxis } from './internal' // typeguards
+ 
  import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
  import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
  import type { Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
@@ -2810,6 +2816,15 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
 
          return writer.stringify();
       }
+
+      /** Convenience method for saving files in browser and node */
+      save(shapes?:ShapeCollection, filename?:string, options:any={})
+      {
+         const shapesToSave = shapes || this;
+         new Exporter({ brep: this._brep } as ArchiyouApp).save(shapesToSave, filename, options);
+      }
+
+
  }
 
 

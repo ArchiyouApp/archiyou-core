@@ -1,8 +1,8 @@
-import { Geom, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, 
+import { Brep, AnyShape, Vector, Vertex, Edge, Wire, Face, ShapeCollection, SceneGraphNode, Gizmo, DimensionLineData, DocData, 
             ArchiyouApp, StatementResult, ConsoleMessage, Shape, VertexCollection} from './internal'
+import type { ConsoleMessageType } from './internal'
 import { toRad, MeshingQualitySettings, ArchiyouData, ArchiyouOutputSettings } from './internal'
 import { Document, Accessor, Scene, WebIO, Node, BufferUtils  } from '@gltf-transform/core';
-import { sequence } from '@gltf-transform/functions';
 
 /* Docs:
     - animation sequence: https://gltf-transform.donmccurdy.com/functions.html 
@@ -41,6 +41,21 @@ export class GLTFBuilder
     /** build Animated GLTF */
     async createAnimation(frameGLBs:Array<Uint8Array>)
     {
+        // Load sequence from '@gltf-transform/functions' dynamically 
+        // Because underlying ndarray is hard to bundle
+        const GLTF_TRANSFORM_FUNCTIONS_MODULE = '@gltf-transform/functions'
+
+        let sequence;
+        try {
+            sequence = (await import(GLTF_TRANSFORM_FUNCTIONS_MODULE))?.sequence;
+            if(!sequence){ throw new Error('sequence function not found'); }
+        }
+        catch(error)
+        {
+            console.error(`GLTFBuilder::createAnimation(): Error loading GLTF transform functions: ${error}. Add the @gltf-transform/functions package to your project.`);
+            return;
+        }
+
         await this.loadFramesIntoScene(frameGLBs) // load GLB buffers into scene
 
         // now we got all frames into seperate nodes - we can use the special function sequence to build a animation out of it
@@ -100,7 +115,7 @@ export class GLTFBuilder
     /** Apply Archiyou GLTF format data to raw GLTF content buffer */
     async addArchiyouData(gltfContent:ArrayBuffer|Uint8Array, ay:ArchiyouApp, settings:ArchiyouOutputSettings={}):Promise<Uint8Array>
     {
-        gltfContent = this._convertArrayBufferToUint8Array(gltfContent) // Older versions of GLTF-builder used ArrayBuffer
+        const gltfContentUint = this._convertArrayBufferToUint8Array(gltfContent) // Older versions of GLTF-builder used ArrayBuffer
         const io = new WebIO({credentials: 'include'});
        
 
@@ -112,7 +127,7 @@ export class GLTFBuilder
             // Open ArrayBuffer and write extra data
             try 
             {   
-                this.doc = await io.readBinary(gltfContent);
+                this.doc = await io.readBinary(gltfContentUint);
                 let asset = this.doc.getRoot().getAsset();
 
                 asset.generator = 'Archiyou';
@@ -123,9 +138,11 @@ export class GLTFBuilder
                     gizmos: ay.gizmos, // TODO: need to create Gizmo in Geom not in the Worker
                     annotations: ay.brep._annotator.getAnnotationsData(),
                     // Console Messages. Include or not, or select types. NOTE: Console can be the standard console in DEBUG mode
-                    messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) ? ay.console.getBufferedMessages(settings?.messages) : [], 
+                    messages: (settings?.messages !== false && ay?.console?.getBufferedMessages) 
+                            ? ay.console.getBufferedMessages((settings?.messages) ? ['error', 'warning', 'info'] as Array<ConsoleMessageType> : []) 
+                            : [], 
                     // Document data by document name in special format for AY doc viewers (PDF and web)
-                    docs: (settings?.docs !== false) ? (await ay?.doc?.toData(settings?.docs) || {}) : {},
+                    docs: (settings?.docs !== false) ? (await ay?.doc?.toData(settings?.docs as Array<string>) || {}) : {},
                     pipelines: ay.runner.getPipelineNames(), // TODO: Make this definitions not only names
                     metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
                     tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
@@ -146,7 +163,7 @@ export class GLTFBuilder
             catch(e)
             {
                 console.error(`GLTFBuilder::addArchiyouData(): Error "${e}". Returned original`)
-                return gltfContent
+                return gltfContentUint;
             }
         }
     }
@@ -155,10 +172,10 @@ export class GLTFBuilder
     /** Add all loose point and line Shapes (Vertex,Edge,Wire) to the GLTF buffer */
     async addPointsAndLines(gltfContent:ArrayBuffer|Uint8Array, shapes:ShapeCollection, quality:MeshingQualitySettings):Promise<Uint8Array>
     {
-        gltfContent = this._convertArrayBufferToUint8Array(gltfContent) // Older versions of GLTF-builder used ArrayBuffer
+        const gltfContentUint = this._convertArrayBufferToUint8Array(gltfContent) // Older versions of GLTF-builder used ArrayBuffer
 
         const io = new WebIO({credentials: 'include'});
-        this.doc = await io.readBinary(gltfContent);
+        this.doc = await io.readBinary(gltfContentUint);
         const buffer = this.doc.getRoot().listBuffers()[0];
 
         // Create a node for every loose Vertex (TODO: check performace implications?)
@@ -275,8 +292,8 @@ export class GLTFBuilder
     {
         const io = new WebIO({credentials: 'include'});
         
-        gltfContent = this._convertArrayBufferToUint8Array(gltfContent) // Older versions of GLTF-builder used ArrayBuffer
-        this.doc = await io.readBinary(gltfContent);
+        const gltfContentUint = this._convertArrayBufferToUint8Array(gltfContent) // Older versions of GLTF-builder used ArrayBuffer
+        this.doc = await io.readBinary(gltfContentUint);
         let buffer = this.doc.getRoot().listBuffers()[0];
         
         shapes.forEach(shape =>

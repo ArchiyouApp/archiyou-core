@@ -1552,12 +1552,12 @@ export class Wire extends Shape
 
     /** Aligning linear Shapes to each other so they form a connected Line */
     @checkInput(['LinearShape','LinearShapeTail'],['auto','auto'])
-    alignTo(other:LinearShape, pivot:LinearShapeTail='start', alignment:LinearShapeTail='end'):Wire
+    alignTo(other:LinearShape, pivot:LinearShapeTail='start', alignment:LinearShapeTail='end'):this
     {
         let destVec = other[alignment]().toVector(); // either end() or start()
         let origVec = this[pivot]().toVector(); // either end() or start()
 
-        return this.move(destVec.subtracted(origVec)) as Wire;
+        return this.move(destVec.subtracted(origVec));
     }
 
     /** Fillet Wire at given Vertices or all */

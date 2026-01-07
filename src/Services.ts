@@ -127,11 +127,13 @@ export class Services
         try {
             if (!this._nodeFormDataModule)
             {
-                this._nodeFormDataModule = (await import('form-data'))?.default;
+                const FORM_DATA = 'form-data';
+                this._nodeFormDataModule = (await import(FORM_DATA))?.default;
             }
             if(!this._nodeFormFetchModule)
             {
-                this._nodeFormFetchModule = (await import('node-fetch'))?.default;
+                const NODE_FETCH = 'node-fetch';
+                this._nodeFormFetchModule = (await import(NODE_FETCH))?.default;
             }
         } catch (error) {
             throw new Error(`Failed to load Node.js modules 'form-data' or 'node-fetch'. Make sure they are installed. Error: ${error}`);

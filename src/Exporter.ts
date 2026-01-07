@@ -6,8 +6,10 @@ import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POIN
 
 import { GLTFBuilder } from './GLTFBuilder';
 
-import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
-import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
+// import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
+// import { tNode as XmlNode } from 'txml/dist/txml' // bit hacky
+
+type XmlNode = any; // TODO
 
 
 //// TYPES ////
@@ -392,10 +394,13 @@ export class Exporter
         const SVG_FPS = 2; // 2 frames per second
         const SVG_FRAME_DURATION = 1 / SVG_FPS;
 
-        const svgRootNodes = [] as Array<TXmlNode>;
+        const svgRootNodes = [] as Array<any>;
         const svgFrameGroups = [] as Array<string>; // <g id="frameN"><set id="anN" />{{ svg paths }}</g>
         const numFrames = svgs.length;
 
+        return null;
+        // TODO: Implement after change to fast-xml-parser
+        /*
 
         svgs.forEach( (svg,frameNum) => {
             const parsedSvg = txml.parse(svg)[0];
@@ -406,26 +411,27 @@ export class Exporter
                         <g id="frame${frameNum}" visibility="hidden">
                             <set id="an${frameNum*2}" attributeName="visibility" begin="${SVG_FRAME_DURATION*frameNum}; an${frameNum*2+1}.end" to="visible" dur="${SVG_FRAME_DURATION}s" />
                             <set id="an${frameNum*2+1}" attributeName="visibility" begin="an${frameNum*2}.end" to="hidden" dur="${numFrames*SVG_FRAME_DURATION-SVG_FRAME_DURATION}s" />
-                            ${pathNodes.map(p => this._txmlNodeToString(p)).join('')}
+                            ${pathNodes.map(p => this._XmlNodeToString(p)).join('')}
                         </g>`
             svgFrameGroups.push(svgFrameGroup);
         })
 
         // Get biggest bounding box
         svgRootNodes.sort( (a,b) => this._getSvgBboxArea(b) - this._getSvgBboxArea(a))
-        const svgAnimated = this._txmlNodeToString(svgRootNodes[0], svgFrameGroups.join('\n')); // Wrap al groupes with largest SVG bbox
+        const svgAnimated = this._XmlNodeToString(svgRootNodes[0], svgFrameGroups.join('\n')); // Wrap al groupes with largest SVG bbox
 
         return svgAnimated
+        */
     }
 
     /** For some reason TXML does not offer a good node.toString() method */
-    _txmlNodeToString(n:TXmlNode, wrapped:string=''):string
+    _XmlNodeToString(n:any, wrapped:string=''):string
     {
         const attrsStr = Object.keys(n.attributes).map( attr => `${attr}="${n.attributes[attr]}"`).join(' ');
         return `<${n.tagName} ${attrsStr}>${wrapped}</${n.tagName}>`
     }
 
-    _getSvgBboxArea(svg:TXmlNode):number
+    _getSvgBboxArea(svg:XmlNode):number
     {
         const bbox = svg.attributes['viewBox']?.split(' ');
         return (bbox) ? bbox[2] * bbox[3] : 0;
@@ -437,7 +443,7 @@ export class Exporter
        await this._exportToFileWindow(content, 'text/svg', 'svg', 'SVG file');
     }
 
-    exportToDXF(shapes:AnyShape|ShapeCollection):string|null
+    exportToDXF(shapes?:AnyShape|ShapeCollection):string|null
     {
         const shapesToExport = new ShapeCollection(shapes);
         const exportShapes = (shapesToExport.length) 
@@ -454,7 +460,7 @@ export class Exporter
 
 
     /** Convenience method for saving files in browser and node */
-    save(shapes:AnyShape|ShapeCollection, filename:string, options:any={})
+    save(shapes:ShapeCollection, filename:string, options:any={})
     {
         const EXTENTIONS_EXPORT_METHODS = {
             'glb' : 'exportToGLTF',
@@ -467,12 +473,13 @@ export class Exporter
         const ext = filename.split('.').pop();
         if(!Object.keys(EXTENTIONS_EXPORT_METHODS).includes(ext))
         {
-            console.error(`Shape::save: Unsupported file extension to save file "${filename}". Please use any of these extensions: ${ALLOWED_EXTENSIONS.join(', ')}`);
+            console.error(`Shape::save: Unsupported file extension to save file "${filename}". Please use any of these extensions: ${Object.keys(EXTENTIONS_EXPORT_METHODS).join(', ')}`);
             return;
         }
 
         const data = this[EXTENTIONS_EXPORT_METHODS[ext]](shapes, filename, options);
 
+        // TODO
         if (isBrowser())
         {
             

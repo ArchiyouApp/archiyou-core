@@ -35,7 +35,7 @@
  *
  */ 
 
-import { ShapeCollection, Geom } from './internal'
+import { ShapeCollection, Brep } from './internal'
 import { analyzeFunc } from './internal'
 import { PIPELINE_VALID_NAMES } from './internal' // from typeguards.ts
 
@@ -48,8 +48,8 @@ export class Pipeline
     
     //// END SETTINGS ////
 
-    _oc; // is set in constructor prototype when Geom once OC is loaded - IMPORTANT: Don't assign here!
-    _geom:Geom; // also set on Pipeline prototype when making Geom
+    _oc; // is set in constructor prototype when Brep once OC is loaded - IMPORTANT: Don't assign here!
+    _brep:Brep; // also set on Pipeline prototype when making Brep
     name:string;
     _shapes:ShapeCollection
     _function:() => ShapeCollection

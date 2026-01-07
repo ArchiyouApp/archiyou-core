@@ -3,7 +3,7 @@
  *      Generate data tables and do basic data analytics 
  */
  
- import { ArchiyouApp, Geom, Db, Table, TableIO } from './internal'; 
+ import { ArchiyouApp, Brep, Db, Table, TableIO } from './internal'; 
  import { Metric, MetricName, MetricOptions, TableLocation, DataRows, isDataRows, isMetricName } from './internal' // types and typeguards
  import { METRICS } from './internal' // constants
 
@@ -15,7 +15,7 @@
     
     //// END SETTINGS ////
     _ay:ArchiyouApp = null; // reference to main app
-    _geom:Geom;
+    _brep:Brep;
     db:Db // the virtual database with table in there
     dbData:Object // raw outputted data 
     _metrics:{[key:string]:Metric} = {};

@@ -28,15 +28,17 @@
  * 
  */
 
-import { Brep, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, View, TableContainerOptions, GraphicContainer,
-            ArchiyouApp, DocPathStyle, 
-            ContainerAlignment, ContainerHAlignment, ContainerVAlignment, isContainerHAlignment, isContainerVAlignment, isContainerAlignment, AnyShapeOrCollection, 
-            ContainerPositionLike, isContainerPositionLike, ContainerPositionRel, ContainerPositionAbs, 
-            isContainerPositionCoordAbs,
+import { Brep, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, 
+            View, GraphicContainer, TableContainer, 
+            Text, TextArea, Image,
+            TableContainerOptions, DocPathStyle,  
+            ContainerAlignment, ContainerHAlignment, ContainerVAlignment,
+            ContainerPositionLike, ContainerPositionRel, ContainerPositionAbs,
             DocPDFExporter, ScriptParam} from './internal' // classes
 
-import type { isPageSize, PageSide, PageOrientation, isPageOrientation, PageData, ContainerSide, ContainerSizeRelativeTo,
-            ScaleInput, Image, ImageOptions, Text, TextOptions, TextArea, TableContainer } from './internal' // types and type guards
+import type { ArchiyouApp, AnyShapeOrCollection, PageSide, PageOrientation, 
+            PageData, ContainerSide, ContainerSizeRelativeTo,
+            ScaleInput, ImageOptions, TextOptions } from './internal' // types and type guards
 
 import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, DocGraphicInputRect, DocGraphicInputCircle, 
@@ -44,7 +46,9 @@ import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWi
                 ContainerBlock, TitleBlockInput, LabelBlockOptions, ScriptParamData, DocPipeline
             } from './internal'
 
-import { isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer, isWidthHeightInput, isContainerTableInput } from './internal' // typeguards
+import { isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContainer, 
+    isWidthHeightInput, isContainerTableInput, isPageOrientation, isContainerPositionLike, isContainerHAlignment, 
+    isContainerVAlignment, isContainerAlignment, isContainerPositionCoordAbs, isPageSize } from './internal' // typeguards
 
 import { convertValueFromToUnit, isNumeric, isContainerPositionCoordRel } from './internal' // utils
 

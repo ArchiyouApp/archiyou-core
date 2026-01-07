@@ -25,8 +25,7 @@ import { Brep } from './Brep'
 // For browser we refer to the module 
 // For node we just add /src/wasm folder
 import ocFullJS from "./wasm/archiyou-opencascade.js";
-//import ocFullJSFast from "../wasm/archiyou-opencascade.js"; 
-//import ocFullWasm from "./wasm/archiyou-opencascade.wasm?url"; // DEBUG
+//import ocFullWasm from "./wasm/archiyou-opencascade.wasm?url"; // In Vite contexts ?url can be used to serve the wasm file
 
 
 export class OcLoader
@@ -248,7 +247,7 @@ export class OcLoader
       // Does not work: Object(import.meta).url; 
       // NOTE: We use a webpack 4 babel-loader to replace import.meta.url
       const fileURL = import.meta.url; 
-      const curDir = path.dirname(fileURLToPath(fileURL)); // directory of this file
+      let curDir = path.dirname(fileURLToPath(fileURL)); // directory of this file
       
       // The '/' is actually needed in windows for normal ES imports 
       // But does not work with wasm files
@@ -261,7 +260,8 @@ export class OcLoader
       let absPath = path.join(curDir, filepath);
 
       // We need to add file:// to get this working on windows
-      if(process.platform === 'win32')
+      const processObj = globalThis.process;
+      if(typeof processObj !== 'undefined' && processObj.platform === 'win32')
       {
         absPath = 'file://' + absPath; // Add file:// to the path
       }

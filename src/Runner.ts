@@ -27,8 +27,7 @@ import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeColle
 
 import { RunnerComponentImporter, DocDocument, Table } from "./internal"
 
-import { BREP_METHODS_INTO_GLOBAL, SCRIPT_OUTPUT_MODEL_FORMATS
- } from "./internal" // from constants
+import { BREP_METHODS_INTO_GLOBAL } from "./internal" // from constants
 
 
 import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
@@ -1744,7 +1743,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             // Check if any output was added
             if(startNumOutputs + 1 === outputs.length)
             {
-                console.info(`Runner::_exportPipelineModels(): Exported model at "${outputPath.resolvedPath}" to format "${outputPath.format}" with size ${(outputs[outputs.length -1].output?.length ?? (outputs[outputs.length -1].output as ArrayBuffer)?.byteLength) ?? '<unknown>'} bytes`);
+                console.info(`Runner::_exportPipelineModels(): Exported model at "${outputPath.resolvedPath}" to format "${outputPath.format}" with size ${((outputs[outputs.length -1].output as any)?.length ?? (outputs[outputs.length -1].output as ArrayBuffer)?.byteLength) ?? '<unknown>'} bytes`);
             }
             else {
                 console.warn(`Runner::_exportPipelineModels(): No output generated for model at "${outputPath.resolvedPath}" to format "${outputPath.format}"`);

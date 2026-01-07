@@ -44,7 +44,7 @@ export class Edge extends Shape
     
         Inherited from Shape:
         _oc
-        _geom
+        _brep
         _obj
         _parent
         _ocShape
@@ -995,7 +995,7 @@ export class Edge extends Shape
 
     /* Move current Edge so it connects to another Edge or Wire with given from,to = start | end  */
     @checkInput(['LinearShape', [String, EDGE_DEFAULT_ALIGNTO_FROM], [String, EDGE_DEFAULT_ALIGNTO_TO]], ['Wire', String, String])
-    alignTo(other:LinearShape, from?:LinearShapeTail, to?:LinearShapeTail):Edge
+    alignTo(other:LinearShape, from?:LinearShapeTail, to?:LinearShapeTail):this
     {
         // Main method is in Wire, convert single Edge to Wire and use that method
         let w = this._toWire().alignTo(other,from,to);

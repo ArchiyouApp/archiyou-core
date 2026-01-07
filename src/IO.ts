@@ -3,12 +3,12 @@
  * 
  */
 
-import { Geom } from "./Brep";
-import { AnyShape, ShapeCollection, Sketch } from "./internal";
+import { Brep, AnyShape, ShapeCollection, Sketch } from "./internal";
 
 import parseSVG from "svg-path-parser"; // https://github.com/hughsk/svg-path-parser
 const makeAbsolute = parseSVG.makeAbsolute; //
-import * as txml from 'txml'; // for XML parsing because DOMParser is not available in a WebWorker: https://github.com/tobiasnickel/tXml
+
+// import * as txml from 'txml'; // for XML parsing because DOMParser is not available in a WebWorker: https://github.com/tobiasnickel/tXml
 
 
 interface Asset
@@ -34,7 +34,7 @@ interface SvgTransform
 export class IO
 {
     _oc:any;
-    _geom:Geom;
+    _brep:Brep;
     
     source:string;
     asset:Asset // last asset
@@ -50,9 +50,9 @@ export class IO
         png: 'bitmap',
     }
 
-    constructor(geom:Geom)
+    constructor(brep:Brep)
     {
-        this._brep = geom;
+        this._brep = brep;
         this._oc = this?._brep?._oc;
     }
 
@@ -224,8 +224,11 @@ export class IO
         let svgNodesWithTransform;
         try 
         {
+            // TODO: Implement after change to fast-xml-parser
+            /*
             let svgTree = txml.parse(asset.content);
             svgNodesWithTransform = this._getSvgNodesRecursive(svgTree); // [{ node: { tagName, attributes }, transform: {x,y}  }]
+            */
         }
         catch(e)
         {
@@ -235,7 +238,7 @@ export class IO
 
         if (!this._oc)
         {
-            throw new Error(`IO:_importSVG: Cannot import SVG without reference to geom in constructor!`)
+            throw new Error(`IO:_importSVG: Cannot import SVG without reference to brep in constructor!`)
         }
 
         let svgShapeCollection = new ShapeCollection();

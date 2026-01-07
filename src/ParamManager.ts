@@ -1,4 +1,7 @@
 /**
+ *  
+ *  !!!! CHECKS AND REFACTOR NEEDED !!!!
+ *  
  *  ParamManager.ts
  * 
  *  Manages Parameters from script scope
@@ -25,7 +28,7 @@
  * 
  */
 
-import { ScriptParam, ParamOperation, ParamManagerOperator } from './internal'
+import { ScriptParam, ScriptParamData, ParamOperation, ParamManagerOperator } from './internal'
 
 import deepEqual from 'deep-is'
 
@@ -221,16 +224,16 @@ export class ParamManager
     //// EVALUATE ////
 
     /** Return Params that we operated upon */
-    getOperatedParamsByOperation():Record<ParamOperation, Array<ScriptParam>>
+    getOperatedParamsByOperation():Record<ParamOperation, Array<ScriptParamData>>
     {
         const changedParamsByOperation = this.paramOperators
                                     .filter((po) => po.paramOperated())
                                     .reduce(
                                         (acc,po) => {
-                                            acc[po.operation as ParamOperation].push(po.toData())
+                                            acc[po.operation as ParamOperation].push((po as any).toData()) // TODO: Fix TS
                                             return acc
                                         }, 
-                                        { new: [] as Array<ScriptParam>, updated: [] as Array<ScriptParam>, deleted: [] as Array<ScriptParam> })
+                                        { new: [] as Array<ScriptParamData>, updated: [] as Array<ScriptParamData>, deleted: [] as Array<ScriptParamData> })
 
         console.info('**** ParamManager::getOperatedParamsByOperation ****')
         console.info(changedParamsByOperation);

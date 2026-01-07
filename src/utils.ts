@@ -4,6 +4,9 @@
  * 
  */
 
+import { sha256 } from '@noble/hashes/sha256'; // NOTE: use version pinning in this library: @noble/hashes@1.4.0
+import { bytesToHex } from '@noble/hashes/utils';
+
 import type { ScriptParamData } from './internal';
 
 import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, isDocUnitsWithPerc,
@@ -99,6 +102,17 @@ export function flattenEntities(arr:Array<any>)
     }, []);
 }
 
+//// CRYPTO ////
+
+/** Export sha256 hasing function */
+// TODO: use in Script.getVariantId
+export function hash(s:string):string
+{
+    if(typeof s !== 'string') throw new Error('Input must be a string');
+    const message = new TextEncoder().encode(s);
+    const hash = sha256(message);
+    return bytesToHex(hash);
+}
 
 
 //// WORKING WITH NUMBERS ////

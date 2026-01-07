@@ -90,10 +90,12 @@ export class Brep
   _console:any; // reference to console - avoid using type Console to seperate ties between ui components 
   _cache:{(key:string):any} = {} as any; // operations cache - avoid TS errors
   _units:ModelUnits = DEFAULT_UNITS;
+
   scene:Obj;
   activeLayer:Obj;
   layerStack:Array<Obj> = [];
   activeSketch:Sketch; // if we are in Sketch mode
+  _duration:number;
   _captureShapesStart:ShapeCollection = null;
   _activeLayerGroup:Obj = null; // active group of layers - used to combine layer into one
   // NOTE: meshingQuality is either in Main or Webworker scope

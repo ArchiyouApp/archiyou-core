@@ -12,8 +12,11 @@
 
 import { CLASS_TO_STYLE, DOC_DIMENSION_LINES_TEXT_HEIGHT, SVGtoPDFtransform } from './internal' // constants.ts
 
-import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
-import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
+//import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
+//import { tNode as TXmlNode } from 'txml/dist/txml' // bit hacky
+
+import { XMLParser } from 'fast-xml-parser';
+import type { } from 'fast-xml-parser'
 
 import { PageData, ContainerData, DocPDFExporter } from './internal'
 import { DocPathStyle, PDFLinePath } from './internal'
@@ -42,7 +45,7 @@ export class DocViewSVGManager
     //// END SETTINGS ////
 
     _svg:string
-    _svgXML:TXmlNode
+    _svgXML:any // TODO
     _svgToPDFTransform:SVGtoPDFtransform // save important svg to pdf information for later use
     _docActivePage:PageData;
     
@@ -59,7 +62,7 @@ export class DocViewSVGManager
         }
     }
 
-    parse(view?:ContainerData):TXmlNode|null
+    parse(view?:ContainerData):any
     {
         this.reset();
         this._setCleanSvg(view)
@@ -68,7 +71,7 @@ export class DocViewSVGManager
         {
             return null;
         }
-        this._svgXML = txml.parse(this._svg)[0] as TXmlNode; 
+        this._svgXML = new XMLParser().parse(this._svg); // return Object 
         return this._svgXML;
     }
 
@@ -88,7 +91,8 @@ export class DocViewSVGManager
     /** Return changed SVG as string */
     export():string
     {
-        return txml.stringify([this._svgXML]); // NOTE: this is not well documentated in tXML - it needs an Array to start
+        // TODO: test after change to fast-xml-parser
+        return JSON.stringify(this._svgXML);
     }
 
     //// OPERATIONS ////
@@ -100,10 +104,12 @@ export class DocViewSVGManager
 
     setNoStrokeScaling()
     {
-        // NOTE: this does not work with svg-to-pdfkit
+        // TODO: implement using XMLparser
+        /*
         const APPLY_TO_TAGS = ['path'];
         const pathNodes = txml.filter(this._svgXML.children, node => APPLY_TO_TAGS.includes(node.tagName))
         pathNodes.forEach(path => path.attributes['vector-effect'] = 'non-scaling-stroke' )
+        */
     }
 
     /** Information that is needed to transform SVG shape content to PDF */
@@ -174,6 +180,9 @@ export class DocViewSVGManager
     */
     toPDFDocShapePaths(pdfExporter:DocPDFExporter, view:ContainerData, page:PageData):Array<PDFLinePath>
     {
+        return [];
+        // TODO: implement using XMLParser
+        /*
         // gather paths in such a way that we can directly apply them with jsPDF in native PDF coordinate space
         const pathNodes = txml.filter(this._svgXML.children, (node) => 
                                     // NOTE: we can have other paths (for example for arrows)
@@ -204,6 +213,7 @@ export class DocViewSVGManager
         }
         
         return linePaths;
+        */
     }
 
     /** Within SVG path (<path d="..">) we have multiple ways to set style
@@ -213,7 +223,7 @@ export class DocViewSVGManager
      *  Classes have priority over object styling because it allowes the user to quickly override 
      *  styling without going into the script
      */
-    gatherPDFPathStyleFromSVG(svgPathNode:TXmlNode):DocPathStyle
+    gatherPDFPathStyleFromSVG(svgPathNode:any):DocPathStyle
     {
         return {
             ...this.PATH_BASE_STYLE, // start with minimum styling
@@ -222,7 +232,7 @@ export class DocViewSVGManager
         }
     }
 
-    _svgPathAttributesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
+    _svgPathAttributesToPDFPathStyle(svgPathNode:any):DocPathStyle
     {
         const svgUnits = this._svgXML.attributes['worldUnits'] || 'mm'; // default is mm
 
@@ -265,8 +275,11 @@ export class DocViewSVGManager
      * 
      *  Classes are applied in order (last has priority)
     */
-    _svgPathClassesToPDFPathStyle(svgPathNode:TXmlNode):DocPathStyle
+    _svgPathClassesToPDFPathStyle(svgPathNode:any):DocPathStyle|null
     {
+        return null;
+        // TODO: implement new after change to fast-xml-parser
+        /*
         const classesStr = svgPathNode?.attributes['class'];
 
         if(!classesStr || (typeof classesStr) !== 'string' || classesStr === '')
@@ -291,6 +304,7 @@ export class DocViewSVGManager
         })
 
         return docStyle;
+        */
     }
 
     /** jsPDF needs Line paths as [{op: m|l, c: [x,y] }] */
@@ -345,7 +359,9 @@ export class DocViewSVGManager
 
     // Parsing dimension lines and draw directly on active pdfExporter.activePDFDoc
     drawDimLinesToPDF(pdfExporter:DocPDFExporter)
-    {      
+    {
+        // TODO: implement after change to fast-xml-parser
+        /*      
         const DIMLINE_CLASS = 'dimensionline';
         
         if(!this._svgXML){ throw new Error(`DocViewSVGManager:drawDimLinesToPDF: Please parse SVG data first!`); }
@@ -359,7 +375,7 @@ export class DocViewSVGManager
             this._drawDimLineArrows(dimLineNode, pdfExporter);
             this._drawDimLineText(dimLineNode, pdfExporter);
         })
-        
+        */
         
     }
 
@@ -367,7 +383,7 @@ export class DocViewSVGManager
      *  if a SVG Dimension is considered small
      *  Utility used by Dimension Line drawing functions 
     */
-    _svgDimLineIsSmall(dimLineNode:TXmlNode):boolean
+    _svgDimLineIsSmall(dimLineNode:any):boolean
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode)
         // line length in PDF coords (pts!)
@@ -377,8 +393,11 @@ export class DocViewSVGManager
     }
 
     /** Parse SVG dimension node and return line coordines in PDF system  */
-    _svgDimLineParseLine(dimLineNode:TXmlNode):[number,number,number,number]|null
+    _svgDimLineParseLine(dimLineNode:any):[number,number,number,number]|null
     {
+        return null;
+        // TODO: Implement after change to fast-xml-parser
+        /*
         const lineNode = txml.filter(dimLineNode.children, node => node.tagName === 'line')[0];
 
         if(!lineNode) return null;
@@ -389,13 +408,14 @@ export class DocViewSVGManager
         const lineY2 = this._svgCoordToPDFcoord(this._svgToPDFTransform, lineNode.attributes.y2, 'y');
 
         return [lineX1, lineY1, lineX2, lineY2];
+        */
     }
 
     /** Get normalized offset vector from dimension line 
      *  TODO: This does not take into account the original offset direction!
      *  NOTE: We can't use archiyou-core because we are probably in the main app!
     */
-    _svgDimLineOffsetVec(dimLineNode:TXmlNode, length:number=1):[number,number]|null
+    _svgDimLineOffsetVec(dimLineNode:any, length:number=1):[number,number]|null
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
@@ -421,7 +441,7 @@ export class DocViewSVGManager
     /** Draw the line element of a dimLineNode to PDFdocument 
      *  Returns the coordinates of the line in PDF coordinates
     */
-    _drawDimLineLine(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter):Array<number>
+    _drawDimLineLine(dimLineNode:any, pdfExporter:DocPDFExporter):Array<number>
     {
         const dimLineCoords = this._svgDimLineParseLine(dimLineNode);
 
@@ -438,8 +458,10 @@ export class DocViewSVGManager
     /** Draw the line nodes of a dimeLineNode to PDFDocument 
      *  When dimension line is small, the arrows are flipped ( <--> to >--< )
     */
-    _drawDimLineArrows(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
+    _drawDimLineArrows(dimLineNode:any, pdfExporter:DocPDFExporter)
     {
+        // TODO: implement after change to fast-xml-parser
+        /*
         const arrowNodes = txml.filter(dimLineNode.children, node => node.tagName === 'g' && node.attributes?.class?.includes('arrow'));
 
         arrowNodes.forEach(a => 
@@ -475,11 +497,14 @@ export class DocViewSVGManager
                     scale: arrowScale, // IMPROTANT: stroke width is also scaled here
                 }); // path
         })
+        */
     }
 
     /** Draw text label of Dimension line */
-    _drawDimLineText(dimLineNode:TXmlNode, pdfExporter:DocPDFExporter)
+    _drawDimLineText(dimLineNode:any, pdfExporter:DocPDFExporter)
     {
+        // TODO: implement using XMLparser
+        /*
         const textNode = txml.filter(dimLineNode.children, node => node.tagName === 'text')[0];
         const textNodeData = (textNode.attributes?.data) ? JSON.parse(textNode.attributes.data.replaceAll("'",'"')) : {};
 
@@ -552,6 +577,8 @@ export class DocViewSVGManager
 
         // after drawing, return to original context
         drawContext.setTransform(1,0,1,0,0,0);
+
+        */
     }
 
     /** Draw a raw SVG path d datastring to PDF after transforming 

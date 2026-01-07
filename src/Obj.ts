@@ -13,8 +13,10 @@
 
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Geom, isObjStyle, isBaseStyle} from './internal'
-import { AnyShape, isAnyShape } from './internal' // types
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, 
+    Solid, ShapeCollection, Brep } from './internal'
+import type { AnyShape } from './internal'
+import { isAnyShape, isObjStyle, isBaseStyle } from './internal' // typeguards
 import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
 import { uuidv4 } from './internal' // utils
 import { MeshShape, MeshShapeBuffer } from './internal' // ExportModels.MeshShape
@@ -36,8 +38,8 @@ export class Obj
     }
 
     _oc:any; // holds a reference to loaded opencascade.js: needs to be public
-    _geom:Geom; // reference to Geom API instance
-    
+    _brep:Brep; // reference to Brep API instance
+
     _id:string; 
     _name:string;
     _shapeType:string; // for introspection: type of Shape

@@ -24,7 +24,8 @@
  * */
 
 import { ParamManager, ParamOperation } from "./internal";
-import { ScriptParam } from "./internal";
+import { ScriptParam } from "./internal"
+import type { ScriptParamData } from "./internal";
 
 import deepEqual from 'deep-is'
 
@@ -56,7 +57,7 @@ export class ParamManagerOperator
         //this.originalParam = this._checkParam(p); 
         this.originalParam = p; // TODO: validation
         this.name = this.originalParam.name;
-        this.targetParam = { ...this.originalParam, _behaviours: {}}; // start with copy, but reset behaviours 
+        this.targetParam = { ...this.originalParam, _behaviours: {}} as ScriptParam; // start with copy, but reset behaviours 
         this.manager = manager;
 
         this._setParamProps(); // set properties of targetParam on this Controller
@@ -219,7 +220,7 @@ export class ParamManagerOperator
     
     //// IO ////
 
-    paramToData(param:ScriptParam):ScriptParam
+    paramToData(param:ScriptParam):ScriptParamData
     {
         const behaviourData = {};
         for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
@@ -227,13 +228,13 @@ export class ParamManagerOperator
         return {
             ...param,
             _behaviours : behaviourData // Need a string because we can't send functions through
-        }
+        } as any as ScriptParamData; // TODO: TS fix
     }
 
     /** Export to raw Param data for output 
      *  NOTE: We use ScriptParam here that is used for IO, but in App it is transformed back to Param
     */
-    toData():ScriptParam
+    toData():ScriptParamData
     {
         return this.paramToData(this.targetParam);
     }

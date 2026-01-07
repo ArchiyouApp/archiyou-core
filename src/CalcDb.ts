@@ -1,7 +1,7 @@
 /** Convert AY scene to a database with tables/dataframes and basic analytics and IO */
 
 
-import { Geom, Table } from './internal'
+import { Brep, Table } from './internal'
 
 export class Db
 {
@@ -9,17 +9,17 @@ export class Db
     DEBUG = false;
     UNNAMED_TABLE = 'Table'
 
-    _geom:Geom; // bind to geom module to d data of Shapes and Scene
+    _brep:Brep; // bind to brep module to d data of Shapes and Scene
     _tables:Object = {}; // { name : Table }
     
-    shapes:Table; // all Shapes in the current model (see _geom)
-    objects:Table; // all Obj containing Shapes in the Scene ( through _geom)
+    shapes:Table; // all Shapes in the current model (see _brep)
+    objects:Table; // all Obj containing Shapes in the Scene ( through _brep)
 
-    constructor(geom:Geom)
+    constructor(brep:Brep)
     {
-        this._brep = geom;
+        this._brep = brep;
 
-        this.init(); // try to init immediately. Maybe there are not Shapes in Geom instance. When there are use init()
+        this.init(); // try to init immediately. Maybe there are not Shapes in Brep instance. When there are use init()
     }
 
     init()
@@ -37,7 +37,7 @@ export class Db
     {
         // reset tables
         this._tables = {};
-        // get new data from Geom
+        // get new data from Brep
         this.setupTables();
     }
 
@@ -106,7 +106,7 @@ export class Db
     {
         if(!this._brep)
         {
-            console.error(`Db::generateObjsData: Cannot get Objs without an instance of Geom. Please supply it in constructor!`);
+            console.error(`Db::generateObjsData: Cannot get Objs without an instance of Brep. Please supply it in constructor!`);
             return [];
         }
         return this._brep.allObjs().map(obj => obj.toData());

@@ -381,7 +381,7 @@ export class Script
         this.params = (typeof data.params === 'object') 
             ? Object.entries(data.params).reduce((acc, [key, value]) => {
                     try {
-                        acc[key] = new ScriptParam().fromData({ name:key, ...value }); // inject name 
+                        acc[key] = new ScriptParam().fromData({ name:key, ...(value as Object) as any }); // inject name 
                     }
                     catch(e) {
                         console.error(`Script::fromData(): Skipping param "${key}":`, e);

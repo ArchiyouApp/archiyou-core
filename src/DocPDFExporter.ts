@@ -32,7 +32,6 @@ import { PDFLinePath } from './internal' // types
 
 import { jsPDF, GState } from 'jspdf'
 import 'svg2pdf.js' 
-import autoTable from 'jspdf-autotable' // TODO: load dynamically?
 
 import { OutfitByteString } from '../assets/fonts/Outfit'
 import { OutfitSemiBoldByteString } from '../assets/fonts/OutfitSemiBold'
@@ -56,6 +55,8 @@ export class DocPDFExporter
 
 
     //// END SETTINGS
+
+    _autoTableModule:any;
 
     inDocs:Record<string, DocData> = {}; // incoming DocData by name
     
@@ -691,14 +692,31 @@ export class DocPDFExporter
 
     /** Place table using jsPDF AutoTable 
      *  See: https://github.com/simonbengtsson/jsPDF-AutoTable
+     *  NOTE: We use a dynamic import for developer flexibility. If you want to use it: install it.
     */
     async _placeTable(t:ContainerData, p:PageData)
     {
+        let autoTable = this._autoTableModule;
+        if(this._autoTableModule)
+        {
+            // Load autoTable module
+            try {
+                const JSPDF_AUTO_TABLE_MODULE = 'jspdf-autotable';
+                this._autoTableModule = await import(JSPDF_AUTO_TABLE_MODULE);
+            } 
+            catch (error) 
+            {
+                console.error(`DocPDFExporter::_placeTable: Failed to load jsPDF-AutoTable module: ${error}. Please install this external dependency!`);
+                return;
+            }
+        }
+
         if(!Array.isArray(t?.content?.data) || t?.content?.data.length === 0)
         {
             console.error(`DocPDFExporter::_placeTable: Skipped Table "${t.name}" without data!`)
             return;
         }
+        
 
         const settings = t?.content?.settings as TableContainerOptions;
 

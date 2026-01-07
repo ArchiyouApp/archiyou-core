@@ -9,8 +9,9 @@
  *          - Use selectors and selection stack to apply operations to specific parts
  */
 
-import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom } from './internal'
-import { Cursor, AnyShape, isAnyShape, SketchPlaneName, PointLikeSequence, 
+import { Point, Vector, PointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Brep } from './internal'
+
+import { Cursor, AnyShape, isPointLike, isAnyShape, SketchPlaneName, PointLikeSequence, 
     isPointLikeSequence, AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, AnyShapeOrCollection, SelectionString,
     isSelectionString, AnyShapeOrCollectionOrSelectionString } from './internal'
 
@@ -69,8 +70,8 @@ export class Sketch
     
     //// END SETTINGS ////
 
-    _oc; // is set in constructor prototype when Geom once OC is loaded - IMPORTANT: Don't assign here!
-    _geom:Geom;
+    _oc; // is set in constructor prototype when Brep once OC is loaded - IMPORTANT: Don't assign here!
+    _brep:Brep;
     
     mode:string = 'plane'; // or surface
     workplane:SketchPlane; // normal and main directions of Sketch Workplane
