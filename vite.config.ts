@@ -60,11 +60,21 @@ export default defineConfig({
       ], 
       output: 
       {
-        globals: {
-          // Define global variables for external dependencies
-        } 
+        globals: {},
+        // Don't hash WASM-related files
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name?.endsWith('.wasm')) {
+            return 'wasm/[name][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        },
+        // Preserve module structure for WASM loaders
+        preserveModules: false,
+        // Don't inline assets
+        inlineDynamicImports: false,
       },
-    }
+    },
+    assetsInlineLimit: 0, // Don't inline any assets as base64
   },
   plugins: [
         //wasm(), // Not used for now
@@ -88,10 +98,19 @@ export default defineConfig({
           defaultIsModuleExports: 'auto',
           requireReturnsDefault: 'namespace',
           esmExternals: true,
+          // Don't transform OpenCascade files
+          exclude: [
+            /archiyou-opencascade/,
+            /wasm/,
+          ],
         }), // Add this to handle CommonJS modules
         viteStaticCopy({
           targets: [
-            { src: 'src/wasm/*', dest: 'wasm/' }, // wasm is in dist folder
+            { 
+              src: 'src/wasm/*.*', 
+              dest: 'wasm/', // wasm is in dist folder
+              transform: (contents) => contents, // don't do anything
+            }
           ]
         }),
         dts({
@@ -99,5 +118,11 @@ export default defineConfig({
             outDir: "dist",      // Outputs .d.ts files to dist/
         }),
         nodePolyfills({ include: ['url','path','tty','os'] }),  // For node -> browser compatibility
-    ]
+    ],
+
+    optimizeDeps: {
+      exclude: [
+        'archiyou-opencascade',
+      ],
+  },
 });

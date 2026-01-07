@@ -22,11 +22,12 @@
 
 import { Brep } from './Brep'
 
-// For browser we refer to the module 
-// For node we just add /src/wasm folder
-import ocFullJS from "./wasm/archiyou-opencascade.js";
-//import ocFullWasm from "./wasm/archiyou-opencascade.wasm?url"; // In Vite contexts ?url can be used to serve the wasm file
-
+/** IMPORTANT: 
+ *  
+ *  Statically importing WASM related modules gives errors while building archiyou as a module 
+ *  Vite creates base64 versions of the archiyou-opencascade.js which is not what we want
+ *  Underneath are all dynamically imported modules
+*/
 
 export class OcLoader
 {
@@ -35,8 +36,9 @@ export class OcLoader
   RUN_TEST = false;
 
   //// IMPORTANT PATHS ////
-  /* We copy wasm and Emscripten glue files directly from src/wasm to dist/wasm 
-     Relative paths remain to same
+  /* 
+     We copy wasm and Emscripten glue files directly from src/wasm to dist/wasm 
+     Relative paths remain the same
   */
 
   ocJsModulePath = `./wasm/archiyou-opencascade.js`;
@@ -101,7 +103,8 @@ export class OcLoader
   
 
   /** Load OpenCascade module synchronous and run function when loading is done 
-   *  This still uses the standard OC.js method, because alternatives with dynamic imports are not working well in browser
+   *  This still uses the standard OC.js method, because alternatives with dynamic imports 
+   *  are not working well in browser
   */
   _loadOcBrowser(onLoaded)
   {
@@ -109,41 +112,27 @@ export class OcLoader
      *  This uses a static import for the JS module - which still seems to be the most robust
      *  Use this method is everything else fails
      */
-    const initOpenCascade = () => 
-    {
-      return new Promise((resolve, reject) => 
-      {
-        this._getAbsPath(this.ocWasmModulePath)
-        .then(async (wasmPath) =>
-        {
-            //import(/* webpackIgnore: true */ wasmPath) // webpackIgnore works for webpack 5, not 4 
-            // Webpack 4 needs real paths in the import statement on build time 
-            // [Not working] Replace import(wasmPath) with import('./wasm/archiyou-opencascade.wasm') to make it work in webpack 4
-            import('./wasm/archiyou-opencascade.wasm?url') // Webpack 4 needs this to be able to serve the wasm file, ?url is to avoid errors in Vite
-            .then( async wasmModule => 
-            {
-              const mainWasm = wasmModule.default;
-              new ocFullJS({
-                locateFile(path) { // Module.locateFile: https://emscripten.org/docs/api_reference/module.html#Module.locateFile
-
-                  console.log(`**** Emscripten module.locateFile: ${path}`);
-
-                  if (path.endsWith('.wasm')) {
-                    return mainWasm;
-                  }
-                  if (path.endsWith('.worker.js') && !!worker) {
-                    return worker;
-                  }
-                  return path;
-                },
-              }).then(async oc => { resolve(oc); });
-            })
-          });
-        });
+    const initOpenCascade = async () => {
+      return new Promise(async (resolve, reject) => {
+        // Dynamically import to avoid bundling
+        const ocModule = await import(
+          this.ocJsModulePath
+        );
+        
+        const wasmPath = './wasm/archiyou-opencascade.wasm';
+        
+        new ocModule.default({
+          locateFile(path) {
+            if (path.endsWith('.wasm')) {
+              return wasmPath;
+            }
+            return path;
+          },
+        }).then(oc => resolve(oc));
+      });
     };
 
     this.startLoadAt = performance.now();
-    
     initOpenCascade({}).then(oc => this._onOcLoaded(oc, onLoaded));     
   }
 
@@ -159,8 +148,8 @@ export class OcLoader
     const wasmPath = await this._getAbsPath(this.ocWasmModulePath);
     //const wasmPath = await this._getAbsPath('./wasm/archiyou-opencascade.wasm'); 
     const ocWasm = (await import(/* webpackIgnore: true */ wasmPath)).default;
-    const ocJs = ocFullJS; // static import - This works!
-    //const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default; // Problem in Webpack 4
+    // const ocJs = ocFullJS; // static import - This works with very old stack like Webpack 4
+    const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default;
 
     // https://emscripten.org/docs/api_reference/module.html#Module.locateFile
     const oc = await ocJs({ 
