@@ -146,14 +146,7 @@ export class GLTFBuilder
                     pipelines: ay.runner.getPipelineNames(), // TODO: Make this definitions not only names
                     metrics: (settings?.metrics !== false) ? (ay?.calc?.metrics() || {}) : {},
                     tables: (settings?.tables !== false) ? (ay?.calc?.toTableData() || {}) : {}, // danfojs-nodejs has problems. Disable on node for now
-                    /* TODO: pipeline
-                        Export models of pipelines for visualisation (GLB) and exports (STL, DXF) etc
-                        something like:
-                        pipelineModels: {
-                            'cnc' : { 'glb' : { ... }, 'dxf' : { .... }},
-                            '3dprint' : { 'glb : { ... }, 'stl' : { ...} }
-                        }
-                    */
+                    
                     managedParams: ay?.paramManager?.getOperatedParamsByOperation(),
                 } as ArchiyouData
                 
