@@ -20,17 +20,17 @@ export default defineConfig({
     {
       entry: resolve(__dirname, 'src/internal.ts'),
       name: "archiyou",
-      // fileName: (format) => `archiyou-core.${format}.js`,
+      // fileName: (format) => `archiyou.${format}.js`,
       fileName: 'archiyou',
-      formats: ["es"],
+      formats: ["es"], // only ES for sanity
     },
     rollupOptions: 
     {
       external: [
-          // don't include any of these node functions
-          'fs', // IMPORTANT: exclude fs from bundle, so it we can actually use it in node
-          'process', // Don't let Rollup polyfill process
-          'unenv/node/process', // Fix for OpenCascade WASM module import issue
+          // don't include any of these Node functions
+          'fs', 
+          'process', 
+          'unenv/node/process',
           'unenv/node/buffer',
           'unenv/node/timers',
           'unenv/node/url',
@@ -43,12 +43,15 @@ export default defineConfig({
           'unenv/npm/node-fetch', // Services.ts - install this seperately in node project
           'unenv/npm/form-data', // Services.ts - install this seperately in node project
           // optional dependencies tied to specific functions
+          // Install these to enable this functionality
           'write-excel-file', // Externalize write-excel-file - used in Table.ts for Excel export
           'file-saver', // Externalize file-saver (write-excel-file dependency)
+          // PDF
           'jspdf', // Externalize jsPDF - optional PDF export feature
           'jspdf-autotable', // Externalize jsPDF autotable - optional PDF table feature
           'svg2pdf.js', // Externalize svg2pdf - optional PDF SVG rendering
           'jsdom', // Externalize jsdom - Node.js DOM parser for PDF export
+          // Google integration
           'googleapis',
           'google-spreadsheet',
           // Add WASM files as external to prevent Rollup from processing them
