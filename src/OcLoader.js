@@ -39,6 +39,7 @@ export class OcLoader
   /* 
      We copy wasm and Emscripten glue files directly from src/wasm to dist/wasm 
      Relative paths remain the same
+     Also: these paths are variables avoid any prefetching in build systems
   */
 
   ocJsModulePath = `./wasm/archiyou-opencascade.js`;
