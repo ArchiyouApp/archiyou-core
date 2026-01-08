@@ -4,7 +4,7 @@
  *          Is used also for selecting and aligning 
  * */
 
-import type { PointLike, MainAxis, Side } from './internal' // types
+import type { AnyShape, PointLike, MainAxis, Side } from './internal' // types
 import { Brep, Point, Vector, Shape, Vertex, Edge, 
         Face, Solid, AnyShapeOrCollection } from './internal'
 import { targetOcForGarbageCollection } from './internal' 
@@ -663,7 +663,7 @@ export class Bbox
 
     //// OPERATIONS / CHECKS ////
 
-    contains(other:Shape):boolean
+    contains(other:AnyShape):boolean
     {
         if(!Shape.isShape(other))
         {

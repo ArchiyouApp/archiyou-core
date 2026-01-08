@@ -33,6 +33,7 @@
     "**/archiyou-opencascade/*.ts", // not working when imported
     "typings",
     "tests",
+    "examples/**/*",
     "**/*.spec.ts"
   ],
   "ts-node": {

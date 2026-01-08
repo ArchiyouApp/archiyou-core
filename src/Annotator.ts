@@ -215,7 +215,7 @@ export class Annotator
 
         
         // Level 2: edges on and parallel to sides of bbox
-        const bboxSideEdges = part.bbox().rect().edges();
+        const bboxSideEdges = part.bbox().rect().edges().shapes as Array<Edge>;
         const sideEdgesUsed = new ShapeCollection();
 
         bboxSideEdges.forEach((sideEdge,i) => 

@@ -1,3 +1,8 @@
+/**
+ *  TODO: Remove this in favor of typed ShapeCollection
+ * 
+ */
+
 import type { MakeShapeCollectionInput } from './internal' // types
 import { ShapeCollection } from './internal'
 import { isCoordArray} from './internal' // typeguards

@@ -56,7 +56,9 @@ export type ShapeType = 'Vertex'|'Edge'|'Wire'|'Face'|'Shell'|'Solid'
 export type ShapeTypes = Array<ShapeType>
 export type LinearShape = Edge|Wire // LinearShape: A Shape that is linear.
 export type PointLikeOrAnyShape = PointLike|AnyShape
+// NOTE: Need to remove Shape here?
 export type AnyShape = Shape|Vertex|Edge|Wire|Face|Shell|Solid // Single Shape, excluding ShapeCollection
+export type AnyTypedShape = Vertex|Edge|Wire|Face|Shell|Solid
 export type AnyShapeCollection = ShapeCollection|VertexCollection
 export type AnyShapeSequence = AnyShapeCollection|Array<AnyShape> 
 export type AnyShapeOrCollection = AnyShape|AnyShapeCollection
@@ -848,14 +850,14 @@ export interface VertexMesh {
 
 export interface EdgeMesh {
     objId : string,
-    ocId : number,
+    ocId : string,
     vertices: Array<number>, // coord buffer!
     indexInShape: number
 }
 
 export interface FaceMesh {
     objId : string,
-    ocId : number,
+    ocId : string,
     numTriangles : number,
     vertices: Array<number>, // triangle vertices
     normals: Array<number>, // Vertex normals

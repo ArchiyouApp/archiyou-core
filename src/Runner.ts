@@ -321,7 +321,7 @@ export class Runner
             case 'export-to-gltf':
                 const binary = (e.data.payload?.binary !== undefined) ? e.data.payload?.binary : true; // get binary flag from payload
                 // Async because some methods within GLTFBuilder are async
-                exporter.exportToGLTF({ binary: binary })
+                exporter.exportToGLTF(null, { binary: binary }, null ) // all shapes, no filename
                     .then( gltfContent => ctx.postMessage({ type : 'save-gltf', payload : { content : gltfContent }}))
                 break;
             
@@ -1653,7 +1653,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         extraShapesAsPointLines: inOptions?.shapesAsPointAndLines ?? this.OUTPUT_FORMAT_DEFAULTS.glb.shapesAsPointAndLines, // export extra shapes as points and lines
                     } as ExportGLTFOptions
 
-                    outp = await (scope.exporter as Exporter).exportToGLTF(options);
+                    outp = await (scope.exporter as Exporter).exportToGLTF(null, options, null);
                     if(outp)
                     {
                         outputs.push({
@@ -1716,11 +1716,9 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     else 
                     {
                         const glb = await (scope.exporter as Exporter)
-                            .exportToGLTF({ 
-                                archiyouFormat: false,  // without archiyou data
-                                includePointsAndLines: false, // IMPORTANT: services/assimp might trip
-                                extraShapesAsPointLines: false
-                            }); 
+                            .exportToGLTF(null, 
+                                { archiyouFormat: false, includePointsAndLines: false, extraShapesAsPointLines: false }, 
+                                null);
                         const conversion = await scope.ay.services.convert(glb, 'glb', outputPath.format);
                         if(!conversion.success)
                         { 

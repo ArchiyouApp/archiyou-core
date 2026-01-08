@@ -261,7 +261,7 @@ export class Wire extends Shape
                 if (i < vertexCollection.length - 1)
                 {
                     let nextVert:Vertex = vertices[i+1];
-                    edges.push( new Edge().makeLine( curVert, nextVert));
+                    edges.push( new Edge().makeLine( curVert as Vertex, nextVert as Vertex));
                 }
         });
 
@@ -917,7 +917,11 @@ export class Wire extends Shape
     {
         // non-OC
         const reversedEdges = [];
-        this.edges().reverse().forEach( e => reversedEdges.push( new Edge(e.end(), e.start()) ));
+        this.edges().reverse()
+            .forEach( e => {
+                const curEdge = e as Edge;
+                reversedEdges.push( new Edge(curEdge.end(), curEdge.start()) );
+            });
         const w = new Wire().fromEdges(reversedEdges);
         this._fromWire(w);
 
@@ -1571,7 +1575,7 @@ export class Wire extends Shape
     /** Fillet Wire at given Vertices or all */
     @protectOC('At least 2 Edges')
     @checkInput([[Number, WIRE_FILLET_RADIUS],['PointLikeOrVertexCollection',null]],['auto','VertexCollection'])
-    fillet(radius?:number, vertices?:PointLikeOrVertexCollection )
+    fillet(radius?:number, at?:PointLikeOrVertexCollection )
     {
         /* IMPORTANT: Closing Wires to create Faces can quickly result in badly shaped Faces
             Especially when using it for local operations like fillet this will results in a lot of avoidable errors
@@ -1580,7 +1584,7 @@ export class Wire extends Shape
         */
         
         // check given vertices
-        let filletVertices = vertices as VertexCollection;
+        let filletVertices = at as VertexCollection;
         let allVertices = this.vertices();
         let allowedVertices = allVertices.shallowCopy().remove(this.start(), this.end()); // cannot do fillet at start and end Vertices
         let checkedVertices = new VertexCollection();

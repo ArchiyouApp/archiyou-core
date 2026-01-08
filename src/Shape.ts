@@ -19,19 +19,22 @@ import { USE_GARBAGE_COLLECTION, MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTI
 import type {
     PointLike,PointLikeOrAnyShape,AnyShape,Pivot,MainAxis,
     AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,
-    LinearShape, ShapeType, Side,
+    AnyShapeOrCollectionOrSelectionString,
+    LinearShape, ShapeType, Side, SideZ,
     SelectionString, CoordArray, ShapeClone,
     Link, SelectorPointRange, SelectorAxisCoord, SelectorBbox, SelectorIndex,
     ShapeAttributes,
     ObjStyle,
     MeshShape, FaceMesh, EdgeMesh, VertexMesh, MeshCache,
-    BaseAnnotation, Annotation, DimensionOptions,DimensionLine,
-    BeamLikeDims
+    Annotation, DimensionOptions,DimensionLine,
+    BeamLikeDims,
+    Alignment, OrientationXY,
+    MeshingQualitySettings
 } from './internal'
 
 import { Obj, Vector, Point, Bbox, OBbox, Vertex, Edge, Wire, Face, 
     Shell, Solid, ShapeCollection, Brep,
-    Selector } from './internal'
+    Selector, BaseAnnotation } from './internal'
     
 import { isPointLike, isSelectionString, isAnyShape, 
     isMainAxis,isAnyShapeCollection, isLinearShape, isShapeAttributes } from './internal' // typeguards
@@ -218,9 +221,6 @@ export class Shape
     {
         return new Shape().fromAll(value);
     }
-
-    
-   
 
     //// MANAGING ATTRIBUTES ////
 
@@ -723,15 +723,16 @@ export class Shape
             let vertexPresent = {}; // hash
             shapeEdges.forEach( e =>
             {
+                const curEdge = e as Edge;
                 // always start with first
                 if(vertices.length == 0)
                 {
-                    let sv = e.start();
+                    let sv = curEdge.start();
                     vertices.add(sv);
                     vertexPresent[sv._hashcode()] = true;
                 }
 
-                let vertex = e.end();
+                let vertex = curEdge.end();
                 if (!vertexPresent[vertex._hashcode()])
                 {
                     vertices.add(vertex);
@@ -3084,8 +3085,9 @@ export class Shape
         let closestDistance:number = null;
         let closestSupportEdge:IEdge = null;
         
-        this.edges().forEach( curEdge => 
+        this.edges().forEach( e => 
         {
+            const curEdge = e as Edge;
             let intersections = rayEdge._intersections(curEdge);
             if (intersections != null)
             {
@@ -3242,18 +3244,19 @@ export class Shape
         let arrayCollection = new ShapeCollection();
         let verticesOnPath:AnyShapeCollection = path.populated(num);
 
-        verticesOnPath.forEach( vertex => 
+        verticesOnPath.forEach( v => 
         {
-            let newShape = this.copy().moveTo(vertex) as Shape;
+            const curVert = v as Vertex;
+            let newShape = this.copy().moveTo(curVert) as Shape;
             arrayCollection.add(newShape);
             // align to path
             // !!!! VERY SLOW !!!!
             if(align)
             {
-                let normalAtVertex = path.normalAt(vertex);
+                let normalAtVertex = path.normalAt(curVert);
                 newShape.alignByPoints(
                         [ newShape.center(),newShape.center().add([1,0,0])], // x-axis
-                        [ vertex,vertex.toVector().add(normalAtVertex)],
+                        [ curVert,curVert.toVector().add(normalAtVertex)],
                     )
             }
         });
@@ -4685,7 +4688,11 @@ export class Shape
                     ocVertex.delete();
                 }
                 // Output all Edges data as sequential vertices
-                meshEdges.push({ vertices : vertexCoords, objId: this._obj.id, ocId: curEdge._hashcode(), indexInShape: curEdgeIndex });
+                meshEdges.push({ 
+                    vertices : vertexCoords, 
+                    objId: this._obj.id, 
+                    ocId: curEdge._hashcode(), 
+                    indexInShape: curEdgeIndex });
 
                 // clean up
                 ocAdaptorCurve.delete();
@@ -4954,9 +4961,10 @@ export class Shape
     */
     save(filename:string, options:any={})
     {
-        new ShapeCollection(this).save(
-            new ShapeCollection(this), 
-            filename, options);
+        console.log('SAVING SHAPE TO FILE:', filename);
+        
+        new ShapeCollection(this)
+        .save(filename, options);
     }
 
     toData():Object

@@ -1,16 +1,17 @@
-import { Shape, AnyShape, ShapeCollection, ArchiyouApp, isBrowser} from './internal'
 
-import { ExportGLTFOptions, MeshingQualitySettings} from './internal'
-
+// constants
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
 
-import { GLTFBuilder } from './GLTFBuilder';
+import type { ArchiyouApp, AnyShapeOrCollection,
+    ExportGLTFOptions, MeshingQualitySettings } from './internal'
 
-// import * as txml from 'txml' // Browser independant XML elements and parsing, used in toSVG. See: https://github.com/TobiasNickel/tXml
-// import { tNode as XmlNode } from 'txml/dist/txml' // bit hacky
+import { isBrowser } from './internal'
+
+import { Shape, AnyShape, ShapeCollection, 
+    GLTFBuilder, 
+    RunnerOps } from './internal'
 
 type XmlNode = any; // TODO
-
 
 //// TYPES ////
 
@@ -33,6 +34,7 @@ declare global {
         user:any,
     }
 }
+
 
 export class Exporter
 {
@@ -72,7 +74,7 @@ export class Exporter
     /** Export given shapes or all shapes in Brep instance to STEP 
      *  Optionally supply a filename
     */
-    exportToSTEP(shapes?:AnyShape|ShapeCollection, filename?:string):string
+    exportToSTEP(shapes?:AnyShape|ShapeCollection, options:Record<string,any> = {}, filename?:string):string
     {
         // Taken from: https://github.com/zalo/CascadeStudio/blob/1a0f44b4d7617cc9dfc1dd6833945e04e2dfc1c9/js/CADWorker/CascadeStudioFileUtils.js
 
@@ -133,7 +135,7 @@ export class Exporter
     /** Export given shapes or all shapes in Brep instance to STL
      *  Optionally supply a filename
     */
-    exportToSTL(shapes?:AnyShape|ShapeCollection, filename?:string):Uint8Array
+    exportToSTL(shapes?:AnyShape|ShapeCollection, options:Record<string,any> = {}, filename?:string):Uint8Array
     {
         const oc = this._ay.brep._oc;
         
@@ -192,14 +194,14 @@ export class Exporter
         - VisMaterialPBR: https://dev.opencascade.org/doc/refman/html/struct_x_c_a_f_doc___vis_material_p_b_r.html
 
     */
-    async exportToGLTF(options?:ExportGLTFOptions, shapes?:Array<AnyShape>, filename?:string):Promise<ArrayBuffer|null>
+    async exportToGLTF(shapes?:AnyShapeOrCollection, options?:ExportGLTFOptions, filename?:string):Promise<ArrayBuffer|null>
     {
         const startGLTFExport = performance.now();
 
         const oc = this._ay.brep._oc;
         options = (!options) ? { ... this.DEFAULT_GLTF_OPTIONS } : { ... this.DEFAULT_GLTF_OPTIONS, ...options };
         
-        const meshingQuality = options.quality || this.DEFAULT_MESH_QUALITY;
+        const meshingQuality = options?.quality || this.DEFAULT_MESH_QUALITY;
         filename = (typeof filename === 'string') ? filename : `file.${(options.binary) ? 'glb' : 'gltf'}`;
 
         const docHandle = new oc.Handle_TDocStd_Document_2(new oc.TDocStd_Document(new oc.TCollection_ExtendedString_1()));
@@ -223,7 +225,7 @@ export class Exporter
             return null;
         }
 
-        new ShapeCollection(exportShapes)
+        exportShapes
             .forEach(entity => {
                 if(Shape.isShape(entity)) // probably entities are all shapes but just to make sure
                 {
@@ -443,7 +445,7 @@ export class Exporter
        await this._exportToFileWindow(content, 'text/svg', 'svg', 'SVG file');
     }
 
-    exportToDXF(shapes?:AnyShape|ShapeCollection):string|null
+    exportToDXF(shapes?:AnyShape|ShapeCollection, options:Record<string,any> = {}):string|null
     {
         const shapesToExport = new ShapeCollection(shapes);
         const exportShapes = (shapesToExport.length) 
@@ -460,15 +462,16 @@ export class Exporter
 
 
     /** Convenience method for saving files in browser and node */
-    save(shapes:ShapeCollection, filename:string, options:any={})
+    async save(filename:string, options:any={}, shapes:ShapeCollection)
     {
         const EXTENTIONS_EXPORT_METHODS = {
-            'glb' : 'exportToGLTF',
-            'svg': 'exportToSVG',
-            'step': 'exportToSTEP',
-            'stl': 'exportToSTL',
-            'dxf' : 'exportToDXF',
-        }
+            // extentions and mapping to exporter method
+            'glb' : async (exp, shapes, filename, options) => await exp.exportToGLTF(shapes, options, filename),
+            'svg': async (exp, shapes, filename, options) => exp.exportToSVG(),
+            'step': async (exp, shapes, filename, options) => exp.exportToSTEP(shapes, options, filename),
+            'stl': async (exp, shapes, filename, options) => exp.exportToSTL(shapes, options, filename),
+            'dxf' : async (exp, shapes, filename, options) => exp.exportToDXF(shapes, options, filename),
+        } 
 
         const ext = filename.split('.').pop();
         if(!Object.keys(EXTENTIONS_EXPORT_METHODS).includes(ext))
@@ -477,12 +480,17 @@ export class Exporter
             return;
         }
 
-        const data = this[EXTENTIONS_EXPORT_METHODS[ext]](shapes, filename, options);
+        const data = await EXTENTIONS_EXPORT_METHODS[ext](this, shapes, options, filename);
+        console.log(data);
 
-        // TODO
         if (isBrowser())
         {
             
+        }
+        else {
+            // We are in backend Node
+            const ops = new RunnerOps();
+            await ops.saveBlobToFile(data, filename);
         }
         
     }

@@ -9,18 +9,19 @@ import { FACE_PLANE_WIDTH, FACE_PLANE_DEPTH, FACE_PLANE_POSITION, FACE_PLANE_NOR
 
 import type { PointLike, Cursor, PointLikeSequence, MakeFaceInput, 
         AnyShape, Axis, ThickenDirection,
-        PointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection,
-        AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, 
+        PointLikeOrAnyShape, PointLikeOrVertexCollection,
+        AnyShapeSequence, AnyShapeOrCollection, PointLikeOrAnyShapeOrCollectionOrSelectionString, 
         SelectionString,
         DimensionOptions } from './internal'; // types
 
 // typeguards
 import { isPointLike, isCoordArray, isPointLikeSequence, 
-        isAnyShape, isSelectionString 
+    isAnyShapeSequence, isAnyShape, isSelectionString, isVertexCollection
 } from './internal'
 
 import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, 
-        ShapeCollection, DimensionLine } from './internal'
+        ShapeCollection, VertexCollection,
+        DimensionLine } from './internal'
 
 import { addResultShapesToScene, checkInput, protectOC  } from './decorators'; // Import directly to avoid ts-node error
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';

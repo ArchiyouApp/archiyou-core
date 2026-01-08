@@ -4,7 +4,8 @@
  *   For example when with intersection and splits the Shapes into seperate Shape instances (Vertex, Edge, Wire, Face, Shell etc.)
  *
  *    ShapeCollection makes operating on multiple Shapes as easy as working on single Shapes (Inspired like JTS/GEOS). 
- *
+ *    
+ *    TODO: Introduce typed ShapeCollections ShapeCollection<Edge> using generics
  */
 
  
@@ -16,14 +17,14 @@ import type { ArchiyouApp, PointLike, PointLikeOrAnyShapeOrCollection,
          MakeShapeCollectionInput,
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
          ModelUnits,
-         BaseAnnotation,
          MeshingQualitySettings,
          LayoutOrderType, LayoutOptions, 
          DimensionLevelSettings, AnnotationAutoDimStrategy,
          MeshShape, MeshShapeBuffer, MeshShapeBufferStats,
          Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions  } from './internal' // see types
 
-import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep, Exporter } from './internal'
+import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep, 
+   Exporter, BaseAnnotation } from './internal'
 
 import { isCoordArray, isPointLike, isPointLikeSequence, 
       isAnyShape, isAnyShapeCollection, isMainAxis } from './internal' // typeguards
@@ -967,6 +968,20 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
 
       */
 
+      /** Just a simple forwarder fillet */
+      fillet(radius:number, at:any):ShapeCollection
+      {
+         const SHAPES_FILLET = ['Wire','Face', 'Solid']
+         this.forEach( 
+            shape => {
+               if (SHAPES_FILLET.includes(shape.type()))
+               {
+                  (shape as Wire|Face|Solid)?.fillet(radius, at)
+               }
+            });
+         return this;
+      }
+
       /** Shape API: Copy entire ShapeCollection and its Shapes and return a new one */
       _copy():ShapeCollection
       {
@@ -1400,7 +1415,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       //// ARRAY LIKE API ////
 
       /** Array API - Alias for ForEach to have compatitibility with Array */
-      forEach(func: (value: any, index: number, arr:Array<any>) => void ): ShapeCollection
+      forEach(func: (value: AnyShape, index: number, arr:Array<any>) => void ): ShapeCollection
       {
          this.shapes.forEach(func);
          return this;
@@ -2813,7 +2828,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          const modelSpace = writer.document.modelSpace;
 
          shapeEdges.forEach( edge => {
-               edge.toDXF(modelSpace); // add Edge as line to DXF modelspace
+               (edge as Edge).toDXF(modelSpace); // add Edge as line to DXF modelspace
          });
 
          if(options?.annotations)
@@ -2830,10 +2845,11 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       }
 
       /** Convenience method for saving files in browser and node */
-      save(shapes?:ShapeCollection, filename?:string, options:any={})
+      save(filename?:string, options:any={}, shapes:ShapeCollection|null=null)
       {
-         const shapesToSave = shapes || this;
-         new Exporter({ brep: this._brep } as ArchiyouApp).save(shapesToSave, filename, options);
+         const shapesToSave = ShapeCollection.isShapeCollection(shapes) ? shapes : this;
+
+         new Exporter({ brep: this._brep } as ArchiyouApp).save(filename, options, shapesToSave);
       }
 
 
