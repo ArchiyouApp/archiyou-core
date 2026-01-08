@@ -4,7 +4,7 @@
  *  !!!! TODO: have Vertex inherit properties from Vector/Point !!!!
  */
 
-import { PointLike, isPointLike, PointLikeOrAnyShapeOrCollection } from './internal' // see types.ts
+import type { PointLike } from './internal' // see types.ts
 import { Point, Vector, Shape, Edge } from './internal'
 import { checkInput } from './decorators' // Use direct import to avoid error with ts-node/jest
 import { roundToTolerance } from './internal'

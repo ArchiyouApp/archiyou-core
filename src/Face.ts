@@ -4,17 +4,26 @@
 
  */
 
+// constants
 import { FACE_PLANE_WIDTH, FACE_PLANE_DEPTH, FACE_PLANE_POSITION, FACE_PLANE_NORMAL, FACE_BASEPLANE_AXIS, FACE_BASEPLANE_SIZE, FACE_CIRCLE_RADIUS, FACE_EXTRUDE_AMOUNT, FACE_OFFSET_AMOUNT, FACE_OFFSET_TYPE, FACE_THICKEN_AMOUNT, FACE_THICKEN_DIRECTION, FACE_LOFT_SOLID, FACE_NORMAL_EDGE_SIZE, FACE_FILLET_RADIUS, FACE_CHAMFER_DISTANCE, FACE_CHAMFER_ANGLE, LinearShape } from './internal'
 
-import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+import type { PointLike, Cursor, PointLikeSequence, MakeFaceInput, 
+        AnyShape, Axis, ThickenDirection,
+        PointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection,
+        AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, 
+        SelectionString,
+        DimensionOptions } from './internal'; // types
 
-import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, ShapeCollection } from './internal'
+// typeguards
+import { isPointLike, isCoordArray, isPointLikeSequence, 
+        isAnyShape, isSelectionString 
+} from './internal'
+
+import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, 
+        ShapeCollection, DimensionLine } from './internal'
+
 import { addResultShapesToScene, checkInput, protectOC  } from './decorators'; // Import directly to avoid ts-node error
-import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPointLikeSequence, MakeFaceInput, 
-        isMakeFaceInput, AnyShape, isAnyShape, Axis, isAxis, ThickenDirection, isThickenDirection,
-        PointLikeOrAnyShape, isPointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection, AnyShapeOrSequence, isAnyShapeOrSequence,
-        isAnyShapeCollection, AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, SelectionString, isSelectionString} from './internal'; // types
-import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
 
 import { flattenEntities, toRad, roundToTolerance } from './internal' // utils
 

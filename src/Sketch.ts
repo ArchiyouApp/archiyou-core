@@ -9,17 +9,23 @@
  *          - Use selectors and selection stack to apply operations to specific parts
  */
 
-import { Point, Vector, PointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Brep } from './internal'
+// constants
+import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal'
 
-import { Cursor, AnyShape, isPointLike, isAnyShape, SketchPlaneName, PointLikeSequence, 
-    isPointLikeSequence, AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, AnyShapeOrCollection, SelectionString,
-    isSelectionString, AnyShapeOrCollectionOrSelectionString } from './internal'
+import type { PointLike, Cursor, AnyShape, SketchPlaneName, PointLikeSequence, 
+    AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, 
+    AnyShapeOrCollection, SelectionString,
+    AnyShapeOrCollectionOrSelectionString } from './internal'
+
+import { isPointLike, isAnyShape, isSelectionString } from './internal' // typeguards
+
+import { Point, Vector, ShapeCollection, Vertex, Edge, Wire, Face, Brep } from './internal'
 
 import { gp_Ax3, gp_Trsf } from './wasm/archiyou-opencascade' // OC
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
-import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal' // Face
+
 
 //// SETTINGS ////
 export const SKETCH_FILLET_SIZE = 5;

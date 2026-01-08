@@ -187,7 +187,7 @@ export class OcLoader
   /** When OC is loaded, we set a couple of things */
   _onOcLoaded(oc, onLoaded)
   {
-    console.log(`**** OC: CAD library loaded with ${Object.keys(oc).length} functions! Took: ${ Math.round((performance.now() - this.startLoadAt) )} ms`);
+    console.log(`**** OC: BREP CAD library loaded with ${Object.keys(oc).length} functions! Took: ${ Math.round((performance.now() - this.startLoadAt) )} ms ****`);
 
     this._oc = oc;
     this._oc.SHAPE_TOLERANCE = this.SHAPE_TOLERANCE; // set tolerance

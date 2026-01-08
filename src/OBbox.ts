@@ -2,12 +2,11 @@
  *      OBbox.ts - Orientated Orientated Bounding Box
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, Shell, Solid, AnyShape, ShapeCollection } from './internal'
-import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
+import type { PointLike, MainAxis } from './internal' // types
+import { Point, Vector, Shape, Edge, Face, Solid, AnyShape } from './internal'
+
 import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { roundToTolerance } from './utils'
-
-import { SIDES, SIDE_TO_AXIS } from './internal'
 
 export class OBbox
 {

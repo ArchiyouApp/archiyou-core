@@ -11,13 +11,11 @@
       "allowJs": true,
       "outDir": "dist",
       "strict": false,
-      //"noPropertyAccessFromIndexSignature" : false,
       "noImplicitAny": false,
       "emitDecoratorMetadata": true,
       "experimentalDecorators" : true,
+      "useDefineForClassFields": false, // for legacy decorators
       "forceConsistentCasingInFileNames": true,
-      //"useDefineForClassFields": false,
-      //"esModuleInterop": true,
       "allowSyntheticDefaultImports" : true, // fix: This module is declared with using 'export =', and can only be used with a default import when using the 'esModuleInterop' flag.
       "sourceMap": true,
       "noEmit": false,
@@ -34,6 +32,7 @@
       "**/archiyou-opencascade/*.ts", // not working when imported
       "typings",
       "tests",
+      "dist",
       "**/*.spec.ts"
     ],
     "ts-node": {

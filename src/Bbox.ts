@@ -4,16 +4,13 @@
  *          Is used also for selecting and aligning 
  * */
 
+import type { PointLike, MainAxis, Side } from './internal' // types
 import { Brep, Point, Vector, Shape, Vertex, Edge, 
         Face, Solid, AnyShapeOrCollection } from './internal'
 import { targetOcForGarbageCollection } from './internal' 
-
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
-
-import { PointLike, MainAxis, Side } from './internal' // types
-import { roundToTolerance } from './utils'
-
-import { SIDES, SIDE_TO_AXIS } from './internal'
+import { roundToTolerance } from './internal' // utils
+import { SIDES, SIDE_TO_AXIS } from './internal' // constants
 
 export class Bbox
 {

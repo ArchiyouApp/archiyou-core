@@ -8,24 +8,29 @@
  */
 
  
-import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep, Exporter } from './internal'
+// constants
+import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
 
 import type { ArchiyouApp, PointLike, PointLikeOrAnyShapeOrCollection,
-         ShapeType, AnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, MakeShapeCollectionInput,
+         ShapeType, AnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, 
+         MakeShapeCollectionInput,
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
-         ModelUnits } from './internal' // see types
+         ModelUnits,
+         BaseAnnotation,
+         MeshingQualitySettings,
+         LayoutOrderType, LayoutOptions, 
+         DimensionLevelSettings, AnnotationAutoDimStrategy,
+         MeshShape, MeshShapeBuffer, MeshShapeBufferStats,
+         Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions  } from './internal' // see types
+
+import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep, Exporter } from './internal'
 
 import { isCoordArray, isPointLike, isPointLikeSequence, 
       isAnyShape, isAnyShapeCollection, isMainAxis } from './internal' // typeguards
  
- import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
- import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
- import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
- import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, AnnotationAutoDimStrategy } from './internal'
+import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
+import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
 
- import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
- import { MeshingQualitySettings } from './types';
 
 // special libraries
 import chroma from 'chroma-js';

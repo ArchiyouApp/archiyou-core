@@ -5,9 +5,9 @@
  *    
  */
 
-import { MainAxis, Point } from './internal'
-import { Vertex } from './internal'
-import { PointLike, isPointLike } from './internal' // see: types.ts
+import type { MainAxis, PointLike  } from './internal' // types
+import { Point, Vertex } from './internal'
+import { isPointLike  } from './internal' // typeguards
 import { addResultShapesToScene, checkInput } from './decorators' // decorators
 import { toDeg, toRad, roundToTolerance } from './internal' // utils
 import { targetOcForGarbageCollection } from './internal'

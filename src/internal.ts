@@ -9,7 +9,6 @@
     See: https://github.com/Microsoft/TypeScript/issues/2076
 */
 
-
 export * from './types'
 export * from './constants'
 export * from './garbageCollection'

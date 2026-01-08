@@ -11,30 +11,35 @@
  *  see https://github.com/CadQuery/cadquery/blob/master/cadquery/occ_impl/shapes.py:361 for inspiration
  */
 
-import { USE_GARBAGE_COLLECTION } from './internal';
-import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
+// constants
+import { USE_GARBAGE_COLLECTION, MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
             SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
 
-import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
-import { PointLike,PointLikeOrAnyShape,AnyShape,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
-import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Brep } from './internal'
+import type {
+    PointLike,PointLikeOrAnyShape,AnyShape,Pivot,MainAxis,
+    AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,
+    LinearShape, ShapeType, Side,
+    SelectionString, CoordArray, ShapeClone,
+    Link, SelectorPointRange, SelectorAxisCoord, SelectorBbox, SelectorIndex,
+    ShapeAttributes,
+    ObjStyle,
+    MeshShape, FaceMesh, EdgeMesh, VertexMesh, MeshCache,
+    BaseAnnotation, Annotation, DimensionOptions,DimensionLine,
+    BeamLikeDims
+} from './internal'
 
-import { ShapeClone } from './internal'
-
+import { Obj, Vector, Point, Bbox, OBbox, Vertex, Edge, Wire, Face, 
+    Shell, Solid, ShapeCollection, Brep,
+    Selector } from './internal'
+    
+import { isPointLike, isSelectionString, isAnyShape, 
+    isMainAxis,isAnyShapeCollection, isLinearShape, isShapeAttributes } from './internal' // typeguards
+    
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal'
 
-import { Link,SelectorPointRange, SelectorAxisCoord, 
-            SelectorBbox,SelectorIndex } from './internal' // InternalModels
-import { ShapeAttributes, isShapeAttributes } from './internal' // attributes
-import { ObjStyle } from './internal'
-import { MeshShape, FaceMesh, EdgeMesh, VertexMesh, MeshCache } from './internal' // see: ExportModels
-import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
-import { Alignment, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
-import { BaseAnnotation, Annotation, DimensionOptions, DimensionLine } from './internal'
-import { OBbox, BeamLikeDims } from './internal'
 
 
 // this can disable TS errors when subclasses are not initialized yet

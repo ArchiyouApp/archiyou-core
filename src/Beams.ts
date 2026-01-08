@@ -34,10 +34,15 @@
  *      
  */
 
-import { uuidv4 } from './internal' // utils
-import { ArchiyouApp, Point, Vector, Shape, AnyShape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, AnyShapeCollection, isBeamBaseLineAlignment } from './internal'
-import { Alignment, PointLike, isPointLike } from './internal'
-import { isNumeric, toRad }  from './internal'
+import type { ArchiyouApp, 
+    AnyShape,
+    Alignment, PointLike
+ } from './internal'
+
+import { isBeamBaseLineAlignment, isPointLike, isNumeric } from './internal' // typeguards
+
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection } from './internal'
+import { uuidv4, toRad }  from './internal'
 import { checkInput } from './decorators'; // Import directly to avoid error in ts-node
 
 //// SETTINGS ////

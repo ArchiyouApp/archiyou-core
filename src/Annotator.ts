@@ -5,13 +5,17 @@
  *      Only on output they might be turned into real Shapes like text Faces etc.
  */ 
 
-import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Brep, DimensionOptions, 
-            ShapeCollection, AnyShapeOrCollection, BaseAnnotation, Bbox } from './internal'
+import type { PointLike, AnyShape, 
+    MainAxis, 
+    DimensionOptions,DimensionLevelSettings,DimensionLevel,
+    Annotation, AnnotationData, AnnotationAutoDimStrategy
+} from './internal' // types
+
+import { Point, Vector, Edge, Brep,
+        ShapeCollection, Bbox,
+        BaseAnnotation, DimensionLine } from './internal'
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
-
-import { Annotation, AnnotationData, DimensionLine, DimensionLevelSettings, AnnotationAutoDimStrategy, 
-            MainAxis, DimensionLevel } from './internal'
 
 import { roundTo, roundToTolerance } from './internal' // utils
 

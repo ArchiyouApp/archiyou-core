@@ -5,18 +5,21 @@
  * 
  */
 
+// constants
 import { SOLID_MAKEBOX_SIZE, SOLID_MAKESPHERE_RADIUS, SOLID_MAKESPHERE_ANGLE, SOLID_MAKECONE_BOTTOM_RADIUS, SOLID_MAKECONE_TOP_RADIUS,
     SOLID_MAKECONE_HEIGHT, SOLID_CYLINDER_RADIUS, SOLID_CYLINDER_HEIGHT, SOLID_CYLINDER_ANGLE, SOLID_FILLET_RADIUS, SOLID_CHAMFER_DISTANCE,
     SOLID_THICKEN_AMOUNT, SOLID_THICKEN_DIRECTION } from './internal'
 
-import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+// types
+import type { AnyShapeOrCollection, PointLike, ThickenDirection,
+        MakeSolidInput, AnyShapeOrCollectionOrSelectionString, SelectionString
+ } from './internal';
 
+import { isMakeSolidInput, isSelectionString } from './internal'; // typeguards
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Shell, ShapeCollection } from './internal'
-import { cacheOperation } from './internal'; // decorators
-import { toRad } from './internal';
-import { AnyShapeSequence, AnyShapeOrCollection, PointLike, isPointLike, AnyShape, isThickenDirection, ThickenDirection } from './internal';
-import { addResultShapesToScene, checkInput, protectOC } from './decorators'; //  Direct import to avoid error in ts-node/jest
-import { MakeSolidInput, isMakeSolidInput, AnyShapeOrCollectionOrSelectionString, isSelectionString, SelectionString } from './internal'; // types
+import { toRad } from './internal'; // utils
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+import { checkInput, protectOC } from './decorators'; //  Direct import to avoid error in ts-node/jest
 
 export class Solid extends Shape
 {   

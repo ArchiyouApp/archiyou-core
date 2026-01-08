@@ -5,22 +5,30 @@
  * 
  */
 
+// constants
 import { WIRE_RECT_WIDTH, WIRE_RECT_DEPTH, WIRE_RECT_POSITION, WIRE_POPULATE_NUM, WIRE_COMBINE_RADIUS, WIRE_LOFTED_SOLID, 
     WIRE_SWEEPED_SOLID, WIRE_SWEEPED_AUTOROTATE, WIRE_THICKEN_AMOUNT, WIRE_THICKEN_DIRECTION, WIRE_OFFSET_AMOUNT,
     WIRE_OFFSET_TYPE, WIRE_FILLET_RADIUS, WIRE_CHAMFER_DISTANCE, WIRE_CHAMFER_ANGLE } from './internal'
 
-import { Vector, Shape, Vertex, Point, Edge, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
+// types
+import type { PointLike, Cursor, AnyShape, AnyShapeOrCollection,
+        Alignment, LinearShape, PointLikeSequence, 
+        PointLikeOrVertexCollection, LinearShapeTail,
+        AnyShapeSequence, ThickenDirection, 
+        MakeWireInput, ShapeType,
+        DimensionOptions } from './internal'
+
+// typeguards
+import { isCoordArray } from './internal'
+
+import { Vector, Shape, Vertex, Point, Edge, Face, Shell, Solid, 
+        ShapeCollection, VertexCollection,
+        DimensionLine } from './internal'
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
 
-import { isCoordArray, PointLike, isPointLike,isCoord,Coord, Cursor, AnyShape,isAnyShape,AnyShapeOrCollection,
-        isAnyShapeOrCollection, Alignment, isAlignment, ColorInput, isColorInput,Pivot,isPivot, LinearShape, isLinearShape, PointLikeSequence, 
-        isPointLikeSequence, PointLikeOrVertexCollection, LinearShapeTail, isLinearShapeTail, AnyShapeCollection, isAnyShapeCollection,
-        AnyShapeSequence, isAnyShapeSequence, AnyShapeOrSequence, isAnyShapeOrSequence, isMakeWireInput, ThickenDirection, 
-        isThickenDirection, MakeWireInput, ShapeType, isShapeType} from './internal' // see types
-import { checkInput, cacheOperation, protectOC, addResultShapesToScene } from './decorators'; // Direct import to avoid error with ts-node/jest
-import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+import { checkInput, protectOC, addResultShapesToScene } from './decorators'; // Direct import to avoid error with ts-node/jest
 
-import { flattenEntitiesToArray, toRad, toDeg } from './internal' // utils
+import { flattenEntitiesToArray, toRad } from './internal' // utils
 
 
 // this can disable TS errors when subclasses are not initialized yet

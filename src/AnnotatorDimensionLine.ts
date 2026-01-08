@@ -9,13 +9,19 @@
  * 
 */
 
-import { DxfBlock, AlignedDimension, point3d } from '@tarikjabiri/dxf'
+import { DxfBlock, point3d } from '@tarikjabiri/dxf'
 
-import { Point, Vector, Shape, Edge, AnyShape, ShapeCollection, AnyShapeOrCollection, isAnyShapeOrCollection, isPointLike } from './internal'
-import {  Coord, MainAxis, PointLike, ModelUnits, DimensionLineData, DimensionOptions, AnnotationType} from './internal' // types
+import type { Coord, MainAxis, PointLike, 
+        AnyShape, AnyShapeOrCollection, 
+        ModelUnits, 
+        DimensionLineData, DimensionOptions, AnnotationType } from './internal'
+
+import { isAnyShapeOrCollection, isPointLike } from './internal' // typeguards
+import { Point, Vector, Shape, Edge, ShapeCollection,
+        BaseAnnotation
+ } from './internal'
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
-import { BaseAnnotation } from './internal'
 import { roundTo, roundToTolerance } from './internal' // utils
 
 export class DimensionLine extends BaseAnnotation

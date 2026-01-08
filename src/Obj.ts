@@ -13,18 +13,16 @@
 
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, 
-    Solid, ShapeCollection, Brep } from './internal'
-import type { AnyShape } from './internal'
-import { isAnyShape, isObjStyle, isBaseStyle } from './internal' // typeguards
-import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
-import { uuidv4 } from './internal' // utils
-import { MeshShape, MeshShapeBuffer } from './internal' // ExportModels.MeshShape
-import { SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle } from './internal' // InternalModels
-import { isNumeric, colorHexToInt } from './internal'
-import { PointLike, isPointLike, AnyShapeOrCollection, MeshingQualitySettings } from './internal';
-import type { RunnerScriptScopeState } from './internal' 
+import { Vector, Shape, ShapeCollection, Brep } from './internal'
 
+import type { PointLike, AnyShape, AnyShapeOrCollection,
+        MeshShape, MeshShapeBuffer,
+    SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle,
+        MeshingQualitySettings
+ } from './internal'
+import { isPointLike, isAnyShape, isObjStyle, isBaseStyle, isNumeric } from './internal' // typeguards
+import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
+import { uuidv4, colorHexToInt } from './internal' // utils
 
 export class Obj
 {

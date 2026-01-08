@@ -24,12 +24,20 @@
     },
     "skipLibCheck": false
   },
-  "exclude": [
-    "tests"
-  ],
   "ts-node": {
-    "moduleTypes": {
-      "jest.config.ts": "cjs"
+    "esm": true,
+    "experimentalSpecifierResolution": "node",
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "ESNext",
+      "moduleResolution": "node",
+      "experimentalDecorators": true, // legacy decorators
+      "emitDecoratorMetadata": true,
+      "useDefineForClassFields": false,  // This prevents the new TC39 class fields behavior that breaks decorators
     }
   },
+  "exclude": [
+    "tests",
+    "node_modules"
+  ],
 }

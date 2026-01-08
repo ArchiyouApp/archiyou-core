@@ -13,21 +13,30 @@
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 import { DxfBlock, point3d } from '@tarikjabiri/dxf'
 
+// types
+import type { ObjStyle, ThickenDirection, PointLike, Cursor,
+        AnyShape, AnyShapeOrCollection,
+        LinearShape, LinearShapeTail, PointLikeSequence,
+        DimensionOptions } from './internal' // see types
+// constants
 import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_DEFAULT_OFFSET, EDGE_DEFAULT_THICKEN,
     EDGE_DEFAULT_POPULATE_NUM, EDGE_DEFAULT_EXTEND_AMOUNT, EDGE_DEFAULT_EXTEND_DIRECTION, EDGE_DEFAULT_ALIGNTO_FROM,
     EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_ANGLE_SVG, EDGE_DEFAULT_SEGMENTS_SIZE,
+    WIRE_LOFTED_SOLID
 } from './internal'
 
-import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
+import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, 
+    ShapeCollection, VertexCollection,
+    DimensionLine } from './internal'
+
+import { isPointLike } from './internal' // typeguards
+
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal'
 
-import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, AnyShapeOrCollection,
-        LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
-import { roundToTolerance } from './internal'
+// utils
+import { toRad, roundToTolerance, convertValueFromToUnit } from './internal'
+// decorators
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
-import { WIRE_LOFTED_SOLID } from './internal'
-import { toRad, convertValueFromToUnit } from './internal';
-import { DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
 
 
 // this can disable TS errors when subclasses are not initialized yet

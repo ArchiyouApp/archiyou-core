@@ -78,6 +78,7 @@ const myModel = brep.Box(100)
     .subtract(
         brep.Box(50,50,100)
         .move(25,25,50)
+        .hide()
     )
 
 myModel.save('mybox.glb') // in browser: save as window - in node save as file

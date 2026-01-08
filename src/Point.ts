@@ -15,11 +15,16 @@
  *        - Vector and Vertex extend the Point class
  */
 
+import type { MainAxis, PointLike, PolarCoord, Axis, 
+    Cursor, AnyShapeOrCollection, Plane } from './internal' // types
+
+import { AXIS_TO_VECS, isPointLike, isCoord, isAxis, isCursor } from './internal' // see typeguards
+
 import { Vector, Vertex, ShapeCollection, targetOcForGarbageCollection } from './internal'
-import { AXIS_TO_VECS, MainAxis, PointLike, isPointLike, isCoord, Coord, PolarCoord, Axis, isAxis, Cursor, 
-    isAnyShapeOrCollection, AnyShapeOrCollection, isCursor, Plane } from './internal' // see types.ts
+
 import { isRelativeCartesianCoordString, parseRelativePolarCoordString, relativeCoordToNumber, roundToTolerance} from './internal' // utils
 import { addResultShapesToScene, checkInput } from './decorators' // decorators - using internal gives error
+
 import { gp_Pnt, gp_Vec } from './wasm/archiyou-opencascade'
 
 export class Point

@@ -5,13 +5,16 @@
  * 
  */
 
+import type { MakeShellInput, ThickenDirection, 
+            AnyShapeOrCollection, AnyShapeSequence } from './internal' // types
+
+import { isCoordArray, isLinearShape } from './internal' // typeguards
+
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Solid, ShapeCollection } from './internal'
 
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
 
-import { PointLike, isCoordArray, isMakeShellInput, MakeShellInput, AnyShape, ThickenDirection, isThickenDirection, AnyShapeOrCollection, 
-            isLinearShape, AnyShapeSequence, isAnyShapeSequence } from './internal' // types
-import { checkInput, cacheOperation, addResultShapesToScene, protectOC } from './decorators'; // Direct import to avoid error in ts-node/jest
+import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Direct import to avoid error in ts-node/jest
 
 import { flattenEntities } from './internal' // utils
 
