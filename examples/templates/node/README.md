@@ -1,6 +1,6 @@
 # Archiyou Starter Template for Node
 
-Execute Archiyou scripts in a Node enviroment. 
+Use Archiyou as a module in a Node enviroment
 
 ## Quickstart
 
@@ -11,7 +11,7 @@ yarn install
 npm install
 # etc
 
-# run 
+# run basic example
 yarn dev
 npm dev 
 # etc

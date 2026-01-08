@@ -9,7 +9,7 @@ import semver from 'semver'; // for version validation
 
 import type { ScriptParamData, ScriptPublished, ScriptMeta } from './internal';
 import { ScriptParam } from './internal'
-import { uuidv4, dataToModuleString } from './internal' // utils
+import { hash, uuidv4, dataToModuleString } from './internal' // utils
 
 export class Script 
 {
@@ -257,9 +257,7 @@ export class Script
     async getVariantId(paramValues: Record<string,any>): Promise<string> 
     {
         const HASH_LENGTH_TRUNCATE = 11;
-        // TODO: remove dynamic import?
-        const { createHash } = await import('crypto'); // NOTE: only for node right now!
-
+        
         // generate string based on the param names and values
         // in format: {param1:value1,param2:value2,...}
         // NOTE: We use param definitions in script.params and default values if not set in paramValues
@@ -271,14 +269,10 @@ export class Script
                 .filter(([k, v]) => Object.keys(this.params).map(p => p.toUpperCase()).includes(k))
         );
         const input = JSON.stringify({...paramValuesDefault, ...paramValuesUpper}); // incoming overwrite default
-        const hash = createHash('md5').update(input).digest();
+        const variantHash = hash(input);
 
-        // Convert to base64 URL-safe format and truncate
-        const id = hash.toString('base64')
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '')
-            .substring(0, HASH_LENGTH_TRUNCATE);
+        // TODO: see is this still works after change to hash function instead of crypto
+        const id = variantHash.substring(0, HASH_LENGTH_TRUNCATE);
 
         console.log(`Script::getVariantId(): Generated variant id "${id}" for param values: ${input}`);
 

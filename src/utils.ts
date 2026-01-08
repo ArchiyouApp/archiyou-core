@@ -568,7 +568,7 @@ export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffe
                         ? Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength)
                         : u8;
             case 'Buffer':
-                if (typeof Buffer !== 'undefined')
+                if (typeof Buffer !== 'undefined' && Buffer.from)
                 {
                     return Buffer.from(obj.data, 'base64') as any;
                 }

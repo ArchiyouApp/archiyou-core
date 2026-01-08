@@ -29,7 +29,7 @@ import { isCoordArray, isPointLike, isPointLikeSequence,
 
 // special libraries
 import chroma from 'chroma-js';
-import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+//import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
 import { DxfWriter, Units } from '@tarikjabiri/dxf';
  
  interface PackerItem {
@@ -51,12 +51,14 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
  export class ShapeCollection
  {
       /*  ShapeCollection cannot contain other ShapeCollections. Hierarchies are managed by Obj container class */
-      _oc:any; // Don't set to null!
+      _oc:any; 
       _brep:Brep;
       _obj:Obj = null; // Obj container
       _parent:AnyShapeOrCollection;
       shapes:Array<AnyShape> = []; // No ShapeCollection here
       _groups:{[key:string]:Array<AnyShape>} = {}; // mechanism to define groups within ShapeCollection (experimental)
+
+      _packerModule:any; // caching of dynamically imported guillotine-packer
 
       annotations:Array<Annotation> = []; // array of annotations associated with this ShapeCollection
    
@@ -2367,6 +2369,9 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
 
       pack(options:LayoutOptions, copy:boolean=true):ShapeCollection
       {
+         // TODO: implement without old guillotine-packer
+         return null;
+         /*
          const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
          const DEFAULT_BIN_HEIGHT = 1000;
          const DEFAULT_AUTOROTATE = false;
@@ -2470,6 +2475,8 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
 
          // return binpacked Shapes and optionally stock outlines in ShapeCollection
          return (binShapes) ? toShapeCollection.addGroup('bins', binShapes) : toShapeCollection;
+
+         */
       }
 
       _makeBinPackBox(shape:AnyShape, margin:number=10, index:number):any // TODO: typing

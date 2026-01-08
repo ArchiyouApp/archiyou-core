@@ -10,5 +10,5 @@ export async function init()
 {
     // TODO: avoid double init
     const ocLoader = new OcLoader();
-    await ocLoader.load();
+    await ocLoader.loadAsync();
 }

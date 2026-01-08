@@ -1,6 +1,7 @@
 /** OcLoader.js
  * 
- *  This helper class contains some black magic to have a custom build from OC.js working accross environments and modes:
+ *  This helper class contains some black magic to have a custom build from OC.js 
+ *   working accross environments and modes:
  * 
  *    - Synchronous (with callback) or as async function: load(), loadAsync()
  *    - In a browser or node - The context is detected automatically
@@ -12,11 +13,12 @@
  *  
  *    TESTED RUNTIMES:
  *      - Browser: in main or web worker
- *      - Node v18lts
+ *      - Node v18+
  *     
  *    TESTED BUILD TOOLS:
  *      - Vite / Vitest (Nuxt3+)
  *      - Webpack 4 (Nuxt2)
+ * 
  *   
 */
 
@@ -65,7 +67,7 @@ export class OcLoader
   /** Load synchronous */
   load(onLoaded)
   {
-    console.log(`OcLoader::load()[context: ${this._getContext()}]: Loading Opencascade WASM module`);
+    console.log(`OcLoader::load(): ******** [context: ${this._getContext()}]: Loading Opencascade WASM module ********`);
       
     this.startLoadAt = performance.now();
     
@@ -190,6 +192,7 @@ export class OcLoader
     this._oc = oc;
     this._oc.SHAPE_TOLERANCE = this.SHAPE_TOLERANCE; // set tolerance
     Brep.prototype._oc = this._oc; // Brep sets it for all other OC based Classes!
+    console.geom = console.info; // If we don't use the Archiyou console, this avoids any errors
 
     if (this.RUN_TEST){ this.runTest();}
 
