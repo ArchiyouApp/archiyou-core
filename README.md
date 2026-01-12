@@ -9,7 +9,7 @@ Use our editor and community platform for free at [Archiyou.com](https://archiyo
 
 This is a script on our platform:
 
-<img width="350" align="right" src="assets/codecad_table.gif">
+<img width="250" align="right" src="assets/codecad_table.gif">
 
 ```js
 // Parameters
