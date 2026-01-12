@@ -6,8 +6,7 @@
  */
 
 import { ConsoleMessage, ArchiyouApp, Point, Vector, AnyShape, Vertex, Edge, Face, Solid, ShapeCollection, LayoutOptions, addResultShapesToScene } from './internal' // classes
-import { Table } from './internal'; 
-import { PointLike } from './internal' // types
+import { Shape, Table  } from './internal'; 
 
 //// TYPES, TYPEGUARDS AND INTERFACES ////
 
@@ -503,7 +502,7 @@ export class Make
         gridLines.forEach((l,i,arr) => 
         {    
             const newStud = stud._copy()
-                .align(l.start(), 'bottom', 'center')
+                .align((l as Edge).start(), 'bottom', 'center')
                 .moveZ(studThickness)
 
             if(ENDING_STUDS_INSIDE)
@@ -648,9 +647,9 @@ export class Make
                 checkedOpenings.add(checkedOpening); // keep track of final openings
 
                 // make opening surrounding frame
-                const openingTestBuffer = checkedOpening
+                const openingTestBuffer = ((checkedOpening
                                             ._offsetted(studThickness-1) // a bit smaller to avoid accuracy problems
-                                            ._thickened(depth*2)
+                                            ) as Shape)._thickened(depth*2)
 
                 primaryStuds.forEach( (stud,studIndex) => 
                 {

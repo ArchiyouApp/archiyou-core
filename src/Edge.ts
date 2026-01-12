@@ -234,7 +234,7 @@ export class Edge extends Shape
         }
 
         let ocPointList = new this._oc.TColgp_Array1OfPnt_2(1, vertices.length);
-        vertices.forEach( (v,i) => ocPointList.SetValue(i+1, v._toOcPoint()) );
+        vertices.forEach( (v,i) => ocPointList.SetValue(i+1, (v as Vertex)._toOcPoint()) );
         let geomSplineCurveHandle = new this._oc.GeomAPI_PointsToBSpline_2(ocPointList, 3, 8, this._oc.GeomAbs_Shape.GeomAbs_C2, 1.0e-3 ).Curve();
         /* WORKAROUND: Expected null or instance of Handle_Geom_Curve, got an instance of Handle_Geom_BSplineCurve
             We resolve the handle (basically an dynamic pointer in OCE) and make a new Curve Handle from the BezierCurve */
@@ -293,7 +293,7 @@ export class Edge extends Shape
         const bezierPoints = points as VertexCollection;
         
         const ocPointList = new this._oc.TColgp_Array1OfPnt_2(1,bezierPoints.length);
-        bezierPoints.forEach( (v,i) => ocPointList.SetValue(i+1, v._toOcPoint()));
+        bezierPoints.forEach( (v,i) => ocPointList.SetValue(i+1, (v as Vertex)._toOcPoint()));
 
         const ocCurve = new this._oc.Geom_BezierCurve_1(ocPointList);
         const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(new this._oc.Handle_Geom_Curve_2(ocCurve)).Edge();

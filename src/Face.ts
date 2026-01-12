@@ -16,7 +16,7 @@ import type { PointLike, Cursor, PointLikeSequence, MakeFaceInput,
 
 // typeguards
 import { isPointLike, isCoordArray, isPointLikeSequence, 
-    isAnyShapeSequence, isAnyShape, isSelectionString, isVertexCollection
+    isAnyShapeSequence, isAnyShape, isSelectionString
 } from './internal'
 
 import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, 
@@ -815,7 +815,7 @@ export class Face extends Shape
     /** Round corners of Wire with given radius, at given Vertex (same or equals) or VertexCollection or all if given none */
     @protectOC('Size of fillet may not exceed length of neighboring Edges')
     @checkInput([[Number,FACE_FILLET_RADIUS],['PointLikeOrAnyShapeOrCollectionOrSelectionString', null]],['auto','auto'])
-    fillet(radius?:number, vertices?:PointLikeOrAnyShapeOrCollectionOrSelectionString )
+    fillet(radius?:number, at?:PointLikeOrAnyShapeOrCollectionOrSelectionString )
     {
         // OC docs: BRepFilletAPI_MakeFillet2d: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fillet_a_p_i___make_fillet2d.html
         if(this.isEmpty() || !this.planar())
@@ -827,17 +827,17 @@ export class Face extends Shape
         // Fillet can either supply a SelectionString or Any Shape or Collection
         let filletVertices = new VertexCollection();
         let doCheck = true;
-        if (vertices == null)
+        if (at == null)
         {   
             filletVertices = this.vertices() as VertexCollection; // all
             doCheck = false;
         }
-        if (isSelectionString(vertices))
+        if (isSelectionString(at))
         {
-            let selectedShapes = this.select(vertices as SelectionString);
+            let selectedShapes = this.select(at as SelectionString);
             if (selectedShapes == null)
             {
-                console.warn(`No vertices found with selection string: "${vertices}. Fell back to all!`);
+                console.warn(`No vertices found with selection string: "${at}. Fell back to all!`);
                 filletVertices = this.vertices() as VertexCollection;
                 doCheck = false;
             }
@@ -847,7 +847,7 @@ export class Face extends Shape
         }
         else // a Shape or Collection
         {
-            filletVertices = new ShapeCollection(vertices).getSubShapes('Vertex') as VertexCollection;
+            filletVertices = new ShapeCollection(at).getSubShapes('Vertex') as VertexCollection;
         }
 
         // now start tests

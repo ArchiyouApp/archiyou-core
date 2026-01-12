@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "vite build",
+    "link" : "npm link",
     "test": "set NODE_OPTIONS=--experimental-vm-modules && vitest --coverage",
     "build:wasm": "tsx src/wasm/build-scripts/build_wasm_base64.ts",
     "apidocs": "npx typedoc"
@@ -55,7 +56,6 @@
     "typescript": "<5.0",
     "vite": "^6.2.0",
     "vite-plugin-dts": "^4.5.3",
-    "vite-plugin-node-polyfills": "^0.23.0",
     "vite-plugin-static-copy": "^2.3.0",
     "vite-plugin-top-level-await": "^1.5.0",
     "vite-plugin-wasm": "^3.4.1",

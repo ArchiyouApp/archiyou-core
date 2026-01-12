@@ -142,10 +142,11 @@ export interface ScriptPublished
 /** A group of all modules of Archiyou for easy access  */
 export interface ArchiyouApp
 {
+    oc?: any // open cascade module
     worker?: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
     runner?:Runner, // The instance of the Runner where the script is run
     scope?:any // Scope where the script is run in
-    brep: Brep,
+    brep?: Brep,
     doc?: Doc,
     console?: Console,
     executor?: CodeParser,
@@ -768,6 +769,7 @@ export interface DocGraphicInputOrthoLine extends DocGraphicInputBase
 export interface toSVGOptions
 {
     all?:boolean // also invisible
+    only2D?:boolean // only export 2D shapes
     annotations?:boolean
     fills?:boolean // Generate fills in SVG
     outlines?:boolean // Calculate the Shape outlines (Slow!)

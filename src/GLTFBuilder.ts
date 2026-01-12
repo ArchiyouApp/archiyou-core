@@ -192,7 +192,7 @@ export class GLTFBuilder
         gltfBuffer = this._convertArrayBufferToUint8Array(gltfBuffer) // Older versions of GLTF-builder used ArrayBuffer
 
         shape.vertices().forEach(v => {
-            let va = v.toArray()
+            let va = (v as Vertex).toArray()
             vArr = vArr.concat([va[0],va[2], -va[1]]) // just switch z and y coordinate to fix different coordinate system
         })
         

@@ -9,7 +9,7 @@ Use our editor and community platform for free at [Archiyou.com](https://archiyo
 
 This is a script on our platform:
 
-<img width=350 align="right" src="assets/codecad_table.gif">
+<img width="350" align="right" src="assets/codecad_table.gif">
 
 ```js
 // Parameters
@@ -50,7 +50,6 @@ top.fillet(1,'Face||top'); // finish table top
 * Open Design: Share scripts and build upon others
 * Project management [Coming]
 
-
 ## Developer Quickstart
 
 To use Archiyou as a module to generate designs and documentation independently from our platform it's available as module on npm. 
@@ -64,38 +63,34 @@ yarn add archiyou
 
 Now run this script in the browser or node:
 
-
 ```js
-
-import { initSimple as init, Brep, Doc } from 'archiyou'
+import { init, Brep, Doc } from 'archiyou'
 
 await init();
 
 const brep = new Brep();
 
-// model a box 
 const myModel = brep.Box(100)
-    .subtract(
+    .subtract( // subtract a box from the main box
         brep.Box(50,50,100)
-        .move(25,25,50)
+        .move(25,-25,50)
         .hide()
-    )
+    ).fillet(5); // Give it round edges
 
-myModel.save('mybox.glb') // in browser: save as window - in node save as file
+await myModel.save('mybox.glb')
 
-// make a 2D isometry projection
-const myIso = myModel.iso()
-myIso.save('myboxiso.svg'); 
+const myIso = myModel.iso([1,-1,1])
+myIso.save('myboxiso.svg');  // export as SVG file
 
-// put it on document
-const myDoc = new Doc().create('spec')
-                .text('My design')
-                .view(myIso);
+const myDoc = new Doc() // Doc module
+                .create('myDoc') // start a new document (and first page)
+                .page('myPage')
+                .text('My design')  // place text
+                .view('iso', myIso); // place view of myIso shapes
 
-myDoc.save('myboxdoc.pdf');
-
-
+await myDoc.save('myboxdoc.pdf');
 ```
+<img src="assets/archiyou_start_example.png">
 
 ## Starter templates for your framework
 

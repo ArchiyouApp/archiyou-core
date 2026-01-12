@@ -328,7 +328,7 @@ export class Solid extends Shape
     /** Give the Solid rounded corners at its Edges with a given radius */
     @protectOC(['Fillet size cannot be bigger then length of filleted Edge'])
     @checkInput([[Number,SOLID_FILLET_RADIUS], ['AnyShapeOrCollectionOrSelectionString',null]], ['auto','auto'])
-    fillet(radius?:number, edges?:AnyShapeOrCollectionOrSelectionString):Solid
+    fillet(radius?:number, at?:null|AnyShapeOrCollectionOrSelectionString):this
     {
         /* OC Docs: 
             - https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fillet_a_p_i___make_fillet.html
@@ -341,13 +341,13 @@ export class Solid extends Shape
         let filletEdges = new ShapeCollection();
         let solidEdges = this.edges();
 
-        if (edges === null)
+        if (at ?? true)
         {
             filletEdges = solidEdges; // all
         }
-        else if(isSelectionString(edges))
+        else if(isSelectionString(at))
         {
-            let selectionString = edges as SelectionString;
+            let selectionString = at as SelectionString;
 
             let selectedShapes = new ShapeCollection(this.select(selectionString)); // select might return Shape or ShapeCollection
             if (selectedShapes == null)
@@ -368,7 +368,7 @@ export class Solid extends Shape
         }
         else {
             // just a collection
-            filletEdges = new ShapeCollection(edges);
+            filletEdges = new ShapeCollection(at);
         }
 
         // now check
@@ -450,7 +450,7 @@ export class Solid extends Shape
 
     /** Chamfer Solid at given Edges with given size */
     @checkInput([[Number, SOLID_CHAMFER_DISTANCE],['AnyShapeOrCollectionOrSelectionString',null]], ['auto','auto'])
-    chamfer(distance?:number, edges?:AnyShapeOrCollectionOrSelectionString, ):Solid
+    chamfer(distance?:number, edges?:AnyShapeOrCollectionOrSelectionString, ):this
     {
          /* OC Docs: 
             - https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fillet_a_p_i___make_chamfer.html
@@ -555,7 +555,7 @@ export class Solid extends Shape
             return this;
         }
         else {
-            throw new Error(`Solid::chamfer: ERROR\n Error generating chamfered Solid`);
+            throw new Error(`Solid::chamfer: ERROR: Error generating chamfered Solid`);
         }   
 
     }

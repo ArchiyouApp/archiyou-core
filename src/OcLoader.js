@@ -191,15 +191,18 @@ export class OcLoader
 
     this._oc = oc;
     this._oc.SHAPE_TOLERANCE = this.SHAPE_TOLERANCE; // set tolerance
+
     Brep.prototype._oc = this._oc; // Brep sets it for all other OC based Classes!
     console.geom = console.info; // If we don't use the Archiyou console, this avoids any errors
 
     if (this.RUN_TEST){ this.runTest();}
 
+    // callback function
     if (onLoaded)
     {
       onLoaded(oc, this); // oc and current runner instance as arguments to callback
     }
+    
     return this._oc;
   }
 

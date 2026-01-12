@@ -1242,6 +1242,18 @@ export class Shape
         return this.rotateToLayFlat('vertical');
     }
 
+    fillet(radius?: number, at?: any): this
+    {
+        console.warn(`Shape::fillet(): Not implemented for type ${this.type()}`);
+        return this;
+    }
+
+    chamfer(radius?: number, at?: any): this
+    {
+        console.warn(`Shape::chamfer(): Not implemented for type ${this.type()}`);
+        return this;
+    }
+
     /** Check if a Solid Shape can be seen as a simple extrusion and return the base Face */
     _extrudedFace(side:SideZ='bottom'):Face|null
     {
@@ -2324,7 +2336,7 @@ export class Shape
         {
 
             // protect against weird crashed of OC under heavy load
-            let ocCutter = new this._oc.BRepAlgoAPI_Cut_3(result, shape._ocShape,  new this._oc.Message_ProgressRange_1());
+            const ocCutter = new this._oc.BRepAlgoAPI_Cut_3(result, shape._ocShape,  new this._oc.Message_ProgressRange_1());
             ocCutter.SetRunParallel(false); // Does not seem to work!
             ocCutter.SetFuzzyValue(0.1);
             ocCutter.Build(new this._oc.Message_ProgressRange_1());
@@ -2338,11 +2350,11 @@ export class Shape
             }
         });
 
-        let fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false); 
+        const fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false); 
         fusor.Build();
-        let newOcShape:any = fusor.Shape();
+        const newOcShape:any = fusor.Shape();
 
-        let newShape = new Shape()._fromOcShape(newOcShape) as AnyShape; // we expect only a single Shape
+        const newShape = new Shape()._fromOcShape(newOcShape) as AnyShape; // we expect only a single Shape
 
         return newShape;
     }
@@ -2359,7 +2371,7 @@ export class Shape
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     subtract(others:AnyShapeOrCollection, removeOthers=false):AnyShapeOrCollection
     {
-        let newShape = this._subtracted(others);
+        const newShape = this._subtracted(others);
         
         // Subtracted never changes the Shape type, we can just replace the OC geometry
         if (newShape == null)
@@ -4564,13 +4576,13 @@ export class Shape
      *      Use showHidden=true to output with hidden lines
      */
     @addResultShapesToScene
-    isometry(viewpoint:string|PointLike, showHidden:boolean=false):AnyShapeCollection
+    isometry(viewpoint?:string|PointLike, showHidden:boolean=false):AnyShapeCollection
     {
         return this._isometry(viewpoint, showHidden)
     }
 
     /** Alias for isometry() */
-    iso(viewpoint:string|PointLike, showHidden:boolean=false):AnyShapeCollection
+    iso(viewpoint?:string|PointLike, showHidden:boolean=false):AnyShapeCollection
     {
         return this.isometry(viewpoint, showHidden)
     }
@@ -4960,11 +4972,8 @@ export class Shape
      *   Supported formats: glb, svg, step, stl, dxf
     */
     save(filename:string, options:any={})
-    {
-        console.log('SAVING SHAPE TO FILE:', filename);
-        
-        new ShapeCollection(this)
-        .save(filename, options);
+    {    
+        new ShapeCollection(this).save(filename, options);
     }
 
     toData():Object

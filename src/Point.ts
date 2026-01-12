@@ -15,12 +15,12 @@
  *        - Vector and Vertex extend the Point class
  */
 
-import type { MainAxis, PointLike, PolarCoord, Axis, 
+import type { MainAxis, PointLike, PolarCoord, 
     Cursor, AnyShapeOrCollection, Plane } from './internal' // types
 
 import { AXIS_TO_VECS, isPointLike, isCoord, isAxis, isCursor } from './internal' // see typeguards
 
-import { Vector, Vertex, ShapeCollection, targetOcForGarbageCollection } from './internal'
+import { Vector, Vertex, Edge, ShapeCollection } from './internal'
 
 import { isRelativeCartesianCoordString, parseRelativePolarCoordString, relativeCoordToNumber, roundToTolerance} from './internal' // utils
 import { addResultShapesToScene, checkInput } from './decorators' // decorators - using internal gives error
@@ -470,9 +470,8 @@ export class Point
         const projectedPoints:Array<Point> = [];
         toOperants.edges().forEach( curEdge => // NOTE: is Shape is a Vertex there will be no edges()
         {
-            let umin, umax;
-            [umin,umax] = curEdge.getParamMinMax();
-            let ocGeomCurveHandle = curEdge._toOcCurve().Curve().Curve(); // Going through the adaptors: _toOcCurve : Adaptor3D_Curve => .Curve(): GeomAdaptor_Curve => .Curve(): Handle_Geom_Curve 
+            // const [umin,umax] = (curEdge as Edge).getParamMinMax();
+            let ocGeomCurveHandle = (curEdge as Edge)._toOcCurve().Curve().Curve(); // Going through the adaptors: _toOcCurve : Adaptor3D_Curve => .Curve(): GeomAdaptor_Curve => .Curve(): Handle_Geom_Curve 
             
             //let ocProjector = new this._oc.GeomAPI_ProjectPointOnCurve_3(this._toOcPoint(), ocGeomCurveHandle, umin, umax);
             let ocProjector = new this._oc.GeomAPI_ProjectPointOnCurve_2(this._toOcPoint(), ocGeomCurveHandle);
@@ -482,9 +481,9 @@ export class Point
                 let ocPoint = ocProjector.Point(i);
                 let p = new Point()._fromOcPoint(ocPoint);
                 // NOTE: For circle Edges something strange happens: HACK a solution
-                if (curEdge.edgeType() == 'Circle')
+                if ((curEdge as Edge).edgeType() == 'Circle')
                 {
-                    p.add(curEdge.center());
+                    p.add((curEdge as Edge).center());
                 }
                 
                 projectedPoints.push(p);

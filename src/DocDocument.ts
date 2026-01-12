@@ -1,5 +1,7 @@
 import { Doc, Page,  } from './internal'
-import type { DocUnits, PageSize , PageOrientation,  DocPipeline, DocData } from './internal';
+import type { DocUnits, PageSize , PageOrientation, DocPipeline, DocData } from './internal';
+
+import { getArchiyou } from './init'
 
 /** A document that is part of a Doc module instance
  *  It contains pages and some settings
@@ -82,7 +84,7 @@ export class DocDocument
             name: this.name,
             units: this.units,
             pages: docPagesData,
-            modelUnits: this._doc._brep._units, // set model units to calculate scale later
+            modelUnits: (this._doc._brep || getArchiyou()?.brep)._units, // set model units to calculate scale later
         }
         
     }

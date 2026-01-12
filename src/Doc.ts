@@ -28,17 +28,21 @@
  * 
  */
 
-import { Brep, ShapeCollection, DataRows, Container, ContainerType, DocDocument, Page, PageSize, AnyPageContainer, 
-            View, GraphicContainer, TableContainer, 
-            Text, TextArea, Image,
-            TableContainerOptions, DocPathStyle,  
-            ContainerAlignment, ContainerHAlignment, ContainerVAlignment,
-            ContainerPositionLike, ContainerPositionRel, ContainerPositionAbs,
-            DocPDFExporter, ScriptParam} from './internal' // classes
-
 import type { ArchiyouApp, AnyShapeOrCollection, PageSide, PageOrientation, 
             PageData, ContainerSide, ContainerSizeRelativeTo,
             ScaleInput, ImageOptions, TextOptions } from './internal' // types and type guards
+
+import { Brep, ShapeCollection, DataRows, 
+         Container, DocDocument, Page, PageSize, AnyPageContainer, 
+         Exporter,
+         View, GraphicContainer, TableContainer, 
+         Text, TextArea, Image,
+         TableContainerOptions, DocPathStyle,  
+         ContainerAlignment, ContainerHAlignment, ContainerVAlignment,
+         ContainerPositionLike, ContainerPositionRel, ContainerPositionAbs,
+         DocPDFExporter, ScriptParam} from './internal' // classes
+
+
 
 import type { DocSettings, DocUnits, DocUnitsWithPerc, PercentageString, ValueWithUnitsString, WidthHeightInput, 
     ContainerTableInput, DocData, DocGraphicInputRect, DocGraphicInputCircle, 
@@ -51,6 +55,8 @@ import { isDocUnits, isPercentageString, isValueWithUnitsString, isAnyPageContai
     isContainerVAlignment, isContainerAlignment, isContainerPositionCoordAbs, isPageSize } from './internal' // typeguards
 
 import { convertValueFromToUnit, isNumeric, isContainerPositionCoordRel } from './internal' // utils
+
+import { setArchiyou } from './init';
 
 
 //// MAIN CLASS ////
@@ -87,7 +93,7 @@ export class Doc
     constructor(settings?:DocSettings, ay?:ArchiyouApp) // null is allowed
     {
         this._pdfExporter = new DocPDFExporter(); // empty PDF exporter
-        this.setArchiyou(ay)
+        this.setArchiyou(ay);
 
         //// DEFAULTS
         this._setDefaults();
@@ -102,6 +108,10 @@ export class Doc
             console.info(`Doc::constructor(settings, ay): Init Doc module with settings: "${JSON.stringify(settings)};`)
         }
         
+        // Register at global ay
+        setArchiyou({
+            doc: this
+        });
     }
 
     hasDocs():boolean
@@ -255,6 +265,19 @@ export class Doc
         return this._activeDoc;
     }
 
+    /** Check if there is an active Page, otherwise create a default one 
+     *  This avoid errors when user forgets to create a page
+    */
+    _getOrMakeActivePage()
+    {
+        if(!this._activePage)
+        {
+            console.warn(`Doc::_getOrMakeActivePage(): No active page. Creating default page 'default'`);
+            this.page('default');
+        }
+        return this._activePage;
+    }
+
     /** Set Unit for active DocDocument: 'mm','cm' or 'inch' */
     units(units:DocUnits):Doc
     {
@@ -356,7 +379,7 @@ export class Doc
         if(typeof name !== 'string'){ throw new Error(`Doc::view: Please supply a name to the view!`);}
         this._checkPageIsActive();
         
-        const newViewContainer = new View().on(this._activePage).setName(name);
+        const newViewContainer = new View().on(this._getOrMakeActivePage()).setName(name);
         this._activeContainer = newViewContainer;
         if(ShapeCollection.isShapeCollection(shapes))
         {
@@ -372,7 +395,7 @@ export class Doc
         if(typeof url !== 'string'){ throw new Error(`Doc::image: Please supply a string with the image`);}
         if(!url.includes('http')){ throw new Error(`Doc::image: Please supply a url with http(s)`);}
 
-        const newImageContainer = new Image(url, options).on(this._activePage);
+        const newImageContainer = new Image(url, options).on(this._getOrMakeActivePage());
         this._activeContainer = newImageContainer;
         
         return this;
@@ -384,7 +407,7 @@ export class Doc
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
         text = (typeof text !== 'string') ? (text?.toString() || '') : text;
 
-        const newTextContainer = new Text(text, options).on(this._activePage);
+        const newTextContainer = new Text(text, options).on(this._getOrMakeActivePage());
         this._activeContainer = newTextContainer;
         return this;
     }
@@ -395,7 +418,7 @@ export class Doc
         if( (typeof text !== 'string') && (typeof text !== 'number') ){ throw new Error('Doc::text(): Please supply a string or number for a Text Container!') }
         text = (typeof text !== 'string') ? (text?.toString() || '') : text;    
 
-        const newTextAreaContainer = new TextArea(text, options).on(this._activePage);
+        const newTextAreaContainer = new TextArea(text, options).on(this._getOrMakeActivePage());
         this._activeContainer = newTextAreaContainer;
         return this;
     }
@@ -416,7 +439,7 @@ export class Doc
                     this._calc.db.table(nameOrData as string).toDataRows()
                     : nameOrData as DataRows
 
-        const newTableContainer = new TableContainer(dataRows, options).on(this._activePage);
+        const newTableContainer = new TableContainer(dataRows, options).on(this._getOrMakeActivePage());
 
         this._activeContainer = newTableContainer;
         
@@ -1140,9 +1163,9 @@ export class Doc
      *  @param only string/Array of doc names to export. Default is all
      *  @returns Either single pdf ArrayBuffer or Record of ArrayBuffers if multiple docs are exported
      */
-    async toPDF(only:string|Array<string>):Promise<ArrayBuffer | Record<string, ArrayBuffer>>
+    async toPDF(only:string|Array<string>=[]):Promise<ArrayBuffer | Record<string, ArrayBuffer>>
     {
-        console.info(`Doc::toPDF(): Exporting docs to PDF: ${only ? (Array.isArray(only) ? only.join(', ') : only) : 'all'}`);
+        console.info(`Doc::toPDF(): Exporting docs to PDF: ${only ? ((Array.isArray(only) && only.length > 1) ? only.join(', ') : only) : 'all'}`);
 
         const onlyDocs = (Array.isArray(only)) ? only : (typeof only === 'string') ? [only] : [];
         const data = await this.toData(onlyDocs); // by doc name
@@ -1152,7 +1175,22 @@ export class Doc
                 ? Object.values(pdfBuffersByDocName)[0] // single buffer
                 : pdfBuffersByDocName; // multiple buffers by doc name
     }
-    
+
+    /** Convenience save documents in Doc module directly to PDF file */
+    async save(filename?:string)
+    {   
+        const buffers = await this.toPDF();
+        
+        if(buffers instanceof ArrayBuffer)
+        {
+            const docName = this.docs()[0];
+            await new Exporter()._saveDataToFile(buffers as ArrayBuffer, filename || `${docName}.pdf`);
+        }
+        else 
+        {
+            console.error(`Doc::save(): There are multiple PDF buffers to save. Please supply any of these document names: ${this.docs().join(',')}`);
+        }
+    }
 
     //// PRIVATE METHODS ////
 
@@ -1405,6 +1443,7 @@ export class Doc
         
         return this;
     }
+
 
     
 }

@@ -358,6 +358,172 @@ export function mmToPoints(m:number):number
     return m/25.4*72
 }
 
+//// WORKING WITH NESTED OBJECTS ////
+
+/** Node structure for filterNestedObjects - optimized for XML/SVG parsing */
+export interface NestedObjectNode<T = any> {
+    tagName: string;              // The tag name or key in parent
+    value: T;                     // The actual object/value
+    parent?: NestedObjectNode<T>; // Reference to parent node
+    children?: NestedObjectNode<T>[]; // Child nodes
+    attributes?: Record<string, any>; // All properties except nested objects
+}
+
+/**
+ * Recursively traverse nested XML/SVG objects and return nodes matching the filter
+ * Optimized for structures from fast-xml-parser where tag names are object keys
+ * Traverses ALL object properties as potential child elements
+ * 
+ * @param obj - The root object to traverse
+ * @param filterFunc - Function that returns true for nodes to include
+ * @param options - Configuration options
+ * @returns Array of matching Node objects
+ * 
+ * @example
+ * // SVG structure: { svg: { rect: { x: 0, y: 0, width: 50 }, circle: { cx: 25, cy: 25, r: 10 } } }
+ * const rects = filterNestedObjects(
+ *   svgData,
+ *   (node) => node.tagName === 'rect'
+ * );
+ * // Returns: [{ tagName: 'rect', value: {...}, attributes: { x: 0, y: 0, width: 50 }, children: [] }]
+ */
+export function filterNestedObjects<T = any>(
+    obj: T,
+    filterFunc: (node: NestedObjectNode<T>) => boolean,
+    options: {
+        maxDepth?: number,                 // Maximum recursion depth
+        includeRoot?: boolean,             // Whether to test the root object
+        collectParents?: boolean,          // Collect parent nodes if child matches
+        extractAttributes?: boolean,       // Extract non-object properties (default: true)
+        excludeKeys?: string[],            // Keys to exclude from attributes
+    } = {}
+): NestedObjectNode<T>[]
+{
+    const {
+        maxDepth = 100,
+        includeRoot = false,
+        collectParents = false,
+        extractAttributes = true,
+        excludeKeys = [],
+    } = options;
+
+    const results: NestedObjectNode<T>[] = [];
+    const excludeSet = new Set(excludeKeys);
+
+    function extractNodeAttributes(nodeValue: any): Record<string, any> | undefined
+    {
+        if (!extractAttributes || typeof nodeValue !== 'object' || nodeValue === null) {
+            return undefined;
+        }
+
+        const attrs: Record<string, any> = {};
+        for (const [key, value] of Object.entries(nodeValue)) {
+            // Skip excluded keys
+            if (excludeSet.has(key)) continue;
+            
+            // Only include non-object values (primitives, arrays)
+            // Nested objects are traversed as children, not included in attributes
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+                attrs[key] = value;
+            }
+        }
+
+        return Object.keys(attrs).length > 0 ? attrs : undefined;
+    }
+
+    function traverse(
+        nodeValue: T, 
+        nodeName: string,
+        depth: number = 0, 
+        parentNode?: NestedObjectNode<T>
+    ): { node: NestedObjectNode<T>, matches: boolean }
+    {
+        // Prevent infinite recursion
+        if (depth >= maxDepth) {
+            console.warn(`filterNestedObjects: Maximum depth ${maxDepth} reached`);
+            return { node: null, matches: false };
+        }
+
+        // Handle null/undefined
+        if (nodeValue === null || nodeValue === undefined) {
+            return { node: null, matches: false };
+        }
+
+        // Skip primitives
+        if (typeof nodeValue !== 'object') {
+            return { node: null, matches: false };
+        }
+
+        // Create Node object
+        const currentNode: NestedObjectNode<T> = {
+            tagName: nodeName,
+            value: nodeValue,
+            parent: parentNode,
+            children: [], // Initialize empty children array
+            attributes: extractNodeAttributes(nodeValue)
+        };
+
+        let nodeMatches = false;
+        let childMatches = false;
+
+        // Test current node (skip root if includeRoot is false)
+        if (depth > 0 || includeRoot) 
+        {
+            nodeMatches = filterFunc(currentNode);
+            if (nodeMatches) {
+                results.push(currentNode);
+            }
+        }
+
+        // Traverse ALL object properties
+        // Each nested object is a potential child element in XML/SVG structures
+        for (const [key, value] of Object.entries(nodeValue as any)) {
+            // Skip excluded keys
+            if (excludeSet.has(key)) continue;
+
+            if (Array.isArray(value)) {
+                // Handle arrays - each item is a child
+                value.forEach((child, index) => {
+                    if (typeof child === 'object' && child !== null) {
+                        const childName = key; // Use just the key name, not key[index]
+                        const result = traverse(child as T, childName, depth + 1, currentNode);
+                        if (result.node) {
+                            currentNode.children.push(result.node);
+                            if (result.matches) {
+                                childMatches = true;
+                            }
+                        }
+                    }
+                });
+            } else if (value && typeof value === 'object') {
+                // Each nested object is a child element
+                // e.g., { svg: { rect: {...}, circle: {...} } }
+                const result = traverse(value as T, key, depth + 1, currentNode);
+                if (result.node) {
+                    currentNode.children.push(result.node);
+                    if (result.matches) {
+                        childMatches = true;
+                    }
+                }
+            }
+        }
+
+        // If collectParents is true and any child matched, add this parent
+        if (collectParents && childMatches && !nodeMatches) {
+            results.push(currentNode);
+        }
+
+        return { 
+            node: currentNode, 
+            matches: nodeMatches || childMatches 
+        };
+    }
+
+    // Start traversal
+    traverse(obj, 'root', 0);
+    return results;
+}
+
 //// DATA ENCODING ////
 
  /**
@@ -524,7 +690,6 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
 
     
 }
-
 
 
 /**

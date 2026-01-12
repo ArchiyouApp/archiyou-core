@@ -69,6 +69,8 @@ import { Annotator } from './internal';
 
 import { isNumeric  } from './utils';
 
+import { setArchiyou } from './init';
+
 //// OWN DEFAULTS
 const DEFAULT_UNITS = 'mm';
 const CIRCLE_RADIUS = 50;
@@ -127,6 +129,11 @@ export class Brep
 
     this.scene = new Obj().name("scene") as Obj; // create empty Collection
     this.setActiveLayer(this.scene);
+
+    // registers at global _ay
+    setArchiyou({
+      brep: this
+    });
 
   }
 

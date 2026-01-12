@@ -1663,7 +1663,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     }
                     break;
                 case 'svg': // 2D SVG export
-                    outp = (scope.exporter as Exporter).exportToSVG(true);
+                    outp = (scope.exporter as Exporter).exportToSVG();
                     if(outp)
                     {
                         outputs.push({

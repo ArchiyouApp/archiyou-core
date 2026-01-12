@@ -969,7 +969,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       */
 
       /** Just a simple forwarder fillet */
-      fillet(radius:number, at:any):ShapeCollection
+      fillet(radius:number, at?:any):ShapeCollection
       {
          const SHAPES_FILLET = ['Wire','Face', 'Solid']
          this.forEach( 
@@ -1402,12 +1402,12 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       *      Use showHidden=true to output with hidden lines
       */
       @addResultShapesToScene
-      isometry(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
+      isometry(viewpoint?:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
          return this._isometry(viewpoint, showHidden)
       }
 
-      iso(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
+      iso(viewpoint?:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
          return this.isometry(viewpoint, showHidden)
       }
@@ -2747,9 +2747,6 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       /** Export Shapes that are 2D and on XY plane to SVG 
        *    All shapes will be converted to Edges
        *    @param options { all:boolean, annotations: boolean, contours:boolean  }
-       * 
-       *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
-       *    TODO: run these algorithms apart from OC
       */
       toSVG(options?:toSVGOptions):string
       {
@@ -2849,7 +2846,8 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       {
          const shapesToSave = ShapeCollection.isShapeCollection(shapes) ? shapes : this;
 
-         new Exporter({ brep: this._brep } as ArchiyouApp).save(filename, options, shapesToSave);
+         new Exporter({ brep: this._brep } as ArchiyouApp)
+            .save(filename, options, shapesToSave);
       }
 
 

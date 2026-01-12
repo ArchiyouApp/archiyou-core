@@ -3,7 +3,8 @@
 import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH } from './internal';
 
 import type { ArchiyouApp, AnyShapeOrCollection,
-    ExportGLTFOptions, MeshingQualitySettings } from './internal'
+    ExportGLTFOptions, MeshingQualitySettings,
+    toSVGOptions } from './internal'
 
 import { isBrowser } from './internal'
 
@@ -354,7 +355,7 @@ export class Exporter
 
         const ext = (typeof content === 'string') ? 'gltf' : 'glb';
         const gltfContent = content || await this.exportToGLTF();
-        this._exportToFileWindow(gltfContent, mime, ext, 'GLTF file');
+        await this._exportToFileWindow(gltfContent, mime, ext, 'GLTF file');
     }
 
     async exportToGLTFAnimation(frameGLBs:Array<Uint8Array>):Promise<Uint8Array>
@@ -366,24 +367,50 @@ export class Exporter
 
     async exportToGLTFAnimationWindow(content:Uint8Array)
     {
-        this._exportToFileWindow(content, 'application/octet-stream', 'glb', 'GLTF file');
+        await this._exportToFileWindow(content, 'application/octet-stream', 'glb', 'GLTF file');
     }
 
     /** Export entire (visual) model by creating a isometric 2D view  
      * TODO: seperate these functions into export3DtoSVG and export2DtoSVG
     */
-    exportToSVG(only2D:boolean=false):string
+    exportToSVG(shapes?:ShapeCollection, options:toSVGOptions={}):string
     {
-        if(!only2D)
+        const shapesToExport = ShapeCollection.isShapeCollection(shapes) 
+                                    ? shapes // only selected shapes
+                                    : this._ay.brep.all().filter(s => s.visible()); // all visible ones in scene
+
+        // if user forces only 2D export or shapes are all 2D anyway
+        if(options?.only2D || shapesToExport.toArray().every(s => s.is2DXY()))
         {
-            const visibleShapes = this._ay.brep.all().filter(s => s.visible());
-            return visibleShapes._isometry().toSVG();
+            return this._export2DToSVG(shapesToExport, options);
         }
         else {
-            // Only export 2D edges on XY plane
-            const edges2DCollection = new ShapeCollection(this._ay.brep.all().filter(s => s.visible() && s.is2DXY()));
-            return edges2DCollection.toSVG();
+            console.info(`Exporter::exportToSVG(): Exporting from 3D to 2D using isometry. If you want only the 2D set only2D to true`)
+            return this._export3DToSVG(shapesToExport, options);
         }
+
+    }
+
+    /** Shortcut function to export 3D shapes to SVG 
+        Make a isometry first
+    */
+    _export3DToSVG(shapes:ShapeCollection, options:toSVGOptions={})
+    {
+        if(!ShapeCollection.isShapeCollection(shapes) || shapes.length === 0)
+        { 
+            throw new Error(`Exporter::_export3DToSVG(): Please supply a ShapeCollection with at least one shape!`);
+        }
+        return shapes._isometry().toSVG(options);
+    }
+
+    /** Export 2D shapes to SVG */
+    _export2DToSVG(shapes:ShapeCollection, options:toSVGOptions={})
+    {
+        if(!ShapeCollection.isShapeCollection(shapes) || shapes.length === 0)
+        { 
+            throw new Error(`Exporter::_export2DToSVG(): Please supply a ShapeCollection with at least one shape!`);
+        }
+        return shapes.toSVG(options);
     }
 
     /** Combine all SVG's into one with SMIL keyframe animations
@@ -461,47 +488,66 @@ export class Exporter
     }
 
 
-    /** Convenience method for saving files in browser and node */
-    async save(filename:string, options:any={}, shapes:ShapeCollection)
+    /** Convenience method for exporting Shapes and save as file in browser and node */
+    async save(filename:string, options:any={}, shapes?:ShapeCollection)
     {
         const EXTENTIONS_EXPORT_METHODS = {
             // extentions and mapping to exporter method
             'glb' : async (exp, shapes, filename, options) => await exp.exportToGLTF(shapes, options, filename),
-            'svg': async (exp, shapes, filename, options) => exp.exportToSVG(),
+            'svg': async (exp, shapes, filename, options) => exp.exportToSVG(shapes, options),
             'step': async (exp, shapes, filename, options) => exp.exportToSTEP(shapes, options, filename),
             'stl': async (exp, shapes, filename, options) => exp.exportToSTL(shapes, options, filename),
             'dxf' : async (exp, shapes, filename, options) => exp.exportToDXF(shapes, options, filename),
-        } 
+            // TODO: more
+        }
 
         const ext = filename.split('.').pop();
         if(!Object.keys(EXTENTIONS_EXPORT_METHODS).includes(ext))
         {
-            console.error(`Shape::save: Unsupported file extension to save file "${filename}". Please use any of these extensions: ${Object.keys(EXTENTIONS_EXPORT_METHODS).join(', ')}`);
+            console.error(`Shape::save: Unsupported file extension to save file "${filename}".
+                Please use any of these extensions: ${Object.keys(EXTENTIONS_EXPORT_METHODS).join(', ')}.
+                Or as developer set mapping to export functions`);
             return;
         }
+        const data = await EXTENTIONS_EXPORT_METHODS[ext](this, shapes, options, filename);        
 
-        const data = await EXTENTIONS_EXPORT_METHODS[ext](this, shapes, options, filename);
-        console.log(data);
+        await this._saveDataToFile(data, filename);
+    }
 
+    /** save raw data to file in browser of node */
+    async _saveDataToFile(data:any, filename:string)
+    {
         if (isBrowser())
         {
-            
+            this.saveDataToFileWindow(data, filename);
         }
         else {
             // We are in backend Node
-            const ops = new RunnerOps();
+            const ops = new RunnerOps(); // some utils
             await ops.saveBlobToFile(data, filename);
         }
-        
     }
-
 
     //// UTILS ////
 
+    /** Simplified function to output data to a file window */
+    async saveDataToFileWindow(data, filename:string)
+    {
+        const mime = this._mimeFromFileName(filename);
+        const ext = filename.split('.').pop();
+        await this._exportToFileWindow(data, mime, ext, `Save .${ext} File`);
+    }
+
+    /** Write data to local disk by opening a file picker in browser */
     async _exportToFileWindow(data:any, mime:string, ext:string, desc:string)
     {
         const fileHandle = await this.getNewFileHandle(desc, mime, ext);
-        await this.writeFile(fileHandle, data)
+        // Create a FileSystemWritableFileStream to write to
+        const writable = await fileHandle.createWritable();
+        // Write the contents of the file to the stream
+        await writable.write(data);
+        // Close the file and write the contents to disk.
+        await writable.close();
         console.info(`Exporter::exportToWindow(): Saved file "${fileHandle.name}"`);
     }
 
@@ -510,6 +556,20 @@ export class Exporter
         // Try to get script name from parent (Webworker (likely!), or Main))
         // TODO: Fix with new Runner structure
         return this._ay?.worker?.lastExecutionRequest?.script?.file_name || 'exportmodel';
+    }
+
+    _mimeFromFileName(fileName:string):string
+    {
+        const ext = fileName.split('.').pop();
+        switch(ext)
+        {
+            case 'svg': return 'image/svg+xml';
+            case 'dxf': return 'application/dxf';
+            case 'stl': return 'application/sla';
+            case 'step': return 'application/step';
+            case 'glb': return 'model/gltf-binary';
+            default: return 'application/octet-stream';
+        }
     }
 
     // Taken from Cascade Studio
@@ -573,15 +633,6 @@ export class Exporter
         }
     }
 
-    async writeFile(fileHandle, contents)
-    {
-        // Create a FileSystemWritableFileStream to write to.
-        const writable = await fileHandle.createWritable();
-        // Write the contents of the file to the stream.
-        await writable.write(contents);
-        // Close the file and write the contents to disk.
-        await writable.close();
-    }
 
 
 }

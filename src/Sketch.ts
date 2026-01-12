@@ -13,13 +13,13 @@
 import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal'
 
 import type { PointLike, Cursor, AnyShape, SketchPlaneName, PointLikeSequence, 
-    AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, 
+    AnyShapeCollection, ShapeType, 
     AnyShapeOrCollection, SelectionString,
     AnyShapeOrCollectionOrSelectionString } from './internal'
 
-import { isPointLike, isAnyShape, isSelectionString } from './internal' // typeguards
+import { isPointLike, isAnyShape, isSelectionString, isSketchPlaneName } from './internal' // typeguards
 
-import { Point, Vector, ShapeCollection, Vertex, Edge, Wire, Face, Brep } from './internal'
+import { Point, Vector, ShapeCollection, VertexCollection, Vertex, Edge, Wire, Face, Brep } from './internal'
 
 import { gp_Ax3, gp_Trsf } from './wasm/archiyou-opencascade' // OC
 
@@ -895,19 +895,19 @@ export class Sketch
 
     /** Apply fillet to Edges or Faces */
     @checkInput([ [Number, SKETCH_FILLET_SIZE], ['AnyShapeOrCollectionOrSelectionString', null]], ['auto', 'auto'])
-    fillet(size?:number, vertices?:AnyShapeOrCollectionOrSelectionString):Sketch
+    fillet(size?:number, at?:AnyShapeOrCollectionOrSelectionString):Sketch
     {
         if (this.pendingShapes.every(s => s.type() == 'Edge' ||  s.type() == 'Wire'))
         {
             // For Edges fillet is applied after the next Edge: set pendingOperations
-            this.pendingOperations.push({ type: 'fillet', params: { size: size, vertices: vertices }, resetOps: true });
+            this.pendingOperations.push({ type: 'fillet', params: { size: size, at: at }, resetOps: true });
         }
 
         else if(this.pendingShapes.every(s => s.type() == 'Face'))
         {
             // For Faces, fillet is applied on last created Face
             let selectedVertices:VertexCollection;
-            if(vertices === null)
+            if(at === null)
             {
                 // check pending selected sub Shapes
                 let selections = this._getPendingSelections();
@@ -919,9 +919,9 @@ export class Sketch
                     selectedVertices = null;
                 }
             }
-            else if (isSelectionString(vertices))
+            else if (isSelectionString(at))
             {   
-                selectedVertices = this.pendingShapes.select(vertices as SelectionString).getShapesByType('Vertex') as VertexCollection; // accept any selector strings but make sure the selection contains Vertices
+                selectedVertices = this.pendingShapes.select(at as SelectionString).getShapesByType('Vertex') as VertexCollection; // accept any selector strings but make sure the selection contains Vertices
             }
             else {
                 
