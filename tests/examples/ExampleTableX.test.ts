@@ -21,23 +21,27 @@ test("ExampleTableX", () =>
     const TOP_THICKNESS = 5;
 
     // leg
-    let legHeight = HEIGHT-TOP_THICKNESS;
-    let leg = brep.Box(LEG_SIZE, LEG_SIZE, legHeight, 
+    const legHeight = HEIGHT-TOP_THICKNESS;
+    const leg = brep.Box(LEG_SIZE, LEG_SIZE, legHeight, 
         [LEG_SIZE/2, LEG_SIZE/2,legHeight/2]) // start position of leg
 
     // 4 legs
-    let legs = leg.array([2,2],[WIDTH-LEG_SIZE,DEPTH-LEG_SIZE]).color('green');
+    const legs = leg.array([2,2],[WIDTH-LEG_SIZE,DEPTH-LEG_SIZE]).color('green');
 
     // table top
-    let top = brep.BoxBetween(
+    const top = brep.BoxBetween(
         [0,0,legHeight],
         [WIDTH, DEPTH, legHeight+TOP_THICKNESS])
         .color('green');
 
+    expect(top.faces().length).toEqual(6);
+
     // finish table top
-    top.fillet(1,'Face||top')
-    expect(legs.count()).toEqual(4);
+    top.fillet(1,'Face||top');
     expect(top.faces().length).toEqual(10);
+
+    expect(legs.count()).toEqual(4);
+    
 });
 
 
@@ -53,16 +57,18 @@ test("ExampleTableXAdv", () =>
     const TOP_CHAMFER = 3;
     const TOP_FILLET = 1;
 
-    let contour = brep.Rect(WIDTH,DEPTH).color('grey');
-    let contourInside = contour.offsetted(-TOP_OVERHANG+LEG_SIZE/2).color('grey');
+    const contour = brep.Rect(WIDTH,DEPTH).color('grey');
+    const contourInside = contour.offsetted(-TOP_OVERHANG+LEG_SIZE/2).color('grey');
 
-    let legHeight = HEIGHT-TOP_THICKNESS;
-    let leg = brep.Box(LEG_SIZE, LEG_SIZE, legHeight).hide();
+    const legHeight = HEIGHT-TOP_THICKNESS;
+    const leg = brep.Box(LEG_SIZE, LEG_SIZE, legHeight).hide();
     contourInside.vertices().forEach( v => leg.copy().color('green').align(v, 'bottom'))
 
-    let tableTop = contour.extruded(TOP_THICKNESS, [0,0,1]).move(0,0,legHeight).color('green');
+    const tableTop = contour.extruded(TOP_THICKNESS, [0,0,1]).move(0,0,legHeight).color('green');
+    expect(tableTop.faces().length).toEqual(6);
+
     tableTop.chamfer(TOP_CHAMFER, 'F||bottom');
     tableTop.fillet(TOP_FILLET, 'F||top')
 
-    expect(tableTop.faces().length).toEqual(14);
+    
 });

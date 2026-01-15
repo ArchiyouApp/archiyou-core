@@ -341,7 +341,7 @@ export class Solid extends Shape
         let filletEdges = new ShapeCollection();
         let solidEdges = this.edges();
 
-        if (at ?? true)
+        if (!at)
         {
             filletEdges = solidEdges; // all
         }
