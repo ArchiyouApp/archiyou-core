@@ -1,9 +1,11 @@
-# archiyou-core
+# Archiyou
 
 ![Archiyou](assets/archiyou_logo_header_white_bg.png)
 
 Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
 Use our editor and community platform for free at [Archiyou.com](https://archiyou.com).
+
+[![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml)
 
 ## Example
 
@@ -97,7 +99,7 @@ await myDoc.save('myboxdoc.pdf');
 For starter-templates for some popular frameworks and build stacks see /examples/templates
 
 * [Node starter template](/examples/templates/node)
-* [Nuxt3+](/examples/templatesnuxt)
+* [Nuxt3+](/examples/templates/nuxt)
 * TODO: React
 * TODO: Next
 
