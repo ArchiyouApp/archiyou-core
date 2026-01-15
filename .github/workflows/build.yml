@@ -1,6 +1,6 @@
-# test CI/CD setup
+# Build and test
 
-name: Node.js CI
+name: build and test
 
 on:
   push:
