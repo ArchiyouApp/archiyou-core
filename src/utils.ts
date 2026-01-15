@@ -686,9 +686,7 @@ export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentD
         }
         return result;
     }
-
-
-    
+   
 }
 
 
@@ -756,6 +754,55 @@ export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffe
     }
 
     return result;
+}
+
+/** Simple metadata printout */
+export function printDataInfo(data: any)
+{
+    console.log(`Type: ${data?.constructor?.name || typeof data}`);
+    console.log(`Size: ${data?.byteLength || data?.size || data?.length || 'unknown'}`);
+    console.log(`Preview: ${getValuePreview(data)}`);
+}
+
+export function getValuePreview(data: any, maxLength: number = 100): string
+{
+    if (data === null) return 'null';
+    if (data === undefined) return 'undefined';
+    
+    const type = typeof data;
+    
+    // Primitives
+    if (type === 'string') {
+        const preview = data.length > maxLength ? data.substring(0, maxLength) + '...' : data;
+        return `"${preview}"`;
+    }
+    
+    if (type === 'number') return String(data);
+    if (type === 'boolean') return String(data);
+    if (type === 'function') return `[Function: ${data.name || 'anonymous'}]`;
+    
+    // Binary types
+    if (data instanceof ArrayBuffer) return `[ArrayBuffer: ${data.byteLength} bytes]`;
+    if (data instanceof Uint8Array) return `[Uint8Array: ${data.length} elements]`;
+    if (typeof Buffer !== 'undefined' && data instanceof Buffer) return `[Buffer: ${data.length} bytes]`;
+    if (typeof Blob !== 'undefined' && data instanceof Blob) return `[Blob: ${data.size} bytes]`;
+    
+    // Arrays
+    if (Array.isArray(data)) {
+        if (data.length === 0) return '[]';
+        const preview = data.slice(0, 3).map(item => getValuePreview(item, 20)).join(', ');
+        return `[${preview}${data.length > 3 ? ', ...' : ''}] (${data.length} items)`;
+    }
+    
+    // Objects
+    if (type === 'object') {
+        const keys = Object.keys(data);
+        if (keys.length === 0) return '{}';
+        const preview = keys.slice(0, 3).join(', ');
+        return `{${preview}${keys.length > 3 ? ', ...' : ''}} (${keys.length} keys)`;
+    }
+    
+    return String(data);
 }
 
 /**

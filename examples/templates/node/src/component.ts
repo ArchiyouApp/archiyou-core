@@ -1,6 +1,6 @@
-//import { OcLoader } from '../../../src/internal';
-//import { OcLoader } from 'archiyou-core'
-import { Runner, RunnerOps, RunnerScriptExecutionRequest, RunnerScriptExecutionResult } from '../../../src/internal'
+//// DEBUG IMPORTS ////
+
+import { Runner, RunnerOps, RunnerScriptExecutionRequest } from '../../../../src/internal'
 
 
 
@@ -72,8 +72,8 @@ new Runner()
             .then((r) => 
             {
                console.log('**** OUTPUTTING MAIN RESULTS ****');
-               new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.model.glb.data, 'test.glb')
-               new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.docs.main?.pdf?.data, 'test.pdf')
+               new RunnerOps().saveBlobToFile(r.outputs[0].output as any, 'test.glb')
+               new RunnerOps().saveBlobToFile(r.outputs[0].output as any, 'test.pdf')
             })
         }
     )

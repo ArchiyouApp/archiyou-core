@@ -16,14 +16,20 @@ export class Services
     private _nodeFormDataModule: any;
     private _nodeFormFetchModule: any;
 
-    constructor(baseUrl: string, timeout: number = 30000) {
-        if(!baseUrl){ throw new Error(`Services(): baseUrl is required`); }
-        this._baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
-        this._timeout = timeout;
-        this._headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Archiyou-Services/1.0'
-        };
+    constructor(baseUrl: string, timeout: number = 30000) 
+    {
+        if(!baseUrl)
+        { 
+            console.warn(`Services(): baseUrl is required. This Services instance is disabled!`); 
+        }
+        else {
+            this._baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+            this._timeout = timeout;
+            this._headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Archiyou-Services/1.0'
+            };
+        }
     }
 
     /** Set authentication token */
@@ -36,6 +42,12 @@ export class Services
     setHeaders(headers: Record<string, string>): this {
         this._headers = { ...this._headers, ...headers };
         return this;
+    }
+    
+    /** If Services instance is set with baseUrl */
+    ifSet():boolean
+    {
+        return this._baseUrl && typeof this._baseUrl === 'string' && this._baseUrl.length > 0;
     }
 
     /** Check if the API service is up and running */
@@ -225,7 +237,14 @@ export class Services
         method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
         body?: any,
         responseType: 'json' | 'arrayBuffer' = 'json'
-    ): Promise<T> {
+    ): Promise<T> 
+    {
+        if(!this.ifSet())
+        {
+            console.error(`❌ Services::_request(): baseUrl is not set. This Services instance is disabled!`);
+            return;
+        }
+
         const url = `${this._baseUrl}${endpoint}`;
         
         const config: RequestInit = {

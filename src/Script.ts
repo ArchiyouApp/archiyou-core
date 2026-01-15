@@ -15,10 +15,10 @@ export class Script
 {
     //// ATTRIBUTES ////
     id: string; // uuid for the script - this is primary because script names can be changed
-    name: string; // always lowercase 
-    author: string; // always lowercase
+    name: undefined|string; // optional, always lowercase
+    author: undefined|string; // optional always lowercase
     // version is only assigned when published
-    description: string;
+    description: undefined|string;
     tags: string[] = []; // array of tags for the script
     created: Date;
     updated: Date;
@@ -87,9 +87,9 @@ export class Script
     _validateBasics():boolean
     {
         const VALIDATIONS = {
-            id: this.id && typeof this.id === "string",
-            name : this.name && typeof this.name === "string" && this.name.length > 0,
-            author: this.author && typeof this.author === "string" && this.author.length > 0,
+            id: this.id && typeof this.id === "string", // should always be a string
+            name : !this.name || (typeof this.name === "string" && this.name.length > 0), // can be undefined, but accept only strings
+            author: !this.author || (typeof this.author === "string" && this.author.length > 0),
             description: (!this?.description) || typeof this.description === "string", // Allow nullish description
             tags: Array.isArray(this.tags),
             created: this.created instanceof Date,
@@ -364,8 +364,8 @@ export class Script
             return data as Script;
         }
 
-        this.id = data.id;
-        this.name = data.name.toLowerCase();
+        this.id = data.id; // scripts should always have an id
+        this.name = data.name?.toLowerCase(); // some scripts don't have names
         this.author = data.author?.toLowerCase();
         this.description = data.description;
         this.tags = Array.isArray(data.tags) ? data.tags : [];
@@ -401,6 +401,9 @@ export class Script
         {
             this.published.version = this.fixSemver(this.published.version);
         }
+        
+        // Set defaults
+        this._setDefaults();
 
         // Validate the script after loading
         try { 

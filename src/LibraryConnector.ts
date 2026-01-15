@@ -192,7 +192,7 @@ export class LibraryConnector
     }
 
     /** Readout basic info on Library */
-    async getLibraryOverview():Promise<void>
+    async printLibraryOverview():Promise<void>
     {
         const baseInfo = await this.connect();
         if(baseInfo)

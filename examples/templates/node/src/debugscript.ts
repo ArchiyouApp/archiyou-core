@@ -1,8 +1,8 @@
-import { promises as fs } from 'fs';
+/** ==== WIP ==== */
 
-import { Runner, RunnerScriptExecutionRequest, RunnerOps, RunnerScriptExecutionResult } from '../../../src/internal'
-
-
+//// DEBUG IMPORTS
+import fs from 'fs/promises'
+import { Runner, RunnerScriptExecutionRequest, RunnerOps, RunnerScriptExecutionResult } from '../../../../src/internal'
 
 
 //// TEST REQUEST ////
@@ -12,7 +12,6 @@ const SCRIPT_FILE = './src/debugscript.txt' // from main dir
 //// MAIN ////
 
 const code = await fs.readFile(SCRIPT_FILE, 'utf-8')
-
 
 const REQUEST = {
     script: {
@@ -106,8 +105,8 @@ new Runner()
                 console.log(r.status);
                 console.log(JSON.stringify(r.errors));
                 console.log(JSON.stringify((r as RunnerScriptExecutionResult).outputs));
-                console.log(r.outputs.pipelines.default.docs.test?.pdf?.data);
-                new RunnerOps().saveBlobToFile(r.outputs.pipelines.default.docs.spec?.pdf?.data, 'test.pdf')
+                console.log(r.outputs[0].output);
+                new RunnerOps().saveBlobToFile(r.outputs[0].output as any, 'test.pdf')
             })
         }
     )

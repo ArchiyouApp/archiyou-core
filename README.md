@@ -94,7 +94,15 @@ await myDoc.save('myboxdoc.pdf');
 
 ## Starter templates for your framework
 
-For starter-templates for some popular frameworks see /examples/templates
+For starter-templates for some popular frameworks and build stacks see /examples/templates
+
+* [Node starter template](/examples/templates/node)
+* [Nuxt3+](/examples/templatesnuxt)
+* TODO: React
+* TODO: Next
+
+
+If your framework is not present, just look at the others for inspiration. Modern ones work most of the time with the same methods. Contributions are welcome. 
 
 ## Notes on the wasm file
 
@@ -102,7 +110,7 @@ Archiyou is a TS/JS layer on top of a WASM build of [OpenCascade](https://github
 You application needs to be able to find the WASM file for it to work. If you experience errors during import or execution this is most probably the cause.  
 
 
-## More advanced applications
+## Run scripts from Archiyou platform independently
 
 If you want to execute scripts (either locally or on a server like Archiyou) and get certain outputs use the Runner. You can also use the Runner to execute scripts in a Webworker. 
 
@@ -126,6 +134,8 @@ If you want to execute scripts (either locally or on a server like Archiyou) and
     });
 
 ```
+
+Runner also offers easy ways to execute scripts in a Webworker.
 
 ## Examples and use cases
 

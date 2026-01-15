@@ -7,11 +7,12 @@
     "link" : "npm link archiyou",
     "dev": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/index.ts",
       "dev:basic": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/basic.ts",
+      "dev:runner": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/runner.ts",
       "dev:pdf": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/pdf.ts",
       "dev:component": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/component.ts",
       "dev:library": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/library.ts",
-      "dev:debug": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/debugscript.ts",
-      "dev:fromurl": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/execScriptUrl.ts"
+      "dev:fromurl": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/fromurl.ts",
+      "dev:debug": "node --loader ts-node/esm --no-warnings=ExperimentalWarning ./src/debugscript.ts"
   },
   "dependencies": {},
   "devDependencies": {

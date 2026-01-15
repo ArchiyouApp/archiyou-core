@@ -109,7 +109,7 @@ export class Runner
         console.info(`Runner: Loading Archiyou library with WASM module`)
         //this._oc = await new OcLoader().loadAsync();
         // TODO: set when to use modern loadAsync() or non-dynamic version for compatibility
-        new OcLoader().load((oc) => {
+        await new OcLoader().load((oc) => {
             this._oc = oc;
             console.info(`Runner: Done loading. Setup default execution scope in role "${this.role}"`)    
             // Create a execution scope and give it a initial state with Archiyou modules 
@@ -193,7 +193,7 @@ export class Runner
             
                 case 'console':
                 const consoleMessage = message.payload.message; // ConsoleMessage
-                console.log(`Runner::handleMessageFromWorker(): Worker console message: ${consoleMessage}`);
+                console.info(`Runner::handleMessageFromWorker(): Worker console message: ${consoleMessage}`);
                 break;
 
             case 'save-step':
@@ -523,11 +523,16 @@ export class Runner
     /** Add Archiyou modules as globals in execution scope state object */
     _addModulesToScopeState(state:Record<string,any>):Record<string,any>
     {
-        if(!state.ay){ throw new Error(`Runner:: _addModulesToScopeState(): Archiyou modules not found in state object`); }
-        
-        Object.assign(state, { 
+        if(!state.ay)
+        { 
+            throw new Error(`Runner:: _addModulesToScopeState(): Archiyou modules not found in state object`); 
+        }
+
+        console.info(`Runner::_addModulesToScopeState(): Adding Archiyou modules to scope state`);
+        Object.assign(state, 
+        { 
             console: state.ay.console,
-            geom: state.ay.brep,
+            brep: state.ay.brep,
             doc: state.ay.doc,
             calc: state.ay.calc,
             exporter: state.ay.exporter,
@@ -544,6 +549,8 @@ export class Runner
     {
         // Overwrite global console methods with Archiyou console
         // That console still has a reference for global console for debugging
+        console.info(`Runner::_addLoggingToScopeState(): Overwriting global console methods with Archiyou console`);
+
         globalThis.console = state.console;
 
         state.print = (m:string) => state.console.user(m);
@@ -555,6 +562,8 @@ export class Runner
     /** Make general modeling methods available in scope state object */
     _addModelingMethodsToScopeState(state:Record<string,any>):Record<string,any>
     {
+        console.info(`Runner::_addModelingMethodsToScopeState(): Adding modeling methods to scope state`);
+        
         // Basic modeling classes
         state.Vector = Vector;
         state.Point = Point;
@@ -570,7 +579,7 @@ export class Runner
 
         if(!state.brep)
         {
-            // Make sure the brep global is present
+            // Make sure the modules are 
             this._addModulesToScopeState(state);
         }
 
@@ -691,7 +700,7 @@ export class Runner
     private async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<RunnerScriptExecutionResult>
     {
         console.info(`**** Runner::_execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****`);
-        console.info(` params: ${JSON.stringify((request as any)?.params)} --- outputs: ${JSON.stringify((request as any)?.outputs)}`);
+        console.info(` params: ${JSON.stringify((request as any)?.params || {})} --- outputs: ${JSON.stringify((request as any)?.outputs)}`);
         console.info(`***************************************`);
 
         // Convert code to request if needed
@@ -870,7 +879,7 @@ export class Runner
         // Create a fresh scope if this is a new execute run
         if(startRun)
         {
-            console.log('**** CREATING FRESH SCOPE STATE FOR NEW RUN ****');
+            console.info('**** CREATING FRESH SCOPE STATE FOR NEW RUN ****');
             this.createScope('default'); // resets all scope variables
         }
 
@@ -929,10 +938,6 @@ export class Runner
                return this._handleExecutionError(scope, this._activeExecRequest, code, e);
             }
         }
-
-        console.warn('**** AFTER EXECUTION - DEBUG  ****');
-        console.warn('GLOBALS')
-        console.warn(Object.keys(globalThis));
 
         const result = await exec();
         
@@ -1120,7 +1125,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     _executionStartRunInScope(scope:any, request: RunnerScriptExecutionRequest):void
     {
         // Setup ParamManager - it still uses Array of Param defintions with _value
-        const paramDefsWithValues = [...Object.values(request.script.params)]
+        const paramDefsWithValues = [...Object.values(request.script.params || {})]
         paramDefsWithValues.forEach(p => p._value = request.params[p.name]);
         console.info(`Runner::_executionStartRunInScope()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(paramDefsWithValues)}"`);
         scope.ay.paramManager = new ParamManager(paramDefsWithValues)
@@ -1435,17 +1440,35 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         {
             return process.env.SERVICES_API_URL;
         }
-        throw new Error(`Runner::getServicesUrl(): SERVICES_API_URL is not defined: Please set in ENV!`);
+        console.warn(`Runner::getServicesUrl(): SERVICES_API_URL is not defined: Please set in ENV!`);
     }
 
+    /** Get a script directly from URL
+     * We need to parse the url to get the library address and that of the script */
     async getScriptFromUrl(url:string):Promise<Script>
     {
-        const libUrl = this.getDefaultComponentLibraryUrl();
+
+        const libUrl = this._getLibUrlFromScriptUrl(url);
+
+        if(!libUrl){ throw new Error(`Runner::getScriptFromUrl(): Cannot extract library URL from script URL "${url}"`); }
+
         console.info(`Runner::getScriptFromUrl(): Fetching script from "${url}" at library "${libUrl}"`);
 
         const library = new LibraryConnector(libUrl); // TODO: cache library instance
         await library.connect();
-        return await library.getScriptFromUrl(`${libUrl}/${url}`); // get script from library
+        return await library.getScriptFromUrl(url); // get script from library
+    }
+
+    _getLibUrlFromScriptUrl(url:string):string|null
+    {
+        const match = url.match(/^(.*\/)([^\/]+)$/);
+        return match ? match[1] : null;
+    }
+
+    _getScriptPathFromScriptUrl(url:string):string|null
+    {
+        const match = url.match(/^(.*\/)([^\/]+)$/);
+        return match ? match[2] : null;
     }
 
     //// RESULTS ////
@@ -1654,6 +1677,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                     } as ExportGLTFOptions
 
                     outp = await (scope.exporter as Exporter).exportToGLTF(null, options, null);
+
                     if(outp)
                     {
                         outputs.push({
@@ -1662,6 +1686,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
                         });
                     }
                     break;
+
                 case 'svg': // 2D SVG export
                     outp = (scope.exporter as Exporter).exportToSVG();
                     if(outp)

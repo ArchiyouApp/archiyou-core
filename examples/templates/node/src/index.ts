@@ -1,4 +1,4 @@
-import { init, Brep, Doc } from 'archiyou'
+//import { init, Brep, Doc } from 'archiyou'
 
 
 //// DEBUG DEVELOPMENT ////
@@ -7,7 +7,7 @@ import { init, Brep, Doc } from 'archiyou'
 //import { init, Brep, Doc } from '../../../../dist/archiyou'
 
 // direct from source
-// import { init, Brep, Doc } from '../../../../src/internal';
+import { init, Brep, Doc } from '../../../../src/internal';
 
 //// END DEBUG IMPORTS ////
 
