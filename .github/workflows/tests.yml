@@ -1,0 +1,23 @@
+# test CI/CD setup
+
+name: Node.js CI
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4  # Downloads your code
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'       # Specify your version
+    - run: npm ci                # Installs dependencies
+    - run: npm run build --if-present
+    - run: npm test              # Runs your test script
