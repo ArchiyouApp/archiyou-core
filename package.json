@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "link" : "npm link",
+    "link": "npm link",
     "test": "set NODE_OPTIONS=--experimental-vm-modules && vitest --coverage",
     "build:wasm": "tsx src/wasm/build-scripts/build_wasm_base64.ts",
     "apidocs": "npx typedoc"
@@ -27,6 +27,7 @@
     "@gltf-transform/functions": "4.2.1",
     "@noble/hashes": "1.4.0",
     "@tarikjabiri/dxf": "^2.8.9",
+    "acorn": "^8.15.0",
     "acorn-globals": "^7.0.1",
     "blob-stream": "^0.1.3",
     "chroma-js": "^3.1.2",
