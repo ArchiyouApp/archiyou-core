@@ -4,18 +4,23 @@ This is the basic nuxt3 starter template generated like described here: https://
 
 ## Settings to be able to load wasm files from archiyou module
 
-See nuxt.config.ts
+See nuxt.config.ts:
+
+```ts
+assetsInclude: 
+    ['**/*.wasm'], // fix for able to load .wasm files
+```
 
 ## Setup
 
 Make sure to install dependencies:
 
 ```bash
-# npm
-npm install
-
 # pnpm
 pnpm install
+
+# npm
+npm install
 
 # yarn
 yarn install
@@ -29,42 +34,14 @@ bun install
 Start the development server on `http://localhost:3000`:
 
 ```bash
-# npm
-npm run dev
 # pnpm
 pnpm dev
+# npm
+npm run dev
 # yarn
 yarn dev
 # bun
 bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
-npm run build
-# pnpm
-pnpm build
-# yarn
-yarn build
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-# pnpm
-pnpm preview
-# yarn
-yarn preview
-# bun
-bun run preview
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.

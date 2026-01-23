@@ -488,8 +488,11 @@ export class Exporter
     }
 
 
-    /** Convenience method for exporting Shapes and save as file in browser and node */
-    async save(filename:string, options:any={}, shapes?:ShapeCollection)
+    /** Convenience method for exporting Shapes and save as file in browser and node
+     *  @returns The file path or null if not successful
+     *  IMPORTANT: save function in browser needs to be tied to user interaction
+    */
+    async save(filename:string, options:any={}, shapes?:ShapeCollection):Promise<string|undefined>
     {
         const EXTENTIONS_EXPORT_METHODS = {
             // extentions and mapping to exporter method
@@ -511,20 +514,23 @@ export class Exporter
         }
         const data = await EXTENTIONS_EXPORT_METHODS[ext](this, shapes, options, filename);        
 
-        await this._saveDataToFile(data, filename);
+        return await this._saveDataToFile(data, filename);
     }
 
-    /** save raw data to file in browser of node */
-    async _saveDataToFile(data:any, filename:string)
+    /** save raw data to file in browser of node
+     *  returns the file path or undefined if not successful
+    */
+    async _saveDataToFile(data:any, filename:string):Promise<string|undefined>
     {
         if (isBrowser())
         {
             this.saveDataToFileWindow(data, filename);
+            return filename; // no file path, only filename
         }
         else {
             // We are in backend Node
             const ops = new RunnerOps(); // some utils
-            await ops.saveBlobToFile(data, filename);
+            return await ops.saveBlobToFile(data, filename); // full path
         }
     }
 

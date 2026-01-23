@@ -10,7 +10,10 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@google/model-viewer": "^4.1.0",
+    "archiyou-core": "^0.6.78",
     "nuxt": "^3.16.1",
+    "three": "^0.182.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   }

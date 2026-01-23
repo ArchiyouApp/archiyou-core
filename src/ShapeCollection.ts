@@ -17,7 +17,7 @@ import type { ArchiyouApp, PointLike, PointLikeOrAnyShapeOrCollection,
          MakeShapeCollectionInput,
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
          ModelUnits,
-         MeshingQualitySettings,
+         MeshingQualitySettings,ExportGLTFOptions,
          LayoutOrderType, LayoutOptions, 
          DimensionLevelSettings, AnnotationAutoDimStrategy,
          MeshShape, MeshShapeBuffer, MeshShapeBufferStats,
@@ -2841,12 +2841,19 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          return writer.stringify();
       }
 
+      /** Export 3D Shape to GLTF */
+      async toGLTF(options?:ExportGLTFOptions): Promise<ArrayBuffer>
+      {
+         // We use centralized export functions from Exporter
+         return await new Exporter({ brep: this._brep }).exportToGLTF(this, options);
+      }
+
       /** Convenience method for saving files in browser and node */
-      save(filename?:string, options:any={}, shapes:ShapeCollection|null=null)
+      async save(filename?:string, options:any={}, shapes:ShapeCollection|null=null): Promise<string|undefined>
       {
          const shapesToSave = ShapeCollection.isShapeCollection(shapes) ? shapes : this;
 
-         new Exporter({ brep: this._brep } as ArchiyouApp)
+         return await new Exporter({ brep: this._brep } as ArchiyouApp)
             .save(filename, options, shapesToSave);
       }
 

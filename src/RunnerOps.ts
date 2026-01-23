@@ -4,9 +4,6 @@
  * 
  */
 
-
-import { Buffer } from 'buffer';
-
 export class RunnerOps
 {
     constructor()
@@ -20,7 +17,7 @@ export class RunnerOps
      * @param filePath - The path where the file should be saved.
      * @param overwrite - Whether to overwrite existing files (default: true).
      */
-    async saveBlobToFile(data: Blob|ArrayBuffer|Uint8Array|string, filePath: string, overwrite:boolean=true): Promise<void> 
+    async saveBlobToFile(data: Blob|ArrayBuffer|Uint8Array|string, filePath: string, overwrite:boolean=true): Promise<string|undefined> 
     {
         console.info(`saveBlobToFile::saveBlobToFile(): Saving data to ${filePath}`);
 
@@ -60,7 +57,8 @@ export class RunnerOps
         }
 
         // Check if the file exists and handle overwrite flag
-        if (fs.existsSync(filePath) && !overwrite) {
+        if (fs.existsSync(filePath) && !overwrite)
+        {
             console.warn(`saveBlobToFile::saveBlobToFile(): File already exists at ${filePath} and overwrite is set to false. Skipping save.`);
             return;
         }
@@ -68,8 +66,10 @@ export class RunnerOps
         // Write the buffer/string to the file
         // Node.js fs.writeFileSync handles both Buffer and string automatically
         fs.writeFileSync(filePath, buffer, typeof data === 'string' ? 'utf8' : undefined);
-        
-        console.info(`File saved to ${filePath}`);
-        
+
+        const fullPath = path.resolve(filePath);
+        console.info(`RunnerOps::saveBlobToFile(): File saved to ${fullPath}`);
+
+        return fullPath;
     }
 }

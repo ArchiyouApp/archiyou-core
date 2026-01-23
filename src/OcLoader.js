@@ -217,7 +217,8 @@ export class OcLoader
     {
       // import.meta.url does not work in webpack < 5
       // also anything with import triggers errors in webpack 4 on build time: so we can't even reference import.meta.url!
-      const fileURL = document.currentScript.src; 
+      // For now we drop any support for webpack 4
+      const fileURL = (import.meta && import.meta.url) ? import.meta.url : document.currentScript.src;
       const absPath = new URL(filepath, fileURL).href;
       console.log(`==== ABS PATH BROWSER: ${absPath}`);
 

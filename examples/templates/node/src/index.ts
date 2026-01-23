@@ -24,11 +24,13 @@ const myModel = brep.Box(100)
     ).fillet(5); // Give it round edges
 
 // save the box as GLTF binary file in root of node project
-await myModel.save('mybox.glb')
+const glb = await myModel.save('mybox.glb')
+console.log(`Saved GLB file at: ${glb}`);
 
 // make a 2D isometry projection of that box 
 const myIso = myModel.iso([1,-1,1])
-myIso.save('myboxiso.svg');  // export as SVG file
+const svg = await myIso.save('myboxiso.svg');  // export as SVG file
+console.log(`Saved SVG file at: ${svg}`);
 
 // put it on document
 const myDoc = new Doc() // Doc module
@@ -38,6 +40,5 @@ const myDoc = new Doc() // Doc module
                 .view('iso', myIso); // place view of myIso shapes
 
 // Save to PDF file
-await myDoc.save('myboxdoc.pdf');
-
-
+const pdf = await myDoc.save('myboxdoc.pdf');
+console.log(`Saved PDF file at: ${pdf}`);

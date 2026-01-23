@@ -14,7 +14,8 @@
 // constants
 import { USE_GARBAGE_COLLECTION, MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
-            SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
+            SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions,
+            Exporter} from './internal'
 
 import type {
     PointLike,PointLikeOrAnyShape,AnyShape,Pivot,MainAxis,
@@ -29,7 +30,7 @@ import type {
     Annotation, DimensionOptions,DimensionLine,
     BeamLikeDims,
     Alignment, OrientationXY,
-    MeshingQualitySettings
+    ExportGLTFOptions, MeshingQualitySettings
 } from './internal'
 
 import { Obj, Vector, Point, Bbox, OBbox, Vertex, Edge, Wire, Face, 
@@ -4967,15 +4968,6 @@ export class Shape
 
     //// EXPORT ////
 
-    /** Convenience method to save the shape to a file
-     *   the extension determines the file format
-     *   Supported formats: glb, svg, step, stl, dxf
-    */
-    save(filename:string, options:any={})
-    {    
-        new ShapeCollection(this).save(filename, options);
-    }
-
     toData():Object
     {
         // override by individual Shape type
@@ -5019,6 +5011,22 @@ export class Shape
         // for now use ShapeCollection.toSVG()
         // NOTE: this method will be overwriten in Edge
         return new ShapeCollection(this).toSVG(options);
+    }
+
+    /** Export 3D Shape to GLTF */
+    async toGLTF(options?:ExportGLTFOptions): Promise<ArrayBuffer>
+    {
+        // We use centralized export functions from Exporter
+        return await new Exporter({ brep: this._brep }).exportToGLTF(this, options);
+    }
+
+    /** Convenience method to save the shape to a file
+     *   the extension determines the file format
+     *   Supported formats: glb, svg, step, stl, dxf
+    */
+    async save(filename:string, options:any={}):Promise<string|undefined>
+    {    
+        return await new ShapeCollection(this).save(filename, options);
     }
 
     

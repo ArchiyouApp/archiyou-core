@@ -5,7 +5,7 @@
 Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
 Use our editor and community platform for free at [Archiyou.com](https://archiyou.com).
 
-[![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml)
+[![License](https://img.shields.io/github/license/ArchiyouApp/archiyou-core)](https://github.com/ArchiyouApp/archiyou-core/blob/main/LICENSE)[![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml)
 
 ## Example
 
@@ -63,7 +63,7 @@ npm add archiyou
 yarn add archiyou
 ```
 
-Now run this script in the browser or node:
+Now run this script in Node or browser:
 
 ```js
 import { init, Brep, Doc } from 'archiyou'
@@ -106,15 +106,15 @@ For starter-templates for some popular frameworks and build stacks see /examples
 
 If your framework is not present, just look at the others for inspiration. Modern ones work most of the time with the same methods. Contributions are welcome. 
 
-## Notes on the wasm file
+## Notes on the WASM file
 
 Archiyou is a TS/JS layer on top of a WASM build of [OpenCascade](https://github.com/Open-Cascade-SAS/OCCT). 
 You application needs to be able to find the WASM file for it to work. If you experience errors during import or execution this is most probably the cause.  
 
 
-## Run scripts from Archiyou platform independently
+## Run scripts independently from Archiyou platform 
 
-If you want to execute scripts (either locally or on a server like Archiyou) and get certain outputs use the Runner. You can also use the Runner to execute scripts in a Webworker. 
+If you want to execute scripts (either locally or on a server like Archiyou) and get certain outputs: use the Runner.
 
 
 ```ts 

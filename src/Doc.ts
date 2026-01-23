@@ -1177,18 +1177,19 @@ export class Doc
     }
 
     /** Convenience save documents in Doc module directly to PDF file */
-    async save(filename?:string)
+    async save(filename?:string):Promise<string|undefined>
     {   
         const buffers = await this.toPDF();
         
         if(buffers instanceof ArrayBuffer)
         {
             const docName = this.docs()[0];
-            await new Exporter()._saveDataToFile(buffers as ArrayBuffer, filename || `${docName}.pdf`);
+            return await new Exporter()._saveDataToFile(buffers as ArrayBuffer, filename || `${docName}.pdf`);
         }
         else 
         {
             console.error(`Doc::save(): There are multiple PDF buffers to save. Please supply any of these document names: ${this.docs().join(',')}`);
+            return;
         }
     }
 
