@@ -53,6 +53,60 @@ top.fillet(1,'Face||top'); // finish table top
 * Open Design: Share scripts and build upon others
 * Project management [Coming]
 
+## Examples and use cases
+
+Archiyou is focused on physical things to build - like furniture and constructions - but the Editor can do much more:
+
+<table>
+  <tr>
+    <td>
+        <a href="https://editor.archiyou.com/_/mark/scripts/Mascotte:0.5">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_mascotte.png">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/mark/scripts/Bracket:0.1">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_bracket.png">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/Boat:0.6">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_boat.png">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/BooleanBlob:0.1">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_booleanblob.png">
+        </a>
+    </td>
+  </tr>
+  <tr>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/KeyChain:0.6">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_keychain.png">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/GardenChair:0.5.0">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_gardenchair.png">
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrBent:0.1">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_bent.png">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrHouseAssembly:0.5">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_house.png">
+        </a>
+    </td>
+  </tr>
+</table>
+
+Where Archiyou really shines is handling documentation and output pipelines:
+
+<a href="https://editor.archiyou.com/_/archiyou/scripts/MariTavolo:0.6"><img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_docs.png" width="100%"></a>
+
 ## Developer Quickstart
 
 To use Archiyou as a module to generate designs and documentation independently from our platform it's available as module on npm. 
@@ -143,59 +197,6 @@ If you want to locally execute scripts from our Editor and get certain outputs: 
 
 Runner also offers easy ways to execute scripts in a Webworker which is the best way if you want create a larger online CAD application.
 
-## Examples and use cases
-
-Archiyou is focused on physical things to build - like furniture and constructions - but the Editor can do much more:
-
-<table>
-  <tr>
-    <td>
-        <a href="https://editor.archiyou.com/_/mark/scripts/Mascotte:0.5">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_mascotte.png">
-        </a>
-    </td>
-    <td>
-        <a href="https://editor.archiyou.com/_/mark/scripts/Bracket:0.1">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_bracket.png">
-        </a>
-    </td>
-    <td>
-        <a href="https://editor.archiyou.com/_/archiyou/scripts/Boat:0.6">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_boat.png">
-        </a>
-    </td>
-    <td>
-        <a href="https://editor.archiyou.com/_/archiyou/scripts/BooleanBlob:0.1">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_booleanblob.png">
-        </a>
-    </td>
-  </tr>
-  <tr>
-    <td>
-        <a href="https://editor.archiyou.com/_/archiyou/scripts/KeyChain:0.6">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_keychain.png">
-        </a>
-    </td>
-    <td>
-        <a href="https://editor.archiyou.com/_/archiyou/scripts/GardenChair:0.5.0">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_gardenchair.png">
-    </td>
-    <td>
-        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrBent:0.1">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_bent.png">
-        </a>
-    </td>
-    <td>
-        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrHouseAssembly:0.5">
-            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_house.png">
-        </a>
-    </td>
-  </tr>
-</table>
-
-Where Archiyou really shines is handling documentation and output pipelines:
-
-<a href="https://editor.archiyou.com/_/archiyou/scripts/MariTavolo:0.6"><img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_docs.png" width="100%"></a>
 
 ## Roadmap 2026
 
