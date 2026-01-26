@@ -1,6 +1,6 @@
 # archiyou
 
-![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png#gh-dark-mode-only)
+![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png#gh-light-mode-only)
 ![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header_white_bg.png#gh-dark-mode-only)
 
 Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
@@ -199,7 +199,7 @@ Where Archiyou really shines is handling documentation and output pipelines:
 
 ## Roadmap 2026
 
-Thanks to [NLNET NG0 Commons Fund](https://nlnet.nl/project/Archiyou/) we can further develop the open source and open design community functionalies of Archiyou. 
+<img src="https://nlnet.nl/logo/banner.svg" width="25%" align="left">Thanks to [NLNET NG0 Commons Fund](https://nlnet.nl/project/Archiyou/) we can further develop the open source and open design community functionality of Archiyou. 
 
 This is a basic roadmap:
 
