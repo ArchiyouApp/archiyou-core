@@ -199,7 +199,7 @@ Where Archiyou really shines is handling documentation and output pipelines:
 
 ## Roadmap 2026
 
-<img src="https://nlnet.nl/logo/banner.svg" width="25%" align="left">Thanks to [NLNET NG0 Commons Fund](https://nlnet.nl/project/Archiyou/) we can further develop the open source and open design community functionality of Archiyou. 
+<img src="https://nlnet.nl/logo/banner.svg" width="20%" align="right">Thanks to [NLNET NG0 Commons Fund](https://nlnet.nl/project/Archiyou/) we can further develop the open source and open design community functionality of Archiyou. 
 
 This is a basic roadmap:
 
