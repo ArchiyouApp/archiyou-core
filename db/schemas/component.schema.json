@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Assembly or Production Item",
+  "description": "Schema for assembly or production items with type, label, parts references and time tracking",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "Type of item or operation"
+    },
+    "label": {
+      "type": "string",
+      "description": "Label or name for the item"
+    },
+    "parts": {
+      "type": "array",
+      "items": {
+        "$ref": "./part.schema.json"
+      },
+      "description": "Array of references to part properties"
+    },
+    "time_production": {
+      "type": "number",
+      "description": "Production time in minutes",
+      "minimum": 0
+    },
+    "time_assembly": {
+      "type": "number",
+      "description": "Assembly time in minutes",
+      "minimum": 0
+    },
+    "time": {
+      "type": "number",
+      "description": "Total time (production + assembly) in minutes",
+      "minimum": 0
+    }
+  },
+  "required": ["type", "label", "parts"],
+  "additionalProperties": false
+}

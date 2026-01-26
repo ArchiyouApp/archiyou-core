@@ -31,8 +31,7 @@ import { Container, DataRows, DataRowsColumnValue, DocData, DocPathStyle, SVGtoP
 import { PDFLinePath } from './internal' // types
 
 import { jsPDF, GState } from 'jspdf'
-import 'svg2pdf.js' // TODO: load dynamically?
-import autoTable from 'jspdf-autotable' // TODO: load dynamically?
+import 'svg2pdf.js' 
 
 import { OutfitByteString } from '../assets/fonts/Outfit'
 import { OutfitSemiBoldByteString } from '../assets/fonts/OutfitSemiBold'
@@ -57,6 +56,8 @@ export class DocPDFExporter
 
     //// END SETTINGS
 
+    _autoTableModule:any;
+
     inDocs:Record<string, DocData> = {}; // incoming DocData by name
     
     docs:Record<string,jsPDF> = {}; // Holds internal jspdf documents
@@ -70,9 +71,10 @@ export class DocPDFExporter
     _jsPDF:any // the module
     _jsPDFDoc:any // doc constructor - TODO: TS typing fix
     _hasJsPDF:boolean = false;
+    _jsdomNode; // dynamically loaded jsdom parser for node
 
     /** Make DocPDFExporter instance either empty or with data and onDone function */
-    constructor(data?:DocData|Record<string, DocData>, onDone?:(blobs:Record<string,Blob>) => any)
+    constructor(data?:DocData|Record<string, DocData>, onDone?:(buffers:Record<string,ArrayBuffer>) => any)
     {
         if(!data)
         { 
@@ -85,11 +87,11 @@ export class DocPDFExporter
         else {
             this.export(data)
                 .catch((e) => console.error(e))
-                .then((blobs) => 
+                .then((buffers) => 
                     {
-                        if(typeof onDone === 'function' && blobs)
+                        if(typeof onDone === 'function' && buffers)
                         {
-                            onDone(blobs);
+                            onDone(buffers);
                         }
                     })
         }
@@ -105,7 +107,7 @@ export class DocPDFExporter
         this.activePDFDoc = undefined;
     }
 
-    async export(data:DocData|Record<string,DocData>): Promise<Record<string, Blob>>
+    async export(data:DocData|Record<string,DocData>): Promise<Record<string, ArrayBuffer>>
     {
         this.reset();
         try {  
@@ -120,9 +122,20 @@ export class DocPDFExporter
    
         if(!this.DEBUG)
         {
-            const blobs = await this.run(data);
+            const blobsByName = await this.run(data); 
+            console.info(`DocPDFExporter::export(): Exported documents:`);
+            blobsByName && Object.keys(blobsByName).forEach( 
+                (k) => console.info(` - ${k}: ${ (blobsByName[k]?.size) } bytes`));
+
             if (this.isBrowser()){ this._saveBlobToBrowserFile() }; // Start file save in browser
-            return blobs;
+            
+            // Turn all into ArrayBuffers for futher processing
+            const docsByNameArrayBuffer = {};
+            for(const [k, blob] of Object.entries(blobsByName))
+            {
+                docsByNameArrayBuffer[k] = await blob.arrayBuffer();
+            };
+            return docsByNameArrayBuffer;
         }
         else {
             this.generateTestDoc();
@@ -210,7 +223,6 @@ export class DocPDFExporter
             {
                 this.inDocs = data as Record<string,DocData>;
             }
-
             // parse docs sequentially
             for( const docData of Object.values(this.inDocs))
             {
@@ -348,9 +360,9 @@ export class DocPDFExporter
     {
         /*
             NOTES:
-                - TODO: container width/height based on content
-
+                TODO: container width/height based on content
         */
+
         const DEFAULT_BORDER_STYLE = {  strokeColor: '#999999', lineWidth: 0.5 } as DocPathStyle
 
         const { x, y } = this.containerToPDFPositionInPnts(c, p); // PDF position in pnts, with regard for pivot (also y axis switch)
@@ -475,7 +487,17 @@ export class DocPDFExporter
                     svgRootElem = new DOMParser().parseFromString(img.content.data, 'image/svg+xml').documentElement; 
                 }
                 else {
-                    // TODO: node js solution replacing DOMParser
+                    if(!this._jsdomNode)
+                    {
+                        
+                        const JSDOM_LIB = 'jsdom'; // to trick webpack 4 not to parse dynamic imports
+                        this._jsdomNode = (await import(JSDOM_LIB));
+                    }
+
+                    const dom = new this._jsdomNode.JSDOM(img.content.data, { contentType: 'image/svg+xml' });
+                    svgRootElem = dom.window.document.querySelector('svg');
+                    // svg2pdf uses document from the browser, so we need to set it here
+                    globalThis.document = dom.window.document; // TODO: check if this is needed
                 }
 
                 if(!svgRootElem)
@@ -492,6 +514,7 @@ export class DocPDFExporter
                         y,
                         width: this.relWidthToPoints(img.width, p),
                         height: this.relHeightToPoints(img.height, p),
+                        loadExternalStyleSheets: false, 
                         //preserveAspectRatio : this.getSVGPreserveAspectRatioOption(img)
                     }
                 );
@@ -621,6 +644,7 @@ export class DocPDFExporter
         // Convert special props that need to be get in GState instead directly on jsPDF doc in activePDFDoc
         const STYLE_PROPS_TO_GSTATE = {
             strokeOpacity : 'stroke-opacity',
+            lineOpacity: 'CA', // stroking operations opacity
             fillOpacity: 'opacity',
         }
 
@@ -654,7 +678,8 @@ export class DocPDFExporter
                     this.activePDFDoc[setFnName](val); // execute style function
                 }
                 else {
-                    console.warn(`DocPDFExporter::_setPathStyle(): Trying to set style property "${styleProp}" with unknown jsPDF function: jsPDF.${setFnName}(). Check config!`)
+                    // console.warn(`DocPDFExporter::_setPathStyle(): Trying to set style property "${styleProp}" with unknown jsPDF function: jsPDF.${setFnName}(). Check config!`)
+                    // TODO:  Trying to set style property "lineOpacity" with unknown jsPDF function: jsPDF.setLineOpacity(). Check config!
                 }
             }
         }
@@ -667,14 +692,31 @@ export class DocPDFExporter
 
     /** Place table using jsPDF AutoTable 
      *  See: https://github.com/simonbengtsson/jsPDF-AutoTable
+     *  NOTE: We use a dynamic import for developer flexibility. If you want to use it: install it.
     */
     async _placeTable(t:ContainerData, p:PageData)
     {
+        let autoTable = this._autoTableModule;
+        if(this._autoTableModule)
+        {
+            // Load autoTable module
+            try {
+                const JSPDF_AUTO_TABLE_MODULE = 'jspdf-autotable';
+                this._autoTableModule = await import(JSPDF_AUTO_TABLE_MODULE);
+            } 
+            catch (error) 
+            {
+                console.error(`DocPDFExporter::_placeTable: Failed to load jsPDF-AutoTable module: ${error}. Please install this external dependency!`);
+                return;
+            }
+        }
+
         if(!Array.isArray(t?.content?.data) || t?.content?.data.length === 0)
         {
             console.error(`DocPDFExporter::_placeTable: Skipped Table "${t.name}" without data!`)
             return;
         }
+        
 
         const settings = t?.content?.settings as TableContainerOptions;
 

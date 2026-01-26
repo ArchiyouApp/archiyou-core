@@ -4,21 +4,26 @@
  * 
  */
 
+import { sha256 } from '@noble/hashes/sha256'; // NOTE: use version pinning in this library: @noble/hashes@1.4.0
+import { bytesToHex } from '@noble/hashes/utils';
+
+import type { ScriptParamData } from './internal';
 
 import { isCoordArray, isAnyShape, isPointLike, PolarCoord, Units, isDocUnits, isDocUnitsWithPerc,
-        Param, PublishParam, isPublishParam, isParam, UnitsWithPerc} from './internal'
+        ScriptParam, isScriptParamData, isScriptParam, UnitsWithPerc, ScriptOutputDataWrapper,
+        } from './internal'
 
 //// PARAMS ////
 
-/** Turn data PublishParam into Param by recreating functions 
- *  NOTE: PublishParam is used as data - internally make sure to use Param
+/** Turn data ScriptParamData into Param by recreating functions 
+ *  NOTE: ScriptParamData is used as data - internally make sure to use Param
 */
-export function publishParamToParam(param:Param|PublishParam):Param
+export function ScriptParamDataToParam(param:ScriptParam|ScriptParamData):ScriptParam
 {
-    if(!isPublishParam(param))
+    if(!isScriptParamData(param))
     {
-        console.warn(`ParamManager::publishParamToParam: param "${param.name}" already a Param!`)
-        return { ...param };
+        console.warn(`ParamManager::ScriptParamDataToParam: param "${param.name}" already a Param!`)
+        return param; // return original
     }
 
     const funcBehaviours = {};
@@ -33,31 +38,31 @@ export function publishParamToParam(param:Param|PublishParam):Param
     const newParam = { 
         ...param, 
         _behaviours : funcBehaviours, 
-    } as Param
+    } as ScriptParam;
 
     return newParam;
 }
 
-/** Turn param into PublishParam */
-export function paramToPublishParam(param:Param|PublishParam):PublishParam
+/** Turn param into ScriptParamData */
+export function paramToScriptParamData(param:ScriptParam|ScriptParamData):ScriptParamData
 {
-    if(!isParam(param)){ console.error(`ParamManager:paramToPublishParam. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
-    if(isPublishParam(param)){ return param }; // already PublishParam
+    if(!isScriptParam(param)){ console.error(`ParamManager:ScriptParamToScriptParamData. Please supply a valid Param. Got: "${JSON.stringify(param)}"`); } 
+    if(isScriptParamData(param)){ return param }; // already ScriptParamData
 
     const behaviourData = {};
     for(const [k,v] of Object.entries(param?._behaviours || {})){ behaviourData[k] = v.toString(); }
-    const publishParam = { ...param } as PublishParam; 
+    const ScriptParamData = { ...param } as ScriptParamData; 
     // remove all private fields (_{{prop}})
-    Object.keys(publishParam)
+    Object.keys(ScriptParamData)
         .filter(prop => prop[0] === '_')
-        .forEach((private_prop) => delete publishParam[private_prop]);
+        .forEach((private_prop) => delete ScriptParamData[private_prop]);
 
-    publishParam._behaviours = behaviourData; // TODO: remove _
+    ScriptParamData._behaviours = behaviourData; // TODO: remove _
     
-    return publishParam
+    return ScriptParamData
 }
 
-//// Working with types ////
+//// WORKING WITH TYPES ////
 
 export function flattenEntitiesToArray(entities:any):Array<any>
 {
@@ -97,9 +102,20 @@ export function flattenEntities(arr:Array<any>)
     }, []);
 }
 
+//// CRYPTO ////
 
- 
-//// Working with numbers ////
+/** Export sha256 hasing function */
+// TODO: use in Script.getVariantId
+export function hash(s:string):string
+{
+    if(typeof s !== 'string') throw new Error('Input must be a string');
+    const message = new TextEncoder().encode(s);
+    const hash = sha256(message);
+    return bytesToHex(hash);
+}
+
+
+//// WORKING WITH NUMBERS ////
 
 // see: https://github.com/sindresorhus/round-to
 export function roundTo(number:number, precision:number):number
@@ -342,7 +358,188 @@ export function mmToPoints(m:number):number
     return m/25.4*72
 }
 
+//// WORKING WITH NESTED OBJECTS ////
+
+/** Node structure for filterNestedObjects - optimized for XML/SVG parsing */
+export interface NestedObjectNode<T = any> {
+    tagName: string;              // The tag name or key in parent
+    value: T;                     // The actual object/value
+    parent?: NestedObjectNode<T>; // Reference to parent node
+    children?: NestedObjectNode<T>[]; // Child nodes
+    attributes?: Record<string, any>; // All properties except nested objects
+}
+
+/**
+ * Recursively traverse nested XML/SVG objects and return nodes matching the filter
+ * Optimized for structures from fast-xml-parser where tag names are object keys
+ * Traverses ALL object properties as potential child elements
+ * 
+ * @param obj - The root object to traverse
+ * @param filterFunc - Function that returns true for nodes to include
+ * @param options - Configuration options
+ * @returns Array of matching Node objects
+ * 
+ * @example
+ * // SVG structure: { svg: { rect: { x: 0, y: 0, width: 50 }, circle: { cx: 25, cy: 25, r: 10 } } }
+ * const rects = filterNestedObjects(
+ *   svgData,
+ *   (node) => node.tagName === 'rect'
+ * );
+ * // Returns: [{ tagName: 'rect', value: {...}, attributes: { x: 0, y: 0, width: 50 }, children: [] }]
+ */
+export function filterNestedObjects<T = any>(
+    obj: T,
+    filterFunc: (node: NestedObjectNode<T>) => boolean,
+    options: {
+        maxDepth?: number,                 // Maximum recursion depth
+        includeRoot?: boolean,             // Whether to test the root object
+        collectParents?: boolean,          // Collect parent nodes if child matches
+        extractAttributes?: boolean,       // Extract non-object properties (default: true)
+        excludeKeys?: string[],            // Keys to exclude from attributes
+    } = {}
+): NestedObjectNode<T>[]
+{
+    const {
+        maxDepth = 100,
+        includeRoot = false,
+        collectParents = false,
+        extractAttributes = true,
+        excludeKeys = [],
+    } = options;
+
+    const results: NestedObjectNode<T>[] = [];
+    const excludeSet = new Set(excludeKeys);
+
+    function extractNodeAttributes(nodeValue: any): Record<string, any> | undefined
+    {
+        if (!extractAttributes || typeof nodeValue !== 'object' || nodeValue === null) {
+            return undefined;
+        }
+
+        const attrs: Record<string, any> = {};
+        for (const [key, value] of Object.entries(nodeValue)) {
+            // Skip excluded keys
+            if (excludeSet.has(key)) continue;
+            
+            // Only include non-object values (primitives, arrays)
+            // Nested objects are traversed as children, not included in attributes
+            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+                attrs[key] = value;
+            }
+        }
+
+        return Object.keys(attrs).length > 0 ? attrs : undefined;
+    }
+
+    function traverse(
+        nodeValue: T, 
+        nodeName: string,
+        depth: number = 0, 
+        parentNode?: NestedObjectNode<T>
+    ): { node: NestedObjectNode<T>, matches: boolean }
+    {
+        // Prevent infinite recursion
+        if (depth >= maxDepth) {
+            console.warn(`filterNestedObjects: Maximum depth ${maxDepth} reached`);
+            return { node: null, matches: false };
+        }
+
+        // Handle null/undefined
+        if (nodeValue === null || nodeValue === undefined) {
+            return { node: null, matches: false };
+        }
+
+        // Skip primitives
+        if (typeof nodeValue !== 'object') {
+            return { node: null, matches: false };
+        }
+
+        // Create Node object
+        const currentNode: NestedObjectNode<T> = {
+            tagName: nodeName,
+            value: nodeValue,
+            parent: parentNode,
+            children: [], // Initialize empty children array
+            attributes: extractNodeAttributes(nodeValue)
+        };
+
+        let nodeMatches = false;
+        let childMatches = false;
+
+        // Test current node (skip root if includeRoot is false)
+        if (depth > 0 || includeRoot) 
+        {
+            nodeMatches = filterFunc(currentNode);
+            if (nodeMatches) {
+                results.push(currentNode);
+            }
+        }
+
+        // Traverse ALL object properties
+        // Each nested object is a potential child element in XML/SVG structures
+        for (const [key, value] of Object.entries(nodeValue as any)) {
+            // Skip excluded keys
+            if (excludeSet.has(key)) continue;
+
+            if (Array.isArray(value)) {
+                // Handle arrays - each item is a child
+                value.forEach((child, index) => {
+                    if (typeof child === 'object' && child !== null) {
+                        const childName = key; // Use just the key name, not key[index]
+                        const result = traverse(child as T, childName, depth + 1, currentNode);
+                        if (result.node) {
+                            currentNode.children.push(result.node);
+                            if (result.matches) {
+                                childMatches = true;
+                            }
+                        }
+                    }
+                });
+            } else if (value && typeof value === 'object') {
+                // Each nested object is a child element
+                // e.g., { svg: { rect: {...}, circle: {...} } }
+                const result = traverse(value as T, key, depth + 1, currentNode);
+                if (result.node) {
+                    currentNode.children.push(result.node);
+                    if (result.matches) {
+                        childMatches = true;
+                    }
+                }
+            }
+        }
+
+        // If collectParents is true and any child matched, add this parent
+        if (collectParents && childMatches && !nodeMatches) {
+            results.push(currentNode);
+        }
+
+        return { 
+            node: currentNode, 
+            matches: nodeMatches || childMatches 
+        };
+    }
+
+    // Start traversal
+    traverse(obj, 'root', 0);
+    return results;
+}
+
 //// DATA ENCODING ////
+
+ /**
+ * Convert a string value to its native type if possible.
+ * - "true"/"false" (case-insensitive) => boolean
+ * - Numeric strings => number
+ * - Otherwise, return as string
+ */
+export function convertStringValue(value: string): string | number | boolean {
+    if (typeof value !== 'string') return value;
+    const lower = value.toLowerCase();
+    if (lower === 'true') return true;
+    if (lower === 'false') return false;
+    if (!isNaN(Number(value)) && value.trim() !== '') return Number(value);
+    return value;
+}
 
 // taken from https://github.com/niklasvh/base64-arraybuffer/blob/master/src/index.ts
 export const arrayBufferToBase64 = (arraybuffer: ArrayBuffer): string => 
@@ -381,3 +578,341 @@ export function isWorker():boolean
 {
     return (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
 } 
+
+/** A simple uuid4 method */
+export function uuidv4(): string 
+{
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const random = Math.random() * 16 | 0; // Generate a random number between 0 and 15
+        const value = char === 'x' ? random : (random & 0x3 | 0x8); // Use 4 for the version and 8-11 for the variant
+        return value.toString(16); // Convert to hexadecimal
+    });
+}
+
+//// ENCODING BINARY DATA ////
+
+/**
+ * Recursively transforms binary data in an object to base64 strings for JSON serialization
+ *  We use an instance of ScriptOutputDataWrapper to keep track of original type and length for easy decoding
+ * 
+ * @param obj - The object to transform
+ * @param maxDepth - Maximum recursion depth to prevent infinite loops (default: 10)
+ * @param currentDepth - Current recursion depth (internal use)
+ * @returns Transformed object with binary data as base64 strings
+ */
+export function convertBinaryToBase64<T>(obj: T, maxDepth: number = 10, currentDepth: number = 0): number|string|Array<any>|Object|ScriptOutputDataWrapper
+{
+    // Prevent infinite recursion
+    if (currentDepth >= maxDepth) {
+        console.warn('convertBinaryToBase64: Maximum recursion depth reached');
+        return obj;
+    }
+
+    // Handle null or undefined
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+
+    // Handle ArrayBuffer
+    if (obj instanceof ArrayBuffer) 
+    {
+        return {
+            type: 'ArrayBuffer',
+            encoding: 'base64',
+            data: arrayBufferToBase64(obj),
+            length: obj.byteLength
+        } as ScriptOutputDataWrapper;
+    }
+
+    // Handle Uint8Array and other TypedArrays
+    if (obj instanceof Uint8Array || obj instanceof Int8Array || 
+        obj instanceof Uint16Array || obj instanceof Int16Array ||
+        obj instanceof Uint32Array || obj instanceof Int32Array ||
+        obj instanceof Float32Array || obj instanceof Float64Array) {
+        return {
+            type: obj.constructor.name,
+            encoding: 'base64',
+            data: arrayBufferToBase64(obj.buffer.slice(obj.byteOffset, obj.byteOffset + obj.byteLength) as ArrayBuffer),
+            length: obj.length
+        } as ScriptOutputDataWrapper;
+    }
+ 
+    // Handle Buffer (Node.js)
+    if (typeof Buffer !== 'undefined' && obj instanceof Buffer) {
+        return {
+            type: 'Buffer',
+            encoding: 'base64',
+            data: obj.toString('base64'),
+            length: obj.length
+        } as ScriptOutputDataWrapper;
+    }
+
+    // Don't do functions
+    if (typeof obj === 'function')
+    { 
+        console.warn('convertBinaryToBase64: Function serialization is not supported!');
+    }
+
+    // Handle original primitives
+    if (typeof obj !== 'object')
+    { 
+        return obj;
+    }
+
+    // Arrays - resurse
+    if (Array.isArray(obj))
+    {
+        return obj.map(item => convertBinaryToBase64(item, maxDepth, currentDepth + 1));
+    }
+
+
+    // Object
+    if(typeof obj === 'object')
+    {
+        // Avoid any instances of classes
+        if (Object.getPrototypeOf(obj) !== Object.prototype)
+        {
+            console.warn('convertBinaryToBase64: Class instances are not supported! Returned null');
+            return null;
+        }
+
+        const result: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+            // Skip non-enumerable properties and functions (unless explicitly handling them above)
+            if (typeof value === 'function') {
+                continue; // Skip functions in objects unless we want to serialize them
+            }
+            result[key] = convertBinaryToBase64(value, maxDepth, currentDepth + 1);
+        }
+        return result;
+    }
+   
+}
+
+
+/**
+ * Restores binary data from base64 strings after JSON parsing
+ * @param obj - The object to restore
+ * @returns Object with restored binary data
+ */
+export function restoreBinaryFromBase64(obj: ScriptOutputDataWrapper, forceBuffer: boolean=false): Buffer|ArrayBuffer|Uint8Array|null
+{
+    if (obj === null || obj === undefined) 
+    {
+        console.error('utils::restoreBinaryFromBase64(): Invalid input');
+        return null;
+    }
+    console.info(`utils::restoreBinaryFromBase64(): Restoring to binary "${obj?.type}" with length ${obj?.length}`);
+
+    // Handle primitives
+    if (typeof obj !== 'object') 
+    {
+        return obj;
+    }
+    // Check if this is a serialized binary object
+    if (obj.type && obj.data !== undefined)
+    {
+        switch (obj.type)
+        {
+            case 'ArrayBuffer':
+                const binaryString = atob(obj.data);
+                const buffer = new ArrayBuffer(binaryString.length);
+                const view = new Uint8Array(buffer);
+                for (let i = 0; i < binaryString.length; i++) {
+                    view[i] = binaryString.charCodeAt(i);
+                }
+                return (forceBuffer) 
+                        ? Buffer.from(buffer)
+                        : buffer as any;
+            case 'Uint8Array':
+                const b = restoreBinaryFromBase64({ type: 'ArrayBuffer', data: obj.data, length: obj.length }) as ArrayBuffer;
+                const u8 = new Uint8Array(b, 0, obj.length)
+                return (forceBuffer) 
+                        ? Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength)
+                        : u8;
+            case 'Buffer':
+                if (typeof Buffer !== 'undefined' && Buffer.from)
+                {
+                    return Buffer.from(obj.data, 'base64') as any;
+                }
+                break;
+
+            default:
+                console.warn(`restoreBinaryFromBase64: Unknown type ${obj.type}`);
+                return null;
+        }
+    }
+    // Handle Arrays
+    if (Array.isArray(obj)) {
+        return obj.map(item => restoreBinaryFromBase64(item)) as any;
+    }
+    // Handle plain objects
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj))
+    {
+        result[key] = restoreBinaryFromBase64(value);
+    }
+
+    return result;
+}
+
+/** Simple metadata printout */
+export function printDataInfo(data: any)
+{
+    console.log(`Type: ${data?.constructor?.name || typeof data}`);
+    console.log(`Size: ${data?.byteLength || data?.size || data?.length || 'unknown'}`);
+    console.log(`Preview: ${getValuePreview(data)}`);
+}
+
+export function getValuePreview(data: any, maxLength: number = 100): string
+{
+    if (data === null) return 'null';
+    if (data === undefined) return 'undefined';
+    
+    const type = typeof data;
+    
+    // Primitives
+    if (type === 'string') {
+        const preview = data.length > maxLength ? data.substring(0, maxLength) + '...' : data;
+        return `"${preview}"`;
+    }
+    
+    if (type === 'number') return String(data);
+    if (type === 'boolean') return String(data);
+    if (type === 'function') return `[Function: ${data.name || 'anonymous'}]`;
+    
+    // Binary types
+    if (data instanceof ArrayBuffer) return `[ArrayBuffer: ${data.byteLength} bytes]`;
+    if (data instanceof Uint8Array) return `[Uint8Array: ${data.length} elements]`;
+    if (typeof Buffer !== 'undefined' && data instanceof Buffer) return `[Buffer: ${data.length} bytes]`;
+    if (typeof Blob !== 'undefined' && data instanceof Blob) return `[Blob: ${data.size} bytes]`;
+    
+    // Arrays
+    if (Array.isArray(data)) {
+        if (data.length === 0) return '[]';
+        const preview = data.slice(0, 3).map(item => getValuePreview(item, 20)).join(', ');
+        return `[${preview}${data.length > 3 ? ', ...' : ''}] (${data.length} items)`;
+    }
+    
+    // Objects
+    if (type === 'object') {
+        const keys = Object.keys(data);
+        if (keys.length === 0) return '{}';
+        const preview = keys.slice(0, 3).join(', ');
+        return `{${preview}${keys.length > 3 ? ', ...' : ''}} (${keys.length} keys)`;
+    }
+    
+    return String(data);
+}
+
+/**
+ * Converts a record object to a URL parameter string.
+ * Example: { foo: 'bar', baz: 1 } => 'foo=bar&baz=1'
+ * @param params Record<string, any>
+ * @returns URL parameter string
+ */
+export function recordToUrlParams(params: Record<string, any>): string {
+    return Object.entries(params)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&');
+}
+
+/**
+ * Converts a URL parameter string to a record object.
+ * Example: 'foo=bar&baz=1' => { foo: 'bar', baz: '1' }
+ * @param paramString URL parameter string
+ * @returns Record<string, string>
+ */
+export function urlParamsToRecord(paramString: string): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (!paramString) return params;
+    paramString.split('&').forEach(pair => {
+        const [key, value] = pair.split('=');
+        if (key) params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+    });
+    return params;
+}
+
+ /**
+ * Converts a data object to a JS module string with export default,
+ * each key on a separate line for readability.
+ * @param data The data object to export
+ * @returns JS module string
+ * 
+*  This is used to write script.js files in the Library
+ */
+export function dataToModuleString(data: Record<string, any>): string {
+    function serialize(val: any, indent: string = '  '): string {
+        if (typeof val === 'string')
+        {
+            if (val.includes('${')) val = val.replace(/\$\{/g, '\\${'); // Escape ${...} to prevent evaluation when imported
+            // Use backticks for multiline strings or strings with backticks
+            if (val.includes('\n')) return '`' + val.replace(/`/g, '\\`') + '`';
+            // Otherwise just use JSON.stringify which results in double quotes
+            return JSON.stringify(val);
+        }
+        if (typeof val === 'number' || typeof val === 'boolean' || val === null)
+        {
+            return String(val);
+        }
+        if (Array.isArray(val))
+        {
+            if (val.length === 0) return '[]';
+            return '[\n' + val.map(v => indent + serialize(v, indent + '  ')).join(',\n') + '\n' + indent.slice(2) + ']';
+        }
+        if (typeof val === 'object' && val !== null)
+        {
+            const entries = Object.entries(val);
+            if (entries.length === 0) return '{}';
+            // Don't stringify keys, assume they are valid identifiers
+            return '{\n' + entries.map(([k, v]) => `${indent}${k}: ${serialize(v, indent + '  ')}`).join(',\n') + '\n' + indent.slice(2) + '}';
+        }
+        return undefined;
+    }
+
+    return `export default ${serialize(data)};\n`;
+}
+
+//// FUNCTIONS ////
+
+export function _getArgNames(func:any):Array<string>
+{
+     // taken from: https://stackoverflow.com/questions/1007981/how-to-get-function-parameter-names-values-dynamically?page=1&tab=votes#tab-top
+     var STRIP_COMMENTS = /(\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s*=[^,\)]*(('(?:\\'|[^'\r\n])*')|("(?:\\"|[^"\r\n])*"))|(\s*=[^,\)]*))/mg;
+     const ARGUMENT_NAMES = /([^\s,]+)/g;
+     
+     let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+     let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+     if(result === null)
+         result = [];
+     return result;
+}
+
+export function analyzeFunc(func:(any) => any)
+    : { argCount: number, argNames: string[], isAsync: boolean, 
+        hasMainScopeParam: boolean, returnsPromise: boolean }
+{
+    const funcStr = func.toString();
+    
+    // Get argument names (reuse your existing logic)
+    const argNames = _getArgNames(func);
+    
+    // Check if async
+    const isAsync = funcStr.startsWith('async ') || funcStr.includes('async function');
+    
+    // Check if first parameter looks like mainScope
+    const hasMainScopeParam = argNames.length > 0 && 
+        (argNames[0].toLowerCase().includes('scope') || argNames[0] === 'mainScope');
+    
+    // Detect return statements and promises
+    const returnMatches = funcStr.match(/return\s+([^;}\n]+)/g) || [];
+    const returnsPromise = isAsync || returnMatches.some(r => r.includes('Promise'));
+    
+    return {
+        argCount: argNames.length,
+        argNames,
+        isAsync,
+        hasMainScopeParam, // this is indicative
+        returnsPromise
+    };
+}

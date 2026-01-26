@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Material Properties",
+  "description": "Schema for material properties including physical, mechanical, thermal, and environmental characteristics",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": ["string", "null"],
+      "description": "Unique name of the material"
+    },
+    "group": {
+      "type": ["string", "null"],
+      "description": "Material group or category"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Detailed description of the material"
+    },
+    "density": {
+      "type": ["number", "null"],
+      "description": "Density in kg/m³"
+    },
+    "porosity": {
+      "type": ["number", "null"],
+      "description": "Porosity as a percentage (0-100)"
+    },
+    "moisture": {
+      "type": ["number", "null"],
+      "description": "Moisture content as a percentage (0-100)"
+    },
+    "diffusion_resistance": {
+      "type": ["number", "null"],
+      "description": "Diffusion resistance of water vapor (unitless)"
+    },
+    "compressive_strength": {
+      "type": ["number", "null"],
+      "description": "Compressive strength in MPa"
+    },
+    "tensile_strength": {
+      "type": ["number", "null"],
+      "description": "Tensile strength in MPa"
+    },
+    "elastic_modulus": {
+      "type": ["number", "null"],
+      "description": "Elastic modulus in GPa"
+    },
+    "shear_strength": {
+      "type": ["number", "null"],
+      "description": "Shear strength in MPa"
+    },
+    "thermal_conductivity": {
+      "type": ["number", "null"],
+      "description": "Thermal conductivity in W/(m·K)"
+    },
+    "thermal_resistance": {
+      "type": ["number", "null"],
+      "description": "Thermal resistance in m²·K/W"
+    },
+    "thermal_expansion": {
+      "type": ["number", "null"],
+      "description": "Coefficient of thermal expansion in 1/K"
+    },
+    "heat_capacity": {
+      "type": ["number", "null"],
+      "description": "Specific heat capacity in J/(kg·K)",
+      "minimum": 0
+    },
+    "fire_resistance": {
+      "type": ["string", "null"],
+      "description": "Fire resistance rating in ISO 834 format (R60, REI60, etc.)"
+    },
+    "fire_reaction": {
+      "type": ["string", "null"],
+      "description": "Fire reaction classification according to EN 13501-1"
+    },
+    "carbon": {
+      "type": ["number", "null"],
+      "description": "Embodied carbon in kg CO2 eq/kg in phases A1-A3"
+    },
+    "energy": {
+      "type": ["number", "null"],
+      "description": "Embodied energy in MJ/kg"
+    },
+    "water": {
+      "type": ["number", "null"],
+      "description": "Water footprint in liters/kg"
+    },
+    "toxicity": {
+      "type": ["string", "null"],
+      "description": "Toxicity level or classification"
+    },
+    "recyclability": {
+      "type": ["number", "null"],
+      "description": "Recyclability as a percentage (0-100)"
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false
+}

@@ -2,12 +2,11 @@
  *      OBbox.ts - Orientated Orientated Bounding Box
  * */
 
-import { Point, Vector, Shape, Obj, Vertex, Edge, Face, Shell, Solid, AnyShape, ShapeCollection } from './internal'
-import { PointLike, isPointLike, MainAxis, Side } from './internal' // types
+import type { PointLike, MainAxis } from './internal' // types
+import { Point, Vector, Shape, Edge, Face, Solid, AnyShape } from './internal'
+
 import { checkInput, addResultShapesToScene } from './decorators'; // Import directly to avoid error in ts-node
 import { roundToTolerance } from './utils'
-
-import { SIDES, SIDE_TO_AXIS } from './internal'
 
 export class OBbox
 {
@@ -366,6 +365,12 @@ export class OBbox
                                 ? this.box() : null
     }
 
+    /** Alias for shape() */
+    toShape():Edge|Face|Solid|null
+    {
+        return this.shape();
+    }
+
     /** Make Line from 1D Bbox */
     line():Edge|null
     {
@@ -388,11 +393,17 @@ export class OBbox
         return new Face().fromVertices(this.corners().slice(0,4));
     }
 
-    /** returns a Box Shape for this Bbox if not 2D, otherwise null */
+    /** returns a Box Shape for this Bbox if not 2D, otherwise null 
+     *  NOTE: Don't automatically add to scene
+    */
     box():Solid|null
     {
-        // NOTE: not always robust!
-        return new Face().fromVertices(this.corners().slice(0,4)).extrude(this.height())
+        if(!this.is3D())
+        { 
+            console.warn(`Bbox::box: Bbox is not 3D, so can't turn into a Box!`);
+            return null;
+        }
+        return new Face().fromVertices(this.corners().slice(0,4))._extruded(this.height())
     }   
 
     /** Return flipped Bbox that is mirrored in x-axis. For certain 2D ops */

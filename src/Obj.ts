@@ -13,15 +13,16 @@
 
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
 
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, Geom, isObjStyle, isBaseStyle} from './internal'
-import { AnyShape, isAnyShape } from './internal' // types
-import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
-import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
-import { MeshShape, MeshShapeBuffer } from './internal' // ExportModels.MeshShape
-import { SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle } from './internal' // InternalModels
-import { isNumeric, colorHexToInt } from './internal'
-import { PointLike, isPointLike, AnyShapeOrCollection, MeshingQualitySettings } from './internal';
+import { Vector, Shape, ShapeCollection, Brep } from './internal'
 
+import type { PointLike, AnyShape, AnyShapeOrCollection,
+        MeshShape, MeshShapeBuffer,
+    SceneGraphNode, SceneGraphNodeDetails, BaseStyle, ObjStyle,
+        MeshingQualitySettings
+ } from './internal'
+import { isPointLike, isAnyShape, isObjStyle, isBaseStyle, isNumeric } from './internal' // typeguards
+import { checkInput } from './decorators'; // decorators - use direct import to avoid error in jest / ts-node 
+import { uuidv4, colorHexToInt } from './internal' // utils
 
 export class Obj
 {
@@ -35,8 +36,8 @@ export class Obj
     }
 
     _oc:any; // holds a reference to loaded opencascade.js: needs to be public
-    _geom:Geom; // reference to Geom API instance
-    
+    _brep:Brep; // reference to Brep API instance
+
     _id:string; 
     _name:string;
     _shapeType:string; // for introspection: type of Shape
@@ -82,6 +83,12 @@ export class Obj
     setParent(parent:Obj)
     {
         // TODO
+    }
+
+    /** Add Obj with its children to active layer */
+    addToScene()
+    {
+        this._brep.addToActiveLayer(this);
     }
 
     /** Get or set style
@@ -341,22 +348,25 @@ export class Obj
         return (all) ? this.allShapes() : this._shapes; // all children of ShapeCollection _shapes
     }
 
-    /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection */
+    /** Get all shapes of this Obj including its descendant Obj's returned as grouped ShapeCollection 
+     *  TODO: Do we need Shape.valid() - It's slow!
+    */
     allShapesCollection():ShapeCollection
     {
         // IMPORTANT: don't change reference this._shapes
-        const collection = this._shapes.shallowCopy().filter(s => s.valid());  // Protect against invalid Shapes too!
+        //const collection = this._shapes.shallowCopy().filter(s => s.valid()); // GC: valid() only needed with GC - but slows down a lot!
+        const collection = this._shapes.shallowCopy();
 
         this.children().forEach((child,i) => 
         {
             // add as layers
             if(child.isLayer())
             {
-                const groupShapes = child.allShapes().filter(s => s.valid());
+                const groupShapes = child.allShapes(); // .filter(s => s.valid()); // GC 
                 collection.addGroup( child?.name() as string || `obj${i}`, groupShapes);
             }
             else {
-                collection.add(child._shapes.filter(s => s.valid()));
+                collection.add(child._shapes); // .filter(s => s.valid()));
             }
         });
  
@@ -385,10 +395,11 @@ export class Obj
         {
             obj._shapes.forEach((s) => 
             {
-                if(s.valid()) // Protect against empty shapes for example
-                {
+                // TMP DISABLED - SLOW!
+                //if(s.valid()) // Protect against empty shapes for example
+                //{
                     shapes.add(s);
-                }
+                //}
             })
         });
 
@@ -445,7 +456,8 @@ export class Obj
     /** Get type of Shape(s) in this Object */
     shapeType():string
     {
-        let shapeCollapsed = this._shapes.filter(s => s.valid()).collapse(); // will be null if empty ShapeCollection, single Shape if only one or ShapeCollection
+        //.filter(s => s.valid()) 
+        let shapeCollapsed = this._shapes.collapse(); // will be null if empty ShapeCollection, single Shape if only one or ShapeCollection
         this._shapeType = (shapeCollapsed == null) ? 'container' : shapeCollapsed.type(); 
         
         return this._shapeType;
@@ -465,16 +477,18 @@ export class Obj
      * */
     _updateShapes(shapes:AnyShapeOrCollection)
     {
-        if ( new Shape().isShape(shapes) )
+        if (!Shape.isShape(shapes) && !ShapeCollection.isShapeCollection(shapes))
         {
-            // console.geom(`Obj::_updateShapes: from type "${this._shapes.type()}" to "${newShape.type()}"`);
-            this._shapes = new ShapeCollection(shapes);
-            this._shapes.setObj(this); // place reference of current Obj into new Shape
+            console.error(`Obj::_updateShapes: Got a unknown type of shape or ShapeCollection: ${typeof shapes}`);
         }
+        
+        this._shapes = new ShapeCollection(shapes);
+        this._shapes.setObj(this); // place reference of current Obj into new Shape
     }
 
-    // ==== Output all mesh data from Shape in this Obj and its children ====
+    //// EXPORTS ////
 
+    /** Output all mesh data from Shape in this Obj and its children */
     toMeshShapes(quality?:MeshingQualitySettings):Array<MeshShape>
     {
         let meshes = (this._visible && this._shapes != null) ? this._shapes.toMeshShapes(quality) : [];
@@ -527,7 +541,7 @@ export class Obj
             {
                 // If this Obj has only one Shape in its ShapeCollection ._shapes then output more details of it!
 
-                if(this._shapes.length == 1 && this._shapes.first()?.valid())
+                if(this._shapes.length == 1) // this._shapes.first()?.valid()
                 {
                     let singleShape = this._shapes.first() as Shape;
                     shapeDetails = { 
@@ -580,5 +594,41 @@ export class Obj
         );
         return `<Obj id="${this.id}, name="${this._name}", shapes: ${shapeStrings}>`;
     }
+
+    /** 
+     *  Export Obj tree structure with raw shapes that will be recreated in other scope
+     *  NOTE: is this needed?
+     * */
+    toComponentGraph(component:string, parentNode:Object=null):Object
+    {
+        const curNode = {
+            _entity : 'ObjData',
+            name : this._name,
+            // Note: shapes(true) for all shapes including children Objs
+            shapes:  this.shapes(false) as ShapeCollection, // NOTE: geom is still current scope instance!
+            children : [],
+        }
+
+        // Recurse through children if any
+        this.children().forEach(childObj =>
+        {
+            childObj.toComponentGraph(component, curNode); // pass parent to child
+        });
+
+        // if child 
+        if(parentNode)
+        {
+            curNode.name = `${component}_${this.name()}`;
+            (parentNode as any).children.push(curNode); // add to to new parent Obj
+        }
+        // root
+        else {
+            curNode.name = component;
+        } 
+
+        return curNode;
+    }
+
+    
 
 }

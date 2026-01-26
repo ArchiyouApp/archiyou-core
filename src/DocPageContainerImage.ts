@@ -51,12 +51,12 @@ export class Image extends Container
 
     //// OUTPUT ////
 
-    async toData(cache?:Record<string,any>):Promise<ContainerData> // TODO
+    async toData(cache?:Record<string,any>|undefined):Promise<ContainerData> 
     {
         const format = this.getImageFormat();
 
         let data;
-        if(format) // load data
+        if(format)
         {  
             data = await this.loadImageData(cache);
         }
@@ -74,10 +74,10 @@ export class Image extends Container
     }
 
     /** We want to load the raw data of the image in the ContainerContent for easy access later (in HTML and PDF exporter) */
-    async loadImageData(cache?:Record<string,any>):Promise<any>
+    async loadImageData(cache?:Record<string,any>|undefined):Promise<any>
     {
         let data;
-        if(cache[this._url]) // get from cache
+        if(cache && cache[this._url]) // get from cache
         {
             console.info(`DocPageContainerImage::loadImageData: Loaded image "${this._url}" data from cache`)
             data = cache[this._url];
@@ -85,37 +85,42 @@ export class Image extends Container
         else {
             // async load the image through a proxy (to avoid CORS issues in browser)
             const proxyUrl = this._page._doc?._settings?.proxy;
-
             if(!proxyUrl)
             {
-                console.error(`DocPageContainerImage::loadImageData(): Can't query image data. No proxy given. Please supply settings with proxy url in Doc()!`);
+                console.warn(`DocPageContainerImage::loadImageData(): No proxy given. Please supply settings with proxy url in Doc()! Querying the images directly. This might not work in the browser!`);
             }
-            else 
+
+            const fetchUrl = (proxyUrl) ? proxyUrl : this._url;
+            const fetchSettings = (proxyUrl) 
+                                ?  {
+                                    method: 'POST',
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ url : this._url })       
+                                }
+                                : { 
+                                    method: 'GET',
+                                }
+            
+            // Do fetch
+            try 
             {
-                try 
+                const r = await fetch(fetchUrl, fetchSettings);                
+
+                if(r.status !== 200) 
                 {
-                    let r = await fetch(proxyUrl, 
-                        {
-                            method: 'POST',
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url : this._url })       
-                        }
-                    );
-                    if(r.status !== 200) 
-                    {
-                        console.error(`DocPageContainerImage::loadImageData(): Could not get image. Check if it exists or proxy address: "${proxyUrl}"`)
-                    }
-                    else {
-                        data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer());                     
-                        console.info(`DocPageContainerImage::loadImageData: Got data for image "${this._url}" with size ${data.length}`)
-                        cache[this._url] = data;
-                    }
+                    console.error(`DocPageContainerImage::loadImageData(): Could not get image. Check if it exists or proxy address: "${proxyUrl}"`)
                 }
-                catch(e)
-                {
-                    console.warn(`DocPageContainerImage::loadImageData(): Could not load image at "${this._url}" fetching through proxy: "${proxyUrl}":  ERROR: "${e}".`);
+                else {
+                    data = (this.getImageFormat() === 'svg') ? await r.text() : this._exportImageDataBase64(await r.arrayBuffer());                     
+                    console.info(`DocPageContainerImage::loadImageData: Got data for image "${this._url}" with size ${data.length}`)
+                    if (cache) cache[this._url] = data;
                 }
             }
+            catch(e)
+            {
+                console.warn(`DocPageContainerImage::loadImageData(): Could not load image at "${this._url}" fetching through proxy: "${proxyUrl}":  ERROR: "${e}".`);
+            }
+            
 
         }
 

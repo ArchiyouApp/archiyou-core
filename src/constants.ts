@@ -9,7 +9,15 @@ import { DocPathStyle } from './internal'
 export const USE_GARBAGE_COLLECTION = false; // if true, we will use garbage collection for OpenCascade objects
 export const SHAPE_CACHE_ENABLED = false;
 
-//// MISC SETTINGS
+//// EXECUTION AND OUTPUT SETTINGS ////
+
+export const SCRIPT_OUTPUT_CATEGORIES = ['model','metrics','tables','docs'] // see types: ScriptOutputCategory
+export const SCRIPT_OUTPUT_MODEL_FORMATS = ['glb','step','stl','svg', 'dae', 'obj', 'dxf'] // see types: ScriptOutputModelFormat
+export const SCRIPT_OUTPUT_METRIC_FORMATS = ['json','xlsx'] // see types: ScriptOutputMetricFormat
+export const SCRIPT_OUTPUT_TABLE_FORMATS = ['json','xlsx', 'gsheets'] // see types: ScriptOutputTableFormat
+export const SCRIPT_OUTPUT_DOC_FORMATS = ['json','pdf'] // see types: ScriptOutputDocFormat
+
+//// MESH SETTINGS
 
 export const MESHING_MAX_DEVIATION = 0.1;
 export const MESHING_ANGULAR_DEFLECTION = 0.5;
@@ -151,7 +159,7 @@ export const METRICS = [
 //// WORKER UTILS ////
 
 //// Methods from geom that are imported into global under samen name and lowercase ////
-export const GEOM_METHODS_INTO_GLOBAL = [
+export const BREP_METHODS_INTO_GLOBAL = [
     'Point', 'Vector', 
     'Vertex', 'Edge', 'Line', 'Arc', 'Spline', 
     'Wire', 'Polyline', 'Spiral', 'Helix',
@@ -163,7 +171,6 @@ export const GEOM_METHODS_INTO_GLOBAL = [
     'rectTo', 'rect', 'circleTo', 'circle', 'mirror', 'offset', 'offsetted', 'fillet', 'chamfer', 'thicken', 'thickened','combine',
     'close', 'importSketch',
     'units',
-    'pipeline',
     ];
 
 

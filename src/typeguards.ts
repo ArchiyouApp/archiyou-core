@@ -1,8 +1,8 @@
 import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, 
             VertexCollection, DimensionLineData, DimensionLevel, DimensionLevelSettings, PipelineType, Beam,  
-            DocUnitsWithPerc} from './internal'
+            DocUnitsWithPerc , View, Container } from './internal'
 
-import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
+import type { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName, ObjStyle, PointLike, ShapeType, 
           ShapeTypes, LinearShape,PointLikeOrAnyShape, AnyShape, PointLikeSequence, AnyShapeCollection, AnyShapeSequence,
           AnyShapeOrCollection, AnyShapeOrSequence, PointLikeOrAnyShapeOrCollection, ColorInput,
           Pivot, Alignment, BboxAlignment, LinearShapeTail, ThickenDirection, MakeShapeCollectionInput,
@@ -14,21 +14,27 @@ import { Side, Plane, CoordArray, Coord, Cursor, MainAxis, Axis, SketchPlaneName
           ShapeAttributes, 
           DataRowColumnValue, DataRowsValues, DataRowsColumnValue, DocUnits, PercentageString, WidthHeightInput,
           BeamBaseLineAlignment, 
-          AnnotationAutoDimStrategy
+          AnnotationAutoDimStrategy,
+          RunnerScriptExecutionResult,
+          RunnerScriptExecutionRequest,
+          ScriptOutputPathData, ScriptOutputCategory, ScriptOutputFormat, ScriptOutputDataWrapper
         } from './internal' // types
 
-import { ParamType, Param, PublishParam } from './internal'
+import { ParamType, ScriptParam, ScriptParamData } from './internal'
 
-import { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
-            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer, Container, View,
+import type { BaseStyle, ContainerAlignment, ContainerPositionRel, ContainerPositionAbs, ScaleInput, DataRows,
+            ImageOptionsFit, TextAreaAlign, PageSize, PageOrientation, AnyPageContainer,
             ContainerHAlignment, ContainerVAlignment, MetricName,
             ContainerTableInput, ContainerPositionLike, ContainerPositionCoordRel, ContainerPositionCoordAbs, 
             OrientationXY
         } from './internal' // NOTE: Position is a DOC type
 
-import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, SIDE_TO_AXIS, METRICS} from './internal' // types
+import { SIDES, ALL_SHAPE_NAMES, AXIS_TO_VECS, ALIGNMENTS_ADD_TO_SIDES, 
+        SIDE_TO_AXIS, METRICS, SCRIPT_OUTPUT_MODEL_FORMATS, SCRIPT_OUTPUT_METRIC_FORMATS, SCRIPT_OUTPUT_TABLE_FORMATS,
+    SCRIPT_OUTPUT_DOC_FORMATS } from './internal' // types
 
 import { isNumeric, isRelativeCoordString } from './internal'
+
 
 
 //// TYPE GUARD FUNCTIONS ////
@@ -41,23 +47,23 @@ import { isNumeric, isRelativeCoordString } from './internal'
 
 */
 
-export function isParamType(o:any): o is ParamType
+export function isScriptParamType(o:any): o is ParamType
 {
     return ['number','text','options','boolean','list','object'].includes(o)
 }
 
-export function isParam(o:any): o is Param
+export function isScriptParam(o:any): o is ScriptParam
 {
     return (typeof o === 'object') &&
-        isParamType(o?.type) &&
+        isScriptParamType(o?.type) &&
         typeof o?.name  === 'string'
         // NOTE: value and default are optional
         // TODO: add _behaviours?
 }
 
-export function isPublishParam(o:any): o is PublishParam
+export function isScriptParamData(o:any): o is ScriptParamData
 {
-    return isParam(o) && 
+    return isScriptParam(o) && 
         o?._behaviours &&
         typeof o?._behaviours === 'object' &&
         Object.values(o._behaviours).every(v => typeof v === 'string') // function stringified
@@ -547,3 +553,57 @@ export function isBeamBaseLineAlignment(o:any): o is BeamBaseLineAlignment
         ['start','end','center','middle'].includes(o)
         : isNumeric(o)
 }
+
+//// EXECUTION ////
+
+export function isRunnerScriptExecutionResult(r:any): r is RunnerScriptExecutionResult
+{
+    return r && typeof r === 'object' && (r.status)  // TODO: better
+}
+
+export function isRunnerScriptExecutionRequest(o:any): o is RunnerScriptExecutionRequest
+{
+    return o && typeof o === 'object'
+        && typeof o.script === 'object' && 
+        typeof o?.script?.name === 'string' &&
+        (!o?.component || typeof o?.component === 'string') &&
+        (typeof o?.mode === 'string' || !o?.mode) &&
+        (!o?.params || typeof o.params === 'object') &&
+        (!o?.outputs || Array.isArray(o.outputs)) &&
+        (!o?.onDone || typeof o.onDone === 'function');
+}
+
+//// EXECUTION RESULTS ////
+
+export function isScriptOutputCategory(o:any):o is ScriptOutputCategory
+{
+    return typeof o === "string" && ['model','metrics','tables','docs'].includes(o);
+}
+
+/** Main typeguard for OutputFormat - Please update constants.ts when introducing a new format! */
+export function isScriptOutputFormat(o:any):o is ScriptOutputFormat
+{
+    const ALL_FORMATS = [...SCRIPT_OUTPUT_MODEL_FORMATS, ...SCRIPT_OUTPUT_METRIC_FORMATS, ...SCRIPT_OUTPUT_TABLE_FORMATS, ...SCRIPT_OUTPUT_DOC_FORMATS, 'internal']
+    const r = typeof o === "string" && ALL_FORMATS.includes(o);
+    if(!r){
+        console.error(`isScriptOutputFormat: Unknown output format "${o}". Valid formats: ${ALL_FORMATS.join(', ')}`);
+    }
+    return r;
+}
+
+export function isScriptOutputDataWrapper(o:any): o is ScriptOutputDataWrapper
+{
+    return o && typeof o === 'object' 
+        && o.data // can be string, object, Buffer
+        && typeof o.type === 'string';
+}
+
+export function isScriptOutputPathData(o:any): o is ScriptOutputPathData
+{
+    return o && typeof o === 'object'
+        && typeof o.requestedPath === 'string'
+        && typeof o.resolvedPath === 'string'
+        && typeof o.pipeline === 'string'
+        && typeof o.category === 'string'
+}
+

@@ -11,22 +11,32 @@
  */
 
 import chroma from 'chroma-js' // direct import like in documentation does not work - fix with @types/chroma
+import { DxfBlock, point3d } from '@tarikjabiri/dxf'
 
+// types
+import type { ObjStyle, ThickenDirection, PointLike, Cursor,
+        AnyShape, AnyShapeOrCollection,
+        LinearShape, LinearShapeTail, PointLikeSequence,
+        DimensionOptions } from './internal' // see types
+// constants
 import { EDGE_DEFAULT_START, EDGE_DEFAULT_END, EDGE_DEFAULT_CIRCLE_RADIUS, EDGE_DEFAULT_OFFSET, EDGE_DEFAULT_THICKEN,
     EDGE_DEFAULT_POPULATE_NUM, EDGE_DEFAULT_EXTEND_AMOUNT, EDGE_DEFAULT_EXTEND_DIRECTION, EDGE_DEFAULT_ALIGNTO_FROM,
     EDGE_DEFAULT_ALIGNTO_TO, EDGE_DEFAULT_SEGMENTS_ANGLE, EDGE_DEFAULT_SEGMENTS_ANGLE_SVG, EDGE_DEFAULT_SEGMENTS_SIZE,
+    WIRE_LOFTED_SOLID
 } from './internal'
 
-import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection } from './internal'
+import { Vector, Point, Shape, Vertex, Wire, Face, Shell, Solid, 
+    ShapeCollection, VertexCollection,
+    DimensionLine } from './internal'
+
+import { isPointLike } from './internal' // typeguards
+
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal'
 
-import { ObjStyle, ThickenDirection, PointLike, isPointLike,Cursor,AnyShape, AnyShapeOrCollection,
-        LinearShape, LinearShapeTail, PointLikeSequence } from './internal' // see types
-import { roundToTolerance } from './internal'
+// utils
+import { toRad, roundToTolerance, convertValueFromToUnit } from './internal'
+// decorators
 import { addResultShapesToScene, checkInput } from './decorators' // import directly to avoid ts-node error
-import { WIRE_LOFTED_SOLID } from './internal'
-import { toRad, convertValueFromToUnit } from './internal';
-import { DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
 
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -43,7 +53,7 @@ export class Edge extends Shape
     
         Inherited from Shape:
         _oc
-        _geom
+        _brep
         _obj
         _parent
         _ocShape
@@ -69,15 +79,17 @@ export class Edge extends Shape
         // NOTE: We can always create default Edges with new Edge() and then alter them with makeCircle, makeArc etc
     }
 
-    //// TRANSFORMATION METHODS ////
+    //// CREATION METHODS ////
 
     _fromOcEdge(ocEdge:any):this
     {
         if (ocEdge && (ocEdge instanceof this._oc.TopoDS_Edge || ocEdge instanceof this._oc.TopoDS_Shape) && !ocEdge.IsNull() )
         {
+            // First clear existing if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Edge
             ocEdge = this._makeSpecificOcShape(ocEdge, 'Edge');
-
             this._ocShape = ocEdge;
             this._ocId = this._hashcode();
             this.round(); // round to tolerance - !!!! look like not really working
@@ -192,8 +204,8 @@ export class Edge extends Shape
          */
 
         center = center as Point; // auto converted
-        let ocCircle = new this._oc.gp_Circ_2(new this._oc.gp_Ax2_3(center._toOcPoint(),new this._oc.gp_Dir_4(0, 0, 1)), radius); 
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_8(ocCircle).Edge();
+        const ocCircle = new this._oc.gp_Circ_2(new this._oc.gp_Ax2_3(center._toOcPoint(),new this._oc.gp_Dir_4(0, 0, 1)), radius); 
+        const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_8(ocCircle).Edge();
         this._fromOcEdge(ocEdge);
         
         return this;
@@ -222,12 +234,12 @@ export class Edge extends Shape
         }
 
         let ocPointList = new this._oc.TColgp_Array1OfPnt_2(1, vertices.length);
-        vertices.forEach( (v,i) => ocPointList.SetValue(i+1, v._toOcPoint()) );
+        vertices.forEach( (v,i) => ocPointList.SetValue(i+1, (v as Vertex)._toOcPoint()) );
         let geomSplineCurveHandle = new this._oc.GeomAPI_PointsToBSpline_2(ocPointList, 3, 8, this._oc.GeomAbs_Shape.GeomAbs_C2, 1.0e-3 ).Curve();
         /* WORKAROUND: Expected null or instance of Handle_Geom_Curve, got an instance of Handle_Geom_BSplineCurve
             We resolve the handle (basically an dynamic pointer in OCE) and make a new Curve Handle from the BezierCurve */
-        let geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomSplineCurveHandle.get());
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24( geomCurveHandle ).Edge(); 
+        const geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomSplineCurveHandle.get());
+        const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24( geomCurveHandle ).Edge(); 
 
         this._fromOcEdge(ocEdge);
 
@@ -257,12 +269,12 @@ export class Edge extends Shape
         { 
             type = (type != "threepoint" && type != "tangent" ) ? 'threepoint' : type; // check inputs
 
-            let geomTrimmedCurveHandle = (type == 'threepoint') ? 
+            const geomTrimmedCurveHandle = (type == 'threepoint') ? 
                                     new this._oc.GC_MakeArcOfCircle_4(start._toOcPoint(), mid._toOcPoint(), end._toOcPoint()).Value() : // mid point is a point
                                     new this._oc.GC_MakeArcOfCircle_5(start._toOcPoint(), mid._toOcVector(), end._toOcPoint()).Value(); // mid point is a tangent
 
-            let geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomTrimmedCurveHandle.get());
-            let newOcEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(geomCurveHandle).Edge();
+            const geomCurveHandle = new this._oc.Handle_Geom_Curve_2(geomTrimmedCurveHandle.get());
+            const newOcEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(geomCurveHandle).Edge();
             this._fromOcEdge(newOcEdge);
 
         }
@@ -278,14 +290,14 @@ export class Edge extends Shape
             - Geom_Bezier_Curve: https://dev.opencascade.org/doc/refman/html/class_geom___bezier_curve.html
         */
 
-        let bezierPoints = points as VertexCollection;
+        const bezierPoints = points as VertexCollection;
         
-        let ocPointList = new this._oc.TColgp_Array1OfPnt_2(1,bezierPoints.length);
-        bezierPoints.forEach( (v,i) => ocPointList.SetValue(i+1, v._toOcPoint()));
+        const ocPointList = new this._oc.TColgp_Array1OfPnt_2(1,bezierPoints.length);
+        bezierPoints.forEach( (v,i) => ocPointList.SetValue(i+1, (v as Vertex)._toOcPoint()));
 
-        let ocCurve = new this._oc.Geom_BezierCurve_1(ocPointList);
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(new this._oc.Handle_Geom_Curve_2(ocCurve)).Edge();
-        let bezierEdge = this._fromOcEdge(ocEdge);
+        const ocCurve = new this._oc.Geom_BezierCurve_1(ocPointList);
+        const ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_24(new this._oc.Handle_Geom_Curve_2(ocCurve)).Edge();
+        const bezierEdge = this._fromOcEdge(ocEdge);
         return bezierEdge;
     }
 
@@ -465,16 +477,16 @@ export class Edge extends Shape
     {
         // see: https://dev.opencascade.org/content/reverse-edge
 
-        let curve = new this._oc.BRepAdaptor_Curve_2(ocEdge);
-        let uMin = curve.FirstParameter();
-        let uMax = curve.LastParameter();
+        const ocCurve = new this._oc.BRepAdaptor_Curve_2(ocEdge);
+        const uMin = ocCurve.FirstParameter();
+        const uMax = ocCurve.LastParameter();
         
-        let ocGeomCurve = new this._oc.Handle_Geom_Curve_2(curve.Curve().Curve().get()).get();
+        const ocGeomCurve = new this._oc.Handle_Geom_Curve_2(ocCurve.Curve().Curve().get()).get();
         
-        let uMinRev = ocGeomCurve.ReversedParameter(uMin);
-        let uMaxRev = ocGeomCurve.ReversedParameter(uMax);
+        const uMinRev = ocGeomCurve.ReversedParameter(uMin);
+        const uMaxRev = ocGeomCurve.ReversedParameter(uMax);
 
-        let ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(ocGeomCurve.Reversed(), uMaxRev, uMinRev);
+        const ocEdgeCreator = new this._oc.BRepBuilderAPI_MakeEdge_25(ocGeomCurve.Reversed(), uMaxRev, uMinRev);
         return ocEdgeCreator.Edge();
     }
 
@@ -992,7 +1004,7 @@ export class Edge extends Shape
 
     /* Move current Edge so it connects to another Edge or Wire with given from,to = start | end  */
     @checkInput(['LinearShape', [String, EDGE_DEFAULT_ALIGNTO_FROM], [String, EDGE_DEFAULT_ALIGNTO_TO]], ['Wire', String, String])
-    alignTo(other:LinearShape, from?:LinearShapeTail, to?:LinearShapeTail):Edge
+    alignTo(other:LinearShape, from?:LinearShapeTail, to?:LinearShapeTail):this
     {
         // Main method is in Wire, convert single Edge to Wire and use that method
         let w = this._toWire().alignTo(other,from,to);
@@ -1209,9 +1221,9 @@ export class Edge extends Shape
         // For Edges it is always unclear where to offset dimension to
         // For now we set offset away from origin. See Annotator
         if(!options){ options = { units: null }}
-        options.units = options?.units || this._geom.units(); // make sure we have units
+        options.units = options?.units || this._brep.units(); // make sure we have units
 
-        const dimLine = this._geom._annotator.dimensionLine().fromEdge(this, options);
+        const dimLine = this._brep._annotator.dimensionLine().fromEdge(this, options);
         dimLine.link(this._parent); // set parent
 
         return dimLine
@@ -1250,7 +1262,7 @@ export class Edge extends Shape
      *  IMPORTANT: official SVG path (without comma!)
      *  code inspired from CadQuery: https://github.com/CadQuery/cadquery/blob/917d918e34690c101a50a233a11026974b87574b/cadquery/occ_impl/exporters/svg.py#L84
     */
-    toSvg():string
+    toSVG():string
     {
         /* OC docs: 
             - GCPnts_QuasiUniformDeflection: https://dev.opencascade.org/doc/refman/html/class_g_c_pnts___quasi_uniform_deflection.html
@@ -1275,7 +1287,7 @@ export class Edge extends Shape
         // Based on attributes we assign some classes for later styling
         const svgNodeStr = `<path d="${svgPathD}" ${this._getSvgPathAttributes()} fill="none" class="${this._getSvgClasses()}"/>`; 
 
-        // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSvg() method
+        // NOTE: any dimension lines tied to this Edge will be added in the ShapeCollection.toSVG() method
         return svgNodeStr; // return as string for now
     }
 
@@ -1289,7 +1301,7 @@ export class Edge extends Shape
             - we set all attributes here, either set by user or default. So the renderers have consistent styling to work with
         */
 
-        const modelUnits = this._geom._units;
+        const modelUnits = this._brep._units;
 
         const STYLE_TO_ATTR = [
             { geom: 'line', prop: 'color', attr: 'stroke', transform : (val) => (val) ? chroma(val).hex() : this.TO_SVG_LINE_COLOR_DEFAULT },
@@ -1323,7 +1335,9 @@ export class Edge extends Shape
                     svgAttrs[t.attr] = svgValue
                 } 
                 else {
-                    console.warn(`Edge::_getSvgPathAttributes(): Skipped attribute ${t.geom}->${t.prop} because svg value was null!`);
+                    // console.warn(`Edge::_getSvgPathAttributes(): Skipped attribute ${t.geom}->${t.prop} because svg value was null!`);
+                    // Disabled because it happens often
+                    // TODO: fix common line->dashed === null
                 }
             })
         }
@@ -1371,6 +1385,28 @@ export class Edge extends Shape
         })
         return classes.join(' ');
     }
+
+    /** Export Edge to DXF writer instance 
+     *  Now only lines are supported
+     *  TODO: Introduce arcs and splines
+    */
+    toDXF(dxf:DxfBlock):this
+    {
+        const segmPoints = this._segmentizeToPoints(EDGE_DEFAULT_SEGMENTS_ANGLE_SVG);
+
+        segmPoints.forEach((point,i,arr) =>
+        {
+            if(i < arr.length -1 ) // skip last point
+            {
+                dxf.addLine(
+                    point3d(point.x, point.y, 0), 
+                    point3d(arr[i+1].x, arr[i+1].y, 0));
+            }
+        });
+
+        return this; 
+    }
+
     
     //// UTILS ////
 

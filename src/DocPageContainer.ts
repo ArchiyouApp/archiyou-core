@@ -229,7 +229,7 @@ export class Container
 
 
     /** Export Data of Container */
-    async toData(cache?:Record<string,any>):Promise<ContainerData>
+    async toData(cache?:Record<string,any>|undefined):Promise<ContainerData>
     {
         // will be overriden by subclasses (DocPageContainerImage, DocPageContainerText etc)
         return null;
@@ -262,7 +262,7 @@ export class Container
             zoomLevel: this._zoomLevel || 1,
             zoomRelativeTo: this._zoomRelativeTo || 'container',
             docUnits: this._page._units, // needed to scale the content
-            modelUnits: this._page?._doc?._geom?._units, // needed to scale the content
+            modelUnits: this._page?._doc?._brep?._units, // needed to scale the content
             caption: this._caption,
             title: this._title,
         }

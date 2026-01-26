@@ -1,5 +1,12 @@
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, BaseAnnotation, ParamManager  } from './internal'
-import { Geom, Doc, Beams, Container, DimensionLine, CodeParser, Exporter, Make, Calc, View } from './internal' // TMP DISABLED: Table
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, 
+        Solid, ShapeCollection, VertexCollection, Bbox, BaseAnnotation, 
+        ParamManager, Obj, Script, ScriptParam, ScriptData  } from './internal'
+
+import { Brep, Doc, Beams, Container, DimensionLine, CodeParser, 
+            Exporter, Make, Calc, Db as CalcDb, View, Runner, Services } from './internal'
+
+import type { ScriptParamData } from './internal'
+
 import { Console } from './Console'
 
 //// SETTINGS ////
@@ -30,7 +37,7 @@ export const ALIGNMENTS_ADD_TO_SIDES = ['center','start','end'];
 
 //// UNION TYPES ////
 
-export type ModelUnits = 'mm'|'cm'|'dm'|'m'|'km'|'inch'|'feet'|'yd'|'mi'; // For now they are for administration only
+export type ModelUnits = 'mm'|'cm'|'dm'|'m'|'km'|'in'|'ft'|'yd'|'mi'; // For now they are for administration only
 export type Units = DocUnits | ModelUnits
 export type UnitsWithPerc = Units | '%'
 export type Coord = number|string
@@ -49,7 +56,9 @@ export type ShapeType = 'Vertex'|'Edge'|'Wire'|'Face'|'Shell'|'Solid'
 export type ShapeTypes = Array<ShapeType>
 export type LinearShape = Edge|Wire // LinearShape: A Shape that is linear.
 export type PointLikeOrAnyShape = PointLike|AnyShape
+// NOTE: Need to remove Shape here?
 export type AnyShape = Shape|Vertex|Edge|Wire|Face|Shell|Solid // Single Shape, excluding ShapeCollection
+export type AnyTypedShape = Vertex|Edge|Wire|Face|Shell|Solid
 export type AnyShapeCollection = ShapeCollection|VertexCollection
 export type AnyShapeSequence = AnyShapeCollection|Array<AnyShape> 
 export type AnyShapeOrCollection = AnyShape|AnyShapeCollection
@@ -79,21 +88,77 @@ export type PipelineType = 'docs' | '3dprint' | 'cnc' | 'techdraw' | 'laser'
 
 //// INTERFACES ////
 
+/** Saved Scripts by Version */
+export interface ScriptVersion 
+{
+    id? : string,
+    file_id? : string,
+    user_id? : string,
+    user_name? : string,
+    file_name? : string,
+    prev_version_id? : string,
+    created_at? : string,
+    updated_at? : string,
+    params? : Array<ScriptParam>,
+    code : string,
+    shared?: boolean,
+    shared_version_tag?:string,
+    shared_auto_sync? : boolean,
+    shared_category?: string,
+    shared_description?: string
+}
+
+/** After execution of the script (on client or server) we fill in some metadata */
+export interface ScriptMeta
+{
+    // Information after execution of script
+    units: ModelUnits, // units of the script
+    pipelines: Array<string>, // pipelines that are part of the script
+    metrics: Array<string>, // metric names that are part of the script
+    tables: Array<string>, // table names that are part of the script
+    docs: Array<string>, // names of docs that are part of the script
+    numShapes?: number
+    bbox?: Array<number|number|number|number|number|number>, // bbox of scene [minX, minY, minZ, maxX, maxY, maxZ]
+}
+
+/** Information on how the Script is published 
+ *  If null then the script is not published
+ *  Before publishing the script is executed and validated, so here we also add information 
+ *  that comes out of execution
+*/
+export interface ScriptPublished
+{
+    title?:string // nice title of the script
+    version:string // valid semver
+    libraryUrl?:string // url to the library where the script is published
+    url?:string // url to the published script - without library url - this anticipates different publication urls
+    published?:Date // Date of publication
+    description?:string // public description of script
+    public?:boolean // if the script is public or not
+    params?: Record<string, any>; // the parameters that are public with override configuration, others are default
+    presets?: Array<string>; // presets that are public
+}
+
 /** A group of all modules of Archiyou for easy access  */
 export interface ArchiyouApp
 {
+    oc?: any // open cascade module
     worker?: any, // Keep track of scope of root scope of Archiyou core app - TODO: TS typing
-    geom: Geom,
+    runner?:Runner, // The instance of the Runner where the script is run
+    scope?:any // Scope where the script is run in
+    brep?: Brep,
     doc?: Doc,
     console?: Console,
     executor?: CodeParser,
     exporter?: Exporter,
     calc?: Calc,
     make?: Make,
+    services?: Services,
     // TODO: importer?
     gizmos?: Array<Gizmo>, // TODO: move this to Geom?
     beams?: Beams,
     paramManager?:ParamManager
+    config?: Record<string,any> // all environment variables
 }
 
 export interface ArchiyouAppInfoBbox
@@ -129,7 +194,7 @@ export interface ConsoleMessage
 }
 
 /** Special Archiyou data inserted into asset.archiyou
-    TODO: We use ComputeResult internally - which has a lot of overlap with this
+    TODO: We use RunnerScriptExecutionResult internally - which has a lot of overlap with this
     When we start using GLB format internally these types will merge
 */
 export interface ArchiyouData
@@ -142,17 +207,9 @@ export interface ArchiyouData
     messages?: Array<ConsoleMessage>, // NOTE: for internal use and export in GLTF
     metrics?: Record<string, Metric>,  
     tables?:{[key:string]:any}, // raw data tables
-    managedParams?:Record<ParamOperation, Array<PublishParam>>
+    managedParams?:Record<ParamOperation, Array<ScriptParamData>>
 }
 
-/** Data structure on the current state of the Archiyou App (mostly inside a worker) */
-export interface ArchiyouAppInfo
-{
-    units?:ModelUnits // units of Geom._units
-    numShapes?:number
-    bbox?:ArchiyouAppInfoBbox // bbox of all shapes in scene
-    hasDocs?:boolean // if there are docs part of the script
-}
 
 /** TODO */
 export interface ExportSVGOptions 
@@ -183,25 +240,6 @@ export interface ArchiyouData
     tables?:{[key:string]:any}, // raw data tables
 }
 
-/** Saved Scripts by Version */
-export interface ScriptVersion 
-{
-    id? : string,
-    file_id? : string,
-    user_id? : string,
-    user_name? : string,
-    file_name? : string,
-    prev_version_id? : string,
-    created_at? : string,
-    updated_at? : string,
-    params? : Array<Param>,
-    code : string,
-    shared?: boolean,
-    shared_version_tag?:string,
-    shared_auto_sync? : boolean,
-    shared_category?: string,
-    shared_description?: string
-}
 
 export type EngineStateStatus = 'init' | 'loaded' | 'executing' | 'executed'
 
@@ -218,26 +256,6 @@ export interface MeshingQuality
 
 }
 
-/** Settings on what to compute in a ExecutionRequest */
-export interface ExecutionRequestCompute
-{
-    doc:boolean
-    pipelines:boolean
-}
-
-export interface ExecutionRequest
-{
-    script: ScriptVersion
-    createdAtString:string
-    mode: 'main'|'local' // executing in main or in some component (for example keep meshes local or not)
-    compute: ExecutionRequestCompute
-    meshingQuality: MeshingQualitySettings,
-    outputFormat?: 'buffer'|'glb'|'svg' // null = default
-    outputOptions?: ExportGLTFOptions|ExportSVGOptions // TODO: more options per output
-    onDone?: ((result:ComputeResult) => any)
-}
-
-
 export interface ComputeTask
 {
     uuid?: string,
@@ -246,90 +264,71 @@ export interface ComputeTask
     broker_id? : string,
     client_id?: string,
     created_at?: Date,
-    params? : Array<Param>,
+    params? : Array<ScriptParam>,
     code: string
 }
 
-export interface ComputeResult
+export interface RunnerScriptExecutionResult
 {
-    uuid: string,
-    user_id : string,
-    broker_id : string,
-    task: ComputeTask,
     created_at: Date,
-    meshes?: Array<MeshShape>, // individual ShapeMeshes: TO BE FASED OUT!
-    meshBuffer?: MeshShapeBuffer,
-    meshGLB?:ArrayBuffer, // raw GLB file in buffer
-    svg?:string, // SVG output is any
-    scenegraph: SceneGraphNode
-    statements: Array<StatementResult>
-    errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
-    messages?: Array<ConsoleMessage>,
+    status:'success'|'error',
+    duration: number
+    request: RunnerScriptExecutionRequest,
+
+    scenegraph?: SceneGraphNode
     gizmos?: Array<Gizmo>,
     annotations?: Array<any> // TODO: TS typing: DimensionLineData etc. 
-    duration: number
-    docs?:{[key:string]:DocData} // Data for generating docs
-    pipelines: Array<string>,
-    tables?: Record<string, any>, // TS type TODO
-    metrics?: Record<string, any>, // TS type TODO
-    info?:ArchiyouAppInfo, // general metadata 
-    managedParams?:Record<ParamOperation, Array<PublishParam>>
+    managedParams?:Record<ParamOperation, Array<ScriptParamData>>
+
+    statements?: Array<StatementResult>
+    errors?: Array<StatementResult>, // seperate the error statements (for backward compat)
+    warnings?: Array<string>, // warnings that occured related to request or execution
+    messages?: Array<ConsoleMessage>, // based on settings in request you find the relevant messages
+
+    meta?: ScriptMeta, // meta information on the script execution
+    
+    // All outputs in flat array with request path and data
+    outputs?: Array<ScriptOutputData>
 }
+
+/** Results of component execution 
+ *  This is a flattened version of RunnerScriptExecutionResult for direct use in execution scope
+ *  Any output is in internal format
+ *   - models -> Obj (which contains Shapes)
+ *   - metrics -> Record<string,Metric>
+ *   - tables -> CalcTable (or CalcDb?)
+ *   - docs -> Doc
+ *   
+*/
+export type ImportComponentOutput = Obj|Record<string,Metric>|Calc|Doc|null
+export interface ImportComponentResultPipeline {
+    model?: Obj|null,
+    metrics?: Record<string,Metric>|null,
+    tables?:CalcDb|null,
+    docs?: Doc|null
+}
+/** Result with multiple pipelines */
+export type ImportComponentResultPipelines = Record<string, ImportComponentResultPipeline>
+/** Combined type: direct output, per pipeline or multiple pipelines */
+export type ImportComponentResult = ImportComponentOutput|ImportComponentResultPipeline|ImportComponentResultPipelines
 
 
 //// PARAMS ////
+// See ScriptParam for base class and ScriptParamData
 
-// NOTE: We put these in the core library because of the ParamManager 
+export type ParamType = 'number'|'boolean'|'text'|'options'|'list'|'object' 
 
-export type ParamType = 'number'|'text'|'options'|'boolean'|'list'|'object' 
-
+export type ParamOperation = 'new'|'updated'|'deleted'
 /** Target of a Param behaviour  */
 export type ParamBehaviourTarget = 'visible' | 'enable' | 'value' | 'values' | 'start' | 'end' | 'options'
-
-/** Param inside the application */
-export interface Param
-{ 
-    id?: string
-    type: ParamType
-    listElem?: Param, // definition of list content (also a Param)
-    name: string // always a name!
-    enabled?:boolean // enabled or not
-    visible?:boolean // Param is visible or not
-    label: string // publically visible name
-    default?: any // Default value: can be string or number
-    value?: any // Can be string or number
-    values?: Array<any> // active values in list
-    start?: number // for ParamInputNumber
-    end?: number // for ParamInputNumber
-    step?: number // for ParamInputNumber
-    schema?: ParamObjectSchema // object definition
-    options?: Array<string> // for ParamInputOptions
-    length?: number // for ParamInputText, ParamInputList    
-    units?:ModelUnits
-    // internal data for ParamManager
-    // _manageOperation?: ParamOperation // Not used
-    _definedProgrammatically?: boolean // this Param is defined programmatically in script
-    // logic attached to param, triggerend anytime any param changes and applies to a specific Param attribute (ParamBehaviourTarget)
-    _behaviours?: Record<ParamBehaviourTarget, (curParam:Param, params:Record<string,Param>) => any> | {} 
-    
-}
-
-/** Extentions of Param for Publishing - data only! */
-export interface PublishParam extends Omit<Param, '_behaviours'>
-{
-    // NOTE: need to nullify private attributes (for example behavious)
-    order?:number // integer, lower is in front
-    iterable?:boolean // for determine param variants
-    description?:string // added for the user
-    _behaviours?: Record<string,string> // stringified function for save to db etc
-}
-
-
 
 /** A way to define nested ParamObjects, either user in a single entry or list
  *  NOTE: For now we don't allow nested structures (so no ParamObj containing other ParamObj field)
 */
-export type ParamObjectSchema = Record<string,Param> // TODO: use something like base Param here
+export type ParamObjectSchema = Record<string,ScriptParam> // TODO: use something like base Param here
+
+
+///// SHAPES/GEOMETRY BASICS /////
 
 /** All possible attributes for Shapes */
 // TODO: Can we allow user attributes??
@@ -382,25 +381,6 @@ export interface SceneGraphNodeDetails {
     numWires?:number,
 }
 
-/** The Script seperated into statements */
-export interface Statement
-{
-    code:string; // the real code
-    startIndex?: number;
-    endIndex?: number;
-    lineStart?:number; // the line the statement starts (it can actually span multiple lines)
-    lineEnd?:number;
-    columnStartIndex?:number;
-    columnEndIndex?:number;
-}
-
-export interface StatementResult extends Statement
-{
-    status: 'error'|'success'
-    message?: string,
-    duration?: number
-    durationPerc?:number // Added by Archiyou app ProfilingMenu
-}
 
 export interface BaseStyle 
 {
@@ -495,6 +475,28 @@ export interface ShapeClone
     transformations:Array<any> // TODO
 }
 
+//// SCRIPT CODE STATEMENTS ////
+
+/** The Script seperated into statements */
+export interface Statement
+{
+    code:string; // the real code
+    startIndex?: number;
+    endIndex?: number;
+    lineStart?:number; // the line the statement starts (it can actually span multiple lines)
+    lineEnd?:number;
+    columnStartIndex?:number;
+    columnEndIndex?:number;
+}
+
+export interface StatementResult extends Statement
+{
+    status: 'error'|'success'
+    message?: string,
+    duration?: number
+    durationPerc?:number // Added by Archiyou app ProfilingMenu
+}
+
 //// ANNOTATIONS ////
 
 /** Bring all annotations in one type */
@@ -577,6 +579,12 @@ export interface DocData {
 }
 
 
+export interface DocPipeline
+{
+    fn:() => any
+    done: boolean
+}
+
 //// DOC:PAGE ////
 
 export type PageSize = 'A0'|'A1'|'A2'|'A3'|'A4'|'A5'|'A6'|'A7';
@@ -656,7 +664,7 @@ export interface ContainerContent
 {
     source?:string, // source url (used for quick access if possible)
     format?:'jpg'|'svg'|'png';
-    data:any; // main data
+    data:any; // main data - can be base64
     settings:{[key:string]:any}
 }
 
@@ -761,6 +769,7 @@ export interface DocGraphicInputOrthoLine extends DocGraphicInputBase
 export interface toSVGOptions
 {
     all?:boolean // also invisible
+    only2D?:boolean // only export 2D shapes
     annotations?:boolean
     fills?:boolean // Generate fills in SVG
     outlines?:boolean // Calculate the Shape outlines (Slow!)
@@ -778,6 +787,13 @@ export interface SVGtoPDFtransform
     contentOffsetX: number // Offset to align content
     contentOffsetY: number
     
+}
+
+export interface toDXFOptions 
+{
+    all?:boolean // also invisible
+    annotations?:boolean // add annotations
+    // TODO: more
 }
 
 //// DOCS:PAGE:CONTAINER:TEXTAREA ////
@@ -836,20 +852,26 @@ export interface VertexMesh {
 
 export interface EdgeMesh {
     objId : string,
-    ocId : number,
+    ocId : string,
     vertices: Array<number>, // coord buffer!
     indexInShape: number
 }
 
 export interface FaceMesh {
     objId : string,
-    ocId : number,
+    ocId : string,
     numTriangles : number,
     vertices: Array<number>, // triangle vertices
     normals: Array<number>, // Vertex normals
     uvCoords: Array<number>,
     triangleIndices: Array<number>,
     indexInShape: number,
+}
+
+export interface MeshCache {
+    vertices:Array<VertexMesh>|null,
+    edges:Array<EdgeMesh>|null,
+    faces:Array<FaceMesh>|null,
 }
 
 /** MeshShape is a very verbose format in which to save Shape Mesh data
@@ -1004,6 +1026,7 @@ export interface Metric {
     type:'text'|'bar'|'line'|'radar' // TODO: more
     data: number|string|Array<number|string> // raw data (either value, array<value> or array<object>)
     options: TextMetricOptions // some options per type of Metric
+    _component:string; // name of component that created this Metric
 }
 
 export interface MetricOptionsBase
@@ -1032,25 +1055,194 @@ export interface TableLocation
     data: any|Array<any>, // any data - format to be defined more clear
 }
 
-export interface DbCompareStatement 
-{
-    column: string,
-    comparator: string,
-    value: any,
-    combine: string,
-}
-
 export interface CalcData
 {
     tables: Object // { tablename: [{col, val}] }
     metrics: Object // { name : Metric, name2: Metric }
 }
 
-//// PARAM MANAGER ////
-// NOTE: See above for general types around Params
-
-export type ParamOperation = 'new'|'updated'|'deleted'
 
 //// PUBLISH TYPES ////
 
 export type PublishLicense = 'unknown' | 'copyright' | 'trademarked' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'CC BY-NC-ND' | 'CC0'
+
+
+export interface PublishScriptSettings extends ArchiyouOutputSettings
+{
+    fulFillments:Array<any> // Will be phased out
+}
+
+// NOTE: This type will superseed any old OCCI and editor app types
+export type PublishScript = {
+    id?:string
+    name:string // always lowercase
+    title?:string // public title
+    author?:string // None
+    org?:string
+    url?:string
+    description?:string
+    created_at?:Date
+    updated_at?:Date
+    version?:string
+    prev_version?:string
+    safe?:boolean
+    published?:boolean
+    units?:string
+    params?:{[key:string]:ScriptParamData}
+    param_presets?:{[key:string]:{[key:string]:Record<string,any>}}
+    public_code?:boolean // show code in public script
+    public_code_url?:string // url to edit public code
+    code: string
+    cad_engine?:string // archiyou
+    cad_engine_version?:string
+    cad_engine_config?:PublishScriptSettings 
+    meta?:{[key:string]:any}
+}
+
+
+//// RUNNER ////
+
+
+//// TYPES
+export type RunnerExecutionContext = 'local' | 'worker'
+export type RunnerRole = 'manager' | 'worker' | 'single'
+
+export type ModelFormat = 'buffer'|'glb'|'svg'
+
+//// INTERFACES
+
+export interface RunnerOptions 
+{
+    context?: RunnerExecutionContext
+}
+
+export interface RunnerActiveScope 
+{
+    name: string
+    context: RunnerExecutionContext
+}
+
+/** Basic structure of scope */
+export interface RunnerScriptScopeState extends ProxyConstructor
+{
+    _scope:string // name of scope
+    _main:boolean // is this the main scope
+    ay: ArchiyouApp
+    // global references
+    console: Console
+    brep: Brep
+    doc: Doc
+    calc: Calc
+    exporter: Exporter
+    make: Make
+    // Also classes (MORE TODO)
+    Vector: typeof Vector
+    Point: typeof Point
+    Bbox: typeof Bbox
+    Edge: typeof Edge
+    Vertex: typeof Vertex
+    Wire: typeof Wire
+    Face: typeof Face
+    Shell: typeof Shell
+    Solid: typeof Solid
+    ShapeCollection: typeof ShapeCollection
+    Obj: typeof Obj
+}
+
+/** Simplified version of Script(Version) */
+export interface RunnerScript
+{
+    code:string // code to execute
+    params?:Record<string,ScriptParamData> // param settings
+    // variants
+}
+
+/** Request results from executing a script */
+export interface RunnerScriptExecutionRequest
+{
+    script:Script|ScriptData // script to execute
+    component?:string // name of component if any
+    params?:Record<string,any> // param values
+    preset?:string // TODO: preset - overrides param values
+    variantId?:string // hash of param values for identifying unique requests - is filled in on submission
+    mode?: 'main'|'component'
+    // What to calculate and output
+    outputs?: Array<string> // requested output paths
+    cache?:boolean // enable caching. Default is true
+    messages?:Array<ConsoleMessageType>; // output messages of given types
+    forceFileResponse?:boolean // if true, force response as file download (either single file or multiple files in zip)
+
+    _onDone?: ((result:RunnerScriptExecutionResult) => any) // internal callback 
+}   
+
+//// SCRIPT OUTPUT MANAGER
+
+export type ScriptOutputCategory = 'model'|'metrics'|'tables'|'docs'
+export type ScriptOutputFormatInternal = 'internal'; // basics
+
+export type ScriptOutputFormatModel = 'buffer'|'glb'|'step'|'stl'|'svg'|'dae'|'obj'|'dxf'; // TODO:brep,dxf
+export type ScriptOutputFormatMetric = 'json'|'xlsx';
+export type ScriptOutputFormatTable = 'json'|'xlsx'|'gsheets';
+export type ScriptOutputFormatDoc = 'json'|'pdf';
+export type ScriptOutputFormat = ScriptOutputFormatInternal|ScriptOutputFormatModel|ScriptOutputFormatMetric|ScriptOutputFormatTable|ScriptOutputFormatDoc
+
+/** Data only representation of ScriptOutputPath class */
+export interface ScriptOutputPathData
+{
+    requestedPath: string;
+    resolvedPath: string;
+    pipeline: string | null;
+    category: ScriptOutputCategory | null;
+    entityName: string | null;
+    format: ScriptOutputFormat | null;
+    formatOptions: Record<string, any>;
+}
+
+/** Data output of a script based on given path */
+export interface ScriptOutputData
+{
+    path:ScriptOutputPathData
+    output: string|ArrayBuffer|Record<string,any>|ScriptOutputDataWrapper // raw data or wrapped data with metadata
+}
+
+
+/** Wraps different output data with information 
+ *  When we apply an encoding (like base64) we apply extra data to the wrapper
+*/
+export interface ScriptOutputDataWrapper
+{
+    type?: string // original type (string, ArrayBuffer etc)
+    encoding?: 'base64'  // any special encoding
+    //binary?:boolean // if true, data is binary format
+    //mime?: string // mime type of data
+    data: any|string|ArrayBuffer // internal, string (and base64) and ArrayBuffer for binary data
+    length?: number // length of data in bytes
+}
+
+export interface ExecutionRequestOutputFormatGLTFOptions
+{
+    binary?:boolean // if true, output is binary glTF - default is true
+    data?:boolean // if true, output Archiyou data in glTF
+    metrics?:boolean // if data, include metric data in output
+    tables?:boolean // if data, include tables data in output
+    docs?:boolean // if data, incoutputs?: ExecutionResultOutputslude docs data in output
+    pointAndLines?:boolean // if true, output points and lines in glTF
+    shapesAsPointAndLines?:boolean // if true, output all shapes as extra points and lines in glTF
+}
+
+
+
+/** Message from Worker to Manager */
+export interface RunnerWorkerMessage
+{
+    type: 'init'|'loaded'|'executing'|'stopped'|'executed'|'console'|'save-step'|'save-stl'|'save-gltf'|'save-svg'|'save-svg-2d'
+    payload: any //Record<string, any>
+}
+
+/** Message from Manager to Worker */
+export interface RunnerManagerMessage 
+{
+    type: 'init'|'load'|'execute'|'stop'|'export-to-step'|'export-to-stl'|'export-to-gltf'|'export-to-svg'|'export-to-svg-2d'  
+    payload?: any //Record<string, any>
+}
+

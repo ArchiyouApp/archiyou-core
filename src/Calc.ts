@@ -3,7 +3,7 @@
  *      Generate data tables and do basic data analytics 
  */
  
- import { Db, Table, Geom,  } from './internal'; 
+ import { ArchiyouApp, Brep, Db, Table, TableIO } from './internal'; 
  import { Metric, MetricName, MetricOptions, TableLocation, DataRows, isDataRows, isMetricName } from './internal' // types and typeguards
  import { METRICS } from './internal' // constants
 
@@ -12,86 +12,33 @@
  export class Calc
  {
     //// SETTINGS ////
-    ENABLE_DANFO = false;
+    
     //// END SETTINGS ////
-
-    _danfo;
-    _geom;
+    _ay:ArchiyouApp = null; // reference to main app
+    _brep:Brep;
     db:Db // the virtual database with table in there
     dbData:Object // raw outputted data 
     _metrics:{[key:string]:Metric} = {};
 
-    constructor(geom:Geom = null)
+    gsheets:Record<string, any>; // utils bundled in gsheet object
+
+    constructor()
     {
-        this._geom = geom; // needed to get data from the model
-
-        if(this.ENABLE_DANFO)
-        {
-            this.loadDanfo()
-                .catch(this.handleFailedDanfoImport)
-                .then(() => this.init());
-        }
-        else {
-            this.init();
-        }
-
+        // use setArchiyou to init
     }
-
-    /** Load Danfo module dynamically based on enviroment */
-    async loadDanfo():Promise<any> // TODO TS typing
-    {   
-        // detect context of JS
-        const DANFO_MODULE = 'danfojs';
-        const isBrowser = typeof window === 'object'
-        let isWorker = (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope)
-        const isNode = !isWorker && !isBrowser;
-
-        if(isWorker || isBrowser)
-        {
-            console.log('==== LOAD DANFO FOR BROWSER/WORKER ====')
-            this._danfo = await import(DANFO_MODULE)
-        }
-        else {
-            console.log('==== LOAD DANFO FOR NODE ====')
-            // keep this out import(..) to avoid being picked up by Webpack in client
-            // looks like NodeJS can search node_modules in webworker for the danfojs-node library
-            const nodeDanfoPath = 'danfojs-node'; 
-            this._danfo = await import(nodeDanfoPath)
-        }
-
-        if(this._danfo)
-        {
-            console.info('==== DANFO LOADED ====');
-        }
- 
-        return this._danfo;
-    }
-
-    hasDanfo():boolean
+    
+    setArchiyou(ay:ArchiyouApp)
     {
-        return (this._danfo !== undefined)
-    }
-
-    handleFailedDanfoImport(e)
-    {
-        console.error(`!!!! Calc: Cannot import Danfo module: "${e}"
-        Calc will have limited abilities. Add danfojs or danfojs-node to your node_modules!!!!`);
+        this._ay = ay;
+        this._brep = ay?.brep;
+        this.init();
     }
 
     /** We need to know when we can load the Shapes */
     init()
     {
-        this.db = new Db(this._geom, this._danfo);
-    }
-
-    /** Automatically calc.init() when user uses calc module */
-    autoInit()
-    {
-        // NOTE: We can't init without danfo loaded!
-        if(this.hasDanfo() && !this.db.isInitiated())
-        {
-            this?.db?.init();
-        }
+        this.db = new Db(this._brep);
+        this.setupGSheetUtils();
     }
 
     reset()
@@ -106,6 +53,19 @@
         return this?.db?.tables();
     }
 
+    /** Get table instances */
+    getTables(only:Array<string>):Array<Table>
+    {
+        const tables = (this?.db?._tables) ? Object.values(this?.db?._tables) : [];
+        return (only.includes('*'))
+            ? tables : tables.filter(t => only.includes(t.name));
+    }
+
+    getTableNames():Array<string>
+    {
+        return this.tables();
+    }
+
     //// CREATION API ////
 
     /** Make or get table with data 
@@ -114,7 +74,6 @@
     */
     table(name:string, data?:DataRows, columns?:Array<string>):Calc|Table
     {   
-        //this.autoInit(); // Not needed: Danfo is disabled
 
         if(!name){ throw new Error(`Calc::table: Please supply a table name`); }
 
@@ -144,19 +103,39 @@
         return newTable;
     }
 
+    //// IO ////
+
     /** Output raw data */
-    toTableData():{[key:string]:Object}
+    toTableData(only:Array<string>=null):Record<string, Object>
     {   
-        return this?.db?.toTableData(); 
+        return this?.db?.toTableData(only); 
+    }
+
+    toMetricsData(only:Array<string>=null):Record<string, Metric>
+    {
+        const metrics = this.getMetrics(only);
+        return metrics.reduce((acc, metric) => {
+            acc[metric.name] = metric;
+            return acc;
+        }, {} as Record<string, Metric>);
     }
 
     //// METRIC BOARD ////
 
-    /** Export metrics */
+    /** Get internal metric objects */
     metrics():Record<string,Metric>
     {
         return this._metrics;
     }   
+    
+    /** Get internal metric objects with filtering
+     * @param only - array of metric names to filter by, or '*' to get all metrics
+      */
+    getMetrics(only?:Array<string>):Array<Metric>
+    {
+        if(!only || only.length === 0 || only.includes('*')) return Object.values(this._metrics); // all
+        return Object.values(this._metrics).filter(m => only.includes(m.name));
+    }
 
     /** Add Metric element to dashboard */
     metric(name:MetricName, data:string|number, options:MetricOptions):Metric // TODO: Metric setting typing
@@ -168,9 +147,6 @@
         {
             console.warn(`Calc::metric: Your metric "${name}" is not part of official ones: ${METRICS.join(', ')}`);
         }
-
-        //this.autoInit(); // Disabled because we don't need Danfo
-
         // make metric data structure
         const metric = {  
                 name: name,
@@ -194,6 +170,44 @@
             ['name', 'value']
         ) as Table
     }
+
+    getMetricNames():Array<string>
+    {
+        return Object.keys(this._metrics);
+    }
+
+    //// GOOGLE SHEETS OPS ////
+    /* We bundle some CalcTableIO utils here for easy access */
+    
+    setupGSheetUtils()
+    {
+        const io = new TableIO();
+    
+        this.gsheets = {
+            exports: [], // keep track of exported sheets. Add base url to ID 
+            connect: async (googleDriveRootId:string) => await io.initGoogle(null, googleDriveRootId),
+            fromTemplate: 
+                async (templateSheetPath:string, newSheetPath:string, inputs:Record<string, any>) => 
+                {
+                    console.info('Calc::gsheets.fromTemplate(): Creating Google Sheet from template...');
+                    const savedSheetUrl = await io.googleSheetFromTemplate(templateSheetPath, newSheetPath, inputs, true, true)
+                    console.info(`Calc::gsheets.fromTemplate(): Published new sheet at "${savedSheetUrl}"`);
+
+                    // HACK: We save results in Runner.pipelineExports for now 
+                    // TODO: Find out why we can't get the scope.calc.gsheets.exports in Runner.exportPipelineTables()
+                    console.warn('============== HACK: Saving exported sheet url to Runner._pipelineExports ==============');
+                    if(!Array.isArray(this._ay.runner?._pipelineExports))
+                    {
+                        console.warn("Calc::gsheets.fromTemplate(): Can't reach Runner._pipelineExports to save exported sheet url!");
+                    }
+                    else {
+                        this._ay.runner._pipelineExports.push(savedSheetUrl);
+                    }
+                },
+        };
+    }
+
+
 
     //// UTILS ////
 

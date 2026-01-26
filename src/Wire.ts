@@ -5,22 +5,30 @@
  * 
  */
 
+// constants
 import { WIRE_RECT_WIDTH, WIRE_RECT_DEPTH, WIRE_RECT_POSITION, WIRE_POPULATE_NUM, WIRE_COMBINE_RADIUS, WIRE_LOFTED_SOLID, 
     WIRE_SWEEPED_SOLID, WIRE_SWEEPED_AUTOROTATE, WIRE_THICKEN_AMOUNT, WIRE_THICKEN_DIRECTION, WIRE_OFFSET_AMOUNT,
     WIRE_OFFSET_TYPE, WIRE_FILLET_RADIUS, WIRE_CHAMFER_DISTANCE, WIRE_CHAMFER_ANGLE } from './internal'
 
-import { Vector, Shape, Vertex, Point, Edge, Face, Shell, Solid, ShapeCollection, VertexCollection  } from './internal'
+// types
+import type { PointLike, Cursor, AnyShape, AnyShapeOrCollection,
+        Alignment, LinearShape, PointLikeSequence, 
+        PointLikeOrVertexCollection, LinearShapeTail,
+        AnyShapeSequence, ThickenDirection, 
+        MakeWireInput, ShapeType,
+        DimensionOptions } from './internal'
+
+// typeguards
+import { isCoordArray } from './internal'
+
+import { Vector, Shape, Vertex, Point, Edge, Face, Shell, Solid, 
+        ShapeCollection, VertexCollection,
+        DimensionLine } from './internal'
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
 
-import { isCoordArray, PointLike, isPointLike,isCoord,Coord, Cursor, AnyShape,isAnyShape,AnyShapeOrCollection,
-        isAnyShapeOrCollection, Alignment, isAlignment, ColorInput, isColorInput,Pivot,isPivot, LinearShape, isLinearShape, PointLikeSequence, 
-        isPointLikeSequence, PointLikeOrVertexCollection, LinearShapeTail, isLinearShapeTail, AnyShapeCollection, isAnyShapeCollection,
-        AnyShapeSequence, isAnyShapeSequence, AnyShapeOrSequence, isAnyShapeOrSequence, isMakeWireInput, ThickenDirection, 
-        isThickenDirection, MakeWireInput, ShapeType, isShapeType} from './internal' // see types
-import { checkInput, cacheOperation, protectOC, addResultShapesToScene } from './decorators'; // Direct import to avoid error with ts-node/jest
-import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+import { checkInput, protectOC, addResultShapesToScene } from './decorators'; // Direct import to avoid error with ts-node/jest
 
-import { flattenEntitiesToArray, toRad, toDeg } from './internal' // utils
+import { flattenEntitiesToArray, toRad } from './internal' // utils
 
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -69,6 +77,9 @@ export class Wire extends Shape
     {
         if(ocWire && (ocWire instanceof this._oc.TopoDS_Wire || ocWire instanceof this._oc.TopoDS_Shape) && !ocWire.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Wire
             ocWire = this._makeSpecificOcShape(ocWire, 'Wire');
             this._ocShape = ocWire;
@@ -250,7 +261,7 @@ export class Wire extends Shape
                 if (i < vertexCollection.length - 1)
                 {
                     let nextVert:Vertex = vertices[i+1];
-                    edges.push( new Edge().makeLine( curVert, nextVert));
+                    edges.push( new Edge().makeLine( curVert as Vertex, nextVert as Vertex));
                 }
         });
 
@@ -906,7 +917,11 @@ export class Wire extends Shape
     {
         // non-OC
         const reversedEdges = [];
-        this.edges().reverse().forEach( e => reversedEdges.push( new Edge(e.end(), e.start()) ));
+        this.edges().reverse()
+            .forEach( e => {
+                const curEdge = e as Edge;
+                reversedEdges.push( new Edge(curEdge.end(), curEdge.start()) );
+            });
         const w = new Wire().fromEdges(reversedEdges);
         this._fromWire(w);
 
@@ -1549,18 +1564,18 @@ export class Wire extends Shape
 
     /** Aligning linear Shapes to each other so they form a connected Line */
     @checkInput(['LinearShape','LinearShapeTail'],['auto','auto'])
-    alignTo(other:LinearShape, pivot:LinearShapeTail='start', alignment:LinearShapeTail='end'):Wire
+    alignTo(other:LinearShape, pivot:LinearShapeTail='start', alignment:LinearShapeTail='end'):this
     {
         let destVec = other[alignment]().toVector(); // either end() or start()
         let origVec = this[pivot]().toVector(); // either end() or start()
 
-        return this.move(destVec.subtracted(origVec)) as Wire;
+        return this.move(destVec.subtracted(origVec));
     }
 
     /** Fillet Wire at given Vertices or all */
     @protectOC('At least 2 Edges')
     @checkInput([[Number, WIRE_FILLET_RADIUS],['PointLikeOrVertexCollection',null]],['auto','VertexCollection'])
-    fillet(radius?:number, vertices?:PointLikeOrVertexCollection )
+    fillet(radius?:number, at?:PointLikeOrVertexCollection )
     {
         /* IMPORTANT: Closing Wires to create Faces can quickly result in badly shaped Faces
             Especially when using it for local operations like fillet this will results in a lot of avoidable errors
@@ -1569,7 +1584,7 @@ export class Wire extends Shape
         */
         
         // check given vertices
-        let filletVertices = vertices as VertexCollection;
+        let filletVertices = at as VertexCollection;
         let allVertices = this.vertices();
         let allowedVertices = allVertices.shallowCopy().remove(this.start(), this.end()); // cannot do fillet at start and end Vertices
         let checkedVertices = new VertexCollection();

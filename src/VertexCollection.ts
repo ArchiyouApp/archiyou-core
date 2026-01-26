@@ -1,5 +1,11 @@
+/**
+ *  TODO: Remove this in favor of typed ShapeCollection
+ * 
+ */
+
+import type { MakeShapeCollectionInput } from './internal' // types
 import { ShapeCollection } from './internal'
-import { isCoordArray, MakeShapeCollectionInput } from './internal' // types
+import { isCoordArray} from './internal' // typeguards
 import { checkInput } from './decorators'; // Use direct import to avoid error with ts-node/jest
 
 /** A ShapeCollection with only Vertices */

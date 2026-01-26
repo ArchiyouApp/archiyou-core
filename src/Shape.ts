@@ -11,29 +11,39 @@
  *  see https://github.com/CadQuery/cadquery/blob/master/cadquery/occ_impl/shapes.py:361 for inspiration
  */
 
-import { MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
+// constants
+import { USE_GARBAGE_COLLECTION, MESHING_MAX_DEVIATION, MESHING_ANGULAR_DEFLECTION, MESHING_MINIMUM_POINTS, MESHING_TOLERANCE, MESHING_EDGE_MIN_LENGTH, 
             DEFAULT_WORKPLANE, SHAPE_ARRAY_DEFAULT_OFFSET, SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SWEEP_DEFAULT_SOLID,
-            SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions} from './internal'
+            SHAPE_SWEEP_DEFAULT_AUTOROTATE, SHAPE_SCALE_DEFAULT_FACTOR, SHAPE_ALIGNMENT_DEFAULT, SHAPE_SHELL_AMOUNT, toSVGOptions,
+            Exporter} from './internal'
 
-import { isPointLike, SelectionString, isSelectionString, CoordArray, isAnyShape,isAnyShapeOrCollection,isColorInput,isPivot,isAxis,isMainAxis,isAnyShapeCollection, isPointLikeOrAnyShapeOrCollection,isLinearShape, isSide} from './internal' // types
-import { PointLike,PointLikeOrAnyShape,AnyShape,ColorInput,Pivot,Axis,MainAxis,AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,LinearShape, ShapeType, Side } from './internal' // types
-import { Obj, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection,  } from './internal'
+import type {
+    PointLike,PointLikeOrAnyShape,AnyShape,Pivot,MainAxis,
+    AnyShapeCollection,AnyShapeOrCollection, PointLikeOrAnyShapeOrCollection,
+    AnyShapeOrCollectionOrSelectionString,
+    LinearShape, ShapeType, Side, SideZ,
+    SelectionString, CoordArray, ShapeClone,
+    Link, SelectorPointRange, SelectorAxisCoord, SelectorBbox, SelectorIndex,
+    ShapeAttributes,
+    ObjStyle,
+    MeshShape, FaceMesh, EdgeMesh, VertexMesh, MeshCache,
+    Annotation, DimensionOptions,DimensionLine,
+    BeamLikeDims,
+    Alignment, OrientationXY,
+    ExportGLTFOptions, MeshingQualitySettings
+} from './internal'
 
-import { ShapeClone } from './internal'
-
+import { Obj, Vector, Point, Bbox, OBbox, Vertex, Edge, Wire, Face, 
+    Shell, Solid, ShapeCollection, Brep,
+    Selector, BaseAnnotation } from './internal'
+    
+import { isPointLike, isSelectionString, isAnyShape, 
+    isMainAxis,isAnyShapeCollection, isLinearShape, isShapeAttributes } from './internal' // typeguards
+    
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal'
 
-import { Link,SelectorPointRange, SelectorAxisCoord, 
-            SelectorBbox,SelectorIndex } from './internal' // InternalModels
-import { ShapeAttributes, isShapeAttributes } from './internal' // attributes
-import { ObjStyle } from './internal'
-import { MeshShape, FaceMesh, EdgeMesh, VertexMesh } from './internal' // see: ExportModels
-import { Selector } from './internal' // see: Selectors
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
-import { Alignment, SideZ, OrientationXY, AnyShapeOrCollectionOrSelectionString, MeshingQualitySettings } from './internal'
-import { BaseAnnotation, Annotation, DimensionOptions, DimensionLine } from './internal'
-import { OBbox, BeamLikeDims } from './internal'
 
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -42,17 +52,21 @@ type IEdge = Edge
 type ISolid = Solid
 type IWire = Wire
 type IDimensionLine = DimensionLine
+
  
 export class Shape
 {
     _oc:any; // avoids TS errors in filling CLASSNAME_TO_SHAPE_ENUM
-    _geom:any;
+    _brep:Brep;
     _obj:Obj; // Obj container this Shape belongs to
     _parent:AnyShapeOrCollection; // With selecting subshapes we keep the reference to parent    
     _ocShape:any = null; // instance of OC Shape subclass: Vertex, Edge, Wire etc. - NOTE: we have to set a value here: otherwise it will not be set 
     _ocId:string = null;
     _isTmp:boolean = false; // Flag to signify if a Shape is temporary (for example for construction)
     _cloned:ShapeClone|null = null;
+
+    // cache for mesh results
+    _meshCache:MeshCache = { vertices: null, edges: null, faces: null }
     
     attributes:ShapeAttributes = {}; // data attributes that can be added to Shapes (NOT STYLING)
     annotations:Array<Annotation> = []; // array of annotations associated with this Shape
@@ -80,76 +94,13 @@ export class Shape
         this._setShapeEnumToClassName(); // Some groundwork
     }
 
-    /** Update _OcShape from Shape properties */
-    _updateOcShape()
-    {
-        // override by different classes where needed, for example in Vertex
-    }
-
-    /** Update properties from current OC Shape */
-    _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
-    {
-        // Can be overriden by subclass
-        if(ocShape && !ocShape?.IsNull())
-        {
-            removeOcTargetForGarbageCollection(this._ocShape); // remove old target
-            this._ocShape = ocShape;
-            targetOcForGarbageCollection(this, ocShape); // set new target
-        }
-    }
-
-    /** Manually Clear OC Shape 
-     *  Please use automatic methods in carbageCollection module
-    */
-    _clearOcShape()
-    {
-        this?._ocShape?.delete();
-        this._ocShape = null;
-    }
-
-    /** Do an effort to create a Shape */
-    fromAll(value:any):AnyShape
-    {
-        // Overrides by subclasses
-        
-        if (value === null || value === undefined)
-        {
-            return null;
-        }
-        // already a Shape
-        if (Shape.isShape(value))
-        {
-            return value; // original Shape
-        }
-        else if (isPointLike(value))
-        {
-            return new Point(value as PointLike)._toVertex(); // Vertex
-        }
-        else if (value instanceof Bbox)
-        {
-            return (value as Bbox).box(); // Solid
-        }
-        else {
-            console.warn(`_convertToShape: Could not convert "${value}" to a Shape! Returned null`);
-        }
-        
-    }
-
-    /** Class method for ease of use */
-    static fromAll(value:any):AnyShape
-    {
-        return new Shape().fromAll(value);
-    }
-
-    
-    /** Make Shape from OC Shape if given, otherwise update properties based on current _ocShape */
-    /* !!!! Important: This method is not consistent with _fromOcWire, _fromOcSolid etc because it does not affect original 
+     /** Make Shape from OC Shape */
+    /* !!!! IMPORTANT: This method is not consistent with _fromOcWire, _fromOcSolid etc because it does not affect original 
         So: this does NOT update current Shape with an Oc Shape. For now we do that manually in every operator
     */
-
-    _fromOcShape(ocShape:any):AnyShapeOrCollection
+    _fromOcShape(ocShape?:any):AnyShapeOrCollection
     {
-        ocShape = ocShape || this._ocShape;
+        ocShape = ocShape
 
         if (ocShape === null || ocShape?.IsNull())
         {
@@ -196,6 +147,80 @@ export class Shape
         // Too slow: apply checkDowngrade() after operations where it these kind of Shapes can be created
     
         return newShape;
+    }
+
+    /** Update _OcShape from Shape properties */
+    _updateOcShape()
+    {
+        // override by different classes where needed, for example in Vertex
+    }
+
+    /** Update properties from current OC Shape */
+    _updateFromOcShape(ocShape?:any) // TODO: TopoDS_Shape
+    {
+        // Can be overriden by subclass (Vertex)
+        
+        if(ocShape && !ocShape?.IsNull())
+        {
+            if(USE_GARBAGE_COLLECTION)
+            {
+                this._clearOcShape(); // clear previous
+                this._ocShape = ocShape;
+                targetOcForGarbageCollection(this, ocShape); // set new target
+                this.clearMeshCache();
+            }
+            else {
+                // just set new OcShape
+                this._ocShape = ocShape;
+                this.clearMeshCache();
+            }
+        }
+    }
+
+    /** Manually clear existing OC Shape */
+    _clearOcShape()
+    {
+        if(USE_GARBAGE_COLLECTION && this._ocShape)
+        {
+            removeOcTargetForGarbageCollection(this._ocShape);
+            this?._ocShape?.delete();
+            this._ocShape = null;
+            this.clearMeshCache();
+        }
+    }
+
+    /** Do an effort to create a Shape */
+    fromAll(value:any):AnyShape
+    {
+        // Overrides by subclasses
+        
+        if (value === null || value === undefined)
+        {
+            return null;
+        }
+        // already a Shape
+        if (Shape.isShape(value))
+        {
+            return value; // original Shape
+        }
+        else if (isPointLike(value))
+        {
+            return new Point(value as PointLike)._toVertex(); // Vertex
+        }
+        else if (value instanceof Bbox)
+        {
+            return (value as Bbox).box(); // Solid
+        }
+        else {
+            console.warn(`_convertToShape: Could not convert "${value}" to a Shape! Returned null`);
+        }
+        
+    }
+
+    /** Class method for ease of use */
+    static fromAll(value:any):AnyShape
+    {
+        return new Shape().fromAll(value);
     }
 
     //// MANAGING ATTRIBUTES ////
@@ -264,7 +289,6 @@ export class Shape
             if (ocShape && !ocShape.IsNull())
             {
                 // success
-                removeOcTargetForGarbageCollection(this._ocShape); // remove old target
                 this._ocShape = this._makeSpecificOcShape(ocFixer.Shape(), this.type());
                 targetOcForGarbageCollection(this, this._ocShape); // set new target
             }
@@ -417,7 +441,7 @@ export class Shape
     {
         if(this._obj)
         {
-            this._geom.removeObj(this._obj);
+            this._brep.removeObj(this._obj);
         }
     }
 
@@ -557,13 +581,26 @@ export class Shape
     beamLike():boolean
     {
         const BEAM_VOLUME_PERC = 0.7;
+        const BEAM_SECTION_AREA_MAX = 300*200; // in mm
 
         if (this.type() !== 'Solid')
             return false;
 
-        const obboxDims = this.obbox() as OBbox;
-        const obbox = new Solid().makeBox(obboxDims.width(), obboxDims.depth(), obboxDims.height());
-        return (this.volume() / obbox.volume() >= BEAM_VOLUME_PERC) 
+        const obbox = this.obbox() as OBbox;
+        const box = obbox.box();
+        if(!box) return false;
+        const boxLikeCheck = (this.volume() / box.volume() >= BEAM_VOLUME_PERC); 
+        if(!boxLikeCheck) return false;
+        console.log([obbox.width(), obbox.height(), obbox.depth()]
+        .sort((a,b) => a - b)
+        .slice(0,2));
+
+        // Check reasonable section area
+        return [obbox.width(), obbox.height(), obbox.depth()]
+            .sort((a,b) => a - b)
+            .slice(0,2)
+            .reduce((agg, val) => agg * val, 1) < BEAM_SECTION_AREA_MAX;
+
     }
 
     beamDims():BeamLikeDims
@@ -585,7 +622,7 @@ export class Shape
     /** is this Shape 2D */
     is2D():boolean
     {
-        return (!this.isEmpty() && this.valid())
+        return (!this.isEmpty()) // && this.valid() // GC
                 ? this.bbox().is2D()
                 : false
     }
@@ -600,7 +637,7 @@ export class Shape
 
     is3D():boolean
     {
-        return (!this.isEmpty() && this.valid())
+        return (!this.isEmpty()) // && this.valid() // GC
         ? this.bbox().is3D()
         : false
     }
@@ -687,15 +724,16 @@ export class Shape
             let vertexPresent = {}; // hash
             shapeEdges.forEach( e =>
             {
+                const curEdge = e as Edge;
                 // always start with first
                 if(vertices.length == 0)
                 {
-                    let sv = e.start();
+                    let sv = curEdge.start();
                     vertices.add(sv);
                     vertexPresent[sv._hashcode()] = true;
                 }
 
-                let vertex = e.end();
+                let vertex = curEdge.end();
                 if (!vertexPresent[vertex._hashcode()])
                 {
                     vertices.add(vertex);
@@ -1203,6 +1241,18 @@ export class Shape
     layflat():this
     {
         return this.rotateToLayFlat('vertical');
+    }
+
+    fillet(radius?: number, at?: any): this
+    {
+        console.warn(`Shape::fillet(): Not implemented for type ${this.type()}`);
+        return this;
+    }
+
+    chamfer(radius?: number, at?: any): this
+    {
+        console.warn(`Shape::chamfer(): Not implemented for type ${this.type()}`);
+        return this;
     }
 
     /** Check if a Solid Shape can be seen as a simple extrusion and return the base Face */
@@ -2287,7 +2337,7 @@ export class Shape
         {
 
             // protect against weird crashed of OC under heavy load
-            let ocCutter = new this._oc.BRepAlgoAPI_Cut_3(result, shape._ocShape,  new this._oc.Message_ProgressRange_1());
+            const ocCutter = new this._oc.BRepAlgoAPI_Cut_3(result, shape._ocShape,  new this._oc.Message_ProgressRange_1());
             ocCutter.SetRunParallel(false); // Does not seem to work!
             ocCutter.SetFuzzyValue(0.1);
             ocCutter.Build(new this._oc.Message_ProgressRange_1());
@@ -2301,11 +2351,11 @@ export class Shape
             }
         });
 
-        let fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false); 
+        const fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false); 
         fusor.Build();
-        let newOcShape:any = fusor.Shape();
+        const newOcShape:any = fusor.Shape();
 
-        let newShape = new Shape()._fromOcShape(newOcShape) as AnyShape; // we expect only a single Shape
+        const newShape = new Shape()._fromOcShape(newOcShape) as AnyShape; // we expect only a single Shape
 
         return newShape;
     }
@@ -2322,7 +2372,7 @@ export class Shape
     @checkInput('AnyShapeOrCollection', 'ShapeCollection')
     subtract(others:AnyShapeOrCollection, removeOthers=false):AnyShapeOrCollection
     {
-        let newShape = this._subtracted(others);
+        const newShape = this._subtracted(others);
         
         // Subtracted never changes the Shape type, we can just replace the OC geometry
         if (newShape == null)
@@ -2646,7 +2696,8 @@ export class Shape
         const minLevel = bb.min()[axisNormal];
         const maxLevel = bb.max()[axisNormal];
 
-        if(level <= minLevel || level >= maxLevel){ 
+        if(level <= minLevel || level >= maxLevel)
+        { 
             console.error(`Shape::cutoff: Shape can not be cut off: level "${level}" not between "${minLevel}" and "${maxLevel}". Returned original`);
             return this
         }
@@ -2658,6 +2709,7 @@ export class Shape
 
         if(Shape.isShape(splittedShapes) || splittedShapes.length === 0){ console.warn(`Shape::cutoff: No splitted Shapes. Check level!`); return null; }
         if(splittedShapes.length === 1){ console.warn(`Shape::cutoff: Only one splitted Shapes. Returned original`); return this; }
+
 
         // Order by area() or length()
         (splittedShapes as ShapeCollection).sort((a,b) => (b.area() || b.length()) - (a.area() || a.length()))
@@ -2736,6 +2788,13 @@ export class Shape
         this.move(toPosition.subtracted(fromPosition)); //.move(pivotOffsetVec);
 
         return this;
+    }
+
+    /** Alias for align */
+    @checkInput(['AnyShape',['Pivot','center'],['Alignment', 'center']],['auto','auto','auto'])
+    alignTo(other:AnyShape, pivot?:Pivot, alignment?:Alignment):this
+    {
+        return this.align(other, pivot, alignment);
     }
 
     /** Copy and then align */
@@ -3014,7 +3073,7 @@ export class Shape
     @checkInput('AnyShape', 'auto')
     intersecting():AnyShapeCollection
     {
-        let sceneShapes:AnyShapeCollection = this._geom.all(); // get all Shapes in scene
+        let sceneShapes:AnyShapeCollection = this._brep.all(); // get all Shapes in scene
         let intersectingShapeCollection = sceneShapes.filter(shape => (shape as AnyShape)._intersections(this) != null );
 
         return intersectingShapeCollection;
@@ -3039,8 +3098,9 @@ export class Shape
         let closestDistance:number = null;
         let closestSupportEdge:IEdge = null;
         
-        this.edges().forEach( curEdge => 
+        this.edges().forEach( e => 
         {
+            const curEdge = e as Edge;
             let intersections = rayEdge._intersections(curEdge);
             if (intersections != null)
             {
@@ -3197,18 +3257,19 @@ export class Shape
         let arrayCollection = new ShapeCollection();
         let verticesOnPath:AnyShapeCollection = path.populated(num);
 
-        verticesOnPath.forEach( vertex => 
+        verticesOnPath.forEach( v => 
         {
-            let newShape = this.copy().moveTo(vertex) as Shape;
+            const curVert = v as Vertex;
+            let newShape = this.copy().moveTo(curVert) as Shape;
             arrayCollection.add(newShape);
             // align to path
             // !!!! VERY SLOW !!!!
             if(align)
             {
-                let normalAtVertex = path.normalAt(vertex);
+                let normalAtVertex = path.normalAt(curVert);
                 newShape.alignByPoints(
                         [ newShape.center(),newShape.center().add([1,0,0])], // x-axis
-                        [ vertex,vertex.toVector().add(normalAtVertex)],
+                        [ curVert,curVert.toVector().add(normalAtVertex)],
                     )
             }
         });
@@ -4233,7 +4294,7 @@ export class Shape
     @checkInput([['DimensionOptions', null]], ['auto'] )
     autoDim(options?:DimensionOptions)
     {
-        this._geom._annotator.autoDim(this, options);
+        this._brep._annotator.autoDim(new ShapeCollection(this), options);
     }
 
     //// API to forward to _Obj ////
@@ -4242,7 +4303,7 @@ export class Shape
     addToScene(force:boolean=false):Shape
     {
         // TODO: avoid double adding to scene?
-        this._geom.addToActiveLayer(this.object());
+        this._brep.addToActiveLayer(this.object());
 
         return this;
     }
@@ -4367,14 +4428,14 @@ export class Shape
 
         if(visibleOutlines)
         {  
-            visibleOutlines.attribute('outline', true); // for later reference (toSvg())
+            visibleOutlines.attribute('outline', true); // for later reference (toSVG())
             groupedProjectedEdges.addGroup('outlines', visibleOutlines);
         };
         
         // main two groups (hidden and visible)
         const visibleEdges = new ShapeCollection(visibleSharpEdges,visibleSmoothEdges,visibleOutlines);        
         groupedProjectedEdges._defineGroup('visible', visibleEdges);
-        visibleEdges.attribute('visible', true); // for later reference (toSvg())
+        visibleEdges.attribute('visible', true); // for later reference (toSVG())
         
         // add invisible too
         if(all)
@@ -4516,13 +4577,13 @@ export class Shape
      *      Use showHidden=true to output with hidden lines
      */
     @addResultShapesToScene
-    isometry(viewpoint:string|PointLike, showHidden:boolean=false):AnyShapeCollection
+    isometry(viewpoint?:string|PointLike, showHidden:boolean=false):AnyShapeCollection
     {
         return this._isometry(viewpoint, showHidden)
     }
 
     /** Alias for isometry() */
-    iso(viewpoint:string|PointLike, showHidden:boolean=false):AnyShapeCollection
+    iso(viewpoint?:string|PointLike, showHidden:boolean=false):AnyShapeCollection
     {
         return this.isometry(viewpoint, showHidden)
     }
@@ -4559,11 +4620,22 @@ export class Shape
 
     //// OUTPUTS ////
 
+    clearMeshCache()
+    {
+        this._meshCache = { vertices: null, edges: null, faces: null };
+    }
+
     /** Output all Vertices of this Shape into an Array for further processing 
      *  NOTE: Because of its importance and size we do some extra efforts here to make sure we clear all memory
     */
     toMeshVertices():Array<VertexMesh>
     {
+        // Check cache first
+        if(this._meshCache.vertices)
+        {
+            return this._meshCache.vertices;
+        }
+
         const vertices = this.vertices();
         const meshVertices:Array<VertexMesh> = vertices.toArray().map(
             (curVertex, curVertexIndex) => 
@@ -4576,14 +4648,23 @@ export class Shape
                 } as VertexMesh
             }
         )
+        this._meshCache.vertices = meshVertices;
         return meshVertices;
     }
 
     toMeshEdges(quality:MeshingQualitySettings):Array<EdgeMesh>
     {
+        const startMeshEdges = performance.now();
         const meshEdges:Array<EdgeMesh> = [];
         const edges = this.edges();
 
+        // Check cache first to avoid double calculations
+        if(this._meshCache.edges)
+        {
+            return this._meshCache.edges;
+        }
+
+        // TODO: introduce caching of results for speedup
         edges.forEach( (curEdge, curEdgeIndex) => 
         {   
             let vertexCoords = [];
@@ -4591,12 +4672,15 @@ export class Shape
 
             if(curEdge._ocShape == null)
             {
-                console.warn(`Shape::toMeshShape: null Edge detected!`);
+                console.warn(`Shape::toMeshEdges: null Edge detected!`);
             }
+            /*
+            // DISABLED GC
             else if (!curEdge.valid())
             {
-                console.warn(`Shape::toMeshShape: Invalid Edge detected!`);
+                console.warn(`Shape::toMeshEdges: Invalid Edge detected!`);
             }
+            */
             else 
             {   
                 const ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
@@ -4617,13 +4701,22 @@ export class Shape
                     ocVertex.delete();
                 }
                 // Output all Edges data as sequential vertices
-                meshEdges.push({ vertices : vertexCoords, objId: this._obj.id, ocId: curEdge._hashcode(), indexInShape: curEdgeIndex });
+                meshEdges.push({ 
+                    vertices : vertexCoords, 
+                    objId: this._obj.id, 
+                    ocId: curEdge._hashcode(), 
+                    indexInShape: curEdgeIndex });
 
                 // clean up
                 ocAdaptorCurve.delete();
                 ocTangDef.delete();
             }
         });
+
+        console.info(`Shape::toMeshEdges: Meshed ${meshEdges.length} Edges for Shape ${this._hashcode()} in ${Math.round(performance.now() - startMeshEdges)}ms`);
+
+        this._meshCache.edges = meshEdges;
+
         return meshEdges;
     }
 
@@ -4656,8 +4749,15 @@ export class Shape
             WARNING: Mirroring a cloned object does not work yet
         */
         
+        const startMeshFaces = performance.now();
         let meshedShape = this as AnyShape;
         let ocMesher = null;
+
+        // Check cache first to avoid double calculations
+        if(this._meshCache.faces)
+        {
+            return this._meshCache.faces;
+        }
 
         if(this._cloned && this._checkCloned())
         {
@@ -4821,7 +4921,7 @@ export class Shape
                 meshFaces.push(faceMesh);
                 
                 // clean up Face data
-                ocTriangulation.delete();
+                ocTriangulation.delete(); // NOTE: Do we need to delete this? Clone does not seem to work
                 ocPolyConnect.delete();
 
             } // end not null Face
@@ -4830,6 +4930,10 @@ export class Shape
 
         // clean up
         ocMesher?.delete()
+
+        console.info(`Shape::toMeshFaces: Meshed ${meshFaces.length} Faces in ${Math.round(performance.now() - startMeshFaces)}ms`);
+
+        this._meshCache.faces = meshFaces;
 
         return meshFaces;
     }
@@ -4862,7 +4966,17 @@ export class Shape
 
     }
 
-    //// Export ////
+    //// SHAPECOLLECTION API ////
+    /* For robustness give warning if user 
+        uses the most common ShapeCollection methods.
+    */
+
+    first()
+    {
+        
+    }
+
+    //// EXPORT ////
 
     toData():Object
     {
@@ -4902,11 +5016,29 @@ export class Shape
     }
 
     /** Export 2D Shape to SVG */
-    toSvg(options:toSVGOptions = { all: false, annotations: true}):string
+    toSVG(options:toSVGOptions = { all: false, annotations: true}):string
     {
-        // for now use ShapeCollection.toSvg()
+        // for now use ShapeCollection.toSVG()
         // NOTE: this method will be overwriten in Edge
-        return new ShapeCollection(this).toSvg(options);
+        return new ShapeCollection(this).toSVG(options);
     }
+
+    /** Export 3D Shape to GLTF */
+    async toGLTF(options?:ExportGLTFOptions): Promise<ArrayBuffer>
+    {
+        // We use centralized export functions from Exporter
+        return await new Exporter({ brep: this._brep }).exportToGLTF(this, options);
+    }
+
+    /** Convenience method to save the shape to a file
+     *   the extension determines the file format
+     *   Supported formats: glb, svg, step, stl, dxf
+    */
+    async save(filename:string, options:any={}):Promise<string|undefined>
+    {    
+        return await new ShapeCollection(this).save(filename, options);
+    }
+
+    
 
 }

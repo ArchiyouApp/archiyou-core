@@ -9,11 +9,19 @@
  * 
 */
 
-import { Point, Vector, Shape, Edge, AnyShape, ShapeCollection, AnyShapeOrCollection, isAnyShapeOrCollection, isPointLike } from './internal'
-import {  Coord, MainAxis, PointLike, ModelUnits, DimensionLineData, DimensionOptions, AnnotationType} from './internal' // types
+import { DxfBlock, point3d } from '@tarikjabiri/dxf'
+
+import type { Coord, MainAxis, PointLike, 
+        AnyShape, AnyShapeOrCollection, 
+        ModelUnits, 
+        DimensionLineData, DimensionOptions, AnnotationType } from './internal'
+
+import { isAnyShapeOrCollection, isPointLike } from './internal' // typeguards
+import { Point, Vector, Shape, Edge, ShapeCollection,
+        BaseAnnotation
+ } from './internal'
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
-import { BaseAnnotation } from './internal'
 import { roundTo, roundToTolerance } from './internal' // utils
 
 export class DimensionLine extends BaseAnnotation
@@ -28,7 +36,7 @@ export class DimensionLine extends BaseAnnotation
     targetEnd:Point; // point on Shape
     targetShape:AnyShape = null; // the (sub)shape (mostly an Edge) the dimension line is directly generated from
     linkedTo:AnyShapeOrCollection = null; // the main parent Shape or ShapeCollection this dimension is linked to
-    value:number; // the value of the dimension line, can be static - in BaseAnnotation
+    // value:number; // the value of the dimension line, from BaseAnnotation
     static:boolean = false;
     units:ModelUnits = null;
     offsetVec:Vector; // Normalized Vector offset from Shape 
@@ -390,7 +398,7 @@ export class DimensionLine extends BaseAnnotation
         if(flags.compareOffsetAbs) ov = ov.abs();
         
         const l = (flags.compareOffsetLength) ? this.offsetLength : 1;
-        const v = (flags.compareValue) ? Math.round(this.value) : ''; // round to full units by default
+        const v = (flags.compareValue) ? Math.round((typeof this.value === 'string') ? parseFloat(this.value) : this.value ) : ''; // round to full units by default
         const sId = (flags.compareWithShape) ? (this.linkedTo?._hashcode() || this.uuid) : '';
         const y = (flags.compareProjYAxis) ? Math.round(this._projYAxis()) : ''
 
@@ -453,7 +461,7 @@ export class DimensionLine extends BaseAnnotation
      *     if 3D the Dimension Line is projected to XY plane
      *     NOTE: we need to transform from Archiyou coordinate system to the SVG one (flip y)
      */
-    toSvg():string
+    toSVG():string
     {   
         const lineStart = this._calculatePoint('start');
         const lineEnd = this._calculatePoint('end');
@@ -468,7 +476,8 @@ export class DimensionLine extends BaseAnnotation
         lineEndArr[1] = -lineEndArr[1];
         lineMidArr[1] = -lineMidArr[1];
 
-        let dimText = ((this.round) ? roundTo(this.value, this.roundDecimals) : this.value).toString();
+        const v = (typeof this.value === 'string') ? parseFloat(this.value) : this.value;
+        let dimText = ((this.round) ? roundTo(v, this.roundDecimals) : this.value).toString();
         if (this.showUnits ) dimText += this.units;
 
         return `<g class="dimensionline">
@@ -557,4 +566,15 @@ export class DimensionLine extends BaseAnnotation
                     </text>`; // NOTE: data in JSON format with "'"! TODO: Make this more elegant!
     }
     // NOTE: do very little styling here to be able to easily style with CSS. Only stroke-width is good to set (default is 1, 0.5 sets it apart from Shapes)
+
+    /** Export Annotation to DXF aligned dimension line */
+    toDXF(dxf:DxfBlock):this
+    {
+        dxf.addAlignedDim(
+            point3d(this.targetStart.x, this.targetStart.y, 0), 
+            point3d(this.targetEnd.x, this.targetEnd.y, 0),
+            { offset: this.offsetLength as number }
+        );
+        return this;
+    }
 }

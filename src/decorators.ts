@@ -6,9 +6,9 @@
  * 
  * */
 
-import SparkMD5 from 'spark-md5' // this is used instead of hash-wasm because spark is not async. See: https://www.npmjs.com/package/spark-md5
+import { hash } from './internal'
 
-import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Sketch, Geom } from './internal'
+import { Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, ShapeCollection, VertexCollection, Sketch, Brep } from './internal'
 import { isPointLike, isPivot, isAxis, isColorInput, isMainAxis, isSide, isCursor, isObjStyle, isLinearShape, isLinearShapeTail, isShapeType, isShapeTypes,
             isAnyShape, isPointLikeOrVertexCollection, isPointLikeSequence,isPointLikeOrAnyShape,  isAnyShapeSequence, isAnyShapeCollection, isMakeShapeCollectionInput, isAnyShapeOrCollection, isPointLikeOrAnyShapeOrCollection,
             isMakeWireInput, isMakeFaceInput, isAlignment, isMakeShellInput, isThickenDirection, isAnyShapeOrCollectionOrSelectionString,
@@ -598,7 +598,7 @@ export function cacheOperation(targetPrototype: any, propertyKey: string, descri
         {
             return wrappedMethod.apply(this, args); // this is the direct output 
         }
-        const cache = this._geom._cache;
+        const cache = this._brep._cache;
         const hash = _hashOp(wrappedMethodName, args)
         const cacheResult = _checkCache(cache, hash);
 
@@ -630,9 +630,9 @@ function _hashOp(methodName:string, args):string
 
 function _getHash(str:string):string
 {
-    let hash = SparkMD5.hash(str);
-    return hash;
+    return hash(str);
 }
+
 
 function _checkCache(cache:{(key:string):any} = null, hash:string):any
 {
@@ -648,7 +648,6 @@ function _setCache(cache:{(key:string):any}, hash:string, result:any)
 {
     cache[hash] = result;
 }
-
 
 /** TODO */
 export function ocCheck(target:Object, method:string,  descriptor: PropertyDescriptor)
@@ -1043,9 +1042,9 @@ export function protectOC(hints?:string|Array<string>): MethodDecorator
 
 //// SKETCHER MODE ////
 
-function sketchIsActive(geom:Geom):boolean
+function sketchIsActive(brep:Brep):boolean
 {
-    return geom && (geom.activeSketch instanceof Sketch);
+    return brep && (brep.activeSketch instanceof Sketch);
 }
 
 export function asSketch(targetPrototype: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor

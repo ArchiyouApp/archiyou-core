@@ -9,14 +9,23 @@
  *          - Use selectors and selection stack to apply operations to specific parts
  */
 
-import { Point, Vector, PointLike, isPointLike, ShapeCollection, Shape, Vertex, Edge, Wire, Face, Geom } from './internal'
-import { Cursor, AnyShape, isAnyShape, SketchPlaneName, PointLikeSequence, 
-    isPointLikeSequence, AnyShapeCollection, VertexCollection, isSketchPlaneName, ShapeType, AnyShapeOrCollection, SelectionString,
-    isSelectionString, AnyShapeOrCollectionOrSelectionString } from './internal'
-import { gp_Ax3, gp_Trsf } from '../libs/archiyou-opencascade/archiyou-opencascade'
+// constants
+import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal'
+
+import type { PointLike, Cursor, AnyShape, SketchPlaneName, PointLikeSequence, 
+    AnyShapeCollection, ShapeType, 
+    AnyShapeOrCollection, SelectionString,
+    AnyShapeOrCollectionOrSelectionString } from './internal'
+
+import { isPointLike, isAnyShape, isSelectionString, isSketchPlaneName } from './internal' // typeguards
+
+import { Point, Vector, ShapeCollection, VertexCollection, Vertex, Edge, Wire, Face, Brep } from './internal'
+
+import { gp_Ax3, gp_Trsf } from './wasm/archiyou-opencascade' // OC
+
 import { checkInput } from './decorators' // NOTE: needs to be direct
 
-import { FACE_CIRCLE_RADIUS, FACE_PLANE_WIDTH, FACE_PLANE_DEPTH } from './internal' // Face
+
 
 //// SETTINGS ////
 export const SKETCH_FILLET_SIZE = 5;
@@ -67,8 +76,8 @@ export class Sketch
     
     //// END SETTINGS ////
 
-    _oc; // is set in constructor prototype when Geom once OC is loaded - IMPORTANT: Don't assign here!
-    _geom:Geom;
+    _oc; // is set in constructor prototype when Brep once OC is loaded - IMPORTANT: Don't assign here!
+    _brep:Brep;
     
     mode:string = 'plane'; // or surface
     workplane:SketchPlane; // normal and main directions of Sketch Workplane
@@ -121,7 +130,7 @@ export class Sketch
         }
 
         this._createSketchLayer();
-        this._geom.activeSketch = this;
+        this._brep.activeSketch = this;
     }
 
     /** Set autoOps on or off */
@@ -133,13 +142,13 @@ export class Sketch
 
     _createSketchLayer()
     {
-        this._geom.layer('sketch').color('blue');
+        this._brep.layer('sketch').color('blue');
     }
 
     _removeSketchLayer()
     {
-        this._geom.deleteLayer('sketch');
-        this._geom.activeSketch = null;
+        this._brep.deleteLayer('sketch');
+        this._brep.activeSketch = null;
     }
 
     /** Set workplane from x and y coordinate */
@@ -582,7 +591,7 @@ export class Sketch
         upgradedCollection.replace(oldWires, newFaces);
         this.shapes = upgradedCollection;
 
-        this._geom.activeSketch = null; 
+        this._brep.activeSketch = null; 
 
         return this;
     }
@@ -886,19 +895,19 @@ export class Sketch
 
     /** Apply fillet to Edges or Faces */
     @checkInput([ [Number, SKETCH_FILLET_SIZE], ['AnyShapeOrCollectionOrSelectionString', null]], ['auto', 'auto'])
-    fillet(size?:number, vertices?:AnyShapeOrCollectionOrSelectionString):Sketch
+    fillet(size?:number, at?:AnyShapeOrCollectionOrSelectionString):Sketch
     {
         if (this.pendingShapes.every(s => s.type() == 'Edge' ||  s.type() == 'Wire'))
         {
             // For Edges fillet is applied after the next Edge: set pendingOperations
-            this.pendingOperations.push({ type: 'fillet', params: { size: size, vertices: vertices }, resetOps: true });
+            this.pendingOperations.push({ type: 'fillet', params: { size: size, at: at }, resetOps: true });
         }
 
         else if(this.pendingShapes.every(s => s.type() == 'Face'))
         {
             // For Faces, fillet is applied on last created Face
             let selectedVertices:VertexCollection;
-            if(vertices === null)
+            if(at === null)
             {
                 // check pending selected sub Shapes
                 let selections = this._getPendingSelections();
@@ -910,9 +919,9 @@ export class Sketch
                     selectedVertices = null;
                 }
             }
-            else if (isSelectionString(vertices))
+            else if (isSelectionString(at))
             {   
-                selectedVertices = this.pendingShapes.select(vertices as SelectionString).getShapesByType('Vertex') as VertexCollection; // accept any selector strings but make sure the selection contains Vertices
+                selectedVertices = this.pendingShapes.select(at as SelectionString).getShapesByType('Vertex') as VertexCollection; // accept any selector strings but make sure the selection contains Vertices
             }
             else {
                 
@@ -1099,7 +1108,7 @@ export class Sketch
         let isCollection = ShapeCollection.isShapeCollection(sketchShapes);
         
         // combine incoming Shapes into layer or single Shape
-        let sketchName = this._geom.getNextLayerName('Sketch');
+        let sketchName = this._brep.getNextLayerName('Sketch');
         
         this._removeSketchLayer(); // remove original sketch layer
         
@@ -1114,7 +1123,7 @@ export class Sketch
         }
 
 
-        console.geom(`Sketch::import(): Imported ${ isCollection ? importedShapeOrCollection.length : 1 } Shapes on layer "${this._geom.getLayer().name()}"`);
+        console.geom(`Sketch::import(): Imported ${ isCollection ? importedShapeOrCollection.length : 1 } Shapes on layer "${this._brep.getLayer().name()}"`);
         
         return importedShapeOrCollection;
 

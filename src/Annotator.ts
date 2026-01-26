@@ -5,13 +5,17 @@
  *      Only on output they might be turned into real Shapes like text Faces etc.
  */ 
 
-import { Point, Vector, PointLike, Vertex, Edge, AnyShape, Geom, DimensionOptions, 
-            ShapeCollection, AnyShapeOrCollection, BaseAnnotation, Bbox } from './internal'
+import type { PointLike, AnyShape, 
+    MainAxis, 
+    DimensionOptions,DimensionLevelSettings,DimensionLevel,
+    Annotation, AnnotationData, AnnotationAutoDimStrategy
+} from './internal' // types
+
+import { Point, Vector, Edge, Brep,
+        ShapeCollection, Bbox,
+        BaseAnnotation, DimensionLine } from './internal'
 
 import { checkInput } from './decorators' // NOTE: needs to be direct
-
-import { Annotation, AnnotationData, DimensionLine, DimensionLevelSettings, AnnotationAutoDimStrategy, 
-            MainAxis, DimensionLevel } from './internal'
 
 import { roundTo, roundToTolerance } from './internal' // utils
 
@@ -23,8 +27,8 @@ export class Annotator
     
     //// END SETTINGS ////
 
-    _oc; // is set in constructor prototype when Geom once OC is loaded - IMPORTANT: Don't assign here!
-    _geom:Geom; // also set on Pipeline prototype when making Geom
+    _oc; // is set in constructor prototype once OC is loaded - IMPORTANT: Don't assign here!
+    _brep:Brep; // also set on Pipeline prototype when making Brep
     name:string;
     annotations:Array<Annotation> = [];
     // labels:Array<Label> = []; // TODO
@@ -211,7 +215,7 @@ export class Annotator
 
         
         // Level 2: edges on and parallel to sides of bbox
-        const bboxSideEdges = part.bbox().rect().edges();
+        const bboxSideEdges = part.bbox().rect().edges().shapes as Array<Edge>;
         const sideEdgesUsed = new ShapeCollection();
 
         bboxSideEdges.forEach((sideEdge,i) => 

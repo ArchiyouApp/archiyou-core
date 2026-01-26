@@ -4,26 +4,39 @@
  *   For example when with intersection and splits the Shapes into seperate Shape instances (Vertex, Edge, Wire, Face, Shell etc.)
  *
  *    ShapeCollection makes operating on multiple Shapes as easy as working on single Shapes (Inspired like JTS/GEOS). 
- *
+ *    
+ *    TODO: Introduce typed ShapeCollections ShapeCollection<Edge> using generics
  */
 
- import { isCoordArray, PointLike, isPointLike, isPointLikeSequence, PointLikeOrAnyShapeOrCollection,
-         ShapeType, AnyShape, isAnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, isAnyShapeCollection, MakeShapeCollectionInput, isMakeShapeCollectionInput, 
+ 
+// constants
+import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
+
+import type { ArchiyouApp, PointLike, PointLikeOrAnyShapeOrCollection,
+         ShapeType, AnyShape, AnyShapeOrSequence, AnyShapeOrCollection,AnyShapeCollection, 
+         MakeShapeCollectionInput,
          Pivot,AnyShapeSequence, Alignment, Bbox, Side,
-         isMainAxis} from './internal' // see types
- import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid } from './internal'
- import { MeshShape, MeshShapeBuffer, MeshShapeBufferStats, BaseAnnotation } from './internal' // types
- import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
- import type { Annotation, MainAxis, ObjStyle, toSVGOptions } from './internal'; // NOTE: Vite does not allow re-importing interfaces and types
- import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
- import { LayoutOrderType, LayoutOptions, DimensionLevelSettings, AnnotationAutoDimStrategy } from './internal'
+         ModelUnits,
+         MeshingQualitySettings,ExportGLTFOptions,
+         LayoutOrderType, LayoutOptions, 
+         DimensionLevelSettings, AnnotationAutoDimStrategy,
+         MeshShape, MeshShapeBuffer, MeshShapeBufferStats,
+         Annotation, DimensionLine, MainAxis, ObjStyle, toDXFOptions, toSVGOptions  } from './internal' // see types
 
- import { SHAPE_EXTRUDE_DEFAULT_AMOUNT, SHAPE_SCALE_DEFAULT_FACTOR } from './internal';
- import { MeshingQualitySettings } from './types';
+import { Obj, Point, Vector, Shape, Vertex, Edge, Wire, Face, Shell, Solid, Brep, 
+   Exporter, BaseAnnotation } from './internal'
 
- // special libraries
- import chroma from 'chroma-js';
- import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+import { isCoordArray, isPointLike, isPointLikeSequence, 
+      isAnyShape, isAnyShapeCollection, isMainAxis } from './internal' // typeguards
+ 
+import { addResultShapesToScene, checkInput } from './decorators'; // Import directly to avoid error in ts-node/jest
+import { flattenEntitiesToArray, flattenEntities, roundToTolerance } from './internal'  // utils
+
+
+// special libraries
+import chroma from 'chroma-js';
+//import { packer } from 'guillotine-packer' // see: https://github.com/tyschroed/guillotine-packer
+import { DxfWriter, Units } from '@tarikjabiri/dxf';
  
  interface PackerItem {
    name:string
@@ -44,12 +57,14 @@
  export class ShapeCollection
  {
       /*  ShapeCollection cannot contain other ShapeCollections. Hierarchies are managed by Obj container class */
-      _oc:any; // Don't set to null!
-      _geom:any; // Set on init of Geom
+      _oc:any; 
+      _brep:Brep;
       _obj:Obj = null; // Obj container
       _parent:AnyShapeOrCollection;
       shapes:Array<AnyShape> = []; // No ShapeCollection here
       _groups:{[key:string]:Array<AnyShape>} = {}; // mechanism to define groups within ShapeCollection (experimental)
+
+      _packerModule:any; // caching of dynamically imported guillotine-packer
 
       annotations:Array<Annotation> = []; // array of annotations associated with this ShapeCollection
    
@@ -415,6 +430,8 @@
       @checkInput('AnyShapeOrCollection', 'ShapeCollection')
       add(shapes?:AnyShapeOrSequence, ...args):this
       {
+         // TODO: Adding to ShapeCollection is by reference. This makes it not exclusively owned
+         // This sometimes leads to bugs, especially in map/forEach loops and global variables (not using let/const)
          this._addEntities([shapes, ...args])
          this._setFakeArrayKeys();
 
@@ -718,15 +735,15 @@
          const others = (otherCollection.count() === 1) ? otherCollection.first() : otherCollection;
 
          // pivot using bbox() of ShapeCollection
-         const pivotAlignPerc:Array<number> = (this.bbox().box() || this.bbox().rect())._alignPerc(pivot)
-         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(others)) ? 
-                                             (others.bbox().box() || others.bbox().rect())._alignPerc(alignment) :
-                                             (other as Shape)._alignPerc(alignment)
+         const pivotAlignPerc:Array<number> = (this.bbox().shape())._alignPerc(pivot)
+         const alignmentPerc:Array<number> = (ShapeCollection.isShapeCollection(others)) 
+                                                ? (others.bbox().shape())._alignPerc(alignment) 
+                                                : (others as Shape)._alignPerc(alignment)
          
          const fromPosition = this.bbox().getPositionAtPerc(pivotAlignPerc).toVector();
          const toPosition = others.bbox().getPositionAtPerc(alignmentPerc).toVector();
 
-         this.move(toPosition.subtracted(fromPosition)); //.move(pivotOffsetVec);
+         this.move(toPosition.subtracted(fromPosition));
 
          return this;
       }
@@ -951,6 +968,20 @@
 
       */
 
+      /** Just a simple forwarder fillet */
+      fillet(radius:number, at?:any):ShapeCollection
+      {
+         const SHAPES_FILLET = ['Wire','Face', 'Solid']
+         this.forEach( 
+            shape => {
+               if (SHAPES_FILLET.includes(shape.type()))
+               {
+                  (shape as Wire|Face|Solid)?.fillet(radius, at)
+               }
+            });
+         return this;
+      }
+
       /** Shape API: Copy entire ShapeCollection and its Shapes and return a new one */
       _copy():ShapeCollection
       {
@@ -961,7 +992,7 @@
             const copiedShapes = groupShapes.map(shape => shape._copy())
             newShapeCollection.addGroup(groupName, copiedShapes); 
          })
-         newShapeCollection.setName( this._geom.getNextLayerName( 'CopyOf' + this.getName() ));
+         newShapeCollection.setName( this._brep.getNextLayerName( 'CopyOf' + this.getName() ));
          newShapeCollection._setFakeArrayKeys();
 
          return newShapeCollection;
@@ -1071,7 +1102,7 @@
             
             // Extra: enlarge bbox with possible Annotations within or nearby
             /*
-            this._geom._annotator.getAnnotationsInBbox(combinedBbox)
+            this._brep._annotator.getAnnotationsInBbox(combinedBbox)
                   .forEach( a => combinedBbox = combinedBbox.added(a.toShape().bbox(false)));
             */
          }
@@ -1356,7 +1387,7 @@
        *      Does not add to Scene
        *      Use showHidden=true to output with hidden lines
        */
-      _isometry(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
+      _isometry(viewpoint?:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
          const visibleShapes = new ShapeCollection(this.filter( shape => shape.visible() === true));
          const ocCompoundShape = visibleShapes.toOcCompound(); // combine all Shapes in ShapeCollection as CompoundShape
@@ -1371,12 +1402,12 @@
       *      Use showHidden=true to output with hidden lines
       */
       @addResultShapesToScene
-      isometry(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
+      isometry(viewpoint?:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
          return this._isometry(viewpoint, showHidden)
       }
 
-      iso(viewpoint:string|PointLike, showHidden:boolean=false):ShapeCollection
+      iso(viewpoint?:string|PointLike, showHidden:boolean=false):ShapeCollection
       {
          return this.isometry(viewpoint, showHidden)
       }
@@ -1384,7 +1415,7 @@
       //// ARRAY LIKE API ////
 
       /** Array API - Alias for ForEach to have compatitibility with Array */
-      forEach(func: (value: any, index: number, arr:Array<any>) => void ): ShapeCollection
+      forEach(func: (value: AnyShape, index: number, arr:Array<any>) => void ): ShapeCollection
       {
          this.shapes.forEach(func);
          return this;
@@ -2158,9 +2189,9 @@
       {
          // For now, flatten collection into existing layer
          // TODO: We could start a new layer to keep collection together
-         // this._geom.layer( this._geom.getNextLayerName(this.getName()));
+         // this._brep.layer( this._brep.getNextLayerName(this.getName()));
          this.all().forEach(shape => shape.addToScene());
-         //this._geom.resetLayers(); // return active layer to scene
+         //this._brep.resetLayers(); // return active layer to scene
          return this;
       }
 
@@ -2358,6 +2389,9 @@
 
       pack(options:LayoutOptions, copy:boolean=true):ShapeCollection
       {
+         // TODO: implement without old guillotine-packer
+         return null;
+         /*
          const DEFAULT_BIN_WIDTH = 1000; // NOTE: still in local model-units (can be anything basically)
          const DEFAULT_BIN_HEIGHT = 1000;
          const DEFAULT_AUTOROTATE = false;
@@ -2461,6 +2495,8 @@
 
          // return binpacked Shapes and optionally stock outlines in ShapeCollection
          return (binShapes) ? toShapeCollection.addGroup('bins', binShapes) : toShapeCollection;
+
+         */
       }
 
       _makeBinPackBox(shape:AnyShape, margin:number=10, index:number):any // TODO: typing
@@ -2507,7 +2543,7 @@
       autoDim(settings?:DimensionLevelSettings, strategy?:AnnotationAutoDimStrategy):ShapeCollection
       {
          // TODO: How to tie annotations to ShapeCollection?
-         this._geom._annotator.autoDim(this, settings, strategy);
+         this._brep._annotator.autoDim(this, settings, strategy);
 
          return this;
       }
@@ -2672,8 +2708,12 @@
 
       toString():string
       {
-         return `ShapeCollection<${this.shapes.map(s => s.toString())}>`;
+         return `ShapeCollection<${(this.shapes.length > 0 ? this.shapes.map(s => s.toString()) : 'empty')}>`;
       }
+
+
+
+      //// UTILS ////
 
       /** Get all edges of 2D XY Shapes in this collection 
        *    Supply true to force all Shapes, even invisible ones!
@@ -2688,8 +2728,7 @@
             {
                shapeEdges.add(shape.edges()); // NOTE: this._parent refers to main Shape of subshapes
             }
-         })
-
+         });
          return shapeEdges;
       }
 
@@ -2708,11 +2747,8 @@
       /** Export Shapes that are 2D and on XY plane to SVG 
        *    All shapes will be converted to Edges
        *    @param options { all:boolean, annotations: boolean, contours:boolean  }
-       * 
-       *    NOTE: contours use Arrangement2D (see Geom), but the OC routines are very slow
-       *    TODO: run these algorithms apart from OC
       */
-      toSvg(options?:toSVGOptions):string
+      toSVG(options?:toSVGOptions):string
       {
          const DEFAULT_OPTIONS = { all: false, annotations: true };
 
@@ -2729,7 +2765,7 @@
          let svgPaths:Array<string> = [];
          shapeEdges.forEach( edge => 
          {
-            svgPaths.push(edge.toSvg());
+            svgPaths.push(edge.toSVG());
          })
          
          const withAnnotations = options?.annotations ?? true; // true is default
@@ -2745,24 +2781,83 @@
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
                         viewBox="${svgViewBbox}"
                         _bbox="${svgWorldBbox}" 
-                        _worldUnits="${this._geom._units}" stroke="black">
+                        _worldUnits="${this._brep._units}" stroke="black">
                         ${svgPaths.join('\n\t')}
                         ${ (withAnnotations) ? this._getDimensionLinesSvgElems() : ''}
                      </svg>`
          // TODO: remove block so we can enable subshape styling
-
          return svg;
       }
 
 
       _getDimensionLinesSvgElems():string
       {
-         const svgElems = this.getAnnotations().map(a => a.toSvg())
+         const svgElems = this.getAnnotations().map(a => a.toSVG())
          const svgText = svgElems.join('\n')
 
          return svgText;
       }
       
+      toDXF(options:toDXFOptions = {}):string|null
+      {
+         const UNITS_TO_DXF_UNITS = {
+            mm: Units.Millimeters,
+            cm: Units.Centimeters,
+            dm: Units.Decimeters,
+            m: Units.Meters,
+            in: Units.Inches,
+            ft: Units.Feet,
+            yd: Units.Yards,
+            mi: Units.Miles,
+         } as Record<ModelUnits, any>;
+
+         const DEFAULT_OPTIONS = { all: false, annotations: true };
+         options = { ...DEFAULT_OPTIONS, ...(options ?? {}) };
+         const shapeEdges = this._get2DXYShapeEdges(options?.all);
+         if (shapeEdges.length == 0)
+         { 
+            console.warn(`ShapeCollection::toDXF(): No 2D Shapes on XY plane found in collection!`);
+            return null;
+         }
+
+         const writer = new DxfWriter();
+         writer.setUnits(UNITS_TO_DXF_UNITS[this._brep._units as ModelUnits] || Units.Unitless);
+         const modelSpace = writer.document.modelSpace;
+
+         shapeEdges.forEach( edge => {
+               (edge as Edge).toDXF(modelSpace); // add Edge as line to DXF modelspace
+         });
+
+         if(options?.annotations)
+         {
+            this.getAnnotations().forEach( a => {
+               if(a._type === 'dimensionLine')
+               {
+                   (a as DimensionLine).toDXF(modelSpace);
+               }
+            });
+         }
+
+         return writer.stringify();
+      }
+
+      /** Export 3D Shape to GLTF */
+      async toGLTF(options?:ExportGLTFOptions): Promise<ArrayBuffer>
+      {
+         // We use centralized export functions from Exporter
+         return await new Exporter({ brep: this._brep }).exportToGLTF(this, options);
+      }
+
+      /** Convenience method for saving files in browser and node */
+      async save(filename?:string, options:any={}, shapes:ShapeCollection|null=null): Promise<string|undefined>
+      {
+         const shapesToSave = ShapeCollection.isShapeCollection(shapes) ? shapes : this;
+
+         return await new Exporter({ brep: this._brep } as ArchiyouApp)
+            .save(filename, options, shapesToSave);
+      }
+
+
  }
 
 

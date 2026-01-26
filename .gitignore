@@ -12,3 +12,4 @@ tmp
 Thumbs.db
 dist/**/*
 yarn.lock
+coverage/

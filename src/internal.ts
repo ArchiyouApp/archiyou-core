@@ -31,7 +31,8 @@ export * from './Exporter'
 
 export * from './OBbox'
 
-export * from './Geom'
+
+export * from './Brep'
 export * from './workerUtils'
 export * from './AnnotatorBaseAnnotation'
 export * from './AnnotatorDimensionLine'
@@ -39,9 +40,9 @@ export * from './Annotator'
 export * from './IO'
 export * from './GLTFBuilder'
 
+
 export * from './typeguards'
 export * from './decorators'
-
 
 export * from './utils'
 export * from './Selector'
@@ -50,6 +51,8 @@ export * from './Console'
 export * from './CodeParser'
 
 export * from './Doc'
+export * from './DocDocument'
+export * from './DocPage'
 export * from './DocPageContainer'
 export * from './DocPageContainerView'
 export * from './DocPageContainerImage'
@@ -57,15 +60,16 @@ export * from './DocPageContainerText'
 export * from './DocPageContainerTextArea'
 export * from './DocPageContainerTable'
 export * from './DocPageContainerGraphic'
-export * from './DocPage'
 export * from './DocUtils'
 
 export * from './DocPDFExporter'
 
 
-export * from './Table'
-export * from './Db'
+export * from './CalcTable'
+export * from './CalcDb'
 export * from './Calc'
+export * from './CalcTableIO'
+
 
 export * from './ParamManager'
 export * from './ParamManagerOperator'
@@ -74,6 +78,18 @@ export * from './ParamManagerOperator'
 export * from './Make'
 export * from './Beams'
 
+export * from './init' // exposes init function by using OcLoader
+export * from './OcLoader'
+export * from './Runner'
+export * from './RunnerOps'
+export * from './RunnerComponentImporter'
 
- 
- 
+export * from './Script'
+export * from './ScriptParam'
+export * from './LibraryConnector'
+export * from './ScriptOutputPath'
+export * from './ScriptOutputManager'
+
+export * from './Services'
+
+

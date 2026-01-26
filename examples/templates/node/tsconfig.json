@@ -1,0 +1,43 @@
+// tsconfig.json
+// See reference: https://www.typescriptlang.org/tsconfig
+{
+  "compilerOptions": 
+  {
+    "target": "es2018", 
+    "module": "esnext",
+    "moduleResolution": "node", // Needed to import libs                   
+    "lib": ["es6","dom", "webworker"],        
+    "declaration" : true,
+    "allowJs": true,
+    "outDir": "dist",
+    "strict": false,
+    "noImplicitAny": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators" : true,
+    "allowSyntheticDefaultImports" : true, // fix: This module is declared with using 'export =', and can only be used with a default import when using the 'esModuleInterop' flag.
+    "sourceMap": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./*"],
+      "@/*": ["./*"]
+    },
+    "skipLibCheck": false
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node",
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "ESNext",
+      "moduleResolution": "node",
+      "experimentalDecorators": true, // legacy decorators
+      "emitDecoratorMetadata": true,
+      "useDefineForClassFields": false,  // This prevents the new TC39 class fields behavior that breaks decorators
+    }
+  },
+  "exclude": [
+    "tests",
+    "node_modules"
+  ],
+}

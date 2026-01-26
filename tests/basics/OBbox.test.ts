@@ -1,21 +1,20 @@
-import { Geom } from '../../src/internal' // import only from internal, otherwise we get circular import problems
-import OcLoader from '../../src/OcLoader'
+import { Brep, OcLoader } from '../../src/internal' // import only from internal, otherwise we get circular import problems
 
-// see Jest docs: https://jestjs.io/docs/expect
+import { test, beforeAll, expect } from 'vitest'
 
-let geom;
+let brep:Brep;
 console.geom = console.log;
 
 beforeAll(async () => 
 {
     let ocLoader = new OcLoader();
     await ocLoader.loadAsync(); // Jest waits for the promise to be resolved
-    geom = new Geom(); // needed to set oc on all other Shapes
+    brep = new Brep(); // needed to set oc on all other Shapes
 });
 
 test("Bbox3D", () => 
 {
-    const b = geom.Box(100,10,200).rotateZ(10);
+    const b = brep.Box(100,10,200).rotateZ(10);
     const obb = b.obbox();
     expect(obb.width()).toEqual(10);
     expect(obb.depth()).toEqual(100);
@@ -28,7 +27,7 @@ test("Bbox3D", () =>
 
 test("Bbox2D", () => 
 {
-    const r = geom.Rect(100,10).moveY(-100).rotateZ(30);
+    const r = brep.Rect(100,10).moveY(-100).rotateZ(30);
     expect(r.obbox().is2D()).toEqual(true);
     expect(r.obbox().depthHalfLine().type()).toEqual('Edge');
 })

@@ -5,13 +5,16 @@
  * 
  */
 
+import type { MakeShellInput, ThickenDirection, 
+            AnyShapeOrCollection, AnyShapeSequence } from './internal' // types
+
+import { isCoordArray, isLinearShape } from './internal' // typeguards
+
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Solid, ShapeCollection } from './internal'
 
 import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
 
-import { PointLike, isCoordArray, isMakeShellInput, MakeShellInput, AnyShape, ThickenDirection, isThickenDirection, AnyShapeOrCollection, 
-            isLinearShape, AnyShapeSequence, isAnyShapeSequence } from './internal' // types
-import { checkInput, cacheOperation, addResultShapesToScene, protectOC } from './decorators'; // Direct import to avoid error in ts-node/jest
+import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Direct import to avoid error in ts-node/jest
 
 import { flattenEntities } from './internal' // utils
 
@@ -60,6 +63,9 @@ export class Shell extends Shape
     {
         if (ocShell && (ocShell instanceof this._oc.TopoDS_Shell || ocShell instanceof this._oc.TopoDS_Shape) && !ocShell.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Shell
             ocShell = this._makeSpecificOcShape(ocShell, 'Shell');
             this._ocShape = ocShell;
@@ -502,10 +508,10 @@ export class Shell extends Shape
     @checkInput(Shell, 'auto')
     _bridge(other:Shell):ISolid
     {
-        let offsetShellWire = (other as Shell).outerWire();
-        let originaShellWire = this.outerWire();
-        let sideShell = originaShellWire._lofted(offsetShellWire, false) as Shell;
-        let newSolid = new Solid().fromShells(new ShapeCollection(this, other as Shell,sideShell));
+        const offsetShellWire = (other as Shell).outerWire();
+        const originaShellWire = this.outerWire();
+        const sideShell = originaShellWire._lofted(offsetShellWire, false) as Shell;
+        const newSolid = new Solid().fromShells(new ShapeCollection(this, other as Shell,sideShell));
         return newSolid;
     }
 

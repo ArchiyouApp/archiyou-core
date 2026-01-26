@@ -5,9 +5,9 @@
  *    
  */
 
-import { MainAxis, Point } from './internal'
-import { Vertex } from './internal'
-import { PointLike, isPointLike } from './internal' // see: types.ts
+import type { MainAxis, PointLike  } from './internal' // types
+import { Point, Vertex } from './internal'
+import { isPointLike  } from './internal' // typeguards
 import { addResultShapesToScene, checkInput } from './decorators' // decorators
 import { toDeg, toRad, roundToTolerance } from './internal' // utils
 import { targetOcForGarbageCollection } from './internal'
@@ -28,7 +28,6 @@ export class Vector extends Point
         set z()
     */
     
-    _oc:any; // this is set on the prototype by the main entrypoint of the library
     _ocVector:any; // OC gp_Vec https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___vec.html
 
     //// CREATION METHODS ////
@@ -636,6 +635,7 @@ export class Vector extends Point
         return this.copy().rotate(angle, position, direction);
     }
 
+    // TODO: add rotation pivot
     @checkInput(Number,'auto')
     rotateX(angle:number):this
     {

@@ -5,7 +5,7 @@
  *      (TODO: refactoring in progress)
  */
 
-import { Statement } from './internal'
+import { Statement, ScriptParam } from './internal'
 
 /** Define a Param: both as a structure and an instance */
 export interface Param
@@ -31,7 +31,7 @@ export interface ScriptVersion
     prev_version_id? : string,
     created_at? : string,
     updated_at? : string,
-    params? : Array<Param>,
+    params? : Array<ScriptParam>,
     code : string,
     shared?: boolean,
     shared_version_tag?:string,

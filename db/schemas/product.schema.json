@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product Properties",
+  "description": "Schema for product specifications including material reference, dimensions, stock information and pricing",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the product. For example OSB3-12-1220x2440"
+    },
+    "material": {
+      "$ref": "./material.schema.json",
+      "description": "Reference to material properties"
+    },
+    "shape": {
+      "type": "string",
+      "enum": ["board", "beam", "cover", "product"],
+      "description": "Type of product shape"
+    },
+    "size": {
+      "type": "string",
+      "description": "Primary size specification in mm. For example length for beams, thickness for boards."
+    },
+    "size_name" : {
+      "type": "string",
+      "enum" : ["length", "thickness"],
+      "description": "Name of the primary size specification"
+    },
+    "width": {
+      "type": "number",
+      "description": "Section width in mm",
+      "minimum": 0
+    },
+    "height": {
+      "type": "number",
+      "description": "Section height in mm (h > w)",
+      "minimum": 0
+    },
+    "pack_pcs": {
+      "type": "integer",
+      "description": "Number of pieces per stock pack",
+      "minimum": 1
+    },
+    "certification": {
+      "type": "string",
+      "description": "Product certification"
+    },
+    "price": {
+      "type": "number",
+      "description": "Stock price value",
+      "minimum": 0
+    },
+    "price_per": {
+      "type": "string",
+      "enum": ["m1", "m2", "m3", "pcs"],
+      "description": "Price per unit type"
+    },
+    "price_currency": {
+      "type": "string",
+      "enum": ["€", "$"],
+      "description": "Price currency"
+    },
+    "locality": {
+      "type": "string",
+      "enum": ["NL", "EU", "DE", "FR"],
+      "description": "Stock availability locality"
+    },
+    "supplier": {
+      "type": "string",
+      "description": "Stock supplier name"
+    },
+    "supplier_document": {
+      "type": "string",
+      "format": "uri",
+      "description": "Link to supplier document"
+    },
+    "epd" : { 
+        "$ref": "./edp.schema.json", "description": "Environmental Product Declaration (EPD) information." 
+    }
+  },
+  "required": ["id", "size", "width", "height"],
+  "additionalProperties": false
+}

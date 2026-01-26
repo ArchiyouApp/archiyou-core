@@ -5,18 +5,21 @@
  * 
  */
 
+// constants
 import { SOLID_MAKEBOX_SIZE, SOLID_MAKESPHERE_RADIUS, SOLID_MAKESPHERE_ANGLE, SOLID_MAKECONE_BOTTOM_RADIUS, SOLID_MAKECONE_TOP_RADIUS,
     SOLID_MAKECONE_HEIGHT, SOLID_CYLINDER_RADIUS, SOLID_CYLINDER_HEIGHT, SOLID_CYLINDER_ANGLE, SOLID_FILLET_RADIUS, SOLID_CHAMFER_DISTANCE,
     SOLID_THICKEN_AMOUNT, SOLID_THICKEN_DIRECTION } from './internal'
 
-import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+// types
+import type { AnyShapeOrCollection, PointLike, ThickenDirection,
+        MakeSolidInput, AnyShapeOrCollectionOrSelectionString, SelectionString
+ } from './internal';
 
+import { isMakeSolidInput, isSelectionString } from './internal'; // typeguards
 import { Vector, Point, Shape, Vertex, Edge, Wire, Face, Shell, ShapeCollection } from './internal'
-import { cacheOperation } from './internal'; // decorators
-import { toRad } from './internal';
-import { AnyShapeSequence, AnyShapeOrCollection, PointLike, isPointLike, AnyShape, isThickenDirection, ThickenDirection } from './internal';
-import { addResultShapesToScene, checkInput, protectOC } from './decorators'; //  Direct import to avoid error in ts-node/jest
-import { MakeSolidInput, isMakeSolidInput, AnyShapeOrCollectionOrSelectionString, isSelectionString, SelectionString } from './internal'; // types
+import { toRad } from './internal'; // utils
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+import { checkInput, protectOC } from './decorators'; //  Direct import to avoid error in ts-node/jest
 
 export class Solid extends Shape
 {   
@@ -118,6 +121,9 @@ export class Solid extends Shape
     {
         if (ocSolid && (ocSolid instanceof this._oc.TopoDS_Solid || ocSolid instanceof this._oc.TopoDS_Shape) && !ocSolid.IsNull())
         {
+            // First clear previous if any
+            this._clearOcShape();
+            
             // For easy debug, always make sure the wrapped OC Shape is TopoDS_Solid
             ocSolid = this._makeSpecificOcShape(ocSolid, 'Solid');
                 
@@ -322,7 +328,7 @@ export class Solid extends Shape
     /** Give the Solid rounded corners at its Edges with a given radius */
     @protectOC(['Fillet size cannot be bigger then length of filleted Edge'])
     @checkInput([[Number,SOLID_FILLET_RADIUS], ['AnyShapeOrCollectionOrSelectionString',null]], ['auto','auto'])
-    fillet(radius?:number, edges?:AnyShapeOrCollectionOrSelectionString):Solid
+    fillet(radius?:number, at?:null|AnyShapeOrCollectionOrSelectionString):this
     {
         /* OC Docs: 
             - https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fillet_a_p_i___make_fillet.html
@@ -335,13 +341,13 @@ export class Solid extends Shape
         let filletEdges = new ShapeCollection();
         let solidEdges = this.edges();
 
-        if (edges === null)
+        if (!at)
         {
             filletEdges = solidEdges; // all
         }
-        else if(isSelectionString(edges))
+        else if(isSelectionString(at))
         {
-            let selectionString = edges as SelectionString;
+            let selectionString = at as SelectionString;
 
             let selectedShapes = new ShapeCollection(this.select(selectionString)); // select might return Shape or ShapeCollection
             if (selectedShapes == null)
@@ -362,7 +368,7 @@ export class Solid extends Shape
         }
         else {
             // just a collection
-            filletEdges = new ShapeCollection(edges);
+            filletEdges = new ShapeCollection(at);
         }
 
         // now check
@@ -444,7 +450,7 @@ export class Solid extends Shape
 
     /** Chamfer Solid at given Edges with given size */
     @checkInput([[Number, SOLID_CHAMFER_DISTANCE],['AnyShapeOrCollectionOrSelectionString',null]], ['auto','auto'])
-    chamfer(distance?:number, edges?:AnyShapeOrCollectionOrSelectionString, ):Solid
+    chamfer(distance?:number, edges?:AnyShapeOrCollectionOrSelectionString, ):this
     {
          /* OC Docs: 
             - https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fillet_a_p_i___make_chamfer.html
@@ -549,7 +555,7 @@ export class Solid extends Shape
             return this;
         }
         else {
-            throw new Error(`Solid::chamfer: ERROR\n Error generating chamfered Solid`);
+            throw new Error(`Solid::chamfer: ERROR: Error generating chamfered Solid`);
         }   
 
     }

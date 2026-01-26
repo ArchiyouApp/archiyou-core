@@ -5,7 +5,7 @@
  */
 
 import { ShapeCollection, Vector, Point, Bbox, Vertex, Edge, Wire, Face, Shell, Solid } from './internal';
-import { GEOM_METHODS_INTO_GLOBAL } from './internal' // constants.ts
+import { BREP_METHODS_INTO_GLOBAL } from './internal' // constants.ts
 
  /** Setup the scope for execution. See also archiyou-app/GeomWorker.ts */
  export function makeShapeGlobals(oc:any, scope:any)
@@ -27,18 +27,19 @@ import { GEOM_METHODS_INTO_GLOBAL } from './internal' // constants.ts
 
  export function makeGeomMethodsGlobals(scope:any)
  {
-     GEOM_METHODS_INTO_GLOBAL.forEach(methodName => {
-         let method = scope.geom[methodName];
-         if (!method){
-             console.warn(`Could not find ${methodName} in Geom class. Check config: GEOM_METHODS_INTO_GLOBAL`);
+     BREP_METHODS_INTO_GLOBAL.forEach(methodName => {
+         let method = scope.brep[methodName];
+         if (!method)
+         {
+             console.warn(`Could not find ${methodName} in Brep class. Check config: BREP_METHODS_INTO_GLOBAL`);
          }
          else {
              // avoid overwriting
              if (!scope[methodName])
              {
-                scope[methodName] = method.bind(scope.geom);
+                scope[methodName] = method.bind(scope.brep);
              }
-             scope[methodName.toLowerCase()] = method.bind(scope.geom);
+             scope[methodName.toLowerCase()] = method.bind(scope.brep);
          }
      })
  }

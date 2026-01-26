@@ -14,12 +14,14 @@
         ocObj.delete() to free memory 
 
     NOTES: 
+        - Currently disabled by default. See USE_GARBAGE_COLLECTION in constants.ts. 
+
         - Browser/Node garbage collection is not every second. In browser you can trigger it to test if callbacks are working
           For example in Chrome: More Tools -> Development Tools -> Memory > Collect Garbage
 
         - For temporary OpenCascade instances, directly delete them after use
 
-        - We need to be very carefyl avoiding shared OC instances, because one Class instance might delete it before another is done using it
+        - We need to be very careful avoiding shared OC instances, because one Class instance might delete it before another is done using it
     
 */
 
@@ -42,16 +44,13 @@ if (!(globalThis as any)?.FinalizationRegistry)
 const onGarbageCollect = function(ocObj:any)
 {
     try {
-        // SERIOUS PROBLEM: BindingError cannot pass deleted object as  pointer
         (ocObj as any)?.delete(); // Delete OC reference - NOTE: This might happen 100k+ for every scene. Don't log for speed!
     }
     catch(e)
     {
         if(e.name === 'BindingError')
         {
-            // Most commonly - object is already deleted
-            //console.log('==== GB ERROR ====')
-            //console.log(ocObj);
+            // NOTE: Catch a binding error when trying to delete an already deleted object
             return;
         }
         

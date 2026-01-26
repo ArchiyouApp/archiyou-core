@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid' // fix TS warning with @types/uuid
+import { uuidv4 } from './internal' // utils
 
 import { AnyShape, Bbox } from './internal'
 import { AnnotationType } from './internal' // types
@@ -46,7 +46,7 @@ export class BaseAnnotation
 
     //// EXPORTS ////
 
-    toSvg():string|null
+    toSVG():string|null
     {
         return null; // override by child class
     }

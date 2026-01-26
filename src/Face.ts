@@ -4,17 +4,27 @@
 
  */
 
+// constants
 import { FACE_PLANE_WIDTH, FACE_PLANE_DEPTH, FACE_PLANE_POSITION, FACE_PLANE_NORMAL, FACE_BASEPLANE_AXIS, FACE_BASEPLANE_SIZE, FACE_CIRCLE_RADIUS, FACE_EXTRUDE_AMOUNT, FACE_OFFSET_AMOUNT, FACE_OFFSET_TYPE, FACE_THICKEN_AMOUNT, FACE_THICKEN_DIRECTION, FACE_LOFT_SOLID, FACE_NORMAL_EDGE_SIZE, FACE_FILLET_RADIUS, FACE_CHAMFER_DISTANCE, FACE_CHAMFER_ANGLE, LinearShape } from './internal'
 
-import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
+import type { PointLike, Cursor, PointLikeSequence, MakeFaceInput, 
+        AnyShape, Axis, ThickenDirection,
+        PointLikeOrAnyShape, PointLikeOrVertexCollection,
+        AnyShapeSequence, AnyShapeOrCollection, PointLikeOrAnyShapeOrCollectionOrSelectionString, 
+        SelectionString,
+        DimensionOptions } from './internal'; // types
 
-import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, ShapeCollection } from './internal'
+// typeguards
+import { isPointLike, isCoordArray, isPointLikeSequence, 
+    isAnyShapeSequence, isAnyShape, isSelectionString
+} from './internal'
+
+import { Vector, Point, Shape, Vertex, Edge, Wire, Shell, Solid, 
+        ShapeCollection, VertexCollection,
+        DimensionLine } from './internal'
+
 import { addResultShapesToScene, checkInput, protectOC  } from './decorators'; // Import directly to avoid ts-node error
-import { PointLike, isPointLike, isCoordArray, Cursor, PointLikeSequence, isPointLikeSequence, MakeFaceInput, 
-        isMakeFaceInput, AnyShape, isAnyShape, Axis, isAxis, ThickenDirection, isThickenDirection,
-        PointLikeOrAnyShape, isPointLikeOrAnyShape, VertexCollection, PointLikeOrVertexCollection, AnyShapeOrSequence, isAnyShapeOrSequence,
-        isAnyShapeCollection, AnyShapeSequence, AnyShapeOrCollection, isAnyShapeSequence, PointLikeOrAnyShapeOrCollectionOrSelectionString, SelectionString, isSelectionString} from './internal'; // types
-import { Annotation, DimensionLine, DimensionOptions } from './internal' // from Annotator through internal.ts
+import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from './internal';
 
 import { flattenEntities, toRad, roundToTolerance } from './internal' // utils
 
@@ -805,7 +815,7 @@ export class Face extends Shape
     /** Round corners of Wire with given radius, at given Vertex (same or equals) or VertexCollection or all if given none */
     @protectOC('Size of fillet may not exceed length of neighboring Edges')
     @checkInput([[Number,FACE_FILLET_RADIUS],['PointLikeOrAnyShapeOrCollectionOrSelectionString', null]],['auto','auto'])
-    fillet(radius?:number, vertices?:PointLikeOrAnyShapeOrCollectionOrSelectionString )
+    fillet(radius?:number, at?:PointLikeOrAnyShapeOrCollectionOrSelectionString )
     {
         // OC docs: BRepFilletAPI_MakeFillet2d: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_fillet_a_p_i___make_fillet2d.html
         if(this.isEmpty() || !this.planar())
@@ -817,17 +827,17 @@ export class Face extends Shape
         // Fillet can either supply a SelectionString or Any Shape or Collection
         let filletVertices = new VertexCollection();
         let doCheck = true;
-        if (vertices == null)
+        if (at == null)
         {   
             filletVertices = this.vertices() as VertexCollection; // all
             doCheck = false;
         }
-        if (isSelectionString(vertices))
+        if (isSelectionString(at))
         {
-            let selectedShapes = this.select(vertices as SelectionString);
+            let selectedShapes = this.select(at as SelectionString);
             if (selectedShapes == null)
             {
-                console.warn(`No vertices found with selection string: "${vertices}. Fell back to all!`);
+                console.warn(`No vertices found with selection string: "${at}. Fell back to all!`);
                 filletVertices = this.vertices() as VertexCollection;
                 doCheck = false;
             }
@@ -837,7 +847,7 @@ export class Face extends Shape
         }
         else // a Shape or Collection
         {
-            filletVertices = new ShapeCollection(vertices).getSubShapes('Vertex') as VertexCollection;
+            filletVertices = new ShapeCollection(at).getSubShapes('Vertex') as VertexCollection;
         }
 
         // now start tests

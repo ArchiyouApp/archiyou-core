@@ -1,109 +1,215 @@
-# Archiyou-core
+# Archiyou
 
 ![Archiyou](assets/archiyou_logo_header_white_bg.png)
 
-## 🌐 What is Archiyou?
+Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
+Use our editor and community platform for free at [Archiyou.com](https://archiyou.com).
 
-Archiyou is an online platform to codify design and making know-how. It is currently in alpha phase and freely available to try. See [Archiyou.com](https://archiyou.com).
+[![License](https://img.shields.io/github/license/ArchiyouApp/archiyou-core)](https://github.com/ArchiyouApp/archiyou-core/blob/main/LICENSE) [![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml) [![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.archiyou.com)
 
-## 🚩 What is Archiyou-core?
+## Example
 
-This is the core library of the Archiyou platform. It consists of the following parts:
+This is a script on our platform:
 
-- 🛠️ **Geom** - The module to create geometry and topology shapes. Wraps a custom build of [OpenCascade.js](https://github.com/donalffons/opencascade.js).
-- 📦 **Exporter** - Module to export data
-- ☝ **Importer (IO)** - Module in-progress to import data from different sources like SVG's, geodata etc.
-- ⭐ **Annotator** - A module for generating annotations like dimension lines and labels
-- 📚 **Doc** - The module to define documents, pages and add content (shapes, text, images) to them
-- 🌈 **Misc utils** - A way to parse scripts in different scopes (like Webworkers)
+<img width="250" align="right" src="assets/codecad_table.gif">
 
-This repository also contains:
+```js
+// Parameters
+WIDTH = 100;
+DEPTH = 80; 
+HEIGHT = 70;
 
-- 📄 **Documentation** - Containing all VuePress documentation at [docs.archiyou.com](https://docs.archiyou.com)
-- ⏰ **Unit tests** - Very basic tests of the core functionality based on Jest (see /tests/)
+legHeight = HEIGHT-TOP_THICKNESS;
+leg = box(LEG_SIZE, LEG_SIZE, legHeight)
+        .move(LEG_SIZE/2, LEG_SIZE/2,legHeight/2); // start position of leg
+     
+legs = leg.array([2,2],[WIDTH-LEG_SIZE,DEPTH-LEG_SIZE])
+         .color('green');
 
-## 💙 Open Source Core
+top = boxbetween(
+    [0,0,legHeight],
+    [WIDTH, DEPTH, HEIGHT])
+    .color('green');
 
-Archiyou would not exist without great open source software: geometry kernel [OpenCascade](https://github.com/Open-Cascade-SAS/OCCT), [OpenCascade.js](https://github.com/donalffons/opencascade.js), [CadQuery](https://github.com/CadQuery/cadquery) and many others.
-
-That's why we want to keep the core of Archiyou open. This has some advantages:
-
-* CAD content created on the Archiyou platform is always portable and can be used without Archiyou. Never a vendor lock-in!
-* Open source CAD based on OpenCascade kernel like FreeCAD, CadQuery, ZenCAD, RepliCAD and now Archiyou can work together to challenge the proprietary CAD systems. For maximum adoption and compatibility with CadQuery we chose the Apache2 License
-
-Currently the source code of the platform itself (the frontend app and server infrastructure) remains closed but parts of it become open source in collaborations like [OCCI](https://github.com/occi-cad).
-
-## 🏗 What is the state of Archiyou-core?
-
-We are building the Archiyou platform, its content and the core at the same time. Currently Archiyou-core is deployed in our alpha platform; running both in the browser as a server side Node environment. Please keep in mind that it is still _alpha_ phase code quality.
-
-## 🚀 Getting started
-
-* Try it out at [Archiyou.com](https://archiyou.com)
-We are working on starter templates for developers:
-- [ ] Basic: run your Archiyou script without Archiyou
-- [ ] Use Archiyou-core in a modern app
-- [ ] Use Archiyou-core in a server Node environment
-
-Let us know if you like more usage scenarios!
-
-## 🙋 Contributions
-
-We love to get contributions. For example:
-
-* Bug reports and fixes
-* Documentation and examples for docs.archiyou.com
-* Community organizing: workshops for example
-* Open design content: make content and share it on the Archiyou platform or OCCI for others
-
-## 🙏 Collaborations and recommended projects
-
-* [Open CAD Components Interface (OCCI)](https://github.com/occi-cad) - Publish your CAD scripts as parametric CAD components (with CadQuery team and OTF)
-
-Other great projects that might suit your needs:
-
-* [CadQuery](https://github.com/CadQuery/cadquery) - Python based Script CAD and inspiration for Archiyou
-* [OpenCascade.js](https://github.com/donalffons/opencascade.js) - Run a CAD kernel directly in your browser. Without the great work by Sebastian on porting the OpenCascade kernel to WASM Archiyou would not exist
-* [Replicad](https://github.com/sgenoud/replicad) - Great script CAD library by Steve based on the same technology as Archiyou. Generally more focussed on developers.
-
-## 🙌 License
-
-Archiyou-core is licensed under the terms of the Apache Public License, version 2.0.
-
-### Developer Notes
-
-More developer guides are coming!
-
-#### Basics
+top.fillet(1,'Face||top'); // finish table top
 
 ```
-yarn
-yarn dev
-yarn build
-yarn test
-yarn apidocs
+
+## Core Library Features
+
+* Minimal object-orientated API that feels like describing your shape. 
+* A lot of modeling techniques with our BREP and mesh kernel: CSG, 2D Sketch, surface modeling
+* Exports: BREP, STEP, GLTF/GLB, DXF, PDF, Excel etc
+* Generate documentation: spec sheets, plans, instructables
+* Connected CAD: Import assets (SVG, JPG) from the web and use for modeling
+* Assemble models by using scripts as components
+* More than a model: Manage data, pipelines, components and outputs
+* Publish your script as parametric model in a configurator and serve to the web
+
+## Platform Features
+
+* [Free Editor](https://editor.archiyou.com)
+* Open Design: Share scripts and build upon others
+* Project management [Coming]
+
+## Developer Quickstart
+
+To use Archiyou as a module to generate designs and documentation independently from our platform it's available as module on npm. 
+
+```bash
+# install with any package manager
+pnpm add archiyou 
+# or
+npm add archiyou
+# or 
+yarn add archiyou
 ```
 
-* To avoid TS errors on OC.js libs: Add // @ts-nocheck to archiyou-opencascade.d.ts
+Now run this script in Node or browser:
 
-#### Special builds:
+```js
+import { init, Brep, Doc } from 'archiyou'
 
-* Standalone TypeDocs: npx typedoc (in ./docs/src/.vuepress/dist/apidocs - so we can combine with VuePress docs)
-* TS compilation testing: npx tsc  -t es5 --experimentalDecorators --esModuleInterop  --noEmit geom.ts
-* TS compile *.d.ts for Intellisense: npx tsc  -t es5 --experimentalDecorators --esModuleInterop -d --outDir ".\d\d.ts" --emitDeclarationOnly geom.ts
+await init();
 
-#### Testing
+const brep = new Brep();
+
+const myModel = brep.Box(100)
+    .subtract( // subtract a box from the main box
+        brep.Box(50,50,100)
+        .move(25,-25,50)
+        .hide()
+    ).fillet(5); // Give it round edges
+
+await myModel.save('mybox.glb')
+
+const myIso = myModel.iso([1,-1,1])
+myIso.save('myboxiso.svg');  // export as SVG file
+
+const myDoc = new Doc() // Doc module
+                .create('myDoc') // start a new document (and first page)
+                .page('myPage')
+                .text('My design')  // place text
+                .view('iso', myIso); // place view of myIso shapes
+
+await myDoc.save('myboxdoc.pdf');
+```
+<img src="assets/archiyou_start_example.png">
+
+## Development: Starter templates
+
+For starter-templates for some popular frameworks and build stacks see /examples/templates.
+
+* [Node starter template](/examples/templates/node)
+* [Nuxt3+](/examples/templates/nuxt)
+* TODO: React
+* TODO: Next
+
+It's easiest to clone this repo, navigate to the starter template directory (examples/templates) and use the npm install, dev etc commands.
+
+If your framework is not present, just look at the others for inspiration. Modern ones work with the same methods. Contributions are welcome. 
+
+## Notes on the WASM file
+
+Archiyou is a TS/JS layer on top of a WASM build of [OpenCascade](https://github.com/Open-Cascade-SAS/OCCT). 
+Your application needs to be able to find the WASM file for it to work. If you experience errors during import or execution this is most probably the cause! Check starter templates how to configure build systems like Vite for WASM.
+
+
+## Run scripts independently from Archiyou platform 
+
+If you want to locally execute scripts from our Editor and get certain outputs: use the Runner.
+
+
+```ts 
+    import { Runner } from 'archiyou'
+    // A runner executes Archiyou scripts
+    const runner = new Runner()
+
+    // First a Runner needs to load (because it uses WASM)
+    runner.load().then(async (runner) => 
+    {
+         // Then you execute a script in the default scope
+         const r = await runner.execute({ 
+                     code: `b = box($SIZE)`, 
+                     params: { SIZE: 100 } }, 
+                     { formats: ['glb'] }
+                  ); 
+         const glb = r?.meshGLB; // The 3D model mesh in GLB format (default)
+         console.log(`Generating a GLB box took: ${r.duration} ms`);
+    });
 
 ```
-yarn test
-yarn test --silent
-```
 
-#### Debug
+Runner also offers easy ways to execute scripts in a Webworker which is the best way if you want create a larger online CAD application.
 
-* Circular dependences:
-     * with dpdm:
-        `npm i -g dpdm
-        dpdm internal.ts`
-     * with madge:
-        `npx madge --circular --extensions ts internal.ts`
+## Examples and use cases
+
+Archiyou is focused on physical things to build - like furniture and constructions - but the Editor can do much more:
+
+<table>
+  <tr>
+    <td>
+        <a href="https://editor.archiyou.com/_/mark/scripts/Mascotte:0.5">
+            <img src="/assets/ay_example_mascotte.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/mark/scripts/Bracket:0.1">
+            <img src="/assets/ay_example_bracket.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/Boat:0.6">
+            <img src="/assets/ay_example_boat.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/BooleanBlob:0.1">
+            <img src="/assets/ay_example_booleanblob.png" width="24%">
+        </a>
+    </td>
+  </tr>
+  <tr>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/KeyChain:0.6">
+            <img src="/assets/ay_example_keychain.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/GardenChair:0.5.0">
+            <img src="/assets/ay_example_gardenchair.png" width="24%">
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrBent:0.1">
+            <img src="/assets/ay_example_bent.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrHouseAssembly:0.5">
+            <img src="/assets/ay_example_house.png" width="24%">
+        </a>
+    </td>
+  </tr>
+</table>
+
+Where Archiyou really shines is handling documentation and output pipelines:
+
+<a href="https://editor.archiyou.com/_/archiyou/scripts/MariTavolo:0.6"><img src="/assets/archiyou_docs.png" width="100%"></a>
+
+## Roadmap 2026
+
+Thanks to [NLNET NG0 Commons Fund](https://nlnet.nl/project/Archiyou/) we can further develop the open source and open design community functionalies of Archiyou. 
+
+This is a basic roadmap:
+
+- [x] Open design user research, strategy and UX/UI
+- [x] DevX: Archiyou as module, examples, templates
+- [x] New high performance (mesh) geometry kernel: [CSGRS](https://github.com/timschmidt/csgrs) and [Meshup](https://github.com/ArchiyouApp/meshup)
+- [ ] Fully open source stack (including publishing)
+- [ ] New lightweight viewer/configurator: portability, extendability
+- [ ] New editor: more value for more users
+- [ ] New open design platform
+
+Please reach out for more information, ideas or collaboration!
+ 
+

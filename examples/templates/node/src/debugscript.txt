@@ -1,0 +1,319 @@
+// Archiyou 0.5
+
+BEAM_WIDTH = $BEAM_WIDTH;
+BEAM_THICKNESS = $BEAM_THICKNESS;
+HEIGHT = $HEIGHT*10; // from cm to mm
+WIDTH = $WIDTH*10;
+
+STEP_RATIO = 1; // riser to thread ratio
+MAX_RISE = 200;
+
+
+// Design options
+
+THREAD_OVERHANG = BEAM_WIDTH/4;
+THREAD_PLANK_SPACING = 5;
+THREAD_LATERALS = true;
+WITH_THREADS = $WITH_TREADS; 
+
+// Calculated params
+numSteps = Math.ceil(HEIGHT / MAX_RISE);
+rise = HEIGHT / numSteps;
+thread = rise * STEP_RATIO;
+depth = numSteps*thread;
+
+layer('diagram').color('blue');
+
+stepProfileSketch = sketch('front');
+new Array(numSteps)
+    .fill(null)
+    .forEach((s,i) => {
+        stepProfileSketch
+            .lineTo(`+0`, `+${rise}`)
+            .lineTo(`+${thread}`, '+0')
+    })
+stepProfile = stepProfileSketch.end();
+diagonal = line([0,0,0],[depth,0,HEIGHT])
+verticalBack = line([depth,0,0],[depth,0,HEIGHT])
+
+// BEAM_WIDTH off the ground
+groundOffset = BEAM_WIDTH;
+layer().shapes().moveZ(groundOffset);
+verticalBackExt = verticalBack.extended(groundOffset, 'start')
+//diagonalExt = verticalBack.extendedTo(plane(1000))
+diagonalExt = diagonal.extendedTo(plane(1000).hide())
+
+layer('side').color('red');
+
+beamVertical = verticalBackExt
+                    .extruded(BEAM_WIDTH)
+                    .extruded(BEAM_THICKNESS)
+
+beamDiagonal = diagonalExt
+                    .extruded(-BEAM_THICKNESS)
+                    .extrude(-BEAM_WIDTH)
+                    .cutoffBy(beamVertical)
+                    .cutoff('z', 0)
+                    .copy(); // DEBUG GC 
+
+beamRisers = collection();
+beamThreads = collection();
+beamThreadLaterals = collection();
+
+stepProfile
+    .edges()
+    .forEach((e,i) =>
+    {
+        // riser
+        if(i % 2 === 0)
+        {
+            beamRisers.add(
+                e.extruded(BEAM_WIDTH)
+                    .extrude(BEAM_THICKNESS)
+                    .cutoffBy(beamDiagonal)
+                )
+
+            if(THREAD_LATERALS)
+            {
+                beamThreadLaterals.add(
+                    line(
+                        e.end(), e.end()._copy().moveY(WIDTH+2*BEAM_THICKNESS))
+                    .moveY(-BEAM_THICKNESS)
+                    .extrude(BEAM_THICKNESS)
+                    .extrude(BEAM_WIDTH)    
+                )
+            }
+        }
+        else {
+            // thread
+            beamThreads.add(
+                line(e.start(), [beamVertical.bbox().maxX(),0,e.start().z])
+                .hide()
+                .extruded(BEAM_WIDTH, [0,0,-1])
+                .extrude(-BEAM_THICKNESS)
+                .copy() // GB DEBUG
+            )
+        }
+    });
+
+beamVerticalCrossed = beamVertical.select('V||frontrightbottom')
+                        .extruded(BEAM_WIDTH, [0,1,0])
+                        .extrude(-BEAM_THICKNESS)
+                        .extrude(beamVertical.bbox().height() - BEAM_WIDTH)
+                        .copy(); // DEBUG GC
+
+beamLateralTop = beamVertical.select('V||frontrighttop')
+                    .extrude(BEAM_THICKNESS, [1,0,0])
+                    .extrude(BEAM_WIDTH, [0,0,-1])
+                    .extrude(WIDTH+BEAM_THICKNESS*2, [0,1,0])
+                    .color('red')
+
+diagonalSpaceHeight = beamLateralTop.bbox().maxZ() - beamThreads.first().bbox().maxZ();
+
+beamDiagonalRight = make.fitRectStrut(BEAM_WIDTH, [diagonalSpaceHeight, WIDTH/2])
+    .rotateY(-90, [0,0,0])
+    .moveZ(beamThreads.first().bbox().maxZ())
+    .moveToX(beamThreads.first().bbox().maxX())
+    .extrude(-BEAM_THICKNESS) 
+    .copy();
+
+rightSide = group(beamDiagonal, beamVertical, beamRisers, beamThreads, beamVerticalCrossed); 
+leftSide = rightSide.mirroredX(WIDTH/2).color('red')
+
+// laterals
+
+beamDiagonalLeft = beamDiagonalRight.mirroredX(WIDTH/2).color('red')
+
+beamLateralBottomFront = beamThreads.first()
+                    .select('V||rightfronttop')
+                    .moved(-BEAM_THICKNESS)
+                    .extrude(WIDTH, [0,1,0])
+                    .extrude(BEAM_THICKNESS, [-1,0,0])
+                    .extrude(-BEAM_WIDTH)
+                    .color('red')
+
+beamLateralBottomBack = beamThreads.first()
+                    .select('V||rightbacktop')
+                    .moved(BEAM_THICKNESS, +(BEAM_WIDTH-2*BEAM_THICKNESS))
+                    .extrude(WIDTH-(BEAM_WIDTH-BEAM_THICKNESS)*2, [0,1,0])
+                    .extrude(BEAM_THICKNESS, [-1,0,0])
+                    .extrude(-BEAM_WIDTH)
+                    .color('red')
+
+
+layer('threads').color('green')
+
+if(WITH_THREADS)
+{
+    numThreadPlanks = Math.floor((thread + BEAM_THICKNESS) / (BEAM_WIDTH+THREAD_PLANK_SPACING));
+    threadPlank = beamThreadLaterals.first().select('V||frontlefttop')
+                        .moveX(-THREAD_OVERHANG)
+                        .extruded(BEAM_WIDTH, [1,0,0])
+                        .extrude(BEAM_THICKNESS, [0,0,1])
+                        .extrude(WIDTH+2*BEAM_THICKNESS)
+    firstStepThreadPlanks = threadPlank.array([numThreadPlanks,0],[BEAM_WIDTH+THREAD_PLANK_SPACING])              
+
+    // Normal steps (skip first which is already done. seperate thead for top)
+    new Array(numSteps-2).fill()
+        .forEach((s,i) => {
+            stepNum = i + 1;
+            firstStepThreadPlanks.clone().move(thread*stepNum, 0, rise*stepNum)
+        })                
+
+    // Top thread planks
+    numTopThreadPlanks = Math.ceil((thread + BEAM_THICKNESS + BEAM_WIDTH + BEAM_THICKNESS) / (BEAM_WIDTH+THREAD_PLANK_SPACING));
+    topThreadPlank = threadPlank.clone().move(thread*(numSteps-1), 0, rise*(numSteps-1))
+    topThreadPlank.array(numTopThreadPlanks, BEAM_WIDTH+THREAD_PLANK_SPACING)
+}
+
+model = all();
+//// CALC::TABLES ////
+
+BEAM_SECTION = `${BEAM_WIDTH}x${BEAM_THICKNESS}`
+partsColumns = ['part', 'subpart', 'section', 'length', 'quantity', 'total length'];
+
+partsRows = [ 
+    ['sides', 'diagonal', BEAM_SECTION, sdl = Math.round(beamDiagonal.obbox().maxSize()), 2], 
+    ['sides', 'vertical', BEAM_SECTION, svl = Math.round(beamVertical.bbox().height()), 2]
+]
+partsRows = partsRows.concat(
+                beamThreads.toArray()
+                    .map((b,i) => {
+                        return ['sides', `thread beam ${i+1}`,BEAM_SECTION, Math.round(b.bbox().maxSize()), 2]
+                    })
+)
+
+/*
+partsRows = partsRows.concat(
+[
+    ['sides', 'riser beam', BEAM_SECTION, sl = Math.round(beamRisers.first().bbox().height()), numSteps*2],
+    ['laterals', 'treads & back', BEAM_SECTION, lt = Math.round(beamLateralTop.bbox().depth()), numSteps+1],
+    ['laterals', 'back bottom', BEAM_SECTION, lb = Math.round(beamLateralBottomBack.bbox().depth()), 2],
+    ['back', 'vertical', BEAM_SECTION, lbv = Math.round(beamVerticalCrossed.bbox().height()), 2],
+    ['back', 'diagonal', BEAM_SECTION, lbd = Math.round(beamDiagonalRight.obbox().maxSize()), 2],
+]
+)
+*/
+
+if(WITH_THREADS){
+    partsRows.push(
+        ['treads', 'planks', BEAM_SECTION, Math.round(threadPlank.bbox().depth()), (numSteps-1)*numThreadPlanks+numTopThreadPlanks]
+    )
+}
+
+// total beam length
+/*
+partsRows = partsRows.concat(
+[
+    ['','','', '---- +', ''],
+    ['','','TOTAL', sdl*2 + svl*2 + 
+            beamThreads.toArray().reduce((agg, b) => agg += b.bbox().width(), 0)
+            + sl*numSteps*2 + lt + numSteps+1 + lb*2 + lbv*2 + lbd*2, '']
+]
+)
+*/
+
+calc.table('parts', partsRows, partsColumns);
+
+
+//// CALC::METRICS
+
+WOOD_COST_EUR_PER_M3 = 1000; // consumer pricing for small timber
+calc.metric('cost EST', Math.round(model.volume()*1e-9*WOOD_COST_EUR_PER_M3), { icon: 'currency-eur'} )
+calc.metric('depth', depth, { icon: 'diameter'} )
+
+//// DOC PIPELINE ////
+
+function docPipeline()
+{
+    model = all();
+    iso = model.iso().move(0,-3000);
+    isoBack = model.iso([1,1,1], false).rotateZ(180).move(-3000,-3000)
+
+    section = collection(beamVertical, beamDiagonal)
+        .addGroup('risers',  beamRisers) // not working
+        .addGroup('threads', beamThreads) // not working
+        .flattened()
+        .move(3000,-3000)
+        .rotateX(-90)
+        .moveToZ(0)
+
+    // print(section.groups()) // Not working
+
+    section.first().bbox().right().dim({offset: 60});
+    section.autoDim({ levels: [{ axis: 'x', 
+                        at: section.first().bbox().maxX()-BEAM_WIDTH/2, 
+                        offset: 30 } ]})
+
+    section.last().select('E||left').dim()
+    section.filter(s => Math.round(s.bbox().depth()) === BEAM_WIDTH)
+            .forEach( thread => thread.select('E||back').dim())
+
+    section.bbox().front().dim();
+    line(
+        section.at(2).select('V||frontleft'),
+        section.at(1).select('V||frontleft')
+    ).hide().dim();
+
+    parts = collection();
+    parts.add(
+        section.sort((a,b) => b.obbox().maxSize() - a.obbox().maxSize()) // order by maxSize (length)
+            .slice(0,7) // dont add multiple risers
+        ) 
+    parts.add(beamThreadLaterals.first().flattened().rotateX(-90).hide())
+    // parts.add(beamLateralTop.flattened().rotateX(-90).hide())  // same as above
+    parts.add(beamVerticalCrossed.flattened().rotateX(-90).hide())
+    parts.add(beamDiagonalRight.flattened().rotateX(-90).hide())
+    
+    layoutMargin = BEAM_WIDTH*3;
+    lastX = 0;
+    partsLayout = parts.map((s,i) => 
+    {
+        x = 0+i*layoutMargin;
+        lp = s.copy()
+            .autoRotate()
+            .moveTo([x,-6000])
+        
+        lp.autoDim() // auto part dim
+        return lp;
+    })
+}
+
+//docPipeline(); // Uncomment to test
+
+
+//// DOC ////
+
+doc
+    .create('spec')
+    .page('spec')
+    .pipeline(docPipeline)
+    .titleblock({ title: 'Simple Step', designer: 'Archiyou', designLicense: 'CC-BY', manualLicense: 'CC-BY-NC'})
+    .table('parts', { fontsize: 6 })
+    .pivot(0,0)
+    .position(0,0)
+    .height(0.4)
+    .width(0.25)
+    .view('sectionparts')
+    .shapes('partsLayout')
+    .position(0,1)
+    .pivot(0,1)
+    .height(0.55)
+    .view('iso')
+    .shapes('iso')
+    .pivot(0,0)
+    .position(0.3,0)
+    .width(0.4)
+    .height(0.45)
+    .view('isoBack')
+    .shapes('isoBack')
+    .position(0.6,0)
+    .width(0.15)
+    .height(0.2)
+    .pivot(0,0)
+    .view('section')
+    .shapes('section')
+    .position(0.5,1)
+    .pivot(0,1)
+    .width(0.5)
+    .height(0.5)
