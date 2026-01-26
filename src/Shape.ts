@@ -4966,6 +4966,16 @@ export class Shape
 
     }
 
+    //// SHAPECOLLECTION API ////
+    /* For robustness give warning if user 
+        uses the most common ShapeCollection methods.
+    */
+
+    first()
+    {
+        
+    }
+
     //// EXPORT ////
 
     toData():Object

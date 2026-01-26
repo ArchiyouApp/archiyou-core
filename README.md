@@ -5,7 +5,7 @@
 Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
 Use our editor and community platform for free at [Archiyou.com](https://archiyou.com).
 
-[![License](https://img.shields.io/github/license/ArchiyouApp/archiyou-core)](https://github.com/ArchiyouApp/archiyou-core/blob/main/LICENSE)[![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml)
+[![License](https://img.shields.io/github/license/ArchiyouApp/archiyou-core)](https://github.com/ArchiyouApp/archiyou-core/blob/main/LICENSE) [![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml) [![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.archiyou.com)
 
 ## Example
 
@@ -37,13 +37,13 @@ top.fillet(1,'Face||top'); // finish table top
 
 ## Core Library Features
 
-* Minimal object-orientated API that feels like descripting your shape. 
+* Minimal object-orientated API that feels like describing your shape. 
 * A lot of modeling techniques with our BREP and mesh kernel: CSG, 2D Sketch, surface modeling
 * Exports: BREP, STEP, GLTF/GLB, DXF, PDF, Excel etc
 * Generate documentation: spec sheets, plans, instructables
 * Connected CAD: Import assets (SVG, JPG) from the web and use for modeling
 * Assemble models by using scripts as components
-* More then a model: Manage data, pipelines, components and outputs
+* More than a model: Manage data, pipelines, components and outputs
 * Publish your script as parametric model in a configurator and serve to the web
 
 ## Platform Features
@@ -58,8 +58,10 @@ To use Archiyou as a module to generate designs and documentation independently 
 
 ```bash
 # install with any package manager
-pnpm add archiyou
+pnpm add archiyou 
+# or
 npm add archiyou
+# or 
 yarn add archiyou
 ```
 
@@ -94,27 +96,28 @@ await myDoc.save('myboxdoc.pdf');
 ```
 <img src="assets/archiyou_start_example.png">
 
-## Starter templates for your framework
+## Development: Starter templates
 
-For starter-templates for some popular frameworks and build stacks see /examples/templates
+For starter-templates for some popular frameworks and build stacks see /examples/templates.
 
 * [Node starter template](/examples/templates/node)
 * [Nuxt3+](/examples/templates/nuxt)
 * TODO: React
 * TODO: Next
 
+It's easiest to clone this repo, navigate to the starter template directory (examples/templates) and use the npm install, dev etc commands.
 
-If your framework is not present, just look at the others for inspiration. Modern ones work most of the time with the same methods. Contributions are welcome. 
+If your framework is not present, just look at the others for inspiration. Modern ones work with the same methods. Contributions are welcome. 
 
 ## Notes on the WASM file
 
 Archiyou is a TS/JS layer on top of a WASM build of [OpenCascade](https://github.com/Open-Cascade-SAS/OCCT). 
-You application needs to be able to find the WASM file for it to work. If you experience errors during import or execution this is most probably the cause.  
+Your application needs to be able to find the WASM file for it to work. If you experience errors during import or execution this is most probably the cause! Check starter templates how to configure build systems like Vite for WASM.
 
 
 ## Run scripts independently from Archiyou platform 
 
-If you want to execute scripts (either locally or on a server like Archiyou) and get certain outputs: use the Runner.
+If you want to locally execute scripts from our Editor and get certain outputs: use the Runner.
 
 
 ```ts 
@@ -137,9 +140,76 @@ If you want to execute scripts (either locally or on a server like Archiyou) and
 
 ```
 
-Runner also offers easy ways to execute scripts in a Webworker.
+Runner also offers easy ways to execute scripts in a Webworker which is the best way if you want create a larger online CAD application.
 
 ## Examples and use cases
 
-TODO
-(links to examples/scripts and editor links)
+Archiyou is focused on physical things to build - like furniture and constructions - but the Editor can do much more:
+
+<table>
+  <tr>
+    <td>
+        <a href="https://editor.archiyou.com/_/mark/scripts/Mascotte:0.5">
+            <img src="/assets/ay_example_mascotte.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/mark/scripts/Bracket:0.1">
+            <img src="/assets/ay_example_bracket.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/Boat:0.6">
+            <img src="/assets/ay_example_boat.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/BooleanBlob:0.1">
+            <img src="/assets/ay_example_booleanblob.png" width="24%">
+        </a>
+    </td>
+  </tr>
+  <tr>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/KeyChain:0.6">
+            <img src="/assets/ay_example_keychain.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/GardenChair:0.5.0">
+            <img src="/assets/ay_example_gardenchair.png" width="24%">
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrBent:0.1">
+            <img src="/assets/ay_example_bent.png" width="24%">
+        </a>
+    </td>
+    <td>
+        <a href="https://editor.archiyou.com/_/archiyou/scripts/UrHouseAssembly:0.5">
+            <img src="/assets/ay_example_house.png" width="24%">
+        </a>
+    </td>
+  </tr>
+</table>
+
+Where Archiyou really shines is handling documentation and output pipelines:
+
+<a href="https://editor.archiyou.com/_/archiyou/scripts/MariTavolo:0.6"><img src="/assets/archiyou_docs.png" width="100%"></a>
+
+## Roadmap 2026
+
+Thanks to [NLNET NG0 Commons Fund](https://nlnet.nl/project/Archiyou/) we can further develop the open source and open design community functionalies of Archiyou. 
+
+This is a basic roadmap:
+
+- [x] Open design user research, strategy and UX/UI
+- [x] DevX: Archiyou as module, examples, templates
+- [x] New high performance (mesh) geometry kernel: [CSGRS](https://github.com/timschmidt/csgrs) and [Meshup](https://github.com/ArchiyouApp/meshup)
+- [ ] Fully open source stack (including publishing)
+- [ ] New lightweight viewer/configurator: portability, extendability
+- [ ] New editor: more value for more users
+- [ ] New open design platform
+
+Please reach out for more information, ideas or collaboration!
+ 
+
