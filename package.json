@@ -1,7 +1,7 @@
 {
   "name": "archiyou",
   "type": "module",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Archiyou script CAD engine",
   "license": "Apache-2.0",
   "main": "./dist/archiyou.js",
