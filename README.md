@@ -1,11 +1,12 @@
-# Archiyou
+# archiyou
 
-![Archiyou](assets/archiyou_logo_header_white_bg.png)
+![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png#gh-dark-mode-only)
+![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header_white_bg.png#gh-dark-mode-only)
 
 Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
 Use our editor and community platform for free at [Archiyou.com](https://archiyou.com).
 
-[![License](https://img.shields.io/github/license/ArchiyouApp/archiyou-core)](https://github.com/ArchiyouApp/archiyou-core/blob/main/LICENSE) [![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml) [![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.archiyou.com)
+[![License](https://img.shields.io/github/license/ArchiyouApp/archiyou-core)](https://github.com/ArchiyouApp/archiyou-core/blob/main/LICENSE) [![build and test](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml/badge.svg)](https://github.com/ArchiyouApp/archiyou-core/actions/workflows/build.yml) [![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.archiyou.com) [![npm version](https://img.shields.io/npm/v/archiyou.svg)](https://www.npmjs.com/package/archiyou)
 
 ## Example
 
@@ -35,7 +36,7 @@ top.fillet(1,'Face||top'); // finish table top
 
 ```
 
-## Core Library Features
+## Library Features
 
 * Minimal object-orientated API that feels like describing your shape. 
 * A lot of modeling techniques with our BREP and mesh kernel: CSG, 2D Sketch, surface modeling
@@ -94,7 +95,7 @@ const myDoc = new Doc() // Doc module
 
 await myDoc.save('myboxdoc.pdf');
 ```
-<img src="assets/archiyou_start_example.png">
+<img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_start_example.png">
 
 ## Development: Starter templates
 
@@ -150,43 +151,43 @@ Archiyou is focused on physical things to build - like furniture and constructio
   <tr>
     <td>
         <a href="https://editor.archiyou.com/_/mark/scripts/Mascotte:0.5">
-            <img src="/assets/ay_example_mascotte.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_mascotte.png">
         </a>
     </td>
     <td>
         <a href="https://editor.archiyou.com/_/mark/scripts/Bracket:0.1">
-            <img src="/assets/ay_example_bracket.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_bracket.png">
         </a>
     </td>
     <td>
         <a href="https://editor.archiyou.com/_/archiyou/scripts/Boat:0.6">
-            <img src="/assets/ay_example_boat.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_boat.png">
         </a>
     </td>
     <td>
         <a href="https://editor.archiyou.com/_/archiyou/scripts/BooleanBlob:0.1">
-            <img src="/assets/ay_example_booleanblob.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_booleanblob.png">
         </a>
     </td>
   </tr>
   <tr>
     <td>
         <a href="https://editor.archiyou.com/_/archiyou/scripts/KeyChain:0.6">
-            <img src="/assets/ay_example_keychain.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_keychain.png">
         </a>
     </td>
     <td>
         <a href="https://editor.archiyou.com/_/archiyou/scripts/GardenChair:0.5.0">
-            <img src="/assets/ay_example_gardenchair.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_gardenchair.png">
     </td>
     <td>
         <a href="https://editor.archiyou.com/_/archiyou/scripts/UrBent:0.1">
-            <img src="/assets/ay_example_bent.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_bent.png">
         </a>
     </td>
     <td>
         <a href="https://editor.archiyou.com/_/archiyou/scripts/UrHouseAssembly:0.5">
-            <img src="/assets/ay_example_house.png" width="24%">
+            <img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/ay_example_house.png">
         </a>
     </td>
   </tr>
@@ -194,7 +195,7 @@ Archiyou is focused on physical things to build - like furniture and constructio
 
 Where Archiyou really shines is handling documentation and output pipelines:
 
-<a href="https://editor.archiyou.com/_/archiyou/scripts/MariTavolo:0.6"><img src="/assets/archiyou_docs.png" width="100%"></a>
+<a href="https://editor.archiyou.com/_/archiyou/scripts/MariTavolo:0.6"><img src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_docs.png" width="100%"></a>
 
 ## Roadmap 2026
 
@@ -211,5 +212,4 @@ This is a basic roadmap:
 - [ ] New open design platform
 
 Please reach out for more information, ideas or collaboration!
- 
 
