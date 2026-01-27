@@ -1,7 +1,10 @@
 # archiyou
 
-![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png#gh-light-mode-only)
-![Archiyou](https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header_white_bg.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header_white_bg.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png">
+  <img alt="Project Screenshot" src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png">
+</picture>
 
 Archiyou is an online platform and Typescript/Javascript library to codify design and building know-how and publish it online. 
 Use our editor and community platform for free at [Archiyou.com](https://archiyou.com).
@@ -12,7 +15,7 @@ Use our editor and community platform for free at [Archiyou.com](https://archiyo
 
 This is a script on our platform:
 
-<img width="25%" align="right" src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/codecad_table.gif">
+<img width="30%" align="right" src="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/codecad_table.gif">
 
 ```js
 // Parameters
