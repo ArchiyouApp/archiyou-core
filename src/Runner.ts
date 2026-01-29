@@ -930,10 +930,6 @@ export class Runner
             }
         }
 
-        console.warn('**** AFTER EXECUTION - DEBUG  ****');
-        console.warn('GLOBALS')
-        console.warn(Object.keys(globalThis));
-
         const result = await exec();
         
         // Set duration if result is RunnerScriptExecutionResult
@@ -1120,7 +1116,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     _executionStartRunInScope(scope:any, request: RunnerScriptExecutionRequest):void
     {
         // Setup ParamManager - it still uses Array of Param defintions with _value
-        const paramDefsWithValues = [...Object.values(request.script.params)]
+        const paramDefsWithValues = [...Object.values(request.script?.params || {})]
         paramDefsWithValues.forEach(p => p._value = request.params[p.name]);
         console.info(`Runner::_executionStartRunInScope()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(paramDefsWithValues)}"`);
         scope.ay.paramManager = new ParamManager(paramDefsWithValues)

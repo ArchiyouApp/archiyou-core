@@ -87,16 +87,17 @@ export class Script
     _validateBasics():boolean
     {
         const VALIDATIONS = {
-            id: this.id && typeof this.id === "string",
-            name : this.name && typeof this.name === "string" && this.name.length > 0,
-            author: this.author && typeof this.author === "string" && this.author.length > 0,
-            description: (!this?.description) || typeof this.description === "string", // Allow nullish description
-            tags: Array.isArray(this.tags),
-            created: this.created instanceof Date,
-            updated: this.updated instanceof Date,
+            // TMP HACK FOR PUBLISH ON COMPONENTS BRANCH
+            id: (!this.id) || (this.id && typeof this.id === "string"), // allow nullish id
+            //name : this.name && typeof this.name === "string" && this.name.length > 0,
+            //author: this.author && typeof this.author === "string" && this.author.length > 0,
+            //description: (!this?.description) || typeof this.description === "string", // Allow nullish description
+            //tags: Array.isArray(this.tags),
+            //created: this.created instanceof Date,
+            //updated: this.updated instanceof Date,
             code: typeof this.code === "string",
-            params: typeof this.params === "object",
-            presets: typeof this.presets === "object",
+            //params: typeof this.params === "object",
+            //presets: typeof this.presets === "object",
         }
 
         const isValidBasic = Object.values(VALIDATIONS).every((v) => v === true)
@@ -257,7 +258,7 @@ export class Script
     async getVariantId(paramValues: Record<string,any>): Promise<string> 
     {
         const HASH_LENGTH_TRUNCATE = 11;
-        // TODO: remove dynamic import?
+        // TODO: use hash function in utils
         const { createHash } = await import('crypto'); // NOTE: only for node right now!
 
         // generate string based on the param names and values
@@ -371,7 +372,7 @@ export class Script
         }
 
         this.id = data.id;
-        this.name = data.name.toLowerCase();
+        this.name = data.name?.toLowerCase();
         this.author = data.author?.toLowerCase();
         this.description = data.description;
         this.tags = Array.isArray(data.tags) ? data.tags : [];
@@ -460,16 +461,16 @@ export class Script
 
 export interface ScriptData
 {
-    id: string; // all scripts have a id
+    id?: string; // all scripts have a id
     name?: string; // most script have name - lowercase
     author?: string; 
     // The user provides an version when publishing, see published
-    description: string;
+    description?: string;
     tags?: string[];
-    created: string | null;
-    updated: string | null;
+    created?: string | null;
+    updated?: string | null;
     code: string;
-    params: Record<string,ScriptParamData>;
+    params?: Record<string,ScriptParamData>;
     presets?: Record<string, Record<string, ScriptParamData>>;
-    published: ScriptPublished | null;
+    published?: ScriptPublished | null;
 }

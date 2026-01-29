@@ -565,20 +565,6 @@ function _uniformize(value:any, toType:any, fromType:any):any
     }
 }
 
- 
-function _getArgNames(func:any):Array<string>
-{
-     // taken from: https://stackoverflow.com/questions/1007981/how-to-get-function-parameter-names-values-dynamically?page=1&tab=votes#tab-top
-     var STRIP_COMMENTS = /(\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s*=[^,\)]*(('(?:\\'|[^'\r\n])*')|("(?:\\"|[^"\r\n])*"))|(\s*=[^,\)]*))/mg;
-     const ARGUMENT_NAMES = /([^\s,]+)/g;
-     
-     let fnStr = func.toString().replace(STRIP_COMMENTS, '');
-     let result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
-     if(result === null)
-         result = [];
-     return result;
-}
-
 
 /** 
 *   Decorator for caching the results of operations and getting them when needed

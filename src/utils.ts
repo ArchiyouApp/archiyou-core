@@ -674,9 +674,11 @@ export function analyzeFunc(func:(any) => any)
     // Check if async
     const isAsync = funcStr.startsWith('async ') || funcStr.includes('async function');
     
-    // Check if first parameter looks like mainScope
+    // Check if first parameter looks like mainScope, main, scope etc to check if user
+    // Uses this to access the main scope
+    const MAIN_SCOPE_KEYWORDS = ['scope', 'mainscope', 'main_scope', 'main'];
     const hasMainScopeParam = argNames.length > 0 && 
-        (argNames[0].toLowerCase().includes('scope') || argNames[0] === 'mainScope');
+        MAIN_SCOPE_KEYWORDS.includes(argNames[0].toLowerCase());
     
     // Detect return statements and promises
     const returnMatches = funcStr.match(/return\s+([^;}\n]+)/g) || [];
