@@ -187,13 +187,19 @@ If you want to locally execute scripts from our Editor and get certain outputs: 
     runner.load().then(async (runner) => 
     {
          // Then you execute a script in the default scope
-         const r = await runner.execute({ 
-                     code: `b = box($SIZE)`, 
-                     params: { SIZE: 100 } }, 
-                     { formats: ['glb'] }
+         const r = await runner.execute(
+                    {
+                        script: { 
+                                code: `b = box($SIZE)`, 
+                                params: { SIZE: 100 } 
+                        }, 
+                        outputs: ['default/model/glb']
+                    }
                   ); 
-         const glb = r?.meshGLB; // The 3D model mesh in GLB format (default)
-         console.log(`Generating a GLB box took: ${r.duration} ms`);
+         // only one output
+         const glb = r.outputs[0].output; // glb binary is here
+         const path = r.outputs[0].path.resolvedPath;  // 'default/model/glb'
+         console.log(`Generating a box took: ${r.duration} ms`);
     });
 
 ```
