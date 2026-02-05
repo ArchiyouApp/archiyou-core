@@ -19,6 +19,8 @@
     "build": "vite build",
     "link": "npm link",
     "test": "set NODE_OPTIONS=--experimental-vm-modules && vitest --coverage",
+    "test:runner": "set NODE_OPTIONS=--experimental-vm-modules && vitest run ./tests/unit/Runner.test.ts",
+    "test:components": "set NODE_OPTIONS=--experimental-vm-modules && vitest run ./tests/unit/Runner.components.test.ts",
     "build:wasm": "tsx src/wasm/build-scripts/build_wasm_base64.ts",
     "apidocs": "npx typedoc"
   },

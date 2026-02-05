@@ -16,7 +16,9 @@
 import type { ArchiyouApp, ExportGLTFOptions, Statement, 
                 StatementResult, RunnerScriptScopeState, ScriptOutputPath, ScriptOutputFormatModel, 
                 ScriptOutputFormat, ScriptOutputData, DocData,
+                ConsoleMessageType,
  } from "./internal"
+ 
 
 
 import { OcLoader, Console, Brep, Doc, Calc, Exporter, Services, Make, Db, 
@@ -25,19 +27,18 @@ import { OcLoader, Console, Brep, Doc, Calc, Exporter, Services, Make, Db,
 
 import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
 
-import { RunnerComponentImporter, DocDocument, Table } from "./internal"
+import { RunnerComponentImporter } from "./internal"
 
 import { BREP_METHODS_INTO_GLOBAL } from "./internal" // from constants
 
 
-import type { RunnerOptions, RunnerExecutionContext, RunnerRole, RunnerScriptExecutionRequest,
-                RunnerActiveScope, ModelFormat, RunnerWorkerMessage, RunnerManagerMessage, 
-                PublishScript,
+import type { RunnerRole, RunnerScriptExecutionRequest,
+                RunnerActiveScope, RunnerWorkerMessage, RunnerManagerMessage, 
                 ScriptParamData, ExecutionRequestOutputFormatGLTFOptions, ScriptMeta} from "./internal"
 
 import { isRunnerScriptExecutionResult } from './internal' // typeguards
 
-import { roundTo, toRad, toDeg } from './internal' // utils
+import { roundTo, toRad, toDeg, hash } from './internal' // utils
 
 
 export class Runner
@@ -606,11 +607,9 @@ export class Runner
     _addMetaMethodsToScopeState(state:Record<string,any>)
     {
         // Import component
-        state.$component = (name:string, params:Record<string,any>={}) => 
+        state.$component = (name:string) => 
         {
-            console.info(`$component: Importing component: "${name}" with param values: ${JSON.stringify(params)}`);
-
-            const componentImporter = new RunnerComponentImporter(this, this.getLocalActiveScope(), name, params);
+            const componentImporter = new RunnerComponentImporter(this, this.getLocalActiveScope(), name);
             // Don't execute yet, wait for componentImporter.get()
             return componentImporter;
         }
@@ -683,7 +682,6 @@ export class Runner
     }
 
 
-
     //// REQUESTS AND EXECUTION ////
 
     /** Start execution of entire code or script with params in fresh, active scope 
@@ -692,17 +690,20 @@ export class Runner
     */
     public async execute(request: string|RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
-        await this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
+        await this._prefetchComponentScripts(request); // Prefetch component scripts if needed
+
+        console.info(`==== Runner::execute() - prefetched components: ${Object.keys(this._componentScripts).length } ====`);
+        Object.entries(this._componentScripts).forEach(([name, script]) => {
+            console.info(`- ${name}: <<<${script.code}>>>`); // library path, url, inline code
+        });
+        console.info('==== end components cache ====')
+
         return await this._execute(request, true, true);
     }
 
     /** Execute (entire or partial) request on local execution scope or on managed worker */
     private async _execute(request: string|RunnerScriptExecutionRequest, startRun:boolean=true, result:boolean=true):Promise<RunnerScriptExecutionResult>
     {
-        console.info(`**** Runner::_execute(): Executing script "${(request as any)?.script?.name || request}" in role "${this.role}", return result ${result} ****`);
-        console.info(` params: ${JSON.stringify((request as any)?.params || {})} --- outputs: ${JSON.stringify((request as any)?.outputs)}`);
-        console.info(`***************************************`);
-
         // Convert code to request if needed
         if(typeof request === 'string')
         {
@@ -725,6 +726,11 @@ export class Runner
         // Check request structure (including params defs and values)
         this._activeExecRequest = this._checkRequestAndAddDefaults(request);
 
+        console.info(`**** Runner::_execute(): Executing script "${JSON.stringify((request as any)?.script?.name || request)}" in role "${this.role}", return result ${result} ****`);
+        console.info(` params: ${JSON.stringify((request as any)?.params || {})} --- outputs: ${JSON.stringify((request as any)?.outputs)}`);
+        console.info(`***************************************`);
+
+
         if(this.role === 'worker' || this.role === 'single') // Do the work here
         {
             return await this._executeLocal(this._activeExecRequest, startRun, result);
@@ -739,6 +745,7 @@ export class Runner
      *  Use this is you need more control of execution and possible errors
      *  This seperates the code in statements and returns results for each statement
      *  It still uses execute() internally
+     *  Used in editor to provide more granular feedback
     */
     async executeInStatements(request: RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
@@ -885,6 +892,9 @@ export class Runner
 
         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
         console.info(`* With param values: ${JSON.stringify(request.params)} *`);
+        console.info(`====== code ======`)
+        console.info(`${request.script.code}`)
+        console.info(`===================`)
 
         this._activeExecRequest = request;
         const executeStartTime = performance.now()
@@ -896,12 +906,12 @@ export class Runner
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
         const scope = this.getLocalActiveScope();
-        const code = request.script.code;
+        let code = request.script.code;
 
         const startRunFunc = (startRun) ? this._executionStartRunInScope : () => {};
         const outputFunc = (output) 
-                            ? this.getLocalScopeResults.bind(this) // bind to this
-                            : async () => null; // output or return null
+                            ? this.getLocalScopeResults.bind(this)
+                            : async () => null;
 
         const exec = async () =>
         {
@@ -912,25 +922,21 @@ export class Runner
                 'scope', 
                 'startRunFunc',
                 'outputFunc',
-                    // function body
                     `
                     startRunFunc.call(scope, scope, request);
                     
-                    // run code in scope with 'this' bound to scope
                     with (scope)
                     {
                         "use strict"; 
-                        ${code};
+                        ${code}; 
                     }
                     
-                    // detect if everything is OK and this is indeed a AsyncFunction
                     asyncOutput = outputFunc.constructor.name === 'AsyncFunction'; 
                     return (asyncOutput) 
                                 ? Promise.resolve(outputFunc(scope, request))
                                 : outputFunc(scope, request);
                     `
                 );
-                // IMPORTANT: Use .call() to bind 'this' to scope
                 return await asyncFunc.call(scope, this._activeExecRequest, scope, startRunFunc, outputFunc);
             }
             catch(e)
@@ -1029,7 +1035,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             return context;
         }
         else {
-            console.error(`Runner::_extractScriptContextFromErrorStack(): Failed to extract line and column from stack trace: ${e.stack}`);
+            console.error(`Runner::_extractScriptContextFromErrorStack(): Failed to extract line and column from stack trace: ****"${e.stack}"****`);
             return null;
         }
     }
@@ -1041,7 +1047,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     */
     async _executeLocalInStatements(request: RunnerScriptExecutionRequest, statementResults:Array<StatementResult>):Promise<RunnerScriptExecutionResult>
     {
-        this._prefetchComponentScripts(request, true); // Prefetch component scripts if needed
+        this._prefetchComponentScripts(request); // Prefetch component scripts if needed
 
         const codeParser = new CodeParser(request.script.code, {}, null); // TODO: config, IO => archiyou?
         const statements = await codeParser.getStatements();
@@ -1157,7 +1163,7 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
      */
     _executeComponentScript(request:RunnerScriptExecutionRequest): RunnerScriptExecutionResult
     {
-        const scopeName = `component:${request.component}`;
+        const scopeName = `component:"${request.component}"`;
         this.createScope(scopeName); // automatically becomes current scope
         const result = this._executeLocalComponent(request, true, true); // start run and output
         this.deleteLocalScope(scopeName); // delete scope after execution
@@ -1178,16 +1184,19 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
          { 
              throw new Error(`Runner::_executeLocalComponent(): OpenCascade WASM module not loaded yet`);
          }
-             
-         console.info(`Runner: Executing script in active local context: "${this._activeScope.name}"`);
+
+         console.info(`Runner:_executeLocalComponent(): Executing script in active component context: "${this._activeScope.name}"`);
          console.info(`* With execution request settings: { params: ${JSON.stringify(request.params)} and outputs: ${JSON.stringify(request.outputs)} }`);
+         console.info(`====== component code ======`)
+         console.info(`${request.script.code}`);
+         console.info(`============================`)
 
          this._activeExecRequest = request;
          const executeStartTime = performance.now()
  
          const scope = this.getLocalActiveScope();
-         const code = request.script.code;
- 
+         const code = request.script.code
+         
          const startRunFunc = (startRun) ? this._executionStartRunInScope : () => {};
          const outputFunc = (output) 
                              ? this.getLocalScopeResultsComponent.bind(this) // <== this is a special sync function only used for Components
@@ -1243,60 +1252,125 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
          return result;
      }
 
-    /* Prefetch component scripts from request script code
-        IMPORTANT: How to deal with recursive component imports?
-    */
-    async _prefetchComponentScripts(request:string|RunnerScriptExecutionRequest, noCache:boolean=false):Promise<Record<string,Script>>
+    /* Prefetch component scripts from request script code */
+    async _prefetchComponentScripts(request:string|Script|RunnerScriptExecutionRequest, level:number=0):Promise<Record<string,Script>>
     {
-        const IMPORT_COMPONENT_RE = /\$component\(\s*["'](?<name>[^"']+)["']\s*,\s*(?<params>\{[^}]+\})\s*\)/g
+        // protect against unending recursion
+        const MAX_RECURSE_LEVEL = 10;
 
-        const scriptCode = (typeof request === 'string') 
-            ? request : (request as RunnerScriptExecutionRequest).script.code;
-        const componentMatches = [...scriptCode.matchAll(IMPORT_COMPONENT_RE)];
+        /* $component(<<script>>) can have multiple ways to reference a script
+
+            - $component("<<code>>"). ie. $component("myComponent = box(10,20,30);")
+            - $component("<<local file path>>"). ie. "./components/myComponent.js"
+            - $component("<<library path>>"). ie. "archiyou/mycomponent:1.0.0"
+
+            - $component("<<external library path>>"). ie. "https://lib.cadcompany.com/ourcompany/componentscript:1.0.0"
+            - $component("<<url>>"). ie. "https://github.com/archiyouApp/archiyou-core/examples/cadscripts/myComponent.js"
+            
+            We first support the first 3 because they are pretty safe. 
+            The others need some warning (of save execution mechanism): since you are executing untrusted external code            
+
+            See Runner._prepareComponentScript(name) for actual fetching logic
+
+        */
+        let scriptCode = (typeof request === 'string') 
+                            ? request 
+                            : (Script.isScript(request))
+                                ? request.code 
+                                : request?.script?.code;
+
+        if(!scriptCode)
+        { 
+            console.warn(`Runner::_prefetchComponentScripts(): No script code found in request to prefetch component scripts from!`); 
+            return this._componentScripts; 
+        }
+
+        // remove escape characters for quotes to avoid issues in regex matching
+        scriptCode = scriptCode.replaceAll(/\\(["'`])/g, '$1'); 
+
+        // NOTE: for (recursive) components defined inline ($component(<<<code>>>)) 
+        // This matches only top level $component calls - recurse for the rest
+        const componentMatches = this._extractTopLevelComponentCalls(scriptCode);
 
         if(componentMatches.length === 0)
         {
-            console.info(`Runner::_prefetchComponentScripts(): No component scripts found in request script code`);
             return this._componentScripts; // no components to fetch
         }
 
-        console.info(`Runner::_prefetchComponentScripts(): Found ${componentMatches.length} component scripts to prefetch: ${componentMatches.map(m => m.groups?.name).join(', ')}`);
+        // Fetch all top-level component scripts
+        const preparedComponentScripts: Array<Script> = [];
 
-        // Fetch all component scripts
         for(let i = 0; i < componentMatches.length; i++)
         {   
             const match = componentMatches[i];
-            const name = match.groups?.name?.trim();
-            if(!name){ console.warn(`Runner::_prefetchComponentScripts(): Component name not found in match: ${JSON.stringify(match)}`); }
+            const name = match.content;
+
+            if(!name.trim())
+            { 
+                console.warn(`Runner::_prefetchComponentScripts(): Component name not found in match: ${JSON.stringify(match)}`); 
+            }
 
             // Fetch component script
-            const componentScript = await this._fetchComponentScript(name);
-            if(!componentScript){ console.error(`Runner::_prefetchComponentScripts(): Component script "${name}" not found!`);}
+            const componentScript = await this._prepareComponentScript(name);
+            if(!componentScript)
+            {
+                console.error(`Runner::_prefetchComponentScripts(): Can't make a component script out of path/code "${name}". Skipped!`);
+            }
 
-            // Add component script to request
-            console.info(`Runner::_prefetchComponentScripts(): Fetched component script and placed in Runners cache "${name}"`);
-            this._componentScripts[name] = componentScript; // add to components
-            // !!!! TODO: possible recurse with component in component scripts !!!!
+            preparedComponentScripts.push(componentScript);
+
+            // Add component to cache 
+            this.addComponentScriptToCache(name, componentScript);
         };
+
+        // Check found component scripts if they contain 
+        if(level < MAX_RECURSE_LEVEL)
+        {
+            console.info(`Runner::_prefetchComponentScripts(): Recursing nested $component() references. Recursion level: ${level + 1}`);
+            preparedComponentScripts.forEach(async (cs) => await this._prefetchComponentScripts(cs, level + 1));
+        }
+        else {
+            console.error(`Runner::_prefetchComponentScript: Quit recursion after level ${MAX_RECURSE_LEVEL}. Try to flatten your component tree or increase MAX_RECURSE_LEVEL`)
+        }
 
         return this._componentScripts; // return all fetched component scripts
     }
 
-    
-    /** Fetch component script from url or local file path */
-    async _fetchComponentScript(path?:string):Promise<Script|null>
+    /** Manage component script cache */
+    addComponentScriptToCache(name: string, script: Script):string
     {
-        if(!path){ throw new Error(`$component("${path}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
+        // Use hash for stability, especially for name = inline code (with \n and whitespaces)
+        const cleanName = name.replaceAll(/\\/g,''); // remove all escape chars
+        const nameHash = hash(cleanName)
+        script._component = cleanName;
+        this._componentScripts[nameHash] = script;
+        return nameHash;
+    }
 
-        // Local file path (in node) for debug
+    
+    /** Fetch/Prepare component script from: 
+     *    
+     *    - single code string "myComponentBox = box();"
+     *    - library path: "/archiyou/wall"
+     *    - external library url: "https://lib.cadcompany.com/teamx/someComponent:1.0.0"
+     *    - local file path: "./myComponent.js"
+     * 
+     *  NOT YET: 
+     *      - external file url
+     * */
+    async _prepareComponentScript(path?:string):Promise<Script|null>
+    {
+        if(!path && typeof path !== 'string'){ throw new Error(`$component("${path}")::_prefetchComponentScript(): Cannot fetch. Component name not set!`);}
+
+        // Local file path like "./myComponent.ts" (in node) for local scripting and debug
         if(path.includes('.js'))
         {
             if(!this.inNode())
             {
-                throw new Error(`$component("${path}")::_fetchComponentScript(): Cannot fetch component script from local file. Runner is not in Node.js context!`);    
+                throw new Error(`$component("${path}")::_prepareComponentScript(): Cannot fetch component script from local file in the browser!`);    
             }
 
-            console.info(`$component("${path}")::_fetchComponentScript(): Fetching local component script at "${path}"...`);
+            console.info(`$component("${path}")::_prepareComponentScript(): Fetching local component script at "${path}"...`);
 
             // Load dynamically to avoid issues in browser
             const FS_PROMISES_LIB = 'fs/promises'; // avoid problems with older build systems preparsing import statement
@@ -1305,29 +1379,46 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
             if(!data)
             { 
-                throw new Error(`$component("${path}")::_fetchComponentScript(): Cannot read component script from file "${path}". File not found or empty!`);
+                throw new Error(`$component("${path}")::_prepareComponentScript(): Cannot read component script from file "${path}". File not found or empty!`);
             }
             const componentScript = new Script().fromData(data);
             return componentScript;
         }
         // path in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent' (default library)
         // or externally: 'pubv2.archiyou.com/archiyou/myscript:1.0'
-        else {
+        else if(Script.isPath(path))
+        {
             return await this.getScriptFromUrl(path); // get library instance
+        }
+        else if(Script.isProbablyCode(path))
+        {
+            const componentScript = new Script().fromData({ code: path });
+            componentScript._inline = true; // mark as inline
+            return componentScript;
+        }
+        else {
+            console.warn(`Runner::_prepareComponentScript(): Can't make a component script out of path/code "${path}". Skipped!`);
+            return null;
         }
     }
 
     /** Get component from cache in componentScripts 
      *  Cache needs to be filled by this._prefetchComponentScripts()
     */
-    getComponentScript(name:string):Script|null
+    getComponentScriptFromCache(name:string):Script|null
     {
-        if(!this._componentScripts[name])
+        const cleanName = name.replaceAll(/\\/g,''); // remove all escape chars
+        const nameHash = hash(cleanName);
+        if(!this._componentScripts[nameHash])
         {
-            console.warn(`Runner::getComponentScript(): Component script "${name}" not found in cache`);
+            console.warn(`Runner::getComponentScriptFromCache(): Component script "${name}" [hash=${nameHash}] not found in cache. `);
+            console.info(`Current cache: ****`);
+            Object.entries(this._componentScripts)
+                        .forEach(([key, script]) => console.log(` - ${key}: "${script._component}"`));
+
             return null;
         }
-        return this._componentScripts[name];
+        return this._componentScripts[nameHash];
     }
 
     //// PIPELINE ////
@@ -1447,7 +1538,6 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
      * We need to parse the url to get the library address and that of the script */
     async getScriptFromUrl(url:string):Promise<Script>
     {
-
         const libUrl = this._getLibUrlFromScriptUrl(url);
 
         if(!libUrl){ throw new Error(`Runner::getScriptFromUrl(): Cannot extract library URL from script URL "${url}"`); }
@@ -1495,7 +1585,6 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
 
     /** Get results out of local execution scope  
      *  This function is bound to the scope - so 'this' is the execution scope
-     *  If this method is run only if there were no errors during execution
     */
     async getLocalScopeResults(scope:RunnerScriptScopeState, request:RunnerScriptExecutionRequest):Promise<RunnerScriptExecutionResult>
     {
@@ -1527,11 +1616,13 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             throw new Error(`Runner::getLocalScopeResults(): No outputs requested`);
         }
 
-        // Console messages
-        if(request.messages && Array.isArray(result.messages))
-        {
-            result.messages = scope.console.getBufferedMessages(request.messages && []);
-        }
+        // Output console messages
+        const DEFAULT_OUTPUT_MESSAGES = ['user'] as Array<ConsoleMessageType>
+        const messagesToOutput = (Array.isArray(request.messages)) 
+                                    ? request.messages 
+                                    : DEFAULT_OUTPUT_MESSAGES; // default messages to output
+        // add buffered messages of given types
+        result.messages = scope.console.getBufferedMessages(messagesToOutput);
 
         return result;
     }
@@ -2154,14 +2245,102 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
         return longest;
     }
 
-    //// BASE 64 ENCODE/DECODE ////
-    /*
-        If we send anything between scopes, or servers we need to encode binary data
-        For use in JSON we use base64 encoding. This operates on instances of ScriptOutputDataWrapper.
-        In this wrapper we keep track of encoding and register the type of the original data for easy decoding
-    */
+    _extractTopLevelComponentCalls(code: string): Array<{ full: string; content: string }> 
+    {
+        const results: Array<{ full: string; content: string }> = [];
+        const pattern = /\$component\s*\(/g;
+        let match;
 
+        while ((match = pattern.exec(code)) !== null) 
+        {
+            const startIndex = match.index;
+            const contentStart = match.index + match[0].length;
+            
+            // Check if this $component is nested inside another one
+            // by counting unbalanced parentheses before this match
+            let isNested = false;
+            let depth = 0;
+            let inString: string | null = null;
+            let escaped = false;
 
+            for (let i = 0; i < startIndex; i++) 
+            {
+                const char = code[i];
+
+                if (escaped) { escaped = false; continue; }
+                if (char === '\\') { escaped = true; continue; }
+
+                // Track string boundaries
+                if ((char === '"' || char === "'" || char === '`') && !inString) {
+                    inString = char;
+                } else if (char === inString) {
+                    inString = null;
+                }
+
+                // Count parentheses outside strings
+                if (!inString) {
+                    if (char === '(') depth++;
+                    if (char === ')') depth--;
+                }
+            }
+
+            // If depth > 0, we're inside another function call (nested)
+            if (depth > 0) {
+                isNested = true;
+            }
+
+            // Skip nested $component calls
+            if (isNested) {
+                continue;
+            }
+
+            // Now find the matching closing parenthesis for this top-level $component
+            depth = 1;
+            let i = contentStart;
+            inString = null;
+            escaped = false;
+
+            while (i < code.length && depth > 0) 
+            {
+                const char = code[i];
+
+                if (escaped) { escaped = false; i++; continue; }
+                if (char === '\\') { escaped = true; i++; continue; }
+
+                // Track string boundaries
+                if ((char === '"' || char === "'" || char === '`') && !inString) {
+                    inString = char;
+                } else if (char === inString) {
+                    inString = null;
+                }
+
+                // Count parentheses outside strings
+                if (!inString) {
+                    if (char === '(') depth++;
+                    if (char === ')') depth--;
+                }
+
+                i++;
+            }
+
+            if (depth === 0) 
+            {
+                const fullMatch = code.slice(startIndex, i);
+                let content = code.slice(contentStart, i - 1).trim(); // Exclude closing )
+
+                // Remove surrounding quotes if present
+                if ((content.startsWith('"') && content.endsWith('"')) ||
+                    (content.startsWith("'") && content.endsWith("'")) ||
+                    (content.startsWith('`') && content.endsWith('`'))) 
+                {
+                    content = content.slice(1, -1);
+                }
+
+                results.push({ full: fullMatch, content: content });
+            }
+        }
+
+        return results;
+    }
 
 }
-

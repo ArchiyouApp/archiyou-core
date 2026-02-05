@@ -6,7 +6,7 @@ import type { RunnerScriptExecutionRequest,
 
 
 /**
- *  Exists in script execution scope
+ *   Exists in script execution scope
  *   And gathers all information needed to execute a component script 
  *   and return specific results
  * 
@@ -14,19 +14,74 @@ import type { RunnerScriptExecutionRequest,
  *      Script execution is async, but we want to avoid using 
  *      "await $component(...).get(...)" which is not user friendly
  *      
- *      Because all the export functions for raw data (the model Obj/Shapes, table data and doc instances)
- *      that is by definition always available in the scope    
- *      We can get away with introducing a sync execution method
+ *      Because internal data (the model Obj/Shapes, table data and doc instances)
+ *      are by definition always directly available in the scope    
+ *      We can avoid async by using the sync execution method "Runner._executeLocalSync"
  *      RunnerComponentImporter.get() => Runner._executeComponentScript => Runner._executeLocalSync
+ * 
+ *   How components work with RunnerComponentImporter class
+ *   
+ *   1. Runner preprocesses any $component(<<script>>, <<params>>) statements: loads them and caches in Runner._componentScripts
+ *       This is needed because we need to wait until async fetching of scripts is done 
+ *         before we can synchronous execute script, get results out and use them in main script scope
+ * 
+ *      argument <<script>> can point to a script in various ways:
+ *      - $component("{{author}}/{{scriptname}}:{{version}}") or $component("{{author}}/{{scriptname}}")
+ *         => Gets script from default library (probably https://lib.archiyou.com)
+ *      - $component("https://lib.notarchiyou.com/myorg/myscript")
+ *          => Get script from external archiyou library
+ *      - $component("./scripts/test.js") 
+ *          => Get script from local path: relative or absolute (need for .js extension)( possibly later .ts)
+ *      - $component(script:ScriptData)
+ *          => Directly use script data 
+ * 
+ *
+ *   2. Main Execution: The main script is executed within its scope. 
+ *         $component(..) refer to the RunnerComponentImporter constructor
+ *         So every $component(...) statement creates and returns an RunnerComponentImporter instance
+ *          This component importer instance has access to Runner instance and main execution scope 
+ * 
+ *   3. Executing the component script with params and getting results
+ *       $component(<<script>>) just loads the script and creates the component importer instance
+ *       Execution takes two steps (like all scripts):
+ *          a. plug in param values: $component("test").params({ size: 100 })
+ *          b. execute with request for outputs:
+ *              - .pipeline(<<pipeline>>) - if only single pipeline, select it. default = "default"
+ *              - .model() - get the model (ShapeCollection) for single pipeline (mostly default)
+ *                  $component("test").params({ size: 100 }).model() ==> get model from (default or single) pipeline
+ *              - .get(<<output(s)>>)
+ *                  get anything out (various pipelines, various entities) using output paths. 
+ *                  Results by output path. So you can use destructing assignment:
+ *                   const { "default/model" : mainModel, "cnc/model" : cncModel, "cnc/tables/parts" : cncPartsTable } = $component("test").get(["default/model", "cnc/model", "cnc/tables"]);
+ * 
+ *              - .all(): Get all outputs of pipeline (set with .pipeline() or "default")
+ *                          returns { model, docs, tables, metrics }
+ *
+ *   4. Using component results
+ *          Any results that $component(...).model()/get() etc returns are internal entities
+ *          either ShapeCollection, Doc, Table, Metric that can be read and merged with others
+ * 
+ *          Use a wall component:
+ *              myWall = $component("wall").params({ size: 100 }).model();
+ *              // now use it as any other ShapeCollection
+ *              myWall.align(otherMainWall, 'leftfront', 'rightfront'); 
+ * 
+ *          Merge a document of component:
+ *          
+ *           { "default/docs/spec" : myWallDoc } = $component("wall").params({ size: 100 }).get("default/docs/spec")
+ *           // main document
+ *           doc('mainDoc')
+ *              .page('cover page')
+ *              .title('MyProject')
+ *              .merge(myWallDoc) // add all pages of myWallDoc to current Doc
+ *              ..
  *      
- *  Some usage examples based on get and shortcuts methods model() and all():
- * 
- *    - leftWall = $component("test/wall", { LENGTH: 300, HEIGHT: 250 }).model() // default pipeline model Obj  
- *    ==> same as: $component("test/wall", { LENGTH: 300, HEIGHT: 250 }).get('default/model')
- *    - cutShapes = $component("test/box", { WIDTH: 100, DEPTH: 100 }).get('cnc/model')  
- *    - { model: wallShape, docs: wallDocs, tables: wallTables } = $component("test/wall", { }).all()
- *    ==> same as: $component("test/wall", { }).get('default/model','default/tables', 'default/docs', 'default/metrics')
- * 
+ *      NOTE: 
+ *          - no entity names, just entire instances: 
+ *               - no "default/docs/somespecial" => just return Doc module instance
+ *               - tables => Db instance
+ *               these instances have inspection/selection functionality
+ *          
  * 
  */
 export class RunnerComponentImporter
@@ -34,23 +89,47 @@ export class RunnerComponentImporter
     //// SETTINGS ////
     DEFAULT_OUTPUTS = ['default/model/internal']; 
 
-    ////
+    ////  END SETTINGS ////
     
     _runner:Runner;
     _scope:RunnerScriptScopeState; // main scope to import into
-    name:string;
-    params:Record<string,any>;
+    ref:string; // reference. Can be url, or inline code
+    label:string; // nice label
+    _params:Record<string,any>;
+    _pipeline:string = 'default'; // if single pipeline
     options:Record<string,any>; // TODO
     script?:PublishScript; // script to execute - will be fetched from library or from disk
     _requestedOutputs:Array<string> = [];  // requested outputs
 
     
-    constructor(runner:Runner, scope:RunnerScriptScopeState,  name:string, params?:Record<string,any>)
+    constructor(runner:Runner, scope:RunnerScriptScopeState,  ref:string)
     {
         this._runner = runner; // tied to runner
         this._scope = scope; // main scope to import into
-        this.name = name; // name of the component ('archiyou/testcomponent:0.5')
-        this.params = params || {}; // parameters for the component
+        this.ref = ref; // name of the component ('archiyou/testcomponent:0.5')
+        this.label = this.generateName();
+    }
+
+    /** Set param values before execution */
+    params(params?: Record<string, any>): this
+    {
+        if(typeof params !== 'object')
+        {
+            throw new Error(`$component("${this.label}")::params(): Invalid params object. Please supply something like { param1: val1, param2: val2 }`);
+        }
+        this._params = params || {};
+        return this;
+    }
+
+    /** Set single pipeline to get outputs from */
+    pipeline(p:string): this
+    {
+        if(typeof p !== 'string')
+        {
+            throw new Error(`$component("${this.label}")::pipeline(): Invalid pipeline string. Please supply a valid pipeline string.`);
+        }
+        this._pipeline = p;
+        return this;
     }
 
     /** 
@@ -62,6 +141,7 @@ export class RunnerComponentImporter
      *  @param p - path or array of paths to requested outputs (like 'default/model', 'cnc/model')  
      * 
      *  Components only work with internal data, so we always get 'internal' format
+     *  
      *  Some simplications: 
      *      - no other formats than 'internal'
      *      - we export internal categories like 'model', 'docs', 'tables', 'metrics' directly as module instances
@@ -80,7 +160,7 @@ export class RunnerComponentImporter
             const outputPathObj = new ScriptOutputPath(path).internalize();
             if(!outputPathObj.checkValid())
             {
-                console.warn(`$component("${this.name}")::get(): Invalid output path requested: "${path}". Skipping this output.`);
+                console.warn(`$component("${this.label}")::get(): Invalid output path requested: "${path}". Skipping this output.`);
                 return undefined;
             }
             return outputPathObj.resolvedPath;
@@ -89,23 +169,27 @@ export class RunnerComponentImporter
 
         this._requestedOutputs = outputPaths;
 
-        console.info(`$component("${this.name}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
+        console.info(`$component("${this.label}")::get(): Requested outputs:"${this._requestedOutputs.join(',')}"`);
 
         return this._getAndExecute();
     }
 
-    /** Shortcut method for getting model */
+    /** Shortcut method for getting model from single pipeline */
     model(): ImportComponentResult 
     {
-        // TODO: add pipeline arg
-        return this.get('default/model/internal');
+        return this.get(`${this._pipeline}/model/internal`);
     }
 
-    /** Shortcut method for getting everything of default pipeline */
+    /** Shortcut method for getting everything of single/default pipeline */
     all(): ImportComponentResult
     {
-        // TODO: add pipeline arg
-        return this.get(['default/model/internal', 'default/metrics/*/internal', 'default/tables/*/internal', 'default/docs/*/internal']);
+        return this.get([
+            `${this._pipeline}/model/internal`,
+            `${this._pipeline}/tables/*/internal`,
+            `${this._pipeline}/docs/*/internal`,
+            `${this._pipeline}/metrics/*/internal`,
+        ]);
+        // TODO: flatten results to { model, tables, docs, metrics }
     }
 
    
@@ -118,14 +202,13 @@ export class RunnerComponentImporter
     
         if(!script)
         {
-            throw new Error(`$component("${this.name}")::_getAndExecute(): Cannot find component script in Runner.componentScripts cache. Make sure the component is loaded and available.`);
+            throw new Error(`$component("${this.label}")::_getAndExecute(): Cannot find component script in Runner.componentScripts cache. Make sure the component is loaded and available.`);
         }
-        
         return this._executeComponentScript(script); // execute script in seperate component scope
     }
 
     /** Execute component script with params and requested outputs
-     *  @param script - PublishScript to execute
+     *  @param script - Script to execute
      *  @param params - parameters to pass to the script
      *  @returns Promise<ImportComponentResult> - result of the execution
      */
@@ -133,23 +216,24 @@ export class RunnerComponentImporter
     {
         const request:RunnerScriptExecutionRequest = {
             script: script,
-            component: this.name,
+            component: this.label, // scope identifier
             params: this.params,
             outputs: (this._requestedOutputs.length === 0) ? this.DEFAULT_OUTPUTS : this._requestedOutputs,
         };
 
         this._runner._checkRequestAndAddDefaults(request); // check request and add defaults if needed
 
-        console.info(`$component("${this.name}")::_executeComponentScript(): Executing component script with outputs: "${request.outputs.join(',')}"`);
+        console.info(`$component("${this.label}")::_executeComponentScript(): Executing component script with outputs: "${request.outputs.join(',')}"`);
         
         const r = this._runner._executeComponentScript(request);
         
         // Check for errors
         if(r.status === 'error')
         {
-            throw new Error(`$component("${this.name}")::_executeComponentScript(): Error executing component script: ${r.errors.join('; ')}`);
+            throw new Error(`$component("${this.label}")::_executeComponentScript(): Error executing component script: ${r.errors.join('; ')}`);
         }
 
+        //// TODO: 
         // Continue gathering results
         /* Check how we can flatten the result:
             - check how many pipelines
@@ -175,10 +259,10 @@ export class RunnerComponentImporter
                 // Special import for model category - recreate Obj tree in main scope
                 if(outPathObj.category === 'model' && outPathObj._output)
                 {
-                    console.info(`$component("${this.name}")::_executeComponentScript(): Recreating component Obj tree in main scope for pipeline "${pl}"...`);
+                    console.info(`$component("${this.label}")::_executeComponentScript(): Recreating component Obj tree in main scope for pipeline "${pl}"...`);
                     const recreatedObj = this._recreateComponentObjTree(outPathObj._output as Object);
                     pipelineResult['model'] = recreatedObj.shapes(true); // result is ShapeCollection of all shapes in the Obj tree
-                    console.info(`$component("${this.name}")::_executeComponentScript(): Recreated component Obj tree in main scope for pipeline "${pl}".`);
+                    console.info(`$component("${this.label}")::_executeComponentScript(): Recreated component Obj tree in main scope for pipeline "${pl}".`);
                 }
             });
         });
@@ -194,7 +278,7 @@ export class RunnerComponentImporter
                 const singleOutput = outputManager.getOutputsByPipeline(singlePipeline)[0];
                 result = result[singleOutput.category];
                 const resultType = result?.constructor?.name || typeof result;
-                console.info(`$component("${this.name}")::_executeComponentScript(): Returning single output of category "${singleOutput.category}" with result of type "${resultType}".`);
+                console.info(`$component("${this.label}")::_executeComponentScript(): Returning single output of category "${singleOutput.category}" with result of type "${resultType}".`);
             }
         }
         
@@ -205,13 +289,13 @@ export class RunnerComponentImporter
      /** Get component script from Runners cache (in Runner.componentScripts) */
     _getComponentScript():Script|null
     {
-        return this._runner.getComponentScript(this.name)
+        return this._runner.getComponentScriptFromCache(this.ref);
     }
 
     /** We need to recreate the component object tree into the current scope */
     _recreateComponentObjTree(tree:Object, parentObj?:Obj):Obj
     {
-        console.info(`$component("${this.name}")::_recreateComponentObjTree(): Recreating component object tree...`);
+        console.info(`$component("${this.label}")::_recreateComponentObjTree(): Recreating component object tree...`);
         const mainScope = this._scope;
 
         const curNode = tree as Object as any; // TODO: TS typing
@@ -220,7 +304,7 @@ export class RunnerComponentImporter
         // IMPORTANT: Shapes are still tied to Geom of component scope - change that
         newObj._updateShapes(curNode.shapes.map(s => { s._brep = mainScope.brep; return s; })); 
 
-        console.info(`$component("${this.name}")::_recreateComponentObjTree(): Recreated object "${newObj.name()}" with ${newObj.shapes(false).length} shapes`);
+        console.info(`$component("${this.label}")::_recreateComponentObjTree(): Recreated object "${newObj.name()}" with ${newObj.shapes(false).length} shapes`);
         
         // is root
         if(!parentObj)
@@ -241,5 +325,16 @@ export class RunnerComponentImporter
         
         return newObj;
     }
+
+    //// UTILS ////
+
+    /** Either directly name, or is a code a label with snippet */
+    generateName()
+    {
+        return (Script.isProbablyCode(this.ref)) 
+                    ? `<<inline code>>:${this.ref.trim().replace(/\s+/g, ' ').substring(0,20)}...`
+                    : this.ref;
+    }
+
 }
 

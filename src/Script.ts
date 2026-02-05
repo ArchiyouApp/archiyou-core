@@ -33,7 +33,9 @@ export class Script
     previousId?:string; // uuid of the previous script version, if any
     previousVersion?:string; // version of the previous script version, if any
 
-    _valid = false; // internal validation flag
+    _valid:boolean = false; // internal validation flag
+    _inline:boolean = false; // if script was created inline (used in handling inline component code)
+    _component:string|undefined; // keep track how this component was referenced (NOTE: can be inline code!)
 
     constructor(author?:string, name?:string, code?:string, params?:Record<string,ScriptParam>, presets?:Record<string, Record<string, ScriptParamData>>)
     {
@@ -53,6 +55,15 @@ export class Script
             this._setDefaults();
             this.validate(); // automatically validate the script on creation
         }
+    }
+
+    static isScript(obj:any): obj is Script
+    {
+        if(obj instanceof Script) return true;
+        // check data
+        if(typeof obj !== 'object') return false;
+        // Very basic test - might use fromData (if turned into static method)
+        return (typeof obj?.code === 'string' &&  obj?.code.length > 0);
     }
 
     isValid():boolean
@@ -290,7 +301,7 @@ export class Script
             return Infinity;
         }
 
-        return Object.values(this.params).reduce((acc, param) => {
+        return Object.values(this.params).reduce((acc, paraissm) => {
             acc *= param.numValues();
             return acc;
         }, 1);
@@ -450,6 +461,25 @@ export class Script
         return dataToModuleString(this.toData());
     }
 
+    //// UTILS ////
+
+    /** Test if a given string could be a valid Script path 
+     *  {{author}}/{{scriptname}}?:{{version}}
+    */
+    static isPath(s:string)
+    {
+        const regex = /^\s*([\w-]+)\/([\w-]+)(?::([\d.]+))?\s*$/;
+        return regex.test(s);
+    }
+
+    /** Test if a string is probably script code 
+     *  WARNING: unsafe!
+    */
+    static isProbablyCode(s:string)
+    {
+        const signs = ['box(','sphere(','cylinder(','plane(', 'sketch(', 'layer('];
+        return signs.find(sign => s.toLowerCase().includes(sign));
+    }
 }
 
 
@@ -461,10 +491,10 @@ export interface ScriptData
     name?: string; // most script have name - lowercase
     author?: string; 
     // The user provides an version when publishing, see published
-    description: string;
+    description?: string;
     tags?: string[];
-    created: string | null;
-    updated: string | null;
+    created?: string | null;
+    updated?: string | null;
     code: string;
     params: Record<string,ScriptParamData>;
     presets?: Record<string, Record<string, ScriptParamData>>;
