@@ -221,7 +221,7 @@ This is a basic roadmap:
 - [ ] New editor: more value for more users
 - [ ] New open design platform
 
-All documentation for NLNET can be found in the [documentation/nlnet](https://github.com/ArchiyouApp/archiyou-core/documentation/nlnet/) folder in this repo.
+All documentation for NLNET can be found in the [documentation/nlnet](https://github.com/ArchiyouApp/archiyou-core/tree/main/documentation/nlnet) folder in this repo.
 
 Please reach out for more information, ideas or collaboration!
 
