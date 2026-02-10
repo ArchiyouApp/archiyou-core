@@ -16,7 +16,7 @@
 import type { ArchiyouApp, ExportGLTFOptions, Statement, 
                 StatementResult, RunnerScriptScopeState, ScriptOutputPath, ScriptOutputFormatModel, 
                 ScriptOutputFormat, ScriptOutputData, DocData,
-                ConsoleMessageType,
+                ConsoleMessageType, ScriptData
  } from "./internal"
  
 
@@ -25,7 +25,7 @@ import { OcLoader, Console, Brep, Doc, Calc, Exporter, Services, Make, Db,
             RunnerScriptExecutionResult, Script, CodeParser, LibraryConnector, 
             ScriptOutputManager, Pipeline } from "./internal"
 
-import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ParamManager } from "./internal"
+import { Point, Vector, Bbox, Edge, Vertex, Wire, Face, Shell, Solid, ShapeCollection, Obj, ScriptParam, ParamManager } from "./internal"
 
 import { RunnerComponentImporter } from "./internal"
 
@@ -1131,9 +1131,15 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
     _executionStartRunInScope(scope:any, request: RunnerScriptExecutionRequest):void
     {
         // Setup ParamManager - it still uses Array of Param defintions with _value
-        const paramDefsWithValues = [...Object.values(request.script.params || {})]
-        paramDefsWithValues.forEach(p => p._value = request.params[p.name]);
+        const paramDefsWithValues = [...Object.values(request.script.params || {})] as Array<ScriptParam|ScriptParamData>; // param names are uppercase
+        paramDefsWithValues.forEach(pd => 
+        {
+            const n = Object.keys(request.params || {}).find( p => p.toLowerCase() === pd.name.toLowerCase())
+            pd._value = request.params[n];
+        });
+
         console.info(`Runner::_executionStartRunInScope()[in execution context]: Setting up ParamManager in scope with params "${JSON.stringify(paramDefsWithValues)}"`);
+
         scope.ay.paramManager = new ParamManager(paramDefsWithValues)
             .setParent(scope); // sets globals in method setParent()
         scope.$PARAMS = scope.ay.paramManager;
@@ -1375,14 +1381,30 @@ ${e.message === '***** CODE ****\nUnexpected end of input' ? code : ''}
             // Load dynamically to avoid issues in browser
             const FS_PROMISES_LIB = 'fs/promises'; // avoid problems with older build systems preparsing import statement
             const fs = await import(FS_PROMISES_LIB); // use promises version of fs
-            const data = await fs.readFile(path, 'utf-8');
+            const pathLib = await import('path');
 
-            if(!data)
-            { 
-                throw new Error(`$component("${path}")::_prepareComponentScript(): Cannot read component script from file "${path}". File not found or empty!`);
+            // NOTE: absolute paths are recommended - otherwise we take the working directory as root
+            // There is no way to get the main script from here
+            if(path[0] === '.')
+            {
+                path = pathLib.resolve(process.cwd(), path);
+                console.warn(`$component("${path}")::_prepareComponentScript(): Resolved relative path using current working to: "${path}"`);
             }
-            const componentScript = new Script().fromData(data);
-            return componentScript;
+
+            try {
+                // Scripts are modules (not JSON)
+                const data:ScriptData = (await import(path))?.default;
+
+                if(!data){ throw new Error(`$component("${path}")::_prepareComponentScript(): Cannot read component script from file "${path}". File is empty!`);}
+
+                const componentScript = new Script().fromData(data);
+                return componentScript;
+            }
+            catch(e)
+            { 
+                throw new Error(`$component("${path}")::_prepareComponentScript(): Cannot read component script from file "${path}". File not found`);
+            }
+            
         }
         // path in format like 'archiyou/testcomponent:0.5' or 'archiyou/testcomponent' (default library)
         // or externally: 'pubv2.archiyou.com/archiyou/myscript:1.0'

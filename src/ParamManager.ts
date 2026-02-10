@@ -28,7 +28,8 @@
  * 
  */
 
-import { ScriptParam, ScriptParamData, ParamOperation, ParamManagerOperator } from './internal'
+import type { ScriptParamData } from './internal'
+import { ScriptParam, ParamOperation, ParamManagerOperator } from './internal'
 
 import deepEqual from 'deep-is'
 
@@ -45,13 +46,18 @@ export class ParamManager
     paramOperators:Array<ParamManagerOperator> = [];
 
     /** Set up ParamManager with current params */
-    constructor(params?:Array<ScriptParam>)
+    constructor(params?:Array<ScriptParam|ScriptParamData>)
     {
         if(Array.isArray(params) && params.length > 0)
         {
             //this.paramOperators = params.map(p => new ParamManagerOperator(this, this._validateParam(ScriptParamToParam(p)))); // always make sure we use Param internally
             // Disable validation because its old
-            this.paramOperators = params.map(p => new ParamManagerOperator(this, p)); // always make sure we use Param internally
+            this.paramOperators = params
+                                    .map(
+                                        p => {
+                                            const paramDef = (p instanceof ScriptParam) ? p : new ScriptParam().fromData(p);
+                                            return new ParamManagerOperator(this, paramDef); // always make sure we use Param internally
+                                        });
             this.paramOperators.forEach( p => this[p.name] = p) // set param access
         }
     }

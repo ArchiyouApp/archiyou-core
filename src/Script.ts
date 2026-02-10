@@ -97,6 +97,7 @@ export class Script
 
     _validateBasics():boolean
     {
+        // TODO: use a validation library at the start
         const VALIDATIONS = {
             id: this.id && typeof this.id === "string", // should always be a string
             name : !this.name || (typeof this.name === "string" && this.name.length > 0), // can be undefined, but accept only strings
@@ -115,6 +116,7 @@ export class Script
         {
             const firstErrorIndex = Object.values(VALIDATIONS).findIndex(v => v !== true);
             console.error(`Script._validateBasics(): Basic validation failed: ${Object.keys(VALIDATIONS)[firstErrorIndex]}`);
+            console.error(`Incoming data: ${JSON.stringify(this[Object.keys(VALIDATIONS)[firstErrorIndex]])}`);
         }
         
         return this._valid = isValidBasic && this._validatePublished();
@@ -301,7 +303,7 @@ export class Script
             return Infinity;
         }
 
-        return Object.values(this.params).reduce((acc, paraissm) => {
+        return Object.values(this.params).reduce((acc, param) => {
             acc *= param.numValues();
             return acc;
         }, 1);
@@ -367,6 +369,7 @@ export class Script
 
     /** Load from raw data
      *  Some backwards compatibility
+     *  TODO: Make this a static method
      */
     fromData(data:Script|ScriptData|Record<string, any>):Script|this
     {

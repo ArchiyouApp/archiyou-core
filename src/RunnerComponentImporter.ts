@@ -217,7 +217,7 @@ export class RunnerComponentImporter
         const request:RunnerScriptExecutionRequest = {
             script: script,
             component: this.label, // scope identifier
-            params: this.params,
+            params: this._params, 
             outputs: (this._requestedOutputs.length === 0) ? this.DEFAULT_OUTPUTS : this._requestedOutputs,
         };
 
@@ -261,7 +261,9 @@ export class RunnerComponentImporter
                 {
                     console.info(`$component("${this.label}")::_executeComponentScript(): Recreating component Obj tree in main scope for pipeline "${pl}"...`);
                     const recreatedObj = this._recreateComponentObjTree(outPathObj._output as Object);
-                    pipelineResult['model'] = recreatedObj.shapes(true); // result is ShapeCollection of all shapes in the Obj tree
+                    // result is ShapeCollection of all shapes in the Obj tree
+                    pipelineResult['model'] = recreatedObj.shapes(true); // NOTE: only visible shapes, filted out in _recreateComponentObjTree
+
                     console.info(`$component("${this.label}")::_executeComponentScript(): Recreated component Obj tree in main scope for pipeline "${pl}".`);
                 }
             });
@@ -293,7 +295,7 @@ export class RunnerComponentImporter
     }
 
     /** We need to recreate the component object tree into the current scope */
-    _recreateComponentObjTree(tree:Object, parentObj?:Obj):Obj
+    _recreateComponentObjTree(tree:Object, parentObj?:Obj, onlyVisible:boolean=true):Obj
     {
         console.info(`$component("${this.label}")::_recreateComponentObjTree(): Recreating component object tree...`);
         const mainScope = this._scope;
@@ -301,8 +303,11 @@ export class RunnerComponentImporter
         const curNode = tree as Object as any; // TODO: TS typing
         const newObj = new mainScope.Obj(); // create Geom Obj container 
         newObj.name((curNode as any).name);
+
+        const curNodeVisibleShapes = onlyVisible ? curNode.shapes.filter(s => s.visible()) : curNode.shapes;
+
         // IMPORTANT: Shapes are still tied to Geom of component scope - change that
-        newObj._updateShapes(curNode.shapes.map(s => { s._brep = mainScope.brep; return s; })); 
+        newObj._updateShapes(curNodeVisibleShapes.map(s => { s._brep = mainScope.brep; return s; })); 
 
         console.info(`$component("${this.label}")::_recreateComponentObjTree(): Recreated object "${newObj.name()}" with ${newObj.shapes(false).length} shapes`);
         

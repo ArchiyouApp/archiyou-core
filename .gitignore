@@ -13,3 +13,4 @@ Thumbs.db
 dist/**/*
 yarn.lock
 coverage/
+tests/*.glb

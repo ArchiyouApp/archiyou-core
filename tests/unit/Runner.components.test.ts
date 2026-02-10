@@ -1,4 +1,4 @@
-import { Runner } from '../../src/internal'
+import { Runner, RunnerOps } from '../../src/internal'
 import type { ScriptData } from '../../src/internal'
 
 import { describe, it,  beforeAll, expect } from 'vitest'
@@ -15,7 +15,7 @@ describe('Runner with components', () =>
     });
 
     /*
-    it('it should execute a script with a component script define by inline code', 
+    it('should execute a script with a component script define by inline code', 
         async () => 
         {
             const mainScript = {
@@ -45,7 +45,43 @@ describe('Runner with components', () =>
     );
     */
 
-    it('it should handle recursive component scripts', async () => {
+    it('should load a local script file as component', async () => {
+
+        // from working dir
+        const LOCAL_SCRIPT_PATH = './tests/unit/RunnerComponent.js'
+
+        const mainScript = {
+                code : `
+                    // Make a wall
+                    wall = boxbetween([0,0,0], [4000, 200, 3000]) // leftbottom at center
+                            .move(0,-100); // align with X axis
+
+                    // Place Frame as component
+                    frame = $component('${LOCAL_SCRIPT_PATH}')
+                                .params({ width: 1000, height: 500, depth: 300 })
+                                .model();
+                    frame.moveTo(0, 0, 0) // center at origin
+                        .move(2000, 0, 1500);
+                    
+                    // subtract frame from wall
+                    wall.subtract(frame.bbox().shape());
+
+                    print(frame.length); // ==> 1
+                `
+            } as ScriptData;
+
+        const r = await runner.execute({ script: mainScript });
+        expect(r).toBeDefined();
+        expect(r.status).toBe('success');
+        expect(r?.messages?.filter(m => m.type === 'user')[0].message).toBe('1');
+        expect((r?.outputs?.[0].output as ArrayBuffer)?.byteLength).toBeGreaterThan(30000); // 30508  (but some small differences)
+
+        // for visible check: save glb to ./tests/unit/RunnerComponent.glb
+        new RunnerOps().saveBlobToFile(r?.outputs?.[0]?.output as any, './tests/unit/RunnerComponent.glb');
+    })
+
+    /*
+    it('should handle recursive component scripts', async () => {
         // NOTE: make sure you nest backticks correctly or avoid!
         const mainScript = {
             code: `
@@ -73,6 +109,6 @@ describe('Runner with components', () =>
         expect(r?.messages?.filter(m => m.type === 'user')[0].message).toBe('4');
         expect((r?.outputs?.[0].output as ArrayBuffer)?.byteLength).toBeGreaterThan(69000); // can vary
     });
-
+    */
 
 })
