@@ -349,8 +349,8 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          /* OC docs:
                - https://dev.opencascade.org/doc/refman/html/class_n_collection___list.html
          */
-         let ocShapeList = new this._oc.TopTools_ListOfShape_1();
-         this.shapes.forEach( shape => ocShapeList.Append_1(shape._ocShape));
+         let ocShapeList = new this._oc.NCollection_List_TopoDS_Shape();
+         this.shapes.forEach( shape => ocShapeList.Append(shape._ocShape));
 
          return ocShapeList;
       }
@@ -1488,22 +1488,26 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
       {
          /*
          console.log('=========== BOUNDARY ===========');
-         console.log(this._oc.TopTools_HSequenceOfShape);
-         console.log(this._oc.TopTools);
-         console.log(this._oc.TopTools.HSequenceOfShape);
-         console.log(this._oc.Handle_TopTools_HSequenceOfShape);
-         console.log(new this._oc.TopTools().TopTools_HSequenceOfShape);
+         console.log(this._oc.NCollection_HSequence_TopoDS_Shape);
+         console.log(this._oc.ShapeAnalysis_FreeBounds);
          */
 
-         const ocShapeSequence = new this._oc.Handle_TopTools_HSequenceOfShape_1();
-         const ocEdges = new this._oc.Handle_TopTools_HSequenceOfShape_1();
-         this.edges().forEach( e => ocEdges.Append_1(e._ocShape));
+         const ocEdges = new this._oc.NCollection_HSequence_TopoDS_Shape();
+         let ocShapeSequence = null;
 
-         this._oc.ShapeAnalysis_FreeBounds.ConnectEdgesToWires(
-                  ocEdges, 
-                  0.1, 
-                  false,
-                  ocShapeSequence);
+         try
+         {
+            this.edges().forEach(edge => ocEdges.Append(edge._ocShape));
+            ocShapeSequence = this._oc.ShapeAnalysis_FreeBounds.ConnectEdgesToWires(
+                     ocEdges,
+                     0.1,
+                     false);
+         }
+         finally
+         {
+            ocShapeSequence?.delete();
+            ocEdges.delete();
+         }
 
          return null;
       }
@@ -1871,7 +1875,7 @@ import { DxfWriter, Units } from '@tarikjabiri/dxf';
          let ocSew = new this._oc.BRepBuilderAPI_Sewing(1e-6, true, true, true, false);
          this.shapes.forEach( curShape => ocSew.Add(curShape._ocShape));
 
-         ocSew.Perform( new this._oc.Message_ProgressRange_1());
+         ocSew.Perform( new this._oc.Message_ProgressRange());
          let ocSewedShapeOrCompound = ocSew.SewedShape();
          if (!ocSewedShapeOrCompound.IsNull())
          {

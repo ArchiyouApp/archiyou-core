@@ -32,7 +32,7 @@ export class Bbox
         if (!min && !max)
         {
             // console.warn('Bbox:contructor: Created empty Bbox instance! Make sure you set it later');
-            this._ocBbox = new this._oc.Bnd_Box_1();
+            this._ocBbox = new this._oc.Bnd_Box();
             this._ocBbox.SetGap(0.0);
         }
         else
@@ -93,7 +93,7 @@ export class Bbox
         }
 
         // We can continue creating the bbox
-        this._ocBbox = new this._oc.Bnd_Box_2(minVec._toOcPoint(), maxVec._toOcPoint());
+        this._ocBbox = new this._oc.Bnd_Box(minVec._toOcPoint(), maxVec._toOcPoint());
         this._ocBbox.SetGap(0.0)
         this.setBounds();
 

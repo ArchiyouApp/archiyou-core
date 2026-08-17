@@ -113,9 +113,9 @@ export class Face extends Shape
 
         if (wire.planar())
         {
-            let faceBuilder = new this._oc.BRepBuilderAPI_MakeFace_15(wire._ocShape, false); // OnlyPlane = Standard_False 
+            let faceBuilder = new this._oc.BRepBuilderAPI_MakeFace(wire._ocShape, false); // OnlyPlane = Standard_False
             
-            faceBuilder.Build(new this._oc.Message_ProgressRange_1());
+            faceBuilder.Build(new this._oc.Message_ProgressRange());
 
             if (!faceBuilder.IsDone())
             {
@@ -226,8 +226,8 @@ export class Face extends Shape
         position = position as Point; // auto converted
         normal = normal as Vector; 
 
-        const ocPlane = new this._oc.gp_Pln_3(position._toOcPoint(), normal._toOcDir());
-        const ocFace = new this._oc.BRepBuilderAPI_MakeFace_9(
+        const ocPlane = new this._oc.gp_Pln(position._toOcPoint(), normal._toOcDir());
+        const ocFace = new this._oc.BRepBuilderAPI_MakeFace(
             ocPlane, -width * 0.5, width * 0.5, -depth * 0.5, depth * 0.5
         ).Face();
 
@@ -335,8 +335,8 @@ export class Face extends Shape
         const ocMakeFilling = new this._oc.BRepOffsetAPI_MakeFilling(3,15,2,false, 0.0001, 0.0001, 0.01, 0.1, 8, 9)
         const allEdges = new ShapeCollection();
         (wireOrEdges as ShapeCollection).forEach(s => { if(['Wire','Edge'].includes(s.type())){ allEdges.add(s.edges()) }}); // wireOrEdges auto converted to ShapeCollection
-        allEdges.forEach(e => ocMakeFilling.Add_1(e._ocShape, this._oc.GeomAbs_Shape.GeomAbs_C0, true)) // Add to MakeFilling - NOTE: this changes depending on OC version
-        ocMakeFilling.Build(new this._oc.Message_ProgressRange_1());
+        allEdges.forEach(e => ocMakeFilling.Add(e._ocShape, this._oc.GeomAbs_Shape.GeomAbs_C0, true)) // Add to MakeFilling - NOTE: this changes depending on OC version
+        ocMakeFilling.Build(new this._oc.Message_ProgressRange());
         if(ocMakeFilling.IsDone())
         {
             const newShapeOrCollection = new Shape()._fromOcShape(ocMakeFilling.Shape())
@@ -364,7 +364,7 @@ export class Face extends Shape
     {
         // NOTE: returns handle
         let ocFace = this._makeSpecificOcShape(this._ocShape, 'Face');
-        return new this._oc.BRep_Tool.prototype.constructor.Surface_2(ocFace);
+        return this._oc.BRep_Tool.Surface(ocFace);
     }
 
     _ocGeom():any 
@@ -432,7 +432,7 @@ export class Face extends Shape
 
     outerWire():Wire
     {
-        const OcBRepTools = this._oc.BRepTools.prototype.constructor;
+        const OcBRepTools = this._oc.BRepTools;
         const w = new Wire()._fromOcWire(OcBRepTools.OuterWire(this._ocShape));
         return w;
     }
@@ -455,15 +455,9 @@ export class Face extends Shape
             See solution for references to javascript variables: https://github.com/donalffons/opencascade.js/blob/master/doc/README.md#references-to-built-in-data-types
         */
 
-        const umin= { current: 0 };
-        const umax = { current: 0 };
-        const vmin = { current: 0 };
-        const vmax = { current: 0 };
-
         const ocFace = this._makeSpecificOcShape(this._ocShape, 'Face');        
-        this._oc.BRepTools.UVBounds_1(ocFace, umin,umax, vmin, vmax); // Although it does not crash these values still don't get updated!
-
-        return [umin.current,umax.current, vmin.current, vmax.current];
+        const { UMin, UMax, VMin, VMax } = this._oc.BRepTools.UVBounds(ocFace);
+        return [UMin, UMax, VMin, VMax];
     }
 
     /** Reverse Face */
@@ -538,13 +532,13 @@ export class Face extends Shape
         }
 
         let ocSurface = this._toOcSurface();
-        let ocSurfaceProps = new this._oc.GeomLProp_SLProps_1(ocSurface, u, v, 2, 0.001);
+        let ocSurfaceProps = new this._oc.GeomLProp_SLProps(ocSurface, u, v, 2, 0.001);
         if (ocSurfaceProps.IsNormalDefined())
         {
             let normal = new Vector()._fromOcDir( ocSurfaceProps.Normal() );
             // To be sure: check orientation - reversed Faces we are trying to avoid in creation methods
 
-            if(this._ocShape.Orientation_1() === this._oc.TopAbs_Orientation.TopAbs_REVERSED)
+            if(this._ocShape.Orientation() === this._oc.TopAbs_Orientation.TopAbs_REVERSED)
             {
                 // console.warn(`Face::normalAtUv: Encoutered a reversed Face: flipped outputted normal!`)
                 return normal.reversed();
@@ -569,10 +563,10 @@ export class Face extends Shape
     /** Calculate the area of this Face */
     area():number
     {
-        const ocProps = new this._oc.GProp_GProps_1();
-        const BRepGProp = this._oc.BRepGProp.prototype.constructor;
+        const ocProps = new this._oc.GProp_GProps();
+        const BRepGProp = this._oc.BRepGProp;
 
-        BRepGProp.SurfaceProperties_1(this._ocShape, ocProps, false, false);
+        BRepGProp.SurfaceProperties(this._ocShape, ocProps, false, false);
         const area = roundToTolerance(ocProps.Mass());
         ocProps?.delete(); // clear OC instance
         return area;
@@ -615,7 +609,7 @@ export class Face extends Shape
         
         let extrudeVec = directionVec.normalized().scaled(amount);
 
-        let ocSolid = new this._oc.BRepPrimAPI_MakePrism_1(this._ocShape, extrudeVec._toOcVector(), true, true).Shape(); // make a copy 
+        let ocSolid = new this._oc.BRepPrimAPI_MakePrism(this._ocShape, extrudeVec._toOcVector(), true, true).Shape(); // make a copy
         let newSolid = new Solid()._fromOcSolid(ocSolid);
 
         return newSolid;
@@ -884,14 +878,14 @@ export class Face extends Shape
         let filletAtVertices = ((checkedVertices && checkedVertices.length > 0) ? checkedVertices : faceVertices) as VertexCollection;
         filletAtVertices = filletAtVertices.unique() as VertexCollection; // remove double vertices for more robustness
 
-        let ocMakeFillet = new this._oc.BRepFilletAPI_MakeFillet2d_2(this._ocShape);
+        let ocMakeFillet = new this._oc.BRepFilletAPI_MakeFillet2d(this._ocShape);
 
         filletAtVertices.forEach( v => 
         {
             ocMakeFillet.AddFillet(v._ocShape, radius)
         });
 
-        ocMakeFillet.Build(new this._oc.Message_ProgressRange_1());
+        ocMakeFillet.Build(new this._oc.Message_ProgressRange());
         this._fromOcFace(ocMakeFillet.Shape());
 
         return this;        
@@ -938,7 +932,7 @@ export class Face extends Shape
  
          let chamferAtVertices = ((checkedVertices && checkedVertices.length > 0) ? checkedVertices : this.vertices()) as VertexCollection;
  
-         let ocMakeChamfer = new this._oc.BRepFilletAPI_MakeFillet2d_2(this._ocShape);
+         let ocMakeChamfer = new this._oc.BRepFilletAPI_MakeFillet2d(this._ocShape);
          let allEdges = this.edges();
  
          chamferAtVertices.forEach( (vertex,i) => 
@@ -959,10 +953,10 @@ export class Face extends Shape
              }
 
              // now add chamfer
-             ocMakeChamfer.AddChamfer_2(primaryEdge._ocShape, vertex._ocShape, distance, toRad(angle))
+             ocMakeChamfer.AddChamfer(primaryEdge._ocShape, vertex._ocShape, distance, toRad(angle))
          });
  
-         ocMakeChamfer.Build(new this._oc.Message_ProgressRange_1());
+         ocMakeChamfer.Build(new this._oc.Message_ProgressRange());
          let newOcFace = ocMakeChamfer.Shape();
  
          this._fromOcFace(newOcFace);
@@ -1016,7 +1010,7 @@ export class Face extends Shape
                 for ( let i = 1; i <= ocLineSequence.Size(); i++ )
                 {
                     let ocCurveHandle = ocIntTool.ocLineSequence.Value(i); // Lines() returns IntTools_SequenceOfCurves
-                    let ocCurve = ocCurveHandle.Curve().get();
+                    let ocCurve = ocCurveHandle.Curve();
                     
                     let newEdge = new Edge()._fromOcEdge(ocCurve);
                     intersectionShapes.push(newEdge);
@@ -1057,7 +1051,7 @@ export class Face extends Shape
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_shape_analysis___surface.html#ad17aee92b394ed751cb743ba2c905192
         let ocSurface = this._toOcSurface();
         let ocSurfaceAnalysis = new this._oc.ShapeAnalysis_Surface(ocSurface);
-        let ocPoint = ocSurfaceAnalysis.Value_1(u,v);
+        let ocPoint = ocSurfaceAnalysis.Value(u,v);
         return new Point()._fromOcPoint(ocPoint);
     }
 

@@ -147,19 +147,15 @@ export class OcLoader
   async _loadOcBrowserAsync()
   {
     console.log(`OcLoader::_loadOcBrowserAsync(): Loading OpenCascade WASM module`);
-    // We first try with only wasm as dynamic 
+    // Emscripten 6's module factory resolves the binary through locateFile.
     const wasmPath = await this._getAbsPath(this.ocWasmModulePath);
-    //const wasmPath = await this._getAbsPath('./wasm/archiyou-opencascade.wasm'); 
-    const ocWasm = (await import(/* webpackIgnore: true */ wasmPath)).default;
-    // const ocJs = ocFullJS; // static import - This works with very old stack like Webpack 4
     const ocJs = (await import(await this._getAbsPath(this.ocJsModulePath))).default;
 
     // https://emscripten.org/docs/api_reference/module.html#Module.locateFile
     const oc = await ocJs({ 
         locateFile(path)
         {
-          if (path.endsWith('.wasm')) { return ocWasm; }
-          if (path.endsWith('.worker.js') && !!worker) { return worker; }
+          if (path.endsWith('.wasm')) { return wasmPath; }
           return path;
         }
     });

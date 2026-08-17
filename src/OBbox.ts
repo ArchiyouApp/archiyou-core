@@ -32,8 +32,8 @@ export class OBbox
     
     create(shape:AnyShape):this
     {
-        this._ocOBbox = new this._oc.Bnd_OBB_1();
-        this._oc.BRepBndLib.prototype.constructor.AddOBB(
+        this._ocOBbox = new this._oc.Bnd_OBB();
+        this._oc.BRepBndLib.AddOBB(
             shape._ocShape, this._ocOBbox, true, false, false); // useTriangulation, isOptimal, theIsShapeToleranceUsed                    
 
         return this;

@@ -80,7 +80,7 @@ export class Vector extends Point
     _updateOcVector():Vector
     {
         // Don't make OC zero Vector: difficult to control
-        this._ocVector = (this._oc) ? new this._oc.gp_Vec_4(
+        this._ocVector = (this._oc) ? new this._oc.gp_Vec(
                 this._x || 0,  // avoid nulls
                 this._y || 0,  
                 this._z || 0
@@ -99,9 +99,9 @@ export class Vector extends Point
 
     _toOcLocation():any // TODO OC type
     {
-        const ocTransform = new this._oc.gp_Trsf_1();
+        const ocTransform = new this._oc.gp_Trsf();
         ocTransform.SetTranslationPart(this._ocVector);
-        const ocLocation = new this._oc.TopLoc_Location_2(ocTransform);
+        const ocLocation = new this._oc.TopLoc_Location(ocTransform);
 
         return ocLocation;
         // TODO: target for garbage collection
@@ -340,7 +340,7 @@ export class Vector extends Point
     {
         console.error(`Vector::eulerAngles might not work!`);
 
-        let quaternion = new this._oc.gp_Quaternion_3(this._ocVector, (other as Vector)._ocVector).Normalized();
+        let quaternion = new this._oc.gp_Quaternion(this._ocVector, (other as Vector)._ocVector).Normalized();
         
         // ==== Of course this is not working, because OC cannot write to references ====
         // let eulerOrder = this._oc.gp_EulerSequence.gp_Intrinsic_XYZ;
@@ -595,8 +595,8 @@ export class Vector extends Point
         const positionPoint = (position as Vector).toPoint(); // auto converted to Vector
         const directionVec = direction as Vector
 
-        const ocAxis = new this._oc.gp_Ax1_2( positionPoint._toOcPoint(), directionVec._toOcDir() );
-        this._ocVector.Mirror_2(ocAxis);
+        const ocAxis = new this._oc.gp_Ax1( positionPoint._toOcPoint(), directionVec._toOcDir() );
+        this._ocVector.Mirror(ocAxis);
         this._fromOcVec(); // sync internals with Oc instance
         ocAxis?.delete(); // clear ocAxis
         return this;
@@ -618,7 +618,7 @@ export class Vector extends Point
         // IMPORTANT: probably right-hand rotation - for Y - axis this could cause problems 
 
         /** See OC gp_Pnt: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/classgp___pnt.html */
-        const ocAxis = new this._oc.gp_Ax1_2( (position as Point)._toOcPoint(), (direction as Vector)._toOcDir() ); // auto converted
+        const ocAxis = new this._oc.gp_Ax1( (position as Point)._toOcPoint(), (direction as Vector)._toOcDir() ); // auto converted
         this._ocVector.Rotate(ocAxis,toRad(angle));
         this._fromOcVec(); // sync internals from oc instance
         ocAxis?.delete(); // clean

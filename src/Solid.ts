@@ -67,7 +67,7 @@ export class Solid extends Shape
     @checkInput(Shell, 'auto')
     fromShell(shell: Shell) 
     {
-        const ocSolid = new this._oc.ShapeFix_Solid_1().SolidFromShell(shell._ocShape);
+        const ocSolid = new this._oc.ShapeFix_Solid().SolidFromShell(shell._ocShape);
         return this._fromOcShape(ocSolid) as Solid;
     }
 
@@ -84,7 +84,7 @@ export class Solid extends Shape
             }
         });
             
-        ocSew.Perform( new this._oc.Message_ProgressRange_1());
+        ocSew.Perform( new this._oc.Message_ProgressRange());
         let ocSewedShapeOrCompound = ocSew.SewedShape();
 
         if( ocSewedShapeOrCompound.ShapeType() == 0) // Compound
@@ -92,7 +92,7 @@ export class Solid extends Shape
             console.warn(`Solid::fromShells: Sew failed: we still got multiple Shapes (probably Shells). Output will be ShapeCollection!`);
         }
 
-        let ocSolidBuilder = new this._oc.BRepBuilderAPI_MakeSolid_1();
+        let ocSolidBuilder = new this._oc.BRepBuilderAPI_MakeSolid();
         let ocShapeShells = this._getOcShapesByType(ocSewedShapeOrCompound, 'Shell');
         ocShapeShells.forEach( ocShell => 
         {
@@ -169,7 +169,7 @@ export class Solid extends Shape
         depth = depth || width;
         height = height || width;
 
-        const ocBox = new this._oc.BRepPrimAPI_MakeBox_2( width, depth, height).Shape();
+        const ocBox = new this._oc.BRepPrimAPI_MakeBox( width, depth, height).Shape();
         this._fromOcSolid(ocBox);
 
         // translate
@@ -193,7 +193,7 @@ export class Solid extends Shape
             return null;
         }
         
-        const ocBox = new this._oc.BRepPrimAPI_MakeBox_4( fromP._toOcPoint(), toP._toOcPoint() ).Shape();
+        const ocBox = new this._oc.BRepPrimAPI_MakeBox( fromP._toOcPoint(), toP._toOcPoint() ).Shape();
         this._fromOcSolid(ocBox);
 
         return this;
@@ -206,7 +206,7 @@ export class Solid extends Shape
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim___sphere.html
         const angleRad = toRad(angle);
-        const ocSphere = (new this._oc.BRepPrimAPI_MakeSphere_6((position as Point)._toOcPoint(), radius, angleRad)).Shape();
+        const ocSphere = (new this._oc.BRepPrimAPI_MakeSphere((position as Point)._toOcPoint(), radius, angleRad)).Shape();
         this._fromOcSolid(ocSphere);
         
         return this;
@@ -220,7 +220,7 @@ export class Solid extends Shape
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_cone.html#afd899db3f2bc7e2b570305678ba8b40b
         const angleRad = toRad(angle);
-        const ocCone = (new this._oc.BRepPrimAPI_MakeCone_2( bottomRadius, topRadius, height, angleRad)).Shape();
+        const ocCone = (new this._oc.BRepPrimAPI_MakeCone( bottomRadius, topRadius, height, angleRad)).Shape();
         
         this._fromOcSolid(ocCone);
         this.move(position as Point); // auto converted to Point
@@ -237,7 +237,7 @@ export class Solid extends Shape
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_prim_a_p_i___make_cylinder.html
         const angleRad = toRad(angle);
-        const ocCone = (new this._oc.BRepPrimAPI_MakeCylinder_2( radius, height, angleRad )).Shape();
+        const ocCone = (new this._oc.BRepPrimAPI_MakeCylinder( radius, height, angleRad )).Shape();
 
         this._fromOcSolid(ocCone);
         this.move(position as Point) as Solid;
@@ -270,10 +270,10 @@ export class Solid extends Shape
          *      - BRepGProp: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_b_rep_g_prop.html#abd91b892df8d0f6b8571deed5562ca1f
          * */
 
-        let ocProps = new this._oc.GProp_GProps_1();
-        let BRepGProp = this._oc.BRepGProp.prototype.constructor;
+        let ocProps = new this._oc.GProp_GProps();
+        let BRepGProp = this._oc.BRepGProp;
         
-        BRepGProp.SurfaceProperties_1(this._ocShape, ocProps, false, false);
+        BRepGProp.SurfaceProperties(this._ocShape, ocProps, false, false);
 
         return new Point()._fromOcPoint(ocProps.CentreOfMass());
         
@@ -291,12 +291,12 @@ export class Solid extends Shape
     _fix():Solid
     {
         const ocSolid = this._makeSpecificOcShape(this._ocShape);
-        const ocShapeFix = new this._oc.ShapeFix_Solid_2(ocSolid);
+        const ocShapeFix = new this._oc.ShapeFix_Solid(ocSolid);
         ocShapeFix.SetPrecision(this._oc.SHAPE_TOLERANCE); // does not seem to work
         ocShapeFix.SetMaxTolerance(this._oc.SHAPE_TOLERANCE);
         ocShapeFix.SetMinTolerance(this._oc.SHAPE_TOLERANCE);
 
-        ocShapeFix.Perform(new this._oc.Message_ProgressRange_1());
+        ocShapeFix.Perform(new this._oc.Message_ProgressRange());
         const fixedOcSolid = this._makeSpecificOcShape(ocShapeFix.Shape()); // make sure it is a TopoDS_Solid 
         this._fromOcSolid(fixedOcSolid, false); // avoid infinite loops by avoiding fix
         return this;
@@ -312,7 +312,7 @@ export class Solid extends Shape
         let ocReShape = new this._oc.BRepTools_ReShape();
 
         this.faces().forEach( face => {
-            if( face._ocShape.Orientation_1() === this._oc.TopAbs_Orientation.TopAbs_REVERSED )
+            if( face._ocShape.Orientation() === this._oc.TopAbs_Orientation.TopAbs_REVERSED )
             {
                 let newOcFace = face._ocShape.Complemented();
                 ocReShape.Replace(face._ocShape, newOcFace);
@@ -425,8 +425,8 @@ export class Solid extends Shape
         }
         
         let ocMakeFillet = new this._oc.BRepFilletAPI_MakeFillet(this._ocShape, this._oc.ChFi3d_FilletShape.ChFi3d_Rational );
-        checkedOfShapeFilletEdges.forEach( edge => ocMakeFillet.Add_2(radius, edge._ocShape) );
-        ocMakeFillet.Build(new this._oc.Message_ProgressRange_1());
+        checkedOfShapeFilletEdges.forEach( edge => ocMakeFillet.Add(radius, edge._ocShape) );
+        ocMakeFillet.Build(new this._oc.Message_ProgressRange());
         if (ocMakeFillet.IsDone())
         {
             const ocShape = ocMakeFillet.Shape();
@@ -543,8 +543,8 @@ export class Solid extends Shape
          }
          
         let ocMakeChamfer = new this._oc.BRepFilletAPI_MakeChamfer(this._ocShape );
-        checkedOfShapeChamferEdges.forEach( edge => ocMakeChamfer.Add_2(distance, edge._ocShape) );
-        ocMakeChamfer.Build(new this._oc.Message_ProgressRange_1());
+        checkedOfShapeChamferEdges.forEach( edge => ocMakeChamfer.Add(distance, edge._ocShape) );
+        ocMakeChamfer.Build(new this._oc.Message_ProgressRange());
         if (ocMakeChamfer.IsDone())
         {
             let ocShape = ocMakeChamfer.Shape();

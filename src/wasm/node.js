@@ -17,7 +17,7 @@ const initOpenCascade = ({
   module = {},
 } = {}) => {
   return new Promise((resolve, reject) => {
-    new mainJS({
+    mainJS({
       locateFile(path) {
         if (path.endsWith('.wasm')) {
           return mainWasm;

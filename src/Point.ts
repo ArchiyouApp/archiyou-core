@@ -231,12 +231,12 @@ export class Point
 
     _toOcPoint():gp_Pnt
     {
-        return new this._oc.gp_Pnt_3(this._x, this._y, this._z);
+        return new this._oc.gp_Pnt(this._x, this._y, this._z);
     }
     
     _toOcVector():gp_Vec
     {
-        return new this._oc.gp_Vec_4(this._x, this._y, this._z);
+        return new this._oc.gp_Vec(this._x, this._y, this._z);
     }
 
     _toOcDir():any // TODO: OC typing
@@ -251,7 +251,7 @@ export class Point
             p = this;
         }   
 
-        return new this._oc.gp_Dir_2(p._toOcVector());
+        return new this._oc.gp_Dir(p._toOcVector());
     }
 
     toArray():[number,number,number]
@@ -473,8 +473,8 @@ export class Point
             // const [umin,umax] = (curEdge as Edge).getParamMinMax();
             let ocGeomCurveHandle = (curEdge as Edge)._toOcCurve().Curve().Curve(); // Going through the adaptors: _toOcCurve : Adaptor3D_Curve => .Curve(): GeomAdaptor_Curve => .Curve(): Handle_Geom_Curve 
             
-            //let ocProjector = new this._oc.GeomAPI_ProjectPointOnCurve_3(this._toOcPoint(), ocGeomCurveHandle, umin, umax);
-            let ocProjector = new this._oc.GeomAPI_ProjectPointOnCurve_2(this._toOcPoint(), ocGeomCurveHandle);
+            //let ocProjector = new this._oc.GeomAPI_ProjectPointOnCurve(this._toOcPoint(), ocGeomCurveHandle, umin, umax);
+            let ocProjector = new this._oc.GeomAPI_ProjectPointOnCurve(this._toOcPoint(), ocGeomCurveHandle);
 
             for( let i = 1; i < ocProjector.NbPoints()+1; i++ )
             {

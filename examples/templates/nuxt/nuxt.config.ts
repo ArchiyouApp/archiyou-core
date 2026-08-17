@@ -1,5 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 
+import { resolve } from 'node:path';
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   ssr: false, // disable for CAD apps
@@ -18,6 +20,14 @@ export default defineNuxtConfig({
       include: ['@google/model-viewer'], 
     },
     assetsInclude: ['**/*.wasm'], // fix for able to load .wasm files
-  }
+  },
+  nitro: {
+    publicAssets: [
+      {
+        dir: resolve('../../../src/wasm'),
+        baseURL: '/_nuxt/wasm',
+      },
+    ],
+  },
   
 })

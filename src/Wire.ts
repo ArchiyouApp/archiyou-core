@@ -222,10 +222,10 @@ export class Wire extends Shape
 
         let checkedEdgesCollection = edgesCollection.getShapesByType('Edge'); // filter out all non-Edge Shapes
 
-        let wireBuilder = new this._oc.BRepBuilderAPI_MakeWire_1();
-        checkedEdgesCollection.forEach(e => wireBuilder.Add_1(e._ocShape)); // NOTE: we can also add Wires and general Shapes to the WireBuilder: TODO
+        let wireBuilder = new this._oc.BRepBuilderAPI_MakeWire();
+        checkedEdgesCollection.forEach(e => wireBuilder.Add(e._ocShape)); // NOTE: we can also add Wires and general Shapes to the WireBuilder: TODO
 
-        wireBuilder.Build(new this._oc.Message_ProgressRange_1());
+        wireBuilder.Build(new this._oc.Message_ProgressRange());
         
         if (wireBuilder.IsDone() == false)
         {
@@ -302,7 +302,7 @@ export class Wire extends Shape
             - Geom2d_Line: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_geom2d___line.html
             - gp_Pnt2d: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___pnt2d.html#af678f82fce31cbc5847c8c6e1e9b750c
             - gp_Dir2d: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___dir2d.html
-            - GCE2d_MakeSegment: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_g_c_e2d___make_segment.html
+            - GC_MakeSegment2d: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_g_c_e2d___make_segment.html
             - BRepBuilderAPI_MakeEdge: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_builder_a_p_i___make_edge.html
             - BRepLib: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_lib.html
         */
@@ -312,8 +312,8 @@ export class Wire extends Shape
 
         if (!coneSemiAngle || Math.abs(coneSemiAngle) == 90)
         {
-            ocGeomSurface = new this._oc.Geom_CylindricalSurface_1(
-                                    new this._oc.gp_Ax3_4( 
+            ocGeomSurface = new this._oc.Geom_CylindricalSurface(
+                                    new this._oc.gp_Ax3(
                                         (pivot as Point)._toOcPoint(),
                                         (direction as Vector)._toOcDir()),
                                     radius
@@ -321,8 +321,8 @@ export class Wire extends Shape
         }
         else {
             // a tapering Helix
-            ocGeomSurface = new this._oc.Geom_ConicalSurface_1(
-                                new this._oc.gp_Ax3_4((pivot as Point)._toOcPoint(), (direction as Vector)._toOcDir()), 
+            ocGeomSurface = new this._oc.Geom_ConicalSurface(
+                                new this._oc.gp_Ax3((pivot as Point)._toOcPoint(), (direction as Vector)._toOcDir()),
                                 toRad(coneSemiAngle), // angle is semi-angle of cone: meaning half of the angle in the top. Range 0 > angle > 90
                                 radius
                             )
@@ -331,20 +331,19 @@ export class Wire extends Shape
 
         let pitch = height/(angle/360);
         let d = (lefthand) ? -1 : 1; // lefthand or righthand
-        let ocGeomLine = new this._oc.Geom2d_Line_3(new this._oc.gp_Pnt2d_3(0,0), new this._oc.gp_Dir2d_4(d*2*Math.PI, pitch))
+        let ocGeomLine = new this._oc.Geom2d_Line(new this._oc.gp_Pnt2d(0,0), new this._oc.gp_Dir2d(d*2*Math.PI, pitch))
 
         let numTurns = angle/360;
         let ocStartPoint = ocGeomLine.Value(0);
         let ocEndPoint = ocGeomLine.Value(numTurns*Math.sqrt( (2*Math.PI)**2 + pitch**2));
 
-        let ocGeomTrimmedSegHandle = new this._oc.GCE2d_MakeSegment_1(ocStartPoint, ocEndPoint).Value(); // Handle_Geom2d_TrimmedCurve
-        let ocGeomSegHandle = ocGeomTrimmedSegHandle.get().Reversed().get().Reversed(); // TODO: how can we downgrade Handle_Geom2d_TrimmedCurve to Handle_Geom2d_Curve
+        const ocGeomSegment = new this._oc.GC_MakeSegment2d(ocStartPoint, ocEndPoint).Value();
+        const ocGeomCurve = ocGeomSegment.Reversed().Reversed();
 
-        let ocGeomSurfaceHandle = new this._oc.Handle_Geom_Surface_2(ocGeomSurface);
-        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge_30(ocGeomSegHandle, ocGeomSurfaceHandle).Edge();
-        let ocWire = new this._oc.BRepBuilderAPI_MakeWire_2(ocEdge).Wire();
+        let ocEdge = new this._oc.BRepBuilderAPI_MakeEdge(ocGeomCurve, ocGeomSurface).Edge();
+        let ocWire = new this._oc.BRepBuilderAPI_MakeWire(ocEdge).Wire();
 
-        this._oc.BRepLib.BuildCurves3d_1(ocWire, this._oc.SHAPE_TOLERANCE, this._oc.GeomAbs_Shape.GeomAbs_C1, 14, 2000 ); // Wire, tolerance, GeomAbs_Shape, maxDegree, maxSegment        
+        this._oc.BRepLib.BuildCurves3d(ocWire, this._oc.SHAPE_TOLERANCE, this._oc.GeomAbs_Shape.GeomAbs_C1, 14, 2000 ); // Wire, tolerance, GeomAbs_Shape, maxDegree, maxSegment
         
         return this._fromOcWire(ocWire);
     }
@@ -374,46 +373,42 @@ export class Wire extends Shape
         const numFullPeriods = Math.floor(numPeriods);
         const remainingPeriod = numPeriods-numFullPeriods; 
         
-        const ocPoints = new this._oc.TColgp_Array1OfPnt_2(1, 2);
+        const ocPoints = new this._oc.NCollection_Array1_gp_Pnt(1, 2);
         ocPoints.SetValue(1, new Point(firstRadius,0,0)._toOcPoint());
         ocPoints.SetValue(2, new Point(secondRadius,0,0)._toOcPoint());
-        let ocMeridian = new this._oc.Geom_BezierCurve_1(ocPoints);
-        let ocMeridianHandle = new this._oc.Handle_Geom_Curve_2(ocMeridian);
+        let ocMeridian = new this._oc.Geom_BezierCurve(ocPoints);
 
-        let ocAxis = new this._oc.gp_Ax1_2(new Point(0,0,0)._toOcPoint(), new Vector(0,0,1)._toOcDir());
+        let ocAxis = new this._oc.gp_Ax1(new Point(0,0,0)._toOcPoint(), new Vector(0,0,1)._toOcDir());
 
 
-        let ocRevSurface = new this._oc.Geom_SurfaceOfRevolution(ocMeridianHandle, ocAxis);
-        let ocRevSurfaceHandle = new this._oc.Handle_Geom_Surface_2(ocRevSurface);
+        let ocRevSurface = new this._oc.Geom_SurfaceOfRevolution(ocMeridian, ocAxis);
         
-        let ocPeriodStart = new this._oc.gp_Pnt2d_3(0,0);
-        let ocPeriodEnd = new this._oc.gp_Pnt2d_3(0,0)
-        let ocInsetDir = new this._oc.gp_Vec2d_4(((lefthand) ? -1 : 1)*2.0*Math.PI, 1/numPeriods );
+        let ocPeriodStart = new this._oc.gp_Pnt2d(0,0);
+        let ocPeriodEnd = new this._oc.gp_Pnt2d(0,0)
+        let ocInsetDir = new this._oc.gp_Vec2d(((lefthand) ? -1 : 1)*2.0*Math.PI, 1/numPeriods );
 
-        let ocWireBuilder = new this._oc.BRepBuilderAPI_MakeWire_1();
+        let ocWireBuilder = new this._oc.BRepBuilderAPI_MakeWire();
 
         for ( let i = 0; i < numFullPeriods; i++ )
         {
-            ocPeriodEnd = ocPeriodStart.Translated_1(ocInsetDir);
-            let ocSegm = new this._oc.GCE2d_MakeSegment_1(ocPeriodStart , ocPeriodEnd).Value();
-            ocSegm = new this._oc.Handle_Geom2d_Curve_2(ocSegm.get());
-            let ocEdgeOnSurf = new this._oc.BRepBuilderAPI_MakeEdge_30(ocSegm , ocRevSurfaceHandle).Edge();
-            ocWireBuilder.Add_1(ocEdgeOnSurf);
+            ocPeriodEnd = ocPeriodStart.Translated(ocInsetDir);
+            const ocSegm = new this._oc.GC_MakeSegment2d(ocPeriodStart , ocPeriodEnd).Value();
+            let ocEdgeOnSurf = new this._oc.BRepBuilderAPI_MakeEdge(ocSegm , ocRevSurface).Edge();
+            ocWireBuilder.Add(ocEdgeOnSurf);
             ocPeriodStart = ocPeriodEnd;
         }
         // remaining loop
         if (remainingPeriod > this._oc.SHAPE_TOLERANCE)
         {
             ocInsetDir.Scale(remainingPeriod);
-            ocPeriodEnd = ocPeriodStart.Translated_1(ocInsetDir);
-            let ocSegm = new this._oc.GCE2d_MakeSegment_1(ocPeriodStart , ocPeriodEnd).Value();
-            ocSegm = new this._oc.Handle_Geom2d_Curve_2(ocSegm.get());
-            let ocEdgeOnSurf = new this._oc.BRepBuilderAPI_MakeEdge_30(ocSegm , ocRevSurfaceHandle).Edge();
-            ocWireBuilder.Add_1(ocEdgeOnSurf);
+            ocPeriodEnd = ocPeriodStart.Translated(ocInsetDir);
+            const ocSegm = new this._oc.GC_MakeSegment2d(ocPeriodStart , ocPeriodEnd).Value();
+            let ocEdgeOnSurf = new this._oc.BRepBuilderAPI_MakeEdge(ocSegm , ocRevSurface).Edge();
+            ocWireBuilder.Add(ocEdgeOnSurf);
         }
         
         let ocWire = ocWireBuilder.Wire();
-        this._oc.BRepLib.BuildCurves3d_1(ocWire, this._oc.SHAPE_TOLERANCE, this._oc.GeomAbs_Shape.GeomAbs_C1, 14, 10000 ); // Wire, tolerance, GeomAbs_Shape, maxDegree, maxSegment    
+        this._oc.BRepLib.BuildCurves3d(ocWire, this._oc.SHAPE_TOLERANCE, this._oc.GeomAbs_Shape.GeomAbs_C1, 14, 10000 ); // Wire, tolerance, GeomAbs_Shape, maxDegree, maxSegment
         return this._fromOcWire(ocWire);
     }
 
@@ -472,13 +467,13 @@ export class Wire extends Shape
 
      _toOcCurve():any
     {
-        return this._toOcCurveHandle().get();   
+        return this._toOcCurveHandle();
     }
 
     _toOcCurveHandle():any
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_adaptor___comp_curve.html#a1c128035c0640cf679fd3bc22cb59e56
-        let ocCompCurve = new this._oc.BRepAdaptor_CompCurve_2(this._ocShape, false); // TopoDS_Shape, KnotByCurvilinearAbcissa 
+        let ocCompCurve = new this._oc.BRepAdaptor_CompCurve(this._ocShape, false); // TopoDS_Shape, KnotByCurvilinearAbcissa
         
         let ocCurveHandle = ocCompCurve.Trim(ocCompCurve.FirstParameter(), ocCompCurve.LastParameter(), 0.0001); // Use trim to get a Curve, ShallowCopy is not in library yet!    
 
@@ -496,7 +491,7 @@ export class Wire extends Shape
             return true;
         }
 
-        let ocSurfaceFinder = new this._oc.BRepLib_FindSurface_2(this._ocShape, 1e-3, true, false)
+        let ocSurfaceFinder = new this._oc.BRepLib_FindSurface(this._ocShape, 1e-3, true, false)
         if (!ocSurfaceFinder.Found())
         {
             ocSurfaceFinder.delete();
@@ -520,7 +515,7 @@ export class Wire extends Shape
     closed():boolean
     {
         // OC docs: BRep_Tool: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep___tool.html
-        return (this._oc.BRep_Tool.prototype.constructor.IsClosed_1(this._ocShape) === true);
+        return (this._oc.BRep_Tool.IsClosed(this._ocShape) === true);
     }
 
     /** Check if Wire is continuous */
@@ -528,10 +523,10 @@ export class Wire extends Shape
     {
         /** OC docs: https://dev.opencascade.org/doc/refman/html/class_shape_analysis___wire.html */
         // IMPORTANT ON USING ShapeAnalysis: We need to make the Wire part of a Face to get information on self-intersection, connected etc.
-        let shapeAnalyse = new this._oc.ShapeAnalysis_Wire_1();
-        shapeAnalyse.Load_1(this._ocShape);
+        let shapeAnalyse = new this._oc.ShapeAnalysis_Wire();
+        shapeAnalyse.Load(this._ocShape);
         
-        let c = !shapeAnalyse.CheckConnected_1(0.0); // NOTE: seems more logical that is returns true when all is connected
+        let c = !shapeAnalyse.CheckConnected(0.0); // NOTE: seems more logical that is returns true when all is connected
 
         return c;
     }
@@ -544,8 +539,8 @@ export class Wire extends Shape
          */
 
         /*
-        let shapeAnalyse = new this._oc.ShapeAnalysis_Wire_1();
-        shapeAnalyse.Load_1(this._ocShape);
+        let shapeAnalyse = new this._oc.ShapeAnalysis_Wire();
+        shapeAnalyse.Load(this._ocShape);
         return shapeAnalyse.CheckSelfIntersection();
         */
 
@@ -860,20 +855,20 @@ export class Wire extends Shape
         {
             try 
             { 
-                let ocWireFixer = new this._oc.ShapeFix_Wire_2(this._ocShape, new Face().fromWire(this)._ocGeom(), -1.0 );
+                let ocWireFixer = new this._oc.ShapeFix_Wire(this._ocShape, new Face().fromWire(this)._ocGeom(), -1.0 );
                 ocWireFixer.SetPrecision(FIX_PRECISION);
 
                 if (ocWireFixer.IsReady())
                 {
-                    ocWireFixer.FixReorder_1(); // this needs to go first see: https://dev.opencascade.org/doc/overview/html/occt_user_guides__shape_healing.html
-                    //ocWireFixer.FixSmall_1(true, 0.0);
+                    ocWireFixer.FixReorder(false); // this needs to go first see: https://dev.opencascade.org/doc/overview/html/occt_user_guides__shape_healing.html
+                    //ocWireFixer.FixSmall(true, 0.0);
                     //ocWireFixer.FixEdgeCurves();
-                    //ocWireFixer.FixDegenerated_1();
+                    //ocWireFixer.FixDegenerated();
                     //ocWireFixer.FixGaps3d(); // gives weird results with curved lines
                     // ocWireFixer.FixGaps2d(); // also weird results
                     //ocWireFixer.FixClosed(-1.0);
-                    ocWireFixer.FixConnected_1(this._oc.SHAPE_TOLERANCE); // can connect edges for closing!
-                    // ocWireFixer.FixLacking_1(false); // weird results
+                    ocWireFixer.FixConnected(this._oc.SHAPE_TOLERANCE); // can connect edges for closing!
+                    // ocWireFixer.FixLacking(false); // weird results
 
                     //ocWireFixer.Perform();
                     this._fromOcWire(ocWireFixer.Wire(), false); // fix=false, avoid un-ending loop
@@ -1135,7 +1130,7 @@ export class Wire extends Shape
             }
         });
 
-        ocLoft.Build(new this._oc.Message_ProgressRange_1());
+        ocLoft.Build(new this._oc.Message_ProgressRange());
 
         if (ocLoft.IsDone())
         {
@@ -1193,11 +1188,11 @@ export class Wire extends Shape
 
                 All these modes don't really seem to work:
 
-                builder.SetMode_1(true) // IsFrenet
-                builder.SetMode_2( new this._oc.gp_Ax2_3(new Vector(50,0,0)._toOcPoint(), new Vector(1,0,0)._toOcDir()));
-                builder.SetMode_3( new Vector(0,1,1)._toOcDir() );
-                builder.SetMode_4(profileWire._ocShape) // AuxiliarySpine, 	CurvilinearEquivalence, KeepContact
-                builder.SetMode_5(pathWire._ocShape, false, this._oc.BRepFill_TypeOfContact.BRepFill_NoContact) // AuxiliarySpine, 	CurvilinearEquivalence, KeepContact ==> Crash
+                builder.SetMode(true) // IsFrenet
+                builder.SetMode( new this._oc.gp_Ax2(new Vector(50,0,0)._toOcPoint(), new Vector(1,0,0)._toOcDir()));
+                builder.SetMode( new Vector(0,1,1)._toOcDir() );
+                builder.SetMode(profileWire._ocShape) // AuxiliarySpine, 	CurvilinearEquivalence, KeepContact
+                builder.SetMode(pathWire._ocShape, false, this._oc.BRepFill_TypeOfContact.BRepFill_NoContact) // AuxiliarySpine, 	CurvilinearEquivalence, KeepContact ==> Crash
 
                 builder.SetDiscreteMode() // does not do anything
             */
@@ -1211,10 +1206,10 @@ export class Wire extends Shape
             builder.SetTransitionMode(this._oc.BRepBuilderAPI_TransitionMode.BRepBuilderAPI_RightCorner ); // BRepBuilderAPI_Transformed             
             
             // NOTE: autoRotate with 2D Shapes (Edges and Faces) results in crashes!
-            builder.Add_1(p._ocShape, false, autoRotate); // WithContact ( autotranslate ), WithCorrection ( = autorotate )
+            builder.Add(p._ocShape, false, autoRotate); // WithContact ( autotranslate ), WithCorrection ( = autorotate )
             
             try {
-                builder.Build(new this._oc.Message_ProgressRange_1());
+                builder.Build(new this._oc.Message_ProgressRange());
             }
             catch(e){
                 console.error(`Wire::sweeped: Sweep failed. Try to turn off autoRotate for 2D Shapes!`);
@@ -1378,12 +1373,12 @@ export class Wire extends Shape
                 return (downgradedShape._offsetted(amount, type, onPlaneNormal) as Edge)._toWire();
             }
 
-            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_2(this._toFace()._ocShape, ocOffsetType, false); // isOpenResult
+            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset(this._toFace()._ocShape, ocOffsetType, false); // isOpenResult
         }
         else 
         {
             // offset open Wire
-            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset_3(this._ocShape, ocOffsetType, true); // isOpenResult
+            ocMakeOffset = new this._oc.BRepOffsetAPI_MakeOffset(this._ocShape, ocOffsetType, true); // isOpenResult
             isOpen = true;
         }
         
@@ -1441,9 +1436,9 @@ export class Wire extends Shape
         let axisSpine = new Edge().makeLine(pivotPoint, pivotPoint.toVector().add((direction as Vector).normalized().scale(amount)))._toWire();
         let auxSpine = new Wire().makeHelix(1, amount, angle, pivotPoint, direction, lefthand);
         let ocExtrudeBuilder = new this._oc.BRepOffsetAPI_MakePipeShell(axisSpine._ocShape);
-        ocExtrudeBuilder.SetMode_5(auxSpine._ocShape, false, this._oc.BRepFill_TypeOfContact.BRepFill_NoContact);
-        ocExtrudeBuilder.Add_1(this._ocShape, false, false); // WithContact, WithCorrection
-        ocExtrudeBuilder.Build(new this._oc.Message_ProgressRange_1());
+        ocExtrudeBuilder.SetMode(auxSpine._ocShape, false, this._oc.BRepFill_TypeOfContact.BRepFill_NoContact);
+        ocExtrudeBuilder.Add(this._ocShape, false, false); // WithContact, WithCorrection
+        ocExtrudeBuilder.Build(new this._oc.Message_ProgressRange());
         ocExtrudeBuilder.MakeSolid();
         let newOcSolid = ocExtrudeBuilder.Shape()   
         return new Shape()._fromOcShape(newOcSolid) as Solid;
@@ -1503,16 +1498,16 @@ export class Wire extends Shape
         }
 
         const ocProj = (direction) 
-                            ? new this._oc.BRepProj_Projection_1(this._ocShape, other._ocShape, direction._toOcDir())
-                            : new this._oc.BRepProj_Projection_2(this._ocShape, other._ocShape, center._toOcPoint())
+                            ? new this._oc.BRepProj_Projection(this._ocShape, other._ocShape, direction._toOcDir())
+                            : new this._oc.BRepProj_Projection(this._ocShape, other._ocShape, center._toOcPoint())
         
-        const ocOrigOrientation = this._ocShape.Orientation_1();
+        const ocOrigOrientation = this._ocShape.Orientation();
         const projWires = [];
 
         while (ocProj.More())
         {
             const projOcWire = ocProj.Current()
-            if(ocOrigOrientation !== projOcWire.Orientation_1())
+            if(ocOrigOrientation !== projOcWire.Orientation())
             {
                 projOcWire.Reverse();
             }

@@ -130,7 +130,7 @@ export class Shell extends Shape
 
         let ocShellBuilder = new this._oc.BRepBuilderAPI_Sewing(1e-6, true, true, true, false);
         facesCollection.forEach( curFace => ocShellBuilder.Add(curFace._ocShape));
-        ocShellBuilder.Perform( new this._oc.Message_ProgressRange_1());
+        ocShellBuilder.Perform( new this._oc.Message_ProgressRange());
         
         const ocSewResult = ocShellBuilder.SewedShape(); // Can be a single Shell or Compound
         
@@ -205,24 +205,21 @@ export class Shell extends Shape
                 let geomAdaptorCurve = (e as Edge)._toOcCurve().Curve();
                 let handleAdaptor3dHCurve = geomAdaptorCurve.Trim(geomAdaptorCurve.FirstParameter(), geomAdaptorCurve.LastParameter(), 1e-3);
                 let geomFillSimpleBound = new this._oc.GeomFill_SimpleBound( handleAdaptor3dHCurve , 1e-3, 1e-3); // Tol3d TolAng
-                let handleGeomBound = new this._oc.Handle_GeomFill_Boundary_2(geomFillSimpleBound);
-
-                return handleGeomBound
+                return geomFillSimpleBound;
             });
 
             if(checkedEdges.length == 3 )
             {
-                ocConstrainedFilling.Init_1(ocBoundaries[0], ocBoundaries[1], ocBoundaries[2], false); // noCheck
+                ocConstrainedFilling.Init(ocBoundaries[0], ocBoundaries[1], ocBoundaries[2], false); // noCheck
             }
             else {
-                ocConstrainedFilling.Init_2(ocBoundaries[0], ocBoundaries[1], ocBoundaries[2], ocBoundaries[3], false); // noCheck
+                ocConstrainedFilling.Init(ocBoundaries[0], ocBoundaries[1], ocBoundaries[2], ocBoundaries[3], false); // noCheck
             }
 
-            let ocSurfaceBspline = ocConstrainedFilling.Surface(); // Handle_Geom_BSplineSurface: https://dev.opencascade.org/doc/refman/html/class_geom___b_spline_surface.html
+            const ocSurface = ocConstrainedFilling.Surface();
 
             // make Face/Shell from Surface
-            let ocSurface = new this._oc.Handle_Geom_Surface_2(ocSurfaceBspline.get()); // NOTE: We can easily 'transform' inheritance chains with the Handle logic: To Handle_Geom_Surface_2
-            let ocShell = new this._oc.BRepBuilderAPI_MakeShell_2(ocSurface, false).Shell();  // see: https://dev.opencascade.org/doc/refman/html/class_b_rep_builder_a_p_i___make_shell.html
+            let ocShell = new this._oc.BRepBuilderAPI_MakeShell(ocSurface, false).Shell();  // see: https://dev.opencascade.org/doc/refman/html/class_b_rep_builder_a_p_i___make_shell.html
             
             if(!ocShell)
             {
@@ -358,7 +355,7 @@ export class Shell extends Shape
             return this.faces()[0].outerWire();
         }
         else {
-            let ocAnalysor = new this._oc.ShapeAnalysis_FreeBounds_2(this._ocShape, 1e-3, false, true);
+            let ocAnalysor = new this._oc.ShapeAnalysis_FreeBounds(this._ocShape, 1e-3, false, true);
             let ocOuterWire = ocAnalysor.GetClosedWires(); // gives back a Compound of outerwires, but _fromOcShape will make this into one Wire
         
             const wires = new Shape()._fromOcShape(ocOuterWire);
@@ -377,10 +374,10 @@ export class Shell extends Shape
          *      - BRepGProp: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_b_rep_g_prop.html#abd91b892df8d0f6b8571deed5562ca1f
          * */
 
-        let ocProps = new this._oc.GProp_GProps_1();
-        let BRepGProp = this._oc.BRepGProp.prototype.constructor;
+        let ocProps = new this._oc.GProp_GProps();
+        let BRepGProp = this._oc.BRepGProp;
         
-        BRepGProp.SurfaceProperties_1(this._ocShape, ocProps, false, false);
+        BRepGProp.SurfaceProperties(this._ocShape, ocProps, false, false);
 
         return new Point()._fromOcPoint(ocProps.CentreOfMass());
         

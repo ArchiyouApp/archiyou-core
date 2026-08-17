@@ -44,6 +44,7 @@ import { targetOcForGarbageCollection, removeOcTargetForGarbageCollection } from
 
 import { toRad, isNumeric, roundToTolerance } from './internal' // utils
 import { checkInput, addResultShapesToScene, protectOC } from './decorators'; // Import directly to avoid error in ts-node
+import type { OpenCascadeInstance } from './wasm/archiyou-opencascade';
 
 
 // this can disable TS errors when subclasses are not initialized yet
@@ -52,6 +53,8 @@ type IEdge = Edge
 type ISolid = Solid
 type IWire = Wire
 type IDimensionLine = DimensionLine
+type OcShapeType = OpenCascadeInstance['TopAbs_ShapeEnum'][keyof OpenCascadeInstance['TopAbs_ShapeEnum']]
+type OcShapeClassName = ShapeType|'CompSolid'|'Compound'
 
  
 export class Shape
@@ -72,7 +75,7 @@ export class Shape
     annotations:Array<Annotation> = []; // array of annotations associated with this Shape
 
     //// SETTINGS ////
-    CLASSNAME_TO_SHAPE_ENUM_STATIC: {[key:string]:string} =  {
+    CLASSNAME_TO_SHAPE_ENUM_STATIC: Record<OcShapeClassName, keyof OpenCascadeInstance['TopAbs_ShapeEnum']> =  {
         // NOTE: these will be really initialized if _oc is present!
         'Vertex' : 'TopAbs_VERTEX',
         'Edge' : 'TopAbs_EDGE',
@@ -83,8 +86,8 @@ export class Shape
         'CompSolid' : 'TopAbs_COMPSOLID',
         'Compound' : 'TopAbs_COMPOUND',
     };
-    CLASSNAME_TO_SHAPE_ENUM: {[key:string]:any} = {}; // to be filled. 
-    OC_SHAPE_ENUM_TO_CLASSNAME: {[key:string]:string} = {}; // set with CLASSNAME_TO_SHAPE_ENUM
+    CLASSNAME_TO_SHAPE_ENUM: Partial<Record<OcShapeClassName, OcShapeType>> = {}; // to be filled.
+    OC_SHAPE_ENUM_TO_CLASSNAME: Partial<Record<OcShapeType, OcShapeClassName>> = {}; // set with CLASSNAME_TO_SHAPE_ENUM
 
 
     //// CREATION METHODS ////
@@ -283,8 +286,8 @@ export class Shape
         
         try 
         {
-            let ocFixer = new this._oc.ShapeFix_Shape_2(this._ocShape);
-            ocFixer.Perform( new this._oc.Message_ProgressRange_1() );
+            let ocFixer = new this._oc.ShapeFix_Shape(this._ocShape);
+            ocFixer.Perform( new this._oc.Message_ProgressRange() );
             const ocShape = ocFixer.Shape();
             if (ocShape && !ocShape.IsNull())
             {
@@ -308,7 +311,7 @@ export class Shape
     _unifyDomain():AnyShape
     {
         // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_shape_upgrade___unify_same_domain.html
-        let fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(this._ocShape, true, true, false); // unify edges, unify faces, concat bsplines
+        let fusor = new this._oc.ShapeUpgrade_UnifySameDomain(this._ocShape, true, true, false); // unify edges, unify faces, concat bsplines
         fusor.Build();
         let fusedOcShape = new Shape()._fromOcShape(fusor.Shape()) as AnyShape;
         this._ocShape = fusedOcShape._ocShape;
@@ -456,11 +459,12 @@ export class Shape
         // see: http://jcae.sourceforge.net/occjava-doc/index.html?org/jcae/opencascade/jni/TopAbs_ShapeEnum.html
         
         // really initialize the values
-        for ( const [ key,value] of Object.entries(this.CLASSNAME_TO_SHAPE_ENUM_STATIC))
+        for (const [className, enumName] of Object.entries(this.CLASSNAME_TO_SHAPE_ENUM_STATIC) as Array<[OcShapeClassName, keyof OpenCascadeInstance['TopAbs_ShapeEnum']]>)
         {
-            this.CLASSNAME_TO_SHAPE_ENUM[key] = this._oc.TopAbs_ShapeEnum[value];
+            const shapeType = this._oc.TopAbs_ShapeEnum[enumName] as OcShapeType;
+            this.CLASSNAME_TO_SHAPE_ENUM[className] = shapeType;
+            this.OC_SHAPE_ENUM_TO_CLASSNAME[shapeType] = className;
         }
-        Object.entries(this.CLASSNAME_TO_SHAPE_ENUM).forEach(([className, ocShapeEnum]) => this.OC_SHAPE_ENUM_TO_CLASSNAME[ocShapeEnum.value as string] = className); // TS fix
     }
 
     //// TRANSFORMATION METHODS ////
@@ -515,10 +519,17 @@ export class Shape
         return (!obj) ? false : obj.hasOwnProperty('_ocShape');
     }
 
-    /** Create hash for this Shape: can be used to check if an Shape is the same instance (NOTE: not that is has equal geometry!) */
+    /** Return a stable OCCT identity for this shape, ignoring orientation. */
     _hashcode():string
     {
-        return (this._ocShape) ? (this._ocShape.HashCode(2147483647) as number).toString() : null;
+        return this._ocShape ? this._shapeIndex(this._ocShape).toString() : null;
+    }
+
+    _shapeIndex(ocShape:any):number
+    {
+        const key = '__archiyouShapeMap';
+        const map = this._oc[key] ??= new this._oc.NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher();
+        return map.Add(ocShape);
     }
 
     ocGeom():any 
@@ -531,12 +542,12 @@ export class Shape
     {
         // fall back on name of Class: this might not be accurate: but better than nothing
         let type = (this._ocShape) ? 
-                        this._shapeTypeEnumLookup(this._ocShape.ShapeType().value) : 
+                        this._shapeTypeEnumLookup(this._ocShape.ShapeType()) :
                         this.constructor.name;
         return type as ShapeType;
     }
 
-    _getShapeTypeFromOcShape(ocShape:any):string // TODO: OC typing
+    _getShapeTypeFromOcShape(ocShape:any):OcShapeClassName|undefined
     {
         if(!ocShape.ShapeType)
         {
@@ -544,7 +555,7 @@ export class Shape
             return null;
         }
 
-        let shapeType:string = this._shapeTypeEnumLookup(ocShape.ShapeType().value) ;
+        const shapeType = this._shapeTypeEnumLookup(ocShape.ShapeType());
         
         return shapeType;
     }
@@ -656,7 +667,7 @@ export class Shape
             if (ocShape.IsNull()){ return false };
 
             const ocChecker = new this._oc.BRepCheck_Analyzer(ocShape, true, false);
-            const result = ocChecker.IsValid_2();
+            const result = ocChecker.IsValid();
             ocChecker.delete();
             return result;
         }
@@ -686,8 +697,8 @@ export class Shape
             - https://dev.opencascade.org/doc/refman/html/class_g_prop___g_props.html
             - https://dev.opencascade.org/content/calculate-surface-and-volume-topodsshape
         */
-        let ocSystem = new this._oc.GProp_GProps_1();
-        this._oc.BRepGProp.SurfaceProperties_1(this._ocShape, ocSystem, false, false);
+        let ocSystem = new this._oc.GProp_GProps();
+        this._oc.BRepGProp.SurfaceProperties(this._ocShape, ocSystem, false, false);
         return roundToTolerance(ocSystem.Mass()); 
     }
 
@@ -703,8 +714,8 @@ export class Shape
     /** Calculate the volume of this Shape */ 
     volume():number
     {
-        let ocSystem = new this._oc.GProp_GProps_1();
-        this._oc.BRepGProp.VolumeProperties_1(this._ocShape, ocSystem, false, false, false);
+        let ocSystem = new this._oc.GProp_GProps();
+        this._oc.BRepGProp.VolumeProperties(this._ocShape, ocSystem, false, false, false);
         return roundToTolerance(ocSystem.Mass()); 
     }
 
@@ -840,9 +851,9 @@ export class Shape
         */
         try
         {
-            let ocShapeFix = new this._oc.ShapeFix_Shape_2(this._ocShape);
+            let ocShapeFix = new this._oc.ShapeFix_Shape(this._ocShape);
             ocShapeFix.SetPrecision(this._oc.SHAPE_TOLERANCE);
-            ocShapeFix.Perform(new this._oc.Message_ProgressRange_1());
+            ocShapeFix.Perform(new this._oc.Message_ProgressRange());
             this._ocShape = this._makeSpecificOcShape(ocShapeFix.Shape());
             return this;
         }
@@ -865,7 +876,7 @@ export class Shape
     {
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_builder_a_p_i___copy.html
         // Copying does take 10-15ms for even simple geometries like Boxes!
-        const ocBuilderCopy = new this._oc.BRepBuilderAPI_Copy_1();
+        const ocBuilderCopy = new this._oc.BRepBuilderAPI_Copy();
         ocBuilderCopy.Perform(this._ocShape, true, false); // TopoDS_Shape &S, copyGeom=Standard_True, copyMesh=Standard_False
         const newShape = new Shape()._fromOcShape(ocBuilderCopy.Shape()) as this;
         
@@ -1031,10 +1042,10 @@ export class Shape
             - gp_Trsf https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___trsf.html
             - BRepBuilderAPI_Transform: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/class_b_rep_builder_a_p_i___transform.html
         */
-        let ocTransform = new this._oc.gp_Trsf_1();
+        let ocTransform = new this._oc.gp_Trsf();
         pivot = pivot as Point || this.center();
         ocTransform.SetScale(pivot._toOcPoint(), factor);
-        let ocBuilder = new this._oc.BRepBuilderAPI_Transform_2(this._ocShape, ocTransform, true);
+        let ocBuilder = new this._oc.BRepBuilderAPI_Transform(this._ocShape, ocTransform, true);
         this._ocShape = ocBuilder.Shape(); // 
         return this;
     }
@@ -1135,15 +1146,15 @@ export class Shape
             pivotVec = new Vector(pivot);
         }
     
-        let ocTransformation = new this._oc.gp_Trsf_1();
-        ocTransformation.SetRotation_1( 
-                new this._oc.gp_Ax1_2(
+        let ocTransformation = new this._oc.gp_Trsf();
+        ocTransformation.SetRotation(
+                new this._oc.gp_Ax1(
                     pivotVec._toOcPoint(),
                     axisVec._toOcDir()
                 ),
                 toRad(angle)
                 );
-        let ocRotation = new this._oc.TopLoc_Location_2(ocTransformation);
+        let ocRotation = new this._oc.TopLoc_Location(ocTransformation);
 
         this._ocShape.Move(ocRotation, true);
         this._updateFromOcShape(); // needed for certain classes like Vertex to update class properties
@@ -1450,14 +1461,14 @@ export class Shape
 
         const pivotVec = pivot as Vector;
 
-        const ocQuaternion = new this._oc.gp_Quaternion_3(fromVec._ocVector, toVec._ocVector).Normalized();
+        const ocQuaternion = new this._oc.gp_Quaternion(fromVec._ocVector, toVec._ocVector).Normalized();
 
-        const ocTransformation = new this._oc.gp_Trsf_1();
-        ocTransformation.SetRotation_2( ocQuaternion ); // Rotation is done around the origin - so we need to first move the Shape from pivot to origin
+        const ocTransformation = new this._oc.gp_Trsf();
+        ocTransformation.SetRotation( ocQuaternion ); // Rotation is done around the origin - so we need to first move the Shape from pivot to origin
 
         this.move(pivotVec.reversed());
         // Then rotate
-        let ocRotation = new this._oc.TopLoc_Location_2(ocTransformation); 
+        let ocRotation = new this._oc.TopLoc_Location(ocTransformation);
         this._ocShape.Move(ocRotation, true); // Apply the Quaternion rotation around origin
         // and move back
         this.move(pivotVec);
@@ -1482,13 +1493,13 @@ export class Shape
         let mirrorPlaneNormal = (normal as Vector).normalize(); // auto converted
         let mirrorPlaneOrigin = (origin as Vector);
 
-        let ocMirrorTransform = new this._oc.gp_Trsf_1();
+        let ocMirrorTransform = new this._oc.gp_Trsf();
         let ocMirrorPlaneNormal = mirrorPlaneNormal._toOcDir();
         let ocMirrorOrigin = mirrorPlaneOrigin._toOcPoint();
 
-        ocMirrorTransform.SetMirror_3( new this._oc.gp_Ax2_3(ocMirrorOrigin, ocMirrorPlaneNormal));
+        ocMirrorTransform.SetMirror( new this._oc.gp_Ax2(ocMirrorOrigin, ocMirrorPlaneNormal));
 
-        const newShape = new Shape()._fromOcShape(new this._oc.BRepBuilderAPI_Transform_2(this._ocShape, ocMirrorTransform, true).Shape()) as AnyShape; // cast needed
+        const newShape = new Shape()._fromOcShape(new this._oc.BRepBuilderAPI_Transform(this._ocShape, ocMirrorTransform, true).Shape()) as AnyShape; // cast needed
         
         newShape._copyAttributes(this); // copy attributes over
 
@@ -1618,7 +1629,7 @@ export class Shape
         }       
 
         let extrudeVec = directionVec.normalized().scale(amount);
-        let ocPrismBuilder = new this._oc.BRepPrimAPI_MakePrism_1(this._ocShape, extrudeVec._toOcVector(), false, true);
+        let ocPrismBuilder = new this._oc.BRepPrimAPI_MakePrism(this._ocShape, extrudeVec._toOcVector(), false, true);
         let ocShape = ocPrismBuilder.Shape();
         if (ocShape.IsNull())
         {
@@ -1714,7 +1725,7 @@ export class Shape
             if(type){ console.warn(`${this.type()}::offset: You supplied an unknown join type: "${type}". Please use either "arc" [default] or "intersection"`);}
         }
 
-        ocMakeOffsetShape.PerformByJoin(this._ocShape, amount, 0.001, DIRECTION_TYPES.skin, false, false, joinType, false, new this._oc.Message_ProgressRange_1()); // tolerance, construction method, intersection, self intersection, join type, remove internal edges
+        ocMakeOffsetShape.PerformByJoin(this._ocShape, amount, 0.001, DIRECTION_TYPES.skin, false, false, joinType, false, new this._oc.Message_ProgressRange()); // tolerance, construction method, intersection, self intersection, join type, remove internal edges
 
         const ocNewShape = ocMakeOffsetShape.Shape();
 
@@ -1813,16 +1824,16 @@ export class Shape
         let ocBuilder = new this._oc.BRepOffsetAPI_MakeThickSolid();
         
         excludeFacesCollection = excludeFacesCollection.getShapesByType('Face');
-        let ocExcludeFaces = new this._oc.TopTools_ListOfShape_1(); // none for now
+        let ocExcludeFaces = new this._oc.NCollection_List_TopoDS_Shape(); // none for now
         if (excludeFacesCollection && excludeFacesCollection.length > 0)
         {
-            excludeFacesCollection.forEach( face => ocExcludeFaces.Append_1(face._ocShape));
+            excludeFacesCollection.forEach( face => ocExcludeFaces.Append(face._ocShape));
         }
 
         let directionType =  DIRECTION_TYPES[DIRECTION_TYPE_DEFAULT];
         let joinType = JOIN_TYPES[type] || JOIN_TYPES[JOIN_TYPE_DEFAULT];
         
-        ocBuilder.MakeThickSolidByJoin(this._ocShape, ocExcludeFaces, amount, 0.001, directionType, false, false, joinType, false, new this._oc.Message_ProgressRange_1()); // mode, intersection, selfInter, join type, removeIntEdges
+        ocBuilder.MakeThickSolidByJoin(this._ocShape, ocExcludeFaces, amount, 0.001, directionType, false, false, joinType, false, new this._oc.Message_ProgressRange()); // mode, intersection, selfInter, join type, removeIntEdges
 
         if (ocBuilder.IsDone())
         {
@@ -1847,10 +1858,10 @@ export class Shape
                     {
                         if (amount > 0)
                         {
-                            newOcShape = new this._oc.BRepBuilderAPI_MakeSolid_4(offsettedShell._ocShape, origShell._ocShape).Shape();
+                            newOcShape = new this._oc.BRepBuilderAPI_MakeSolid(offsettedShell._ocShape, origShell._ocShape).Shape();
                         }
                         else {
-                            newOcShape = new this._oc.BRepBuilderAPI_MakeSolid_4(origShell._ocShape, offsettedShell._ocShape).Shape();
+                            newOcShape = new this._oc.BRepBuilderAPI_MakeSolid(origShell._ocShape, offsettedShell._ocShape).Shape();
                         }
                         let newShape = new Shape()._fromOcShape(newOcShape) as Solid;
                         if (newShape.type() == 'Solid')
@@ -1944,8 +1955,8 @@ export class Shape
         // TODO: some automatic axis detection
 
         let axisDirection = axisEndVec.subtracted(axisStartVec);
-        let ocAxis = new this._oc.gp_Ax1_2(axisStartVec._toOcPoint(), axisDirection._toOcDir());
-        let ocMakeRevol = new this._oc.BRepPrimAPI_MakeRevol_1(this._ocShape, ocAxis, toRad(angle), true);
+        let ocAxis = new this._oc.gp_Ax1(axisStartVec._toOcPoint(), axisDirection._toOcDir());
+        let ocMakeRevol = new this._oc.BRepPrimAPI_MakeRevol(this._ocShape, ocAxis, toRad(angle), true);
         let newOcShape = ocMakeRevol.Shape();
         let revolvedShape = new Shape()._fromOcShape(newOcShape);
 
@@ -2087,12 +2098,12 @@ export class Shape
     @checkInput('AnyShape', 'auto')
     _distanceToShape(other:AnyShape):number
     {
-        const ocShapeDistanceCalculator = new this._oc.BRepExtrema_DistShapeShape_2(this._ocShape, other._ocShape,
-            this._oc.Extrema_ExtFlag.prototype.constructor.Extrema_ExtFlag_MINMAX, // NOTE: maximum distance can not be calculated with this!
-            this._oc.Extrema_ExtAlgo.prototype.constructor.Extrema_ExtAlgo_Grad,
-            new this._oc.Message_ProgressRange_1(),
+        const ocShapeDistanceCalculator = new this._oc.BRepExtrema_DistShapeShape(this._ocShape, other._ocShape,
+            this._oc.Extrema_ExtFlag.Extrema_ExtFlag_MINMAX, // NOTE: maximum distance can not be calculated with this!
+            this._oc.Extrema_ExtAlgo.Extrema_ExtAlgo_Grad,
+            new this._oc.Message_ProgressRange(),
             );
-        ocShapeDistanceCalculator.Perform(new this._oc.Message_ProgressRange_1());
+        ocShapeDistanceCalculator.Perform(new this._oc.Message_ProgressRange());
 
         if (ocShapeDistanceCalculator.IsDone())
         {
@@ -2151,18 +2162,18 @@ export class Shape
 
         // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_b_rep_extrema___dist_shape_shape.html 
         // interesting: The algoritm can give the type of point ( on Vertex, Edge etc ). See: SupportOnShapeX
-        let shapeDistanceCalculator = new this._oc.BRepExtrema_DistShapeShape_2(
+        let shapeDistanceCalculator = new this._oc.BRepExtrema_DistShapeShape(
             this._ocShape, 
             otherShape._ocShape,
-            this._oc.Extrema_ExtFlag.prototype.constructor.Extrema_ExtFlag_MINMAX, 
-            this._oc.Extrema_ExtAlgo.prototype.constructor.Extrema_ExtAlgo_Grad,
-            new this._oc.Message_ProgressRange_1()
+            this._oc.Extrema_ExtFlag.Extrema_ExtFlag_MINMAX,
+            this._oc.Extrema_ExtAlgo.Extrema_ExtAlgo_Grad,
+            new this._oc.Message_ProgressRange()
             );
 
 
         let links:Array<Link> = [];
 
-        shapeDistanceCalculator.Perform(new this._oc.Message_ProgressRange_1());
+        shapeDistanceCalculator.Perform(new this._oc.Message_ProgressRange());
 
         if (shapeDistanceCalculator.IsDone())
         {
@@ -2337,10 +2348,10 @@ export class Shape
         {
 
             // protect against weird crashed of OC under heavy load
-            const ocCutter = new this._oc.BRepAlgoAPI_Cut_3(result, shape._ocShape,  new this._oc.Message_ProgressRange_1());
+            const ocCutter = new this._oc.BRepAlgoAPI_Cut(result, shape._ocShape,  new this._oc.Message_ProgressRange());
             ocCutter.SetRunParallel(false); // Does not seem to work!
             ocCutter.SetFuzzyValue(0.1);
-            ocCutter.Build(new this._oc.Message_ProgressRange_1());
+            ocCutter.Build(new this._oc.Message_ProgressRange());
             
             if (ocCutter.HasErrors())
             {
@@ -2351,7 +2362,7 @@ export class Shape
             }
         });
 
-        const fusor = new this._oc.ShapeUpgrade_UnifySameDomain_2(result, true, true, false); 
+        const fusor = new this._oc.ShapeUpgrade_UnifySameDomain(result, true, true, false);
         fusor.Build();
         const newOcShape:any = fusor.Shape();
 
@@ -2461,12 +2472,12 @@ export class Shape
         }
         
         // Now start fusing
-        const fuser = new this._oc.BRepAlgoAPI_Fuse_3(this._ocShape, 
+        const fuser = new this._oc.BRepAlgoAPI_Fuse(this._ocShape,
                                                 (other as AnyShape)._ocShape, 
-                                                new this._oc.Message_ProgressRange_1());
+                                                new this._oc.Message_ProgressRange());
 
         fuser.SetFuzzyValue(0.001);
-        fuser.Build(new this._oc.Message_ProgressRange_1());
+        fuser.Build(new this._oc.Message_ProgressRange());
 
         let fuseResult = new Shape()._fromOcShape(fuser.Shape())
         if (!fuseResult)
@@ -2603,11 +2614,11 @@ export class Shape
         let thisCollection = new ShapeCollection(this);
         let otherCollection = others as ShapeCollection; // auto-converted by @checkInput
 
-        let ocSplitter = new this._oc.BOPAlgo_Splitter_1();
+        let ocSplitter = new this._oc.BOPAlgo_Splitter();
         
         ocSplitter.SetArguments(thisCollection._toOcListOfShape()); // the main Shape(s)
         ocSplitter.SetTools(otherCollection._toOcListOfShape());
-        ocSplitter.Perform(new this._oc.Message_ProgressRange_1());
+        ocSplitter.Perform(new this._oc.Message_ProgressRange());
         let ocShape = ocSplitter.Shape();
         
         let splitShapes = new ShapeCollection(new Shape()._fromOcShape(ocShape));
@@ -2980,10 +2991,10 @@ export class Shape
         }
 
         // OC docs: https://dev.opencascade.org/doc/refman/html/class_b_rep_algo_a_p_i___section.html#a5980af65e4ecfd71403072430555eaf4
-        const ocSectionBuilder = new this._oc.BRepAlgoAPI_Section_3(this._ocShape, other._ocShape, false); // PerformNow
+        const ocSectionBuilder = new this._oc.BRepAlgoAPI_Section(this._ocShape, other._ocShape, false); // PerformNow
         ocSectionBuilder.SetNonDestructive(true);
         ocSectionBuilder.SetFuzzyValue(0.1);
-        ocSectionBuilder.Build(new this._oc.Message_ProgressRange_1());
+        ocSectionBuilder.Build(new this._oc.Message_ProgressRange());
 
         /* NOTE: we can actually have a lot of result types here: 
             - single Shapes: Vertex or Edges
@@ -3007,10 +3018,10 @@ export class Shape
             return null;
         }
 
-        const intersectedCommon = new this._oc.BRepAlgoAPI_Common_3(this._ocShape, (other as AnyShape)._ocShape, new this._oc.Message_ProgressRange_1());
-        intersectedCommon.SetOperation( this._oc.BOPAlgo_Operation.prototype.constructor.BOPAlgo_COMMON );
+        const intersectedCommon = new this._oc.BRepAlgoAPI_Common(this._ocShape, (other as AnyShape)._ocShape, new this._oc.Message_ProgressRange());
+        intersectedCommon.SetOperation( this._oc.BOPAlgo_Operation.BOPAlgo_COMMON );
         intersectedCommon.SetFuzzyValue(0.1);
-        intersectedCommon.Build(new this._oc.Message_ProgressRange_1());
+        intersectedCommon.Build(new this._oc.Message_ProgressRange());
 
         const intersected = new Shape()._fromOcShape(intersectedCommon.Shape()); // can be a single Shape or ShapeCollection or null
 
@@ -3324,25 +3335,10 @@ export class Shape
     }
 
     /** Returns type of Shape in Archiyou class name: Vertex, Edge, Wire, Face, Shell etc */
-    _shapeTypeEnumLookup(i:any):any
+    _shapeTypeEnumLookup(shapeType:OcShapeType):OcShapeClassName|undefined
     {
         // see OC type enum: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/_top_abs___shape_enum_8hxx.html#a67b8aa38656811eaee45f9df08499667
-        // We patched this in for Opencascade.js 2.0
-        
-        if (!Number.isInteger(i))
-        {
-            // probably a OC type enum
-            try 
-            {
-                i = i.value;
-            }
-            catch (e)
-            {   
-                // do nothing
-            }
-        }
-
-        return this.OC_SHAPE_ENUM_TO_CLASSNAME[i];
+        return this.OC_SHAPE_ENUM_TO_CLASSNAME[shapeType];
         
     }
 
@@ -3354,12 +3350,12 @@ export class Shape
     _makeSpecificOcShape(ocShape:any, type:string=null):any // TODO: OC typing
     {
         const OC_CONSTUCTOR_BY_TYPE:{[key:string]:any} = {
-            'Vertex' : this._oc.TopoDS.prototype.constructor.Vertex_1,
-            'Edge' : this._oc.TopoDS.prototype.constructor.Edge_1,
-            'Wire' : this._oc.TopoDS.prototype.constructor.Wire_1,
-            'Face' : this._oc.TopoDS.prototype.constructor.Face_1,
-            'Shell' : this._oc.TopoDS.prototype.constructor.Shell_1,
-            'Solid' : this._oc.TopoDS.prototype.constructor.Solid_1,
+            'Vertex' : this._oc.TopoDS.Vertex,
+            'Edge' : this._oc.TopoDS.Edge,
+            'Wire' : this._oc.TopoDS.Wire,
+            'Face' : this._oc.TopoDS.Face,
+            'Shell' : this._oc.TopoDS.Shell,
+            'Solid' : this._oc.TopoDS.Solid,
         }
 
         const OC_SHAPE_TYPE_CLASSES:{[key:string]:any} = {
@@ -3551,7 +3547,7 @@ export class Shape
 
           let ocShapeTypeEnum = (type) ? this.CLASSNAME_TO_SHAPE_ENUM[type] : this._oc.TopAbs_ShapeEnum.TopAbs_VERTEX; // all Shape types
 
-          let shapeExplorer = new this._oc.TopExp_Explorer_2(ocShape, ocShapeTypeEnum, this._oc.TopAbs_ShapeEnum.TopAbs_SHAPE ); 
+          let shapeExplorer = new this._oc.TopExp_Explorer(ocShape, ocShapeTypeEnum, this._oc.TopAbs_ShapeEnum.TopAbs_SHAPE );
           
           let shapesHash:{[key:string]:boolean} = {}; // check to see if we got an specific entity already - TODO: OC typing
           let ocShapes = [];
@@ -3559,7 +3555,7 @@ export class Shape
           for (shapeExplorer.ReInit(); shapeExplorer.More(); shapeExplorer.Next()) 
           {
               let foundShape = shapeExplorer.Current(); // really make sure we have a specific OC shape like Shell etc, not TopoDS_Shape
-              let hash = foundShape.HashCode(2147483647).toString();
+              let hash = this._shapeIndex(foundShape).toString();
               
               if(!shapesHash[hash])
               {
@@ -3586,7 +3582,7 @@ export class Shape
             return null;
         }
 
-        let ocShapeIterator = new this._oc.TopoDS_Iterator_2(ocShapeCompound, true, true);
+        let ocShapeIterator = new this._oc.TopoDS_Iterator(ocShapeCompound, true, true);
         let shapes = []; // gather AY Shapes here to form ShapeCollection
 
         while(ocShapeIterator.More())
@@ -4409,21 +4405,21 @@ export class Shape
 
         */
         
-        let ocHiddenLineRemoval = new this._oc.HLRBRep_Algo_1();
-        ocHiddenLineRemoval.Add_2(this._ocShape, 0); // Shape and number of isoparameters
-        let ocProjector = new this._oc.HLRAlgo_Projector_2(new this._oc.gp_Ax2_3(new Point()._toOcPoint(), (planeNormal as Vector)._toOcDir()));
-        ocHiddenLineRemoval.Projector_1(ocProjector); // NOTE: different between OC versions
+        let ocHiddenLineRemoval = new this._oc.HLRBRep_Algo();
+        ocHiddenLineRemoval.Add(this._ocShape, 0); // Shape and number of isoparameters
+        let ocProjector = new this._oc.HLRAlgo_Projector(new this._oc.gp_Ax2(new Point()._toOcPoint(), (planeNormal as Vector)._toOcDir()));
+        ocHiddenLineRemoval.Projector(ocProjector); // NOTE: different between OC versions
         ocHiddenLineRemoval.Update(); // compute outlines
-        ocHiddenLineRemoval.Hide_1(); // compute hidden lines
+        ocHiddenLineRemoval.Hide(); // compute hidden lines
 
         let groupedProjectedEdges = new ShapeCollection();
 
-        let ocHiddenLinesToShape =  new this._oc.HLRBRep_HLRToShape(new this._oc.Handle_HLRBRep_Algo_2(ocHiddenLineRemoval));
+        let ocHiddenLinesToShape =  new this._oc.HLRBRep_HLRToShape(ocHiddenLineRemoval);
         
-        let visibleOutlines = new Shape()._fromOcShape(ocHiddenLinesToShape.OutLineVCompound_1()); // outlines are edges that are not lying on existing edges of the shape (like the outline of a sphere)
-        let visibleSharpEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.VCompound_1()); // sharp edges are between discontinuous faces
+        let visibleOutlines = new Shape()._fromOcShape(ocHiddenLinesToShape.OutLineVCompound()); // outlines are edges that are not lying on existing edges of the shape (like the outline of a sphere)
+        let visibleSharpEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.VCompound()); // sharp edges are between discontinuous faces
         if (visibleSharpEdges){ groupedProjectedEdges.addGroup('sharp', visibleSharpEdges) };
-        let visibleSmoothEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.Rg1LineVCompound_1()); // smooth edges are between continuous surfaces
+        let visibleSmoothEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.Rg1LineVCompound()); // smooth edges are between continuous surfaces
         if(visibleSmoothEdges){ groupedProjectedEdges.addGroup('smooth', visibleSmoothEdges) }; 
 
         if(visibleOutlines)
@@ -4440,14 +4436,14 @@ export class Shape
         // add invisible too
         if(all)
         {
-            let hiddenEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.HCompound_1());
+            let hiddenEdges = new Shape()._fromOcShape(ocHiddenLinesToShape.HCompound());
             if (hiddenEdges)
             { 
                 hiddenEdges.attribute('hidden', true);
                 groupedProjectedEdges.addGroup('hiddenedges', hiddenEdges);
             }
             
-            let hiddenOutlines = new Shape()._fromOcShape(ocHiddenLinesToShape.OutLineHCompound_1());
+            let hiddenOutlines = new Shape()._fromOcShape(ocHiddenLinesToShape.OutLineHCompound());
             if (hiddenOutlines)
             { 
                 hiddenOutlines.attribute('hidden', true);
@@ -4668,7 +4664,7 @@ export class Shape
         edges.forEach( (curEdge, curEdgeIndex) => 
         {   
             let vertexCoords = [];
-            let ocLocation = new this._oc.TopLoc_Location_1(); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_top_loc___location.html
+            let ocLocation = new this._oc.TopLoc_Location(); // see OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_top_loc___location.html
 
             if(curEdge._ocShape == null)
             {
@@ -4683,8 +4679,8 @@ export class Shape
             */
             else 
             {   
-                const ocAdaptorCurve = new this._oc.BRepAdaptor_Curve_2(curEdge._ocShape);
-                const ocTangDef = new this._oc.GCPnts_TangentialDeflection_2(ocAdaptorCurve, 
+                const ocAdaptorCurve = new this._oc.BRepAdaptor_Curve(curEdge._ocShape);
+                const ocTangDef = new this._oc.GCPnts_TangentialDeflection(ocAdaptorCurve,
                     quality?.linearDeflection || MESHING_MAX_DEVIATION, 
                     quality?.angularDeflection || MESHING_ANGULAR_DEFLECTION, 
                     quality?.edgeMinimalPoints || MESHING_MINIMUM_POINTS, 
@@ -4736,7 +4732,7 @@ export class Shape
         /* OC Docs:
             - BREPMesh_IncrementalMesh Docs: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_b_rep_mesh___incremental_mesh.html
             - BRep_Tool: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_b_rep___tool.html
-            - Poly_Connect: https://dev.opencascade.org/doc/occt-7.6.0/refman/html/class_poly___connect.html
+            - BRepLib_ToolTriangulatedShape: https://dev.opencascade.org/doc/refman/html/class_b_rep_lib___tool_triangulated_shape.html
         
             Here the core of the meshing takes place - it converts the Shape into a Mesh. 
              Data is placed on the Faces of the Shape and retrieved by BRep_Tool.Triangulation(face)
@@ -4764,7 +4760,7 @@ export class Shape
             meshedShape = this._cloned.from;
         }
         else {
-            ocMesher = new this._oc.BRepMesh_IncrementalMesh_2(
+            ocMesher = new this._oc.BRepMesh_IncrementalMesh(
                 this._ocShape, 
                 quality?.linearDeflection || MESHING_MAX_DEVIATION, 
                 false, 
@@ -4777,12 +4773,12 @@ export class Shape
 
         faces.forEach( (curFace, curFaceIndex) => 
         {
-            const ocLocation = new this._oc.TopLoc_Location_1();
-            const ocTriangulation = new this._oc.BRep_Tool.Triangulation(curFace._ocShape, ocLocation, 0); // Poly_MeshPurpose.Poly_MeshPurpose_NONE
+            const ocLocation = new this._oc.TopLoc_Location();
+            const ocTriangulation = this._oc.BRep_Tool.Triangulation(curFace._ocShape, ocLocation, 0); // Poly_MeshPurpose.Poly_MeshPurpose_NONE
             const faceTransformation = ocLocation.Transformation();
-            const clonedShapeTransformation = (this._cloned) ? this._ocShape.Location_1().Transformation() : null;
+            const clonedShapeTransformation = (this._cloned) ? this._ocShape.Location().Transformation() : null;
 
-            if (ocTriangulation.IsNull()) 
+            if (!ocTriangulation)
             { 
                 console.warn(`Shape:toMeshShape: Got Null Face: skipped!`)    
             }
@@ -4799,12 +4795,12 @@ export class Shape
                     indexInShape: curFaceIndex,
                 };
     
-                const numNodes = ocTriangulation.get().NbNodes();    
+                const numNodes = ocTriangulation.NbNodes();
                 // Write vertex buffer ////
                 faceMesh.vertices = new Array(numNodes * 3);
                 for(let i = 0; i < numNodes; i++) 
                 {
-                    const p = ocTriangulation.get().Node(i+1); // gp_Pnt
+                    const p = ocTriangulation.Node(i+1); // gp_Pnt
                     // NOTE: One of the transformations is enough (either just the face, or for main cloned Shape )
                     if(clonedShapeTransformation)
                     { 
@@ -4824,22 +4820,22 @@ export class Shape
                 //// UV coordinate buffer ////
 
                 // Important: Face orientation will be used in coming calculations
-                const faceOrientation = curFace._ocShape.Orientation_1().value; // 0 = forward, 1 = backward
+                const faceOrientation = curFace._ocShape.Orientation();
 
-                if (ocTriangulation.get().HasUVNodes()) 
+                if (ocTriangulation.HasUVNodes())
                 {
                     // Get UV Bounds
                     let UMin = 0, UMax = 0, VMin = 0, VMax = 0;
             
                     // let UVNodes = ocTriangulation.get().InternalUVNodes();
-                    let UVNodesLength = ocTriangulation.get().NbNodes();
+                    let UVNodesLength = ocTriangulation.NbNodes();
 
                     faceMesh.uvCoords = new Array(UVNodesLength * 2);
 
                     for(let i = 0; i < UVNodesLength; i++)
                     {
                         //let p = UVNodes.Value(i + 1);
-                        let p = ocTriangulation.get().UVNode(i + 1);
+                        let p = ocTriangulation.UVNode(i + 1);
                         let x = p.X(), y = p.Y();
                         faceMesh.uvCoords[(i * 2) + 0] = x;
                         faceMesh.uvCoords[(i * 2) + 1] = y;
@@ -4867,17 +4863,15 @@ export class Shape
             
                 // Face Vertex normals
 
-                // We create a TColgp_Array10fDir here, which is a subclass of NCollection_Array1
-                // Which has a constructor documented here: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_n_collection___array1.html
-                const myNormal = new this._oc.TColgp_Array1OfDir_2(1, numNodes); // see: https://dev.opencascade.org/doc/occt-7.5.0/refman/html/classgp___dir.html
-                const ocTriangulateTool = this._oc.StdPrs_ToolTriangulatedShape.prototype.constructor; // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_std_prs___tool_triangulated_shape.html
-                const ocPolyConnect = new this._oc.Poly_Connect_2(ocTriangulation); // OC docs: https://dev.opencascade.org/doc/occt-7.4.0/refman/html/class_poly___triangulation.html 
-                ocTriangulateTool.Normal(curFace._ocShape, ocPolyConnect, myNormal);
-                faceMesh.normals = new Array(myNormal.Length() * 3);
-
-                for(let i = 0; i < myNormal.Length(); i++)
+                if (!ocTriangulation.HasNormals())
                 {
-                    let p = myNormal.Value(i + 1);
+                    this._oc.BRepLib_ToolTriangulatedShape.ComputeNormals(curFace._ocShape, ocTriangulation);
+                }
+                faceMesh.normals = new Array(numNodes * 3);
+
+                for(let i = 0; i < numNodes; i++)
+                {
+                    const p = ocTriangulation.Normal(i + 1);
 
                     if(clonedShapeTransformation)
                     { 
@@ -4893,11 +4887,11 @@ export class Shape
                 }
             
                 // Face triangles
-                const triangles = ocTriangulation.get().Triangles();
+                const triangles = ocTriangulation.Triangles();
                 faceMesh.triangleIndices = new Array(triangles.Length() * 3);
                 let validFaceTriCount = 0;
 
-                for(let nt = 1; nt <= ocTriangulation.get().NbTriangles(); nt++) 
+                for(let nt = 1; nt <= ocTriangulation.NbTriangles(); nt++)
                 {
                     let t = triangles.Value(nt);
                     let n1 = t.Value(1);
@@ -4905,7 +4899,7 @@ export class Shape
                     let n3 = t.Value(3);
 
                     // Reverse order of Face Vertices if orientation of Face is Backward
-                    if(faceOrientation == 1)
+                    if(faceOrientation === this._oc.TopAbs_Orientation.TopAbs_REVERSED)
                     { 
                         let tmp = n1;
                         n1 = n2;
@@ -4922,7 +4916,6 @@ export class Shape
                 
                 // clean up Face data
                 ocTriangulation.delete(); // NOTE: Do we need to delete this? Clone does not seem to work
-                ocPolyConnect.delete();
 
             } // end not null Face
             

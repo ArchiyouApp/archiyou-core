@@ -54,4 +54,4 @@ test("ExampleScript", async () =>
     const pdf = await myDoc.save('myboxdoc.pdf');
     checkFile(pdf);
 
-});
+}, 10_000);

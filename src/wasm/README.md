@@ -1,13 +1,15 @@
 # archiyou-opencascade
 
-Builds of custom opencascade.js WASM libraries
+Archiyou's custom libcascade WASM build.
 
 ## Build
 
-Use python script in /build-scripts/run_build
+Install and start Docker, then run:
 
-IMPORTANT: Add 
+```sh
+pnpm build:wasm
 ```
-// @ts-nocheck
-```
-To archiyou_opencascade.d.ts
+
+[`libcascade.config.ts`](../../libcascade.config.ts) is the build source of truth.
+`pnpm detect:wasm` reports OCCT symbols used by the source; `pnpm check:wasm`
+checks that those symbols are present in the curated binding list.

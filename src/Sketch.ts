@@ -202,14 +202,14 @@ export class Sketch
                 - 
 
         */
-        this.ocGcs = new this._oc.gp_Ax3_1(); // default coordinate system
-        this.ocLcs = new this._oc.gp_Ax3_3( this.workplane.origin._toOcPoint(), 
+        this.ocGcs = new this._oc.gp_Ax3(); // default coordinate system
+        this.ocLcs = new this._oc.gp_Ax3( this.workplane.origin._toOcPoint(),
                                                     this.workplane.zDir._toOcDir(),
                                                     this.workplane.xDir._toOcDir());
-        let lt = new this._oc.gp_Trsf_1();
-        lt.SetTransformation_1(this.ocLcs, this.ocGcs);
-        let gt = new this._oc.gp_Trsf_1();
-        gt.SetTransformation_1(this.ocGcs, this.ocLcs);
+        let lt = new this._oc.gp_Trsf();
+        lt.SetTransformation(this.ocLcs, this.ocGcs);
+        let gt = new this._oc.gp_Trsf();
+        gt.SetTransformation(this.ocGcs, this.ocLcs);
 
         this.ocLocalToWorldTransform = lt;
         this.ocWorldToLocalTransform = gt;
