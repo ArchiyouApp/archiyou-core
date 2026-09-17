@@ -1,5 +1,9 @@
 # archiyou
 
+> [!IMPORTANT]
+> This repo is deprecated in favor of [the new archiyou monorepo](https://github.com/ArchiyouApp/archiyou) that combines this archiyou-core,
+> [meshup kernel](https://github.com/ArchiyouApp/meshup), [archiyou server](https://github.com/ArchiyouApp/archiyou-server) and a new frontend.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header_white_bg.png">
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ArchiyouApp/archiyou-core/main/assets/archiyou_logo_header.png">
